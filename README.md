@@ -416,6 +416,36 @@ This prevents privilege escalation attacks when the binary is installed with ele
 | `XDG_CONFIG_HOME`       | Override config directory (defaults to: `~/.config`)    |
 | `XDG_DATA_HOME`         | Override data directory (defaults to: `~/.local/share`) |
 
+## FAQ
+
+### How do I generate a GPG key?
+
+```bash
+# Generate a new GPG key and choose sensible defaults, i.e.:
+# - (9) ECC (sign and encrypt)
+# - (1) Curve 25519
+# - Key expiration: 1y
+gpg --full-generate-key
+```
+
+### agent_genkey failed: No pinentry
+
+If you are unable to generate a key due to this error, install `pinentry`:
+
+```bash
+# macOS
+brew install pinentry-mac
+
+# Linux
+sudo apt-get install pinentry
+sudo dnf install pinentry-tty
+sudo yum install pinentry-tty
+sudo pacman -S pinentry-tty
+# etc.
+```
+
+In rare cases you may need to add a `pinentry-program` line to your `~/.gnupg/gpg-agent.conf` and restart the gpg-agent (`killall gpg-agent`):
+
 ## Development
 
 ### Building
@@ -455,7 +485,7 @@ make lint
 - Tampering with vault entries (signature verification)
 - Privilege escalation via SUID binaries
 
-### What dotsecenv Does NOT Protect Against
+### What dotsecenv DOES NOT Protect Against
 
 - Operating system-level access (root/admin can always read memory)
 - Compromised GPG private keys
