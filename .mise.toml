@@ -1,0 +1,2 @@
+[tools]
+"ubi:dotsecenv/dotsecenv" = { version = "latest", exe = "dotsecenv" }

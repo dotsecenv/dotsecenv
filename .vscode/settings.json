@@ -1,0 +1,19 @@
+{
+  "go.lintOnSave": "package",
+  "go.lintTool": "golangci-lint",
+  "go.useLanguageServer": true,
+  "[go]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "go.delveConfig": {
+    "dlvToolPath": "dlv",
+    "apiVersion": 2,
+    "showLog": false
+  },
+  "go.testEnvVars": {},
+  "go.testOnSave": false,
+  "go.testTimeout": "10s"
+}

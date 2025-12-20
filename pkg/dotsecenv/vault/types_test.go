@@ -1,0 +1,129 @@
+package vault
+
+import (
+	"testing"
+)
+
+func TestNewVault(t *testing.T) {
+	v := NewVault()
+	if v.Identities == nil {
+		t.Error("NewVault should initialize Identities")
+	}
+	if v.Secrets == nil {
+		t.Error("NewVault should initialize Secrets")
+	}
+}
+
+func TestVault_GetIdentityByFingerprint(t *testing.T) {
+	v := Vault{
+		Identities: []Identity{
+			{Fingerprint: "fp1", UID: "user1"},
+			{Fingerprint: "fp2", UID: "user2"},
+		},
+	}
+
+	id := v.GetIdentityByFingerprint("fp1")
+	if id == nil || id.UID != "user1" {
+		t.Error("failed to get identity fp1")
+	}
+
+	id = v.GetIdentityByFingerprint("fp3")
+	if id != nil {
+		t.Error("should return nil for non-existent identity")
+	}
+}
+
+func TestVault_GetSecretByKey(t *testing.T) {
+	v := Vault{
+		Secrets: []Secret{
+			{Key: "secret1"},
+			{Key: "secret2"},
+		},
+	}
+
+	s := v.GetSecretByKey("secret1")
+	if s == nil || s.Key != "secret1" {
+		t.Error("failed to get secret1")
+	}
+
+	s = v.GetSecretByKey("secret3")
+	if s != nil {
+		t.Error("should return nil for non-existent secret")
+	}
+}
+
+func TestVault_AccessControl(t *testing.T) {
+	v := Vault{
+		Secrets: []Secret{
+			{
+				Key: "secret1",
+				Values: []SecretValue{
+					{Value: "v1", AvailableTo: []string{"user1"}},
+					{Value: "v2", AvailableTo: []string{"user2"}},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		fingerprint string
+		wantAccess  bool
+	}{
+		{"user1 access", "user1", true},
+		{"user2 access", "user2", true},
+		{"user3 no access", "user3", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := v.CanIdentityAccessSecret(tt.fingerprint, "secret1"); got != tt.wantAccess {
+				t.Errorf("CanIdentityAccessSecret(%s) = %v, want %v", tt.fingerprint, got, tt.wantAccess)
+			}
+		})
+	}
+}
+
+func TestVault_GetAccessibleSecretValue(t *testing.T) {
+	v := Vault{
+		Secrets: []Secret{
+			{
+				Key: "secret1",
+				Values: []SecretValue{
+					{Value: "old", AvailableTo: []string{"user1"}},
+					{Value: "new", AvailableTo: []string{"user2"}},
+				},
+			},
+		},
+	}
+
+	// Test Strict Mode
+	t.Run("Strict Mode", func(t *testing.T) {
+		// User2 should see "new"
+		val := v.GetAccessibleSecretValue("user2", "secret1", true)
+		if val == nil || val.Value != "new" {
+			t.Error("user2 should see 'new' in strict mode")
+		}
+
+		// User1 should see nil because they don't have access to "new" (latest)
+		val = v.GetAccessibleSecretValue("user1", "secret1", true)
+		if val != nil {
+			t.Error("user1 should not see anything in strict mode (only has access to old)")
+		}
+	})
+
+	// Test Non-Strict Mode (Fallback)
+	t.Run("Non-Strict Mode", func(t *testing.T) {
+		// User2 should see "new"
+		val := v.GetAccessibleSecretValue("user2", "secret1", false)
+		if val == nil || val.Value != "new" {
+			t.Error("user2 should see 'new'")
+		}
+
+		// User1 should see "old" (fallback)
+		val = v.GetAccessibleSecretValue("user1", "secret1", false)
+		if val == nil || val.Value != "old" {
+			t.Error("user1 should see 'old'")
+		}
+	})
+}

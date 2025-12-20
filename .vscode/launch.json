@@ -1,0 +1,178 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug: dotsecenv (help)",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [],
+            "showLog": true
+        },
+        {
+            "name": "Debug: init <fingerprint>",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "init",
+                "REPLACE_WITH_FINGERPRINT"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "Debug: login <fingerprint>",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "login",
+                "REPLACE_WITH_FINGERPRINT"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "Debug: secret put <key>",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "console": "integratedTerminal",
+            "args": [
+                "secret",
+                "put",
+                "TEST_SECRET_KEY"
+            ]
+        },
+        {
+            "name": "Debug: secret get <key>",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "secret",
+                "get",
+                "TEST_SECRET_KEY"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "Debug: secret share <key> <fingerprint>",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "secret",
+                "share",
+                "TEST_SECRET_KEY",
+                "REPLACE_WITH_FINGERPRINT"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "Debug: secret revoke <key> <fingerprint>",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "secret",
+                "revoke",
+                "TEST_SECRET_KEY",
+                "REPLACE_WITH_FINGERPRINT"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "Debug: vault list",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "vault",
+                "list"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "Debug: vault identity list",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "vault",
+                "identity",
+                "list"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "Debug: vault identity add <fingerprint>",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "vault",
+                "identity",
+                "add",
+                "REPLACE_WITH_FINGERPRINT"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "Debug: validate",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "validate"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "Debug: version",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "version"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "Debug: completion",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                "completion",
+                "bash"
+            ],
+            "showLog": true
+        }
+    ]
+}

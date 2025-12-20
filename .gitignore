@@ -1,0 +1,15 @@
+# For this repo we DO NOT want to include any test vaults
+.dotsecenv
+
+# Binary
+bin/
+dist/
+docs/
+man/
+completions/
+
+# Docusaurus
+website/node_modules
+website/build
+website/.docusaurus
+website/.cache

@@ -1,0 +1,142 @@
+version: 2
+
+project_name: dotsecenv
+
+before:
+  hooks:
+    - go mod tidy
+    - make build completions man docs
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    binary: dotsecenv
+    main: ./cmd/dotsecenv
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - LICENSE
+      - README.md
+      - man/man1/*
+      - completions/*
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+# Homebrew configuration
+# https://goreleaser.com/customization/homebrew_casks/?h=homebrew_casks
+homebrew_casks:
+  - name: dotsecenv
+    url:
+      verified: "github.com/dotsecenv/dotsecenv/"
+    commit_msg_template: "Cask update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: "https://dotsecenv.com"
+    description: "Safe environment secrets."
+    dependencies:
+      - formula: gnupg
+    caveats: |
+        For bash completions, install bash-completion:
+          brew install bash-completion@2
+    manpages:
+      - man/man1/*.1
+    completions:
+      bash: completions/dotsecenv.bash
+      zsh: completions/dotsecenv.zsh
+      fish: completions/myapp.fish      
+    hooks:
+      post:
+        install: |
+          system "#{bin}/dotsecenv", "--help"
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/dotsecenv"]
+          end
+    repository:
+      owner: dotsecenv
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.GITHUB_ORG_TOKEN }}"
+
+nfpms:
+  - id: '{{ .ProjectName }}'
+    file_name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}'
+    description: Safe environment secrets
+    homepage:  https://github.com/dotsecenv/dotsecenv
+    vendor: DotSecEnv Ltd.
+    maintainer: DotSecEnv <release@dotsecenv.com>
+    license: APACHE-2.0
+    formats:
+      - deb
+      - rpm
+      - archlinux
+    dependencies:
+      - gnupg
+    suggests:
+      - bash-completion
+    rpm:
+      packager: DotSecEnv <release@dotsecenv.com>
+      signature:
+        key_file: "{{ .Env.GPG_KEY_FILE }}"
+    deb:
+      signature:
+        key_file: "{{ .Env.GPG_KEY_FILE }}"
+    archlinux:
+      packager: DotSecEnv <release@dotsecenv.com>
+    bindir: /usr/bin
+    section: default
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/dotsecenv/LICENSE
+      - src: README.md
+        dst: /usr/share/doc/dotsecenv/README.md
+      - src: man/man1/*.1
+        dst: /usr/share/man/man1/
+      - src: completions/dotsecenv.bash
+        dst: /usr/share/bash-completion/completions/dotsecenv
+      - src: completions/dotsecenv.zsh
+        dst: /usr/share/zsh/site-functions/_dotsecenv
+      - src: completions/dotsecenv.fish
+        dst: /usr/share/fish/vendor_completions.d/dotsecenv.fish
+
+# https://goreleaser.com/customization/sign/#usage
+signs:
+  - id: checksum 
+    artifacts: checksum
+    stdin: "{{ .Env.NFPM_PASSPHRASE }}"
+  - id: archlinux
+    artifacts: package
+    stdin: "{{ .Env.NFPM_PASSPHRASE }}"
+    signature: "${artifact}.sig"
+    ids:
+      - '{{ .ProjectName }}'
+    args:
+      - "--detach-sign"
+      - "${artifact}"
+
+# https://goreleaser.com/customization/binary_sign/
+binary_signs:
+  - stdin: "{{ .Env.NFPM_PASSPHRASE }}"  
