@@ -132,9 +132,9 @@ runs:
     # ============================================
     - name: Set up Go
       if: steps.release-tag.outputs.is-release == 'false' && inputs.build-from-source == 'true'
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@v5
       with:
-        go-version: stable
+        go-version-file: 'go.mod'
 
     - name: Build from source
       if: steps.release-tag.outputs.is-release == 'false' && inputs.build-from-source == 'true'

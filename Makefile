@@ -40,28 +40,14 @@ clean:
 .PHONY: init
 init: clean build
 	echo "Reinitializing dotsecenv vault..."
-	rm -f ~/.config/dotsecenv/config ~/.local/share/dotsecenv/vault .dotsecenv/vault
-	mkdir -p ~/.local/share/dotsecenv
+	mkdir -p ~/.local/share/dotsecenv .dotsecenv
 	bin/dotsecenv init config
 	bin/dotsecenv init vault -v .dotsecenv/vault
 	bin/dotsecenv init vault -v ~/.local/share/dotsecenv/vault
 	
 .PHONY: e2e
-e2e: init build
-	bin/dotsecenv login B30CF610985F54F1AE7988716F78400695559935
-	bin/dotsecenv vault identity add B30CF610985F54F1AE7988716F78400695559935 --all
-	bin/dotsecenv login 87E64100EF5A7AB3E416C92A471D12B05F88BA5F
-	bin/dotsecenv vault identity add 87E64100EF5A7AB3E416C92A471D12B05F88BA5F --all
-	echo abc | bin/dotsecenv secret put SEC1 -v 1
-	bin/dotsecenv secret get SEC1
-	bin/dotsecenv secret share SEC1 B30CF610985F54F1AE7988716F78400695559935
-	bin/dotsecenv secret get SEC1
-	bin/dotsecenv login B30CF610985F54F1AE7988716F78400695559935
-	echo abc | bin/dotsecenv secret put SEC2 -v 1
-	bin/dotsecenv secret share SEC2 87E64100EF5A7AB3E416C92A471D12B05F88BA5F
-	bin/dotsecenv secret get SEC2
-	bin/dotsecenv secret get SEC1
-	bin/dotsecenv validate
+e2e: build
+	@./scripts/e2e.sh $(E2E_FLAGS)
 
 .PHONY: validate
 validate: build
