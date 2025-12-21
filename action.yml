@@ -137,7 +137,6 @@ runs:
     - name: Build from source
       if: inputs.build-from-source == 'true'
       shell: bash
-      working-directory: .dotsecenv-build
       run: make build
 
     - name: Install source binary
@@ -147,7 +146,7 @@ runs:
       run: |
         INSTALL_DIR="${{ runner.temp }}/dotsecenv-bin"
         mkdir -p "$INSTALL_DIR"
-        cp .dotsecenv-build/bin/dotsecenv "$INSTALL_DIR/dotsecenv"
+        cp bin/dotsecenv "$INSTALL_DIR/dotsecenv"
         chmod +x "$INSTALL_DIR/dotsecenv"
         "$INSTALL_DIR/dotsecenv" version
         echo "$INSTALL_DIR" >> $GITHUB_PATH
