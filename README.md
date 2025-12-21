@@ -530,6 +530,18 @@ make e2e
 make lint
 ```
 
+### Releasing
+
+Releases are triggered by pushing a signed semver tag. Following GitHub Actions conventions, a major version tag (e.g., `v0`) should also be maintained to allow users to pin to a major version.
+
+The [releasetools-cli](https://github.com/releasetools/cli) simplifies this process:
+
+```bash
+rt git::release --major --sign --force --push v0.1.2
+```
+
+This creates both `v0.1.2` and `v0` tags pointing to the same commit, signs them, and pushes to the remote.
+
 ## Security Considerations
 
 ### What dotsecenv Protects Against
