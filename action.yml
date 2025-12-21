@@ -128,19 +128,11 @@ runs:
     # ============================================
     # Build from source path
     # ============================================
-    - name: Checkout dotsecenv source
-      if: inputs.build-from-source == 'true'
-      uses: actions/checkout@v6
-      with:
-        repository: dotsecenv/dotsecenv
-        ref: ${{ inputs.version != 'latest' && inputs.version || '' }}
-        path: .dotsecenv-build
-
     - name: Set up Go
       if: inputs.build-from-source == 'true'
       uses: actions/setup-go@v5
       with:
-        go-version-file: .dotsecenv-build/go.mod
+        go-version-file: go.mod
 
     - name: Build from source
       if: inputs.build-from-source == 'true'
