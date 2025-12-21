@@ -51,6 +51,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
+      - uses: actions/checkout@v6
       - uses: ./
         with:
           version: ${{ github.ref_name }}
