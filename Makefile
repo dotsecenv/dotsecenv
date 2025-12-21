@@ -32,7 +32,7 @@ test-race:
 
 .PHONY: clean
 clean:
-	@rm -rf bin/ build/ dist/ docs/ man/
+	@rm -rf bin/ build/ dist/ docs/ man/ completions/
 	echo "Reinitializing dotsecenv vault..."
 	rm -f ~/.config/dotsecenv/config ~/.local/share/dotsecenv/vault .dotsecenv/vault
 	go clean -testcache
