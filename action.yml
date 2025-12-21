@@ -123,7 +123,7 @@ runs:
         mkdir -p "$INSTALL_DIR"
         tar -xzf "${{ steps.download.outputs.dir }}/${{ steps.download.outputs.archive }}" -C "$INSTALL_DIR"
         chmod +x "$INSTALL_DIR/dotsecenv"
-        "$INSTALL_DIR/dotsecenv" --version
+        "$INSTALL_DIR/dotsecenv" version
         echo "$INSTALL_DIR" >> $GITHUB_PATH
         echo "binary-path=$INSTALL_DIR/dotsecenv" >> $GITHUB_OUTPUT
 
@@ -150,6 +150,6 @@ runs:
         mkdir -p "$INSTALL_DIR"
         cp bin/dotsecenv "$INSTALL_DIR/dotsecenv"
         chmod +x "$INSTALL_DIR/dotsecenv"
-        "$INSTALL_DIR/dotsecenv" --version
+        "$INSTALL_DIR/dotsecenv" version
         echo "$INSTALL_DIR" >> $GITHUB_PATH
         echo "binary-path=$INSTALL_DIR/dotsecenv" >> $GITHUB_OUTPUT
