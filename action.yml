@@ -134,18 +134,18 @@ runs:
       with:
         repository: dotsecenv/dotsecenv
         ref: ${{ inputs.version != 'latest' && inputs.version || '' }}
-        path: ${{ runner.temp }}/dotsecenv-src
+        path: .dotsecenv-build
 
     - name: Set up Go
       if: inputs.build-from-source == 'true'
       uses: actions/setup-go@v5
       with:
-        go-version-file: ${{ runner.temp }}/dotsecenv-src/go.mod
+        go-version-file: .dotsecenv-build/go.mod
 
     - name: Build from source
       if: inputs.build-from-source == 'true'
       shell: bash
-      working-directory: ${{ runner.temp }}/dotsecenv-src
+      working-directory: .dotsecenv-build
       run: make build
 
     - name: Install source binary
@@ -155,7 +155,7 @@ runs:
       run: |
         INSTALL_DIR="${{ runner.temp }}/dotsecenv-bin"
         mkdir -p "$INSTALL_DIR"
-        cp "${{ runner.temp }}/dotsecenv-src/bin/dotsecenv" "$INSTALL_DIR/dotsecenv"
+        cp .dotsecenv-build/bin/dotsecenv "$INSTALL_DIR/dotsecenv"
         chmod +x "$INSTALL_DIR/dotsecenv"
         "$INSTALL_DIR/dotsecenv" version
         echo "$INSTALL_DIR" >> $GITHUB_PATH
