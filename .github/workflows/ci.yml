@@ -51,10 +51,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
       - uses: ./
         with:
+          version: ${{ github.ref_name }}
           build-from-source: true
       - run: dotsecenv version

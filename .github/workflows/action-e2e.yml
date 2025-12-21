@@ -28,5 +28,6 @@ jobs:
       - uses: actions/checkout@v6
       - uses: ./
         with:
+          version: ${{ github.ref_name }}
           build-from-source: true
       - run: dotsecenv version
