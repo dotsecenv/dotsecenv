@@ -79,6 +79,62 @@ make build
 # Binary will be at bin/dotsecenv
 ```
 
+### GitHub Action
+
+Use the official GitHub Action to install `dotsecenv` in your CI/CD workflows:
+
+```yaml
+- uses: dotsecenv/dotsecenv@v0
+```
+
+The action downloads the appropriate binary for your runner's architecture and verifies its integrity.
+
+#### Inputs
+
+Release binaries achieve [SLSA Build Level 3](#security-features) compliance with verified provenance attestations. Using `build-from-source: true` or `verify-provenance: false` bypasses these security guarantees and is generally NOT recommended.
+
+| Input | Default | Description |
+| ----- | ------- | ----------- |
+| `version` | `latest` | Version to install (e.g., `v1.2.3` or `latest`) |
+| `build-from-source` | `false` | Build from source instead of downloading a release |
+| `verify-provenance` | `true` | Verify GPG signatures, checksums, and attestations |
+
+#### Outputs
+
+| Output | Description |
+| ------ | ----------- |
+| `version` | The version of dotsecenv that was installed |
+| `binary-path` | Full path to the installed binary |
+
+#### Examples
+
+**Basic usage (latest release):**
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dotsecenv/dotsecenv@v0
+      - run: dotsecenv secret get DATABASE_URL
+```
+
+**Pin to a specific version:**
+
+```yaml
+- uses: dotsecenv/dotsecenv@v0
+  with:
+    version: v0.0.1
+```
+
+**Build from source:**
+
+```yaml
+- uses: dotsecenv/dotsecenv@v0
+  with:
+    build-from-source: true
+```
+
 ### Shell Completions
 
 dotsecenv supports shell completions for Bash, Zsh, and Fish.
@@ -370,7 +426,6 @@ Each entry includes a hash and cryptographic signature to prevent against tamper
 
 ## Security Features
 
-- File locking with `unix.Flock` for exclusive access
 - FIPS 140-3 algorithm enforcement (if desired)
 - Multi-recipient PGP encryption
 - Detached signatures for identity and secret verification
@@ -379,7 +434,7 @@ Each entry includes a hash and cryptographic signature to prevent against tamper
 - Full secret encryption/decryption lifecycle
 - Validation logic with optional auto-fix
 - SUID mode restrictions for elevated privilege protection
-- XDG Base Directory compliance
+- [SLSA Build Level 3](https://slsa.dev/spec/v1.2/build-requirements): Release binaries include verifiable provenance attestations generated via GitHub's [attest-build-provenance](https://github.com/actions/attest-build-provenance) action on hardened GitHub-hosted runners
 
 ### SUID Mode Restrictions
 
@@ -474,6 +529,18 @@ make e2e
 # Run linting (installs golangci-lint if needed)
 make lint
 ```
+
+### Releasing
+
+Releases are triggered by pushing a signed semver tag. Following GitHub Actions conventions, a major version tag (e.g., `v0`) should also be maintained to allow users to pin to a major version.
+
+The [releasetools-cli](https://github.com/releasetools/cli) simplifies this process:
+
+```bash
+rt git::release --major --sign --force --push v0.1.2
+```
+
+This creates both `v0.1.2` and `v0` tags pointing to the same commit, signs them, and pushes to the remote.
 
 ## Security Considerations
 

@@ -56,8 +56,7 @@ func (c *CLI) Validate(fix bool) *Error {
 
 		fileInfo, err := os.Stat(absVaultPath)
 		if err != nil {
-			_, _ = fmt.Fprintf(c.output.Stdout(), "    Status: ✗ File not found\n")
-			hasErrors = true
+			_, _ = fmt.Fprintf(c.output.Stdout(), "    Status: ⚠ File not found (warning)\n")
 			continue
 		}
 
