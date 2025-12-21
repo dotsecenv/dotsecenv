@@ -87,7 +87,7 @@ Use the official GitHub Action to install `dotsecenv` in your CI/CD workflows:
 - uses: dotsecenv/dotsecenv@v0
 ```
 
-The action automatically detects the release associated with the current commit and downloads the appropriate binary for your runner's architecture.
+The action downloads the appropriate binary for your runner's architecture and verifies its integrity.
 
 #### Inputs
 
@@ -95,6 +95,7 @@ Release binaries achieve [SLSA Build Level 3](#security-features) compliance wit
 
 | Input | Default | Description |
 | ----- | ------- | ----------- |
+| `version` | `latest` | Version to install (e.g., `v1.2.3` or `latest`) |
 | `build-from-source` | `false` | Build from source instead of downloading a release |
 | `verify-provenance` | `true` | Verify GPG signatures, checksums, and attestations |
 
@@ -107,40 +108,31 @@ Release binaries achieve [SLSA Build Level 3](#security-features) compliance wit
 
 #### Examples
 
-**Basic usage (download release):**
+**Basic usage (latest release):**
 
 ```yaml
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Required for tag detection
-      - uses: dotsecenv/dotsecenv@v1
+      - uses: dotsecenv/dotsecenv@v0
       - run: dotsecenv secret get DATABASE_URL
 ```
 
-**Build from source (for untagged commits):**
+**Pin to a specific version:**
 
 ```yaml
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dotsecenv/dotsecenv@v1
-        with:
-          build-from-source: true
-      - run: dotsecenv version
+- uses: dotsecenv/dotsecenv@v0
+  with:
+    version: v0.0.1
 ```
 
-**Skip provenance verification:**
+**Build from source:**
 
 ```yaml
-- uses: dotsecenv/dotsecenv@v1
+- uses: dotsecenv/dotsecenv@v0
   with:
-    verify-provenance: false
+    build-from-source: true
 ```
 
 ### Shell Completions

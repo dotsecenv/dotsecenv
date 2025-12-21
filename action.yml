@@ -8,6 +8,10 @@ branding:
   color: 'green'
 
 inputs:
+  version:
+    description: 'Version to install (e.g., v1.2.3, or "latest" for most recent release)'
+    required: false
+    default: 'latest'
   build-from-source:
     description: 'Build from source instead of using pre-built release binaries'
     required: false
@@ -20,7 +24,7 @@ inputs:
 outputs:
   version:
     description: 'The version of dotsecenv that was installed'
-    value: ${{ steps.release-tag.outputs.version }}
+    value: ${{ steps.resolve-version.outputs.version }}
   binary-path:
     description: 'Full path to the installed binary'
     value: ${{ steps.install-release.outputs.binary-path || steps.install-source.outputs.binary-path }}
@@ -29,35 +33,29 @@ runs:
   using: 'composite'
   steps:
     # ============================================
-    # Detect release tag
+    # Resolve version
     # ============================================
-    - name: Detect semver tags
-      id: release-tag
+    - name: Resolve version
+      id: resolve-version
+      if: inputs.build-from-source != 'true'
       shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
-        TAGS=$(git tag --points-at HEAD 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V || true)
-
-        if [[ -z "$TAGS" ]]; then
-          echo "is-release=false" >> $GITHUB_OUTPUT
-          echo "version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)" >> $GITHUB_OUTPUT
+        if [[ "${{ inputs.version }}" == "latest" ]]; then
+          VERSION=$(gh release view --repo dotsecenv/dotsecenv --json tagName -q .tagName)
+          echo "Resolved latest version: $VERSION"
         else
-          echo "is-release=true" >> $GITHUB_OUTPUT
-          echo "version=$(echo "$TAGS" | tail -1)" >> $GITHUB_OUTPUT
+          VERSION="${{ inputs.version }}"
         fi
-
-    - name: Fail if no tags and build-from-source is false
-      if: steps.release-tag.outputs.is-release == 'false' && inputs.build-from-source != 'true'
-      shell: bash
-      run: |
-        echo "::error::Release tag not found on the current commit. Either tag this commit (e.g., v1.0.0) or set build-from-source: true"
-        exit 1
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
 
     # ===========================================================
-    # When downloading releases, determine OS and architecture
+    # Download release
     # ===========================================================
     - name: Determine architecture
       id: arch
-      if: steps.release-tag.outputs.is-release == 'true'
+      if: inputs.build-from-source != 'true'
       shell: bash
       run: |
         case "${{ runner.os }}" in
@@ -73,12 +71,12 @@ runs:
 
     - name: Download release
       id: download
-      if: steps.release-tag.outputs.is-release == 'true'
+      if: inputs.build-from-source != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        VERSION="${{ steps.release-tag.outputs.version }}"
+        VERSION="${{ steps.resolve-version.outputs.version }}"
         ARCHIVE="dotsecenv_${VERSION#v}_${{ steps.arch.outputs.os }}_${{ steps.arch.outputs.arch }}.tar.gz"
         DEST="${{ runner.temp }}/dotsecenv-download"
         mkdir -p "$DEST"
@@ -89,25 +87,25 @@ runs:
         echo "archive=$ARCHIVE" >> $GITHUB_OUTPUT
 
     - name: Import GPG key
-      if: steps.release-tag.outputs.is-release == 'true' && inputs.verify-provenance == 'true'
+      if: inputs.build-from-source != 'true' && inputs.verify-provenance == 'true'
       shell: bash
       run: |
         curl -fsSL http://get.dotsecenv.com/key.asc | gpg --import
 
     - name: Verify GPG signature
-      if: steps.release-tag.outputs.is-release == 'true' && inputs.verify-provenance == 'true'
+      if: inputs.build-from-source != 'true' && inputs.verify-provenance == 'true'
       shell: bash
       working-directory: ${{ steps.download.outputs.dir }}
       run: gpg --verify checksums.txt.sig checksums.txt
 
     - name: Verify checksum
-      if: steps.release-tag.outputs.is-release == 'true' && inputs.verify-provenance == 'true'
+      if: inputs.build-from-source != 'true' && inputs.verify-provenance == 'true'
       shell: bash
       working-directory: ${{ steps.download.outputs.dir }}
       run: grep "${{ steps.download.outputs.archive }}" checksums.txt | sha256sum -c -
 
     - name: Verify attestation
-      if: steps.release-tag.outputs.is-release == 'true' && inputs.verify-provenance == 'true'
+      if: inputs.build-from-source != 'true' && inputs.verify-provenance == 'true'
       shell: bash
       working-directory: ${{ steps.download.outputs.dir }}
       env:
@@ -116,7 +114,7 @@ runs:
 
     - name: Install release binary
       id: install-release
-      if: steps.release-tag.outputs.is-release == 'true'
+      if: inputs.build-from-source != 'true'
       shell: bash
       run: |
         INSTALL_DIR="${{ runner.temp }}/dotsecenv-bin"
@@ -128,27 +126,36 @@ runs:
         echo "binary-path=$INSTALL_DIR/dotsecenv" >> $GITHUB_OUTPUT
 
     # ============================================
-    # Build from source path (when no tags)
+    # Build from source path
     # ============================================
+    - name: Checkout dotsecenv source
+      if: inputs.build-from-source == 'true'
+      uses: actions/checkout@v6
+      with:
+        repository: dotsecenv/dotsecenv
+        ref: ${{ inputs.version != 'latest' && inputs.version || '' }}
+        path: ${{ runner.temp }}/dotsecenv-src
+
     - name: Set up Go
-      if: steps.release-tag.outputs.is-release == 'false' && inputs.build-from-source == 'true'
+      if: inputs.build-from-source == 'true'
       uses: actions/setup-go@v5
       with:
-        go-version-file: 'go.mod'
+        go-version-file: ${{ runner.temp }}/dotsecenv-src/go.mod
 
     - name: Build from source
-      if: steps.release-tag.outputs.is-release == 'false' && inputs.build-from-source == 'true'
+      if: inputs.build-from-source == 'true'
       shell: bash
+      working-directory: ${{ runner.temp }}/dotsecenv-src
       run: make build
 
     - name: Install source binary
       id: install-source
-      if: steps.release-tag.outputs.is-release == 'false' && inputs.build-from-source == 'true'
+      if: inputs.build-from-source == 'true'
       shell: bash
       run: |
         INSTALL_DIR="${{ runner.temp }}/dotsecenv-bin"
         mkdir -p "$INSTALL_DIR"
-        cp bin/dotsecenv "$INSTALL_DIR/dotsecenv"
+        cp "${{ runner.temp }}/dotsecenv-src/bin/dotsecenv" "$INSTALL_DIR/dotsecenv"
         chmod +x "$INSTALL_DIR/dotsecenv"
         "$INSTALL_DIR/dotsecenv" version
         echo "$INSTALL_DIR" >> $GITHUB_PATH
