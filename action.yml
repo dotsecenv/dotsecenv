@@ -101,7 +101,7 @@ runs:
       if: inputs.build-from-source != 'true' && inputs.verify-provenance == 'true'
       shell: bash
       working-directory: ${{ steps.download.outputs.dir }}
-      run: grep "${{ steps.download.outputs.archive }}" checksums.txt | sha256sum -c -
+      run: grep "${{ steps.download.outputs.archive }}$" checksums.txt | sha256sum -c -
 
     - name: Verify attestation
       if: inputs.build-from-source != 'true' && inputs.verify-provenance == 'true'
