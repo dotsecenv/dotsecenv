@@ -122,8 +122,7 @@ nfpms:
         dst: /usr/share/fish/vendor_completions.d/dotsecenv.fish
 
 sboms:
-  - artifacts: any
-    disable: false
+  - disable: false
 
 # https://goreleaser.com/customization/sign/#usage
 signs:
