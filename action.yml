@@ -37,7 +37,6 @@ runs:
     # ============================================
     - name: Resolve version
       id: resolve-version
-      if: inputs.build-from-source != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -128,20 +127,37 @@ runs:
     # ============================================
     # Build from source path
     # ============================================
+    - name: Checkout the source code
+      id: checkout
+      if: inputs.build-from-source == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        VERSION="${{ steps.resolve-version.outputs.version }}"
+        DEST="${{ runner.temp }}/dotsecenv-download"
+        git clone --depth 1 https://github.com/dotsecenv/dotsecenv.git "$DEST"
+        cd "$DEST"
+        git checkout "$VERSION"
+        echo "dir=$DEST" >> $GITHUB_OUTPUT
+
     - name: Set up Go
       if: inputs.build-from-source == 'true'
       uses: actions/setup-go@v5
       with:
-        go-version-file: go.mod
+        go-version-file: "${{ steps.checkout.outputs.dir }}/go.mod"
 
     - name: Build from source
       if: inputs.build-from-source == 'true'
+      working-directory: ${{ steps.checkout.outputs.dir }}
       shell: bash
-      run: make build
+      run: |
+        make build
 
     - name: Install source binary
       id: install-source
       if: inputs.build-from-source == 'true'
+      working-directory: ${{ steps.checkout.outputs.dir }}
       shell: bash
       run: |
         INSTALL_DIR="${{ runner.temp }}/dotsecenv-bin"
