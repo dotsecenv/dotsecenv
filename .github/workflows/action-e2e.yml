@@ -1,0 +1,33 @@
+name: GitHub Action E2E
+
+on:
+  repository_dispatch:
+    types: [trigger-action-e2e]
+  workflow_dispatch:
+
+jobs:
+  test-released-action:
+    name: Test Released Action (${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: dotsecenv/dotsecenv@v0
+        with:
+          version: ${{ github.event.client_payload.version || 'latest' }}
+      - run: dotsecenv version
+  test-build-action:
+    name: Test Build-From-Source Action (${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: dotsecenv/dotsecenv@v0
+        with:
+          version: ${{ github.event.client_payload.version || 'latest' }}
+          build-from-source: true
+      - run: dotsecenv version

@@ -82,8 +82,7 @@ homebrew_casks:
       token: "{{ .Env.GITHUB_ORG_TOKEN }}"
 
 nfpms:
-  - id: '{{ .ProjectName }}'
-    file_name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}'
+  - file_name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}'
     description: Safe environment secrets
     homepage:  https://github.com/dotsecenv/dotsecenv
     vendor: DotSecEnv Ltd.
@@ -122,17 +121,29 @@ nfpms:
       - src: completions/dotsecenv.fish
         dst: /usr/share/fish/vendor_completions.d/dotsecenv.fish
 
+sboms:
+  - disable: false
+
 # https://goreleaser.com/customization/sign/#usage
 signs:
   - id: checksum 
     artifacts: checksum
     stdin: "{{ .Env.NFPM_PASSPHRASE }}"
-  - id: archlinux
+  - id: package
     artifacts: package
     stdin: "{{ .Env.NFPM_PASSPHRASE }}"
-    signature: "${artifact}.sig"
-    ids:
-      - '{{ .ProjectName }}'
+    args:
+      - "--detach-sign"
+      - "${artifact}"
+  - id: archive
+    artifacts: archive
+    stdin: "{{ .Env.NFPM_PASSPHRASE }}"
+    args:
+      - "--detach-sign"
+      - "${artifact}"
+  - id: sbom
+    artifacts: sbom
+    stdin: "{{ .Env.NFPM_PASSPHRASE }}"
     args:
       - "--detach-sign"
       - "${artifact}"

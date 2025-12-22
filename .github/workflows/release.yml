@@ -58,6 +58,9 @@ jobs:
             homebrew-tap
             packages
 
+      - name: Install Syft
+        uses: anchore/sbom-action@v0
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -91,10 +94,18 @@ jobs:
           repositories: |
             packages
 
-      - name: Repository Dispatch
+      - name: Trigger packages update
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: dotsecenv/packages
           event-type: update-packages
+          client-payload: '{"version": "${{ github.ref_name }}"}'
+
+      - name: Trigger action E2E tests
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ github.token }}
+          repository: dotsecenv/dotsecenv
+          event-type: trigger-action-e2e
           client-payload: '{"version": "${{ github.ref_name }}"}'
