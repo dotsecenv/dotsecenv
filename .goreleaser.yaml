@@ -127,8 +127,17 @@ signs:
   - id: checksum 
     artifacts: checksum
     stdin: "{{ .Env.NFPM_PASSPHRASE }}"
-  - id: archlinux
+  - id: package
     artifacts: package
+    stdin: "{{ .Env.NFPM_PASSPHRASE }}"
+    signature: "${artifact}.sig"
+    ids:
+      - '{{ .ProjectName }}'
+    args:
+      - "--detach-sign"
+      - "${artifact}"
+  - id: archive
+    artifacts: archive
     stdin: "{{ .Env.NFPM_PASSPHRASE }}"
     signature: "${artifact}.sig"
     ids:
