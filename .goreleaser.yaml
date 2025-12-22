@@ -63,11 +63,29 @@ homebrew_casks:
         For bash completions, install bash-completion:
           brew install bash-completion@2
     manpages:
-      - man/man1/*.1
+      - man/man1/dotsecenv.1
+      - man/man1/dotsecenv-completion.1
+      - man/man1/dotsecenv-init.1
+      - man/man1/dotsecenv-init-config.1
+      - man/man1/dotsecenv-init-vault.1
+      - man/man1/dotsecenv-login.1
+      - man/man1/dotsecenv-secret.1
+      - man/man1/dotsecenv-secret-get.1
+      - man/man1/dotsecenv-secret-put.1
+      - man/man1/dotsecenv-secret-revoke.1
+      - man/man1/dotsecenv-secret-share.1
+      - man/man1/dotsecenv-validate.1
+      - man/man1/dotsecenv-vault.1
+      - man/man1/dotsecenv-vault-defrag.1
+      - man/man1/dotsecenv-vault-identity.1
+      - man/man1/dotsecenv-vault-identity-add.1
+      - man/man1/dotsecenv-vault-identity-list.1
+      - man/man1/dotsecenv-vault-list.1
+      - man/man1/dotsecenv-version.1
     completions:
       bash: completions/dotsecenv.bash
       zsh: completions/dotsecenv.zsh
-      fish: completions/myapp.fish      
+      fish: completions/dotsecenv.fish
     hooks:
       post:
         install: |
