@@ -58,6 +58,9 @@ jobs:
             homebrew-tap
             packages
 
+      - name: Install Syft
+        uses: anchore/sbom-action@v0
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
