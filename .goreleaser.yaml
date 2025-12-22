@@ -89,6 +89,7 @@ homebrew_casks:
     hooks:
       post:
         install: |
+          system "#{staged_path}/dotsecenv"
           if OS.mac?
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/dotsecenv"]
           end

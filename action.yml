@@ -145,6 +145,7 @@ runs:
       if: inputs.build-from-source == 'true'
       uses: actions/setup-go@v5
       with:
+        cache-dependency-path: "${{ steps.checkout.outputs.dir }}/go.sum"
         go-version-file: "${{ steps.checkout.outputs.dir }}/go.mod"
 
     - name: Build from source
