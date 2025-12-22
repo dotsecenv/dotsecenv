@@ -16,6 +16,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+          cache-dependency-path: 'go.sum'
       - run: make clean lint build test
 
   e2e:
@@ -29,6 +30,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+          cache-dependency-path: 'go.sum'
       - run: make e2e validate
 
   docs:
@@ -42,6 +44,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+          cache-dependency-path: 'go.sum'
       - run: make build man docs completions
 
   action:
