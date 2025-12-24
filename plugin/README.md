@@ -123,15 +123,16 @@ If both `.env` and `.secenv` define the same variable, `.secenv` takes precedenc
 
 ## Aliases
 
-| Alias | Command | Description |
-|-------|---------|-------------|
-| `dse` | `dotsecenv` | Shorthand for dotsecenv CLI |
-| `secret NAME` | `dotsecenv secret get NAME` | Retrieve a secret |
-| `secretcp NAME` | `dotsecenv secret get NAME \| clipboard` | Copy secret to clipboard |
+| Alias           | Command                                  | Description                 |
+| --------------- | ---------------------------------------- | --------------------------- |
+| `dse`           | `dotsecenv`                              | Shorthand for dotsecenv CLI |
+| `secret NAME`   | `dotsecenv secret get NAME`              | Retrieve a secret           |
+| `secretcp NAME` | `dotsecenv secret get NAME \| clipboard` | Copy secret to clipboard    |
 
 ### Clipboard Support
 
-The `secretcp` command supports:
+The `secretcp` alias supports:
+
 - **macOS**: `pbcopy`
 - **Linux (X11)**: `xclip` or `xsel`
 - **Linux (Wayland)**: `wl-copy`
@@ -140,16 +141,16 @@ The `secretcp` command supports:
 
 When you first enter a directory containing a `.secenv` file, you'll be prompted:
 
-```
+```shell
 dotsecenv: found .secenv in /path/to/project
 Load secrets? [y]es / [n]o / [a]lways:
 ```
 
-| Response | Behavior |
-|----------|----------|
-| `y` / `yes` | Load secrets for this shell session only |
-| `n` / `no` | Skip loading, don't ask again this session |
-| `a` / `always` | Trust this directory permanently |
+| Response       | Behavior                                   |
+| -------------- | ------------------------------------------ |
+| `y` / `yes`    | Load secrets for this shell session only   |
+| `n` / `no`     | Skip loading, don't ask again this session |
+| `a` / `always` | Trust this directory permanently           |
 
 Permanently trusted directories are stored in `~/.config/dotsecenv/trusted_dirs`.
 
@@ -162,15 +163,15 @@ The plugins perform security checks before loading files:
 
 If a file fails these checks, it will be refused with a warning:
 
-```
+```shell
 dotsecenv: refusing to load /path/.secenv - world-writable
 ```
 
 ## Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DOTSECENV_CONFIG_DIR` | `~/.config/dotsecenv` | Configuration directory |
+| Variable                      | Default                              | Description              |
+| ----------------------------- | ------------------------------------ | ------------------------ |
+| `DOTSECENV_CONFIG_DIR`        | `~/.config/dotsecenv`                | Configuration directory  |
 | `DOTSECENV_TRUSTED_DIRS_FILE` | `$DOTSECENV_CONFIG_DIR/trusted_dirs` | Trusted directories list |
 
 ## Requirements
@@ -180,7 +181,7 @@ dotsecenv: refusing to load /path/.secenv - world-writable
 
 ## Uninstalling
 
-```bash
+```shell
 curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash -s -- --uninstall
 ```
 

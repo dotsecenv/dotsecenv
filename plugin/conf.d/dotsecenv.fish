@@ -353,24 +353,26 @@ function _dotsecenv_clipboard_copy
         return $status
     end
 
-    # Linux/BSD - try available clipboard utilities with stderr suppressed
-    if command -sq xclip
-        xclip -selection clipboard 2>/dev/null
+    # Wayland - check for display and wl-copy
+    if test -n "$WAYLAND_DISPLAY"; and command -sq wl-copy
+        wl-copy
         return $status
     end
 
-    if command -sq xsel
-        xsel --clipboard --input 2>/dev/null
-        return $status
+    # X11 - check for display before trying X11 clipboard tools
+    if test -n "$DISPLAY"
+        if command -sq xclip
+            xclip -selection clipboard
+            return $status
+        end
+
+        if command -sq xsel
+            xsel --clipboard --input
+            return $status
+        end
     end
 
-    if command -sq wl-copy
-        # Wayland support
-        wl-copy 2>/dev/null
-        return $status
-    end
-
-    echo "dotsecenv: no clipboard utility found (install xclip, xsel, or wl-copy)" >&2
+    echo "dotsecenv: no clipboard available (no display or clipboard utility found)" >&2
     return 1
 end
 
@@ -388,8 +390,11 @@ end
 function secretcp
     set -l output
     if set output (dotsecenv secret get $argv)
-        echo -n "$output" | _dotsecenv_clipboard_copy
-        echo "dotsecenv: secret copied to clipboard" >&2
+        if echo -n "$output" | _dotsecenv_clipboard_copy
+            echo "dotsecenv: secret copied to clipboard" >&2
+        else
+            return 1
+        end
     else
         return 1
     end

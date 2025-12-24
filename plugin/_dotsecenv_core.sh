@@ -372,29 +372,32 @@ _dotsecenv_on_cd() {
 
 # Clipboard helper - copies stdin to clipboard
 _dotsecenv_clipboard_copy() {
+    # macOS - use pbcopy
     if [[ "$OSTYPE" == darwin* ]]; then
         pbcopy
         return $?
     fi
 
-    # Linux/BSD - try available clipboard utilities with stderr suppressed
-    if command -v xclip &>/dev/null; then
-        xclip -selection clipboard 2>/dev/null
+    # Wayland - check for display and wl-copy
+    if [[ -n "$WAYLAND_DISPLAY" ]] && command -v wl-copy &>/dev/null; then
+        wl-copy
         return $?
     fi
 
-    if command -v xsel &>/dev/null; then
-        xsel --clipboard --input 2>/dev/null
-        return $?
+    # X11 - check for display before trying X11 clipboard tools
+    if [[ -n "$DISPLAY" ]]; then
+        if command -v xclip &>/dev/null; then
+            xclip -selection clipboard
+            return $?
+        fi
+
+        if command -v xsel &>/dev/null; then
+            xsel --clipboard --input
+            return $?
+        fi
     fi
 
-    if command -v wl-copy &>/dev/null; then
-        # Wayland support
-        wl-copy 2>/dev/null
-        return $?
-    fi
-
-    echo "dotsecenv: no clipboard utility found (install xclip, xsel, or wl-copy)" >&2
+    echo "dotsecenv: no clipboard available (no display or clipboard utility found)" >&2
     return 1
 }
 
@@ -411,8 +414,11 @@ secret() {
 secretcp() {
     local output
     if output=$(dotsecenv secret get "$@"); then
-        echo -n "$output" | _dotsecenv_clipboard_copy
-        echo "dotsecenv: secret copied to clipboard" >&2
+        if echo -n "$output" | _dotsecenv_clipboard_copy; then
+            echo "dotsecenv: secret copied to clipboard" >&2
+        else
+            return 1
+        fi
     else
         return 1
     fi
