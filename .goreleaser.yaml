@@ -62,6 +62,9 @@ homebrew_casks:
     caveats: |
         For bash completions, install bash-completion:
           brew install bash-completion@2
+
+        To enable a shell plugin (automatic .env/.secenv loading), see:
+          https://github.com/dotsecenv/plugin
     manpages:
       - man/man1/dotsecenv.1
       - man/man1/dotsecenv-completion.1

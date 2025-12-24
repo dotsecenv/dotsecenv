@@ -139,6 +139,17 @@ jobs:
 
 dotsecenv supports shell completions for Bash, Zsh, and Fish.
 
+### Shell Plugins
+
+Shell plugins that automatically load `.env` and `.secenv` files when entering directories
+are available for `zsh`, `bash`, and `fish`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
+```
+
+For plugin manager installation and additional details, see [github.com/dotsecenv/plugin#installation](https://github.com/dotsecenv/plugin#installation).
+
 #### Bash
 
 Requires the `bash-completion` package:
@@ -499,7 +510,34 @@ sudo pacman -S pinentry-tty
 # etc.
 ```
 
-In rare cases you may need to add a `pinentry-program` line to your `~/.gnupg/gpg-agent.conf` and restart the gpg-agent (`killall gpg-agent`):
+In rare cases you may need to add a `pinentry-program` line to your `~/.gnupg/gpg-agent.conf` and restart the gpg-agent (`killall gpg-agent`).
+
+### gpg: signing failed: Inappropriate ioctl for device
+
+This error occurs when GPG cannot find the terminal for pinentry input. Add the following to your shell profile (`~/.bashrc`, `~/.zshrc`):
+
+```bash
+export GPG_TTY=$(tty)
+```
+
+Or for fish shell, add the following to `~/.config/fish/config.fish`:
+
+```fish
+set -gx GPG_TTY (tty)
+```
+
+Then restart your shell or run the command directly.
+
+### gpg: decryption failed
+
+If you encounter this error, first try to define GPG_TTY (see above) before searching
+for other possible solutions.
+
+```shell
+$ dotsecenv secret get bla
+failed to decrypt secret: failed to decrypt with gpg-agent: exit status 2
+GPG error: gpg: decryption failed: No secret key
+```
 
 ## Development
 
@@ -577,6 +615,7 @@ Apache 2.0 License. See LICENSE file for details.
 
 ## Acknowledgments
 
+- [SOPS](https://github.com/getsops/sops) for the idea of storing encrypted secrets alongside source code
 - [ProtonMail gopenpgp](https://github.com/protonmail/gopenpgp) for PGP cryptography
 - [Cobra](https://github.com/spf13/cobra) for CLI framework
-- [Go standard library](https://golang.org/) for core functionality
+- [Go standard library](https://golang.org/) for easy multi-platform functionality
