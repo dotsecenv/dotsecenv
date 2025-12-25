@@ -13,6 +13,11 @@ import (
 
 // SecretShare shares a secret with another identity
 func (c *CLI) SecretShare(secretKey, targetFingerprint string, vaultIndex int) *Error {
+	// Validate secret key format
+	if _, err := vault.NormalizeSecretKey(secretKey); err != nil {
+		return NewError(vault.FormatSecretKeyError(err), ExitValidationError)
+	}
+
 	// If vaultIndex < 0, find the vault that has the secret
 	if vaultIndex < 0 {
 		vaultIndex = c.vaultResolver.FindSecretVaultIndex(secretKey)
@@ -26,6 +31,11 @@ func (c *CLI) SecretShare(secretKey, targetFingerprint string, vaultIndex int) *
 
 // SecretShareAll shares a secret with a fingerprint across all vaults where the secret exists.
 func (c *CLI) SecretShareAll(secretKey, targetFingerprint string) *Error {
+	// Validate secret key format
+	if _, err := vault.NormalizeSecretKey(secretKey); err != nil {
+		return NewError(vault.FormatSecretKeyError(err), ExitValidationError)
+	}
+
 	vaultCount := c.vaultResolver.VaultCount()
 	if vaultCount == 0 {
 		return NewError("no vaults configured", ExitVaultError)

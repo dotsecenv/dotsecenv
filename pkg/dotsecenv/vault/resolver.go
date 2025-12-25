@@ -142,6 +142,9 @@ func (vr *VaultResolver) GetSecret(index int, key string) (*SecretValue, error) 
 	vr.mu.RLock()
 	defer vr.mu.RUnlock()
 
+	// Normalize key for lookup (graceful fallback for legacy keys)
+	key = NormalizeKeyForLookup(key)
+
 	if index < 0 || index >= len(vr.vaults) {
 		return nil, fmt.Errorf("vault index %d out of range", index)
 	}
@@ -168,6 +171,9 @@ func (vr *VaultResolver) GetSecretFromAnyVault(key string, stderr io.Writer) (*S
 	vr.mu.RLock()
 	defer vr.mu.RUnlock()
 
+	// Normalize key for lookup (graceful fallback for legacy keys)
+	key = NormalizeKeyForLookup(key)
+
 	for _, manager := range vr.vaults {
 		if manager == nil {
 			continue
@@ -187,6 +193,9 @@ func (vr *VaultResolver) GetSecretFromAnyVault(key string, stderr io.Writer) (*S
 func (vr *VaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint string, strict bool) (*SecretValue, error) {
 	vr.mu.RLock()
 	defer vr.mu.RUnlock()
+
+	// Normalize key for lookup (graceful fallback for legacy keys)
+	key = NormalizeKeyForLookup(key)
 
 	for _, manager := range vr.vaults {
 		if manager == nil {
@@ -323,6 +332,9 @@ func (vr *VaultResolver) GetSecretByKeyFromVault(index int, key string) *Secret 
 	vr.mu.RLock()
 	defer vr.mu.RUnlock()
 
+	// Normalize key for lookup (graceful fallback for legacy keys)
+	key = NormalizeKeyForLookup(key)
+
 	if index < 0 || index >= len(vr.vaults) {
 		return nil
 	}
@@ -404,6 +416,9 @@ func (vr *VaultResolver) SaveVault(index int) error {
 func (vr *VaultResolver) FindSecretVaultIndex(key string) int {
 	vr.mu.RLock()
 	defer vr.mu.RUnlock()
+
+	// Normalize key for lookup (graceful fallback for legacy keys)
+	key = NormalizeKeyForLookup(key)
 
 	for i, manager := range vr.vaults {
 		if manager != nil && manager.GetSecretByKey(key) != nil {

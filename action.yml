@@ -136,9 +136,7 @@ runs:
       run: |
         VERSION="${{ steps.resolve-version.outputs.version }}"
         DEST="${{ runner.temp }}/dotsecenv-download"
-        git clone --depth 1 https://github.com/dotsecenv/dotsecenv.git "$DEST"
-        cd "$DEST"
-        git checkout "$VERSION"
+        git clone --depth 1 --branch "$VERSION" https://github.com/dotsecenv/dotsecenv.git "$DEST"
         echo "dir=$DEST" >> $GITHUB_OUTPUT
 
     - name: Set up Go
