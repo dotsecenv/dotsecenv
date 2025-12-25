@@ -6,6 +6,8 @@ help:
 	@echo "  make test-fish       - Run fish unit tests"
 	@echo "  make test-managers   - Run plugin manager integration tests (Docker)"
 	@echo "  make test-all        - Run all tests including integration"
+	@echo "  make fmt             - Format all shell scripts"
+	@echo "  make fmt-check       - Check formatting without modifying files"
 	@echo "  make lint            - Lint shell plugin scripts"
 
 .PHONY: test
@@ -68,3 +70,55 @@ lint:
 	else \
 		echo "fish not found, skipping fish syntax check"; \
 	fi
+
+# Shell script files to format
+SHELL_FILES := ./_dotsecenv_core.sh ./dotsecenv.plugin.bash ./dotsecenv.plugin.zsh \
+               ./tests/test_plugins.sh ./tests/test_plugin_managers.sh ./install.sh
+FISH_FILES := ./conf.d/dotsecenv.fish ./tests/test_plugins.fish
+
+.PHONY: fmt-install
+fmt-install:
+	@echo "Installing formatters..."
+	@if ! command -v shfmt >/dev/null 2>&1; then \
+		echo "Installing shfmt..."; \
+		if command -v brew >/dev/null 2>&1; then \
+			brew install shfmt; \
+		elif command -v go >/dev/null 2>&1; then \
+			go install mvdan.cc/sh/v3/cmd/shfmt@latest; \
+		else \
+			curl -sS https://webi.sh/shfmt | sh; \
+		fi; \
+	else \
+		echo "shfmt already installed"; \
+	fi
+	@if ! command -v fish >/dev/null 2>&1; then \
+		echo "Installing fish (for fish_indent)..."; \
+		if command -v brew >/dev/null 2>&1; then \
+			brew install fish; \
+		elif command -v apt-get >/dev/null 2>&1; then \
+			sudo apt-get update && sudo apt-get install -y fish; \
+		else \
+			echo "Please install fish manually: https://fishshell.com"; \
+			exit 1; \
+		fi; \
+	else \
+		echo "fish already installed"; \
+	fi
+
+.PHONY: fmt
+fmt: fmt-install
+	@echo "Formatting shell scripts..."
+	shfmt -w -i 4 $(SHELL_FILES)
+	@echo "Formatting fish scripts..."
+	fish_indent -w $(FISH_FILES)
+	@echo "Done!"
+
+.PHONY: fmt-check
+fmt-check:
+	@echo "Checking shell script formatting..."
+	@shfmt -d -i 4 $(SHELL_FILES)
+	@echo "Checking fish script formatting..."
+	@for f in $(FISH_FILES); do \
+		fish_indent "$$f" | diff -q "$$f" - > /dev/null 2>&1 || { echo "$$f is not formatted correctly"; exit 1; }; \
+	done
+	@echo "All files formatted correctly!"

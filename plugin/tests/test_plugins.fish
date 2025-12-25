@@ -28,7 +28,7 @@ set -g VERBOSE 0
 # Parse arguments
 for arg in $argv
     switch $arg
-        case '--verbose'
+        case --verbose
             set VERBOSE 1
     end
 end
@@ -88,7 +88,7 @@ if [[ "$1" == "secret" && "$2" == "get" ]]; then
     esac
 else
     exit 1
-fi' > "$mock_dir/dotsecenv"
+fi' >"$mock_dir/dotsecenv"
     chmod +x "$mock_dir/dotsecenv"
     echo $mock_dir
 end
@@ -106,7 +106,7 @@ function test_parse_plain_env
 
     echo 'DATABASE_HOST=localhost
 DATABASE_PORT=5432
-APP_NAME="My Application"' > "$test_dir/.env"
+APP_NAME="My Application"' >"$test_dir/.env"
     chmod 644 "$test_dir/.env"
 
     set mock_path (create_mock_dotsecenv)
@@ -136,7 +136,7 @@ function test_parse_secret_same_name
     set test_dir "$TEMP_DIR/test_secret_same"
     mkdir -p "$test_dir"
 
-    echo 'DB_PASSWORD={dotsecenv}' > "$test_dir/.env"
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/.env"
     chmod 644 "$test_dir/.env"
 
     set mock_path (create_mock_dotsecenv)
@@ -151,7 +151,7 @@ function test_parse_secret_same_name
         echo \$DB_PASSWORD
     " 2>&1)
 
-    if test "$result" = "super-secret-password"
+    if test "$result" = super-secret-password
         pass "[fish] {dotsecenv} secret resolution works correctly"
     else
         fail "[fish] {dotsecenv} secret resolution failed, got: $result"
@@ -159,13 +159,13 @@ function test_parse_secret_same_name
 end
 
 function test_parse_secret_named
-    log "[fish] Testing {dotsecenv:name} secret (named)..."
+    log "[fish] Testing {dotsecenv/name} secret (named)..."
     set TESTS_RUN (math $TESTS_RUN + 1)
 
     set test_dir "$TEMP_DIR/test_secret_named"
     mkdir -p "$test_dir"
 
-    echo 'MY_API_KEY={dotsecenv:API_KEY}' > "$test_dir/.env"
+    echo 'MY_API_KEY={dotsecenv/API_KEY}' >"$test_dir/.env"
     chmod 644 "$test_dir/.env"
 
     set mock_path (create_mock_dotsecenv)
@@ -180,10 +180,10 @@ function test_parse_secret_named
         echo \$MY_API_KEY
     " 2>&1)
 
-    if test "$result" = "mock-api-key-12345"
-        pass "[fish] {dotsecenv:name} secret resolution works correctly"
+    if test "$result" = mock-api-key-12345
+        pass "[fish] {dotsecenv/name} secret resolution works correctly"
     else
-        fail "[fish] {dotsecenv:name} secret resolution failed, got: $result"
+        fail "[fish] {dotsecenv/name} secret resolution failed, got: $result"
     end
 end
 
@@ -194,7 +194,7 @@ function test_missing_secret_warning
     set test_dir "$TEMP_DIR/test_missing_secret"
     mkdir -p "$test_dir"
 
-    echo 'MISSING_SECRET={dotsecenv}' > "$test_dir/.env"
+    echo 'MISSING_SECRET={dotsecenv}' >"$test_dir/.env"
     chmod 644 "$test_dir/.env"
 
     set mock_path (create_mock_dotsecenv)
@@ -223,8 +223,8 @@ function test_security_check_world_writable
     set test_dir "$TEMP_DIR/test_security"
     mkdir -p "$test_dir"
 
-    echo 'UNSAFE_VAR=should-not-load' > "$test_dir/.env"
-    chmod 666 "$test_dir/.env"  # World-writable
+    echo 'UNSAFE_VAR=should-not-load' >"$test_dir/.env"
+    chmod 666 "$test_dir/.env" # World-writable
 
     set mock_path (create_mock_dotsecenv)
 
@@ -253,7 +253,7 @@ function test_two_phase_loading
     mkdir -p "$test_dir"
 
     echo 'PLAIN_VAR=plain-value
-SECRET_VAR={dotsecenv:API_KEY}' > "$test_dir/.env"
+SECRET_VAR={dotsecenv/API_KEY}' >"$test_dir/.env"
     chmod 644 "$test_dir/.env"
 
     set mock_path (create_mock_dotsecenv)
@@ -306,7 +306,7 @@ function test_alias_secret
         secret API_KEY
     " 2>&1)
 
-    if test "$result" = "mock-api-key-12345"
+    if test "$result" = mock-api-key-12345
         pass "[fish] 'secret' function works correctly"
     else
         fail "[fish] 'secret' function failed, got: $result"
@@ -325,7 +325,7 @@ DATABASE_HOST=localhost
 
 # Another comment
 DATABASE_PORT=5432
-' > "$test_dir/.env"
+' >"$test_dir/.env"
     chmod 644 "$test_dir/.env"
 
     set mock_path (create_mock_dotsecenv)
@@ -356,7 +356,7 @@ function test_quoted_values
 
     echo 'DOUBLE_QUOTED="hello world"
 SINGLE_QUOTED='"'"'hello world'"'"'
-UNQUOTED=helloworld' > "$test_dir/.env"
+UNQUOTED=helloworld' >"$test_dir/.env"
     chmod 644 "$test_dir/.env"
 
     set mock_path (create_mock_dotsecenv)

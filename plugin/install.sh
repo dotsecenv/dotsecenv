@@ -46,20 +46,20 @@ UNINSTALL=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --shell=*)
-            SHELL_TARGET="${1#*=}"
-            ;;
-        --dir=*)
-            INSTALL_DIR="${1#*=}"
-            ;;
-        --no-rc)
-            MODIFY_RC=0
-            ;;
-        --uninstall)
-            UNINSTALL=1
-            ;;
-        -h|--help)
-            cat <<EOF
+    --shell=*)
+        SHELL_TARGET="${1#*=}"
+        ;;
+    --dir=*)
+        INSTALL_DIR="${1#*=}"
+        ;;
+    --no-rc)
+        MODIFY_RC=0
+        ;;
+    --uninstall)
+        UNINSTALL=1
+        ;;
+    -h | --help)
+        cat <<EOF
 dotsecenv shell plugin installer
 
 Usage:
@@ -77,23 +77,23 @@ Examples:
   install.sh --shell=zsh          # Install only for zsh
   install.sh --uninstall          # Remove all plugins
 EOF
-            exit 0
-            ;;
-        *)
-            error "Unknown option: $1"
-            exit 1
-            ;;
+        exit 0
+        ;;
+    *)
+        error "Unknown option: $1"
+        exit 1
+        ;;
     esac
     shift
 done
 
 # Validate shell target
 case "$SHELL_TARGET" in
-    bash|zsh|fish|all) ;;
-    *)
-        error "Invalid shell: $SHELL_TARGET. Must be bash, zsh, fish, or all"
-        exit 1
-        ;;
+bash | zsh | fish | all) ;;
+*)
+    error "Invalid shell: $SHELL_TARGET. Must be bash, zsh, fish, or all"
+    exit 1
+    ;;
 esac
 
 # Clone repository to temporary directory
@@ -125,19 +125,19 @@ trap cleanup EXIT
 get_rc_file() {
     local shell="$1"
     case "$shell" in
-        bash)
-            if [[ -f "$HOME/.bash_profile" ]]; then
-                echo "$HOME/.bash_profile"
-            else
-                echo "$HOME/.bashrc"
-            fi
-            ;;
-        zsh)
-            echo "${ZDOTDIR:-$HOME}/.zshrc"
-            ;;
-        fish)
-            echo "${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish"
-            ;;
+    bash)
+        if [[ -f "$HOME/.bash_profile" ]]; then
+            echo "$HOME/.bash_profile"
+        else
+            echo "$HOME/.bashrc"
+        fi
+        ;;
+    zsh)
+        echo "${ZDOTDIR:-$HOME}/.zshrc"
+        ;;
+    fish)
+        echo "${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish"
+        ;;
     esac
 }
 
@@ -160,16 +160,16 @@ add_source_line() {
     touch "$rc_file"
 
     case "$shell" in
-        bash|zsh)
-            echo "" >> "$rc_file"
-            echo "# dotsecenv shell plugin" >> "$rc_file"
-            echo "source \"$plugin_path\"" >> "$rc_file"
-            ;;
-        fish)
-            echo "" >> "$rc_file"
-            echo "# dotsecenv shell plugin" >> "$rc_file"
-            echo "source \"$plugin_path\"" >> "$rc_file"
-            ;;
+    bash | zsh)
+        echo "" >>"$rc_file"
+        echo "# dotsecenv shell plugin" >>"$rc_file"
+        echo "source \"$plugin_path\"" >>"$rc_file"
+        ;;
+    fish)
+        echo "" >>"$rc_file"
+        echo "# dotsecenv shell plugin" >>"$rc_file"
+        echo "source \"$plugin_path\"" >>"$rc_file"
+        ;;
     esac
 }
 
@@ -196,18 +196,18 @@ install_shell() {
     local core_file="_dotsecenv_core.sh"
 
     case "$shell" in
-        bash)
-            plugin_file="dotsecenv.plugin.bash"
-            plugin_src="$TEMP_DIR/$plugin_file"
-            ;;
-        zsh)
-            plugin_file="dotsecenv.plugin.zsh"
-            plugin_src="$TEMP_DIR/$plugin_file"
-            ;;
-        fish)
-            plugin_file="dotsecenv.fish"
-            plugin_src="$TEMP_DIR/conf.d/dotsecenv.fish"
-            ;;
+    bash)
+        plugin_file="dotsecenv.plugin.bash"
+        plugin_src="$TEMP_DIR/$plugin_file"
+        ;;
+    zsh)
+        plugin_file="dotsecenv.plugin.zsh"
+        plugin_src="$TEMP_DIR/$plugin_file"
+        ;;
+    fish)
+        plugin_file="dotsecenv.fish"
+        plugin_src="$TEMP_DIR/conf.d/dotsecenv.fish"
+        ;;
     esac
 
     info "Installing $shell plugin..."
@@ -290,16 +290,16 @@ main() {
     clone_repo
 
     case "$SHELL_TARGET" in
-        all)
-            install_shell "bash"
-            echo ""
-            install_shell "zsh"
-            echo ""
-            install_shell "fish"
-            ;;
-        *)
-            install_shell "$SHELL_TARGET"
-            ;;
+    all)
+        install_shell "bash"
+        echo ""
+        install_shell "zsh"
+        echo ""
+        install_shell "fish"
+        ;;
+    *)
+        install_shell "$SHELL_TARGET"
+        ;;
     esac
 
     echo ""
@@ -307,18 +307,18 @@ main() {
     echo ""
     echo "Please restart your shell or run:"
     case "$SHELL_TARGET" in
-        bash)
-            echo "  source $(get_rc_file bash)"
-            ;;
-        zsh)
-            echo "  source $(get_rc_file zsh)"
-            ;;
-        fish)
-            echo "  source $(get_rc_file fish)"
-            ;;
-        all)
-            echo "  source your shell's RC file"
-            ;;
+    bash)
+        echo "  source $(get_rc_file bash)"
+        ;;
+    zsh)
+        echo "  source $(get_rc_file zsh)"
+        ;;
+    fish)
+        echo "  source $(get_rc_file fish)"
+        ;;
+    all)
+        echo "  source your shell's RC file"
+        ;;
     esac
     echo ""
 }

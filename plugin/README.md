@@ -6,7 +6,7 @@ Shell plugins for [dotsecenv](https://github.com/dotsecenv/dotsecenv) that autom
 
 - Automatically loads `.env` and `.secenv` files when you `cd` into a directory
 - Unsets environment variables when you leave the directory
-- Fetches secrets from your dotsecenv vault using `{dotsecenv}` syntax
+- Fetches secrets from your dotsecenv vault using the `{dotsecenv}` or `{dotsecenv/KEY}` syntax
 - Security checks: refuses to load world-writable files or files not owned by you
 - Trust system: prompts before loading `.secenv` files from untrusted directories
 - Convenient aliases: `dse`, `secret`, `secretcp`
@@ -107,12 +107,28 @@ API_KEY=my-api-key
 # Fetch secret named "DATABASE_PASSWORD" and export as DATABASE_PASSWORD
 DATABASE_PASSWORD={dotsecenv}
 
-# Fetch secret named "prod-api-key" and export as API_KEY
-API_KEY={dotsecenv:prod-api-key}
+# Fetch secret named "PROD_API_KEY" and export as API_KEY
+API_KEY={dotsecenv/PROD_API_KEY}
+
+# Namespaced secrets (double colon separates namespace)
+DB_PASS={dotsecenv/prod::DB_PASSWORD}
 
 # Plain values work here too
 DEBUG=true
 ```
+
+### Syntax Reference
+
+| Pattern | Behavior |
+| ------- | -------- |
+| `{dotsecenv}` | Fetches secret with same name as the variable |
+| `{dotsecenv/SECRET_NAME}` | Fetches secret with the specified name |
+| `{dotsecenv/ns::SECRET}` | Fetches namespaced secret (`::` separates namespace) |
+| `{dotsecenv/}` | Treated as plain value (literal string) |
+| `{dotsecenv/a/b}` | Error: only one `/` allowed, line skipped |
+| `{dotsecenv/invalid-name}` | Error: invalid characters, line skipped |
+
+Secret names must start with a letter or underscore, followed by letters, numbers, or underscores. Namespaced secrets use `::` as separator (e.g., `namespace::SECRET_NAME`).
 
 ### Two-Phase Loading
 

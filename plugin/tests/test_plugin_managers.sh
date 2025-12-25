@@ -32,35 +32,41 @@ TARGET_MANAGER="all"
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --manager=*)
-            TARGET_MANAGER="${1#*=}"
-            ;;
-        --verbose|-v)
-            VERBOSE=1
-            ;;
-        -h|--help)
-            echo "Plugin manager integration tests"
-            echo ""
-            echo "Usage: $0 [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --manager=NAME   Test specific manager (ohmyzsh, zinit, antidote, ohmybash, fisher, ohmyfish, all)"
-            echo "  --verbose, -v    Show verbose output"
-            echo "  -h, --help       Show this help"
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1" >&2
-            exit 1
-            ;;
+    --manager=*)
+        TARGET_MANAGER="${1#*=}"
+        ;;
+    --verbose | -v)
+        VERBOSE=1
+        ;;
+    -h | --help)
+        echo "Plugin manager integration tests"
+        echo ""
+        echo "Usage: $0 [OPTIONS]"
+        echo ""
+        echo "Options:"
+        echo "  --manager=NAME   Test specific manager (ohmyzsh, zinit, antidote, ohmybash, fisher, ohmyfish, all)"
+        echo "  --verbose, -v    Show verbose output"
+        echo "  -h, --help       Show this help"
+        exit 0
+        ;;
+    *)
+        echo "Unknown option: $1" >&2
+        exit 1
+        ;;
     esac
     shift
 done
 
 # Logging
 log() { echo -e "${BLUE}[TEST]${NC} $*"; }
-pass() { echo -e "${GREEN}[PASS]${NC} $*"; ((TESTS_PASSED++)) || true; }
-fail() { echo -e "${RED}[FAIL]${NC} $*"; ((TESTS_FAILED++)) || true; }
+pass() {
+    echo -e "${GREEN}[PASS]${NC} $*"
+    ((TESTS_PASSED++)) || true
+}
+fail() {
+    echo -e "${RED}[FAIL]${NC} $*"
+    ((TESTS_FAILED++)) || true
+}
 debug() { [[ $VERBOSE -eq 1 ]] && echo "[DEBUG] $*" || true; }
 
 # Check prerequisites
@@ -531,42 +537,42 @@ main() {
 
     # Run tests based on target
     case "$TARGET_MANAGER" in
-        ohmyzsh)
-            test_ohmyzsh
-            ;;
-        zinit)
-            test_zinit
-            ;;
-        antidote)
-            test_antidote
-            ;;
-        ohmybash)
-            test_ohmybash
-            ;;
-        fisher)
-            test_fisher
-            ;;
-        ohmyfish)
-            test_ohmyfish
-            ;;
-        all)
-            test_ohmyzsh
-            echo ""
-            test_zinit
-            echo ""
-            test_antidote
-            echo ""
-            test_ohmybash
-            echo ""
-            test_fisher
-            echo ""
-            test_ohmyfish
-            ;;
-        *)
-            echo "Unknown manager: $TARGET_MANAGER" >&2
-            echo "Valid options: ohmyzsh, zinit, antidote, ohmybash, fisher, ohmyfish, all" >&2
-            exit 1
-            ;;
+    ohmyzsh)
+        test_ohmyzsh
+        ;;
+    zinit)
+        test_zinit
+        ;;
+    antidote)
+        test_antidote
+        ;;
+    ohmybash)
+        test_ohmybash
+        ;;
+    fisher)
+        test_fisher
+        ;;
+    ohmyfish)
+        test_ohmyfish
+        ;;
+    all)
+        test_ohmyzsh
+        echo ""
+        test_zinit
+        echo ""
+        test_antidote
+        echo ""
+        test_ohmybash
+        echo ""
+        test_fisher
+        echo ""
+        test_ohmyfish
+        ;;
+    *)
+        echo "Unknown manager: $TARGET_MANAGER" >&2
+        echo "Valid options: ohmyzsh, zinit, antidote, ohmybash, fisher, ohmyfish, all" >&2
+        exit 1
+        ;;
     esac
 
     # Summary

@@ -27,9 +27,9 @@ is_bash5() {
 # Find a suitable bash 5.x binary
 find_bash5() {
     local candidates=(
-        "/opt/homebrew/bin/bash"  # macOS Apple Silicon Homebrew
-        "/usr/local/bin/bash"     # macOS Intel Homebrew / Linux custom
-        "$(command -v bash)"      # System PATH
+        "/opt/homebrew/bin/bash" # macOS Apple Silicon Homebrew
+        "/usr/local/bin/bash"    # macOS Intel Homebrew / Linux custom
+        "$(command -v bash)"     # System PATH
     )
 
     for bash_bin in "${candidates[@]}"; do
@@ -70,16 +70,22 @@ VERBOSE=0
 # Parse arguments
 for arg in "$@"; do
     case "$arg" in
-        --bash-only) TEST_ZSH=0 ;;
-        --zsh-only) TEST_BASH=0 ;;
-        --verbose) VERBOSE=1 ;;
+    --bash-only) TEST_ZSH=0 ;;
+    --zsh-only) TEST_BASH=0 ;;
+    --verbose) VERBOSE=1 ;;
     esac
 done
 
 # Logging
 log() { echo -e "${BLUE}[TEST]${NC} $*"; }
-pass() { echo -e "${GREEN}[PASS]${NC} $*"; ((TESTS_PASSED++)) || true; }
-fail() { echo -e "${RED}[FAIL]${NC} $*"; ((TESTS_FAILED++)) || true; }
+pass() {
+    echo -e "${GREEN}[PASS]${NC} $*"
+    ((TESTS_PASSED++)) || true
+}
+fail() {
+    echo -e "${RED}[FAIL]${NC} $*"
+    ((TESTS_FAILED++)) || true
+}
 warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 debug() { [[ $VERBOSE -eq 1 ]] && echo -e "[DEBUG] $*" || true; }
 
@@ -103,7 +109,7 @@ create_mock_dotsecenv() {
     local mock_dir="$TEMP_DIR/mock_bin"
     mkdir -p "$mock_dir"
 
-    cat > "$mock_dir/dotsecenv" << 'MOCK_EOF'
+    cat >"$mock_dir/dotsecenv" <<'MOCK_EOF'
 #!/usr/bin/env bash
 # Mock dotsecenv CLI for testing
 
@@ -178,7 +184,7 @@ test_parse_plain_env() {
     local test_dir="$TEMP_DIR/test_plain_env"
     mkdir -p "$test_dir"
 
-    cat > "$test_dir/.env" << 'EOF'
+    cat >"$test_dir/.env" <<'EOF'
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 APP_NAME="My Application"
@@ -210,7 +216,7 @@ test_parse_secret_same_name() {
     local test_dir="$TEMP_DIR/test_secret_same"
     mkdir -p "$test_dir"
 
-    cat > "$test_dir/.env" << 'EOF'
+    cat >"$test_dir/.env" <<'EOF'
 DB_PASSWORD={dotsecenv}
 EOF
     chmod 644 "$test_dir/.env"
@@ -234,14 +240,14 @@ EOF
 
 test_parse_secret_named() {
     local shell="$1"
-    log "[$shell] Testing {dotsecenv:name} secret (named)..."
+    log "[$shell] Testing {dotsecenv/name} secret (named)..."
     ((TESTS_RUN++)) || true
 
     local test_dir="$TEMP_DIR/test_secret_named"
     mkdir -p "$test_dir"
 
-    cat > "$test_dir/.env" << 'EOF'
-MY_API_KEY={dotsecenv:API_KEY}
+    cat >"$test_dir/.env" <<'EOF'
+MY_API_KEY={dotsecenv/API_KEY}
 EOF
     chmod 644 "$test_dir/.env"
 
@@ -256,9 +262,9 @@ EOF
     fi
 
     if [[ "$result" == "mock-api-key-12345" ]]; then
-        pass "[$shell] {dotsecenv:name} secret resolution works correctly"
+        pass "[$shell] {dotsecenv/name} secret resolution works correctly"
     else
-        fail "[$shell] {dotsecenv:name} secret resolution failed, got: $result"
+        fail "[$shell] {dotsecenv/name} secret resolution failed, got: $result"
     fi
 }
 
@@ -270,7 +276,7 @@ test_missing_secret_warning() {
     local test_dir="$TEMP_DIR/test_missing_secret"
     mkdir -p "$test_dir"
 
-    cat > "$test_dir/.env" << 'EOF'
+    cat >"$test_dir/.env" <<'EOF'
 MISSING_SECRET={dotsecenv}
 EOF
     chmod 644 "$test_dir/.env"
@@ -300,10 +306,10 @@ test_security_check_world_writable() {
     local test_dir="$TEMP_DIR/test_security"
     mkdir -p "$test_dir"
 
-    cat > "$test_dir/.env" << 'EOF'
+    cat >"$test_dir/.env" <<'EOF'
 UNSAFE_VAR=should-not-load
 EOF
-    chmod 666 "$test_dir/.env"  # World-writable
+    chmod 666 "$test_dir/.env" # World-writable
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -331,13 +337,13 @@ test_secenv_override_warning() {
     mkdir -p "$test_dir"
 
     # .env sets a value
-    cat > "$test_dir/.env" << 'EOF'
+    cat >"$test_dir/.env" <<'EOF'
 API_KEY=local-key
 EOF
     chmod 644 "$test_dir/.env"
 
     # .secenv overrides it
-    cat > "$test_dir/.secenv" << 'EOF'
+    cat >"$test_dir/.secenv" <<'EOF'
 API_KEY={dotsecenv}
 EOF
     chmod 644 "$test_dir/.secenv"
@@ -345,7 +351,7 @@ EOF
     # Pre-trust the directory for this test - write to the config dir used by test
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" > "$config_dir/trusted_dirs"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -387,9 +393,9 @@ test_two_phase_loading() {
     mkdir -p "$test_dir"
 
     # Mixed plain and secret values
-    cat > "$test_dir/.env" << 'EOF'
+    cat >"$test_dir/.env" <<'EOF'
 PLAIN_VAR=plain-value
-SECRET_VAR={dotsecenv:API_KEY}
+SECRET_VAR={dotsecenv/API_KEY}
 EOF
     chmod 644 "$test_dir/.env"
 
@@ -478,7 +484,7 @@ test_comments_and_empty_lines() {
     local test_dir="$TEMP_DIR/test_comments"
     mkdir -p "$test_dir"
 
-    cat > "$test_dir/.env" << 'EOF'
+    cat >"$test_dir/.env" <<'EOF'
 # This is a comment
 DATABASE_HOST=localhost
 
@@ -513,7 +519,7 @@ test_quoted_values() {
     local test_dir="$TEMP_DIR/test_quotes"
     mkdir -p "$test_dir"
 
-    cat > "$test_dir/.env" << 'EOF'
+    cat >"$test_dir/.env" <<'EOF'
 DOUBLE_QUOTED="hello world"
 SINGLE_QUOTED='hello world'
 UNQUOTED=helloworld

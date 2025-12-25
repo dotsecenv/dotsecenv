@@ -58,7 +58,7 @@ function _dotsecenv_security_check
     set -l current_uid (id -u)
 
     # Check ownership: must be owned by current user or root
-    if test "$file_owner" != "$current_uid"; and test "$file_owner" != "0"
+    if test "$file_owner" != "$current_uid"; and test "$file_owner" != 0
         echo "dotsecenv: refusing to load $file - not owned by current user or root" >&2
         return 1
     end
@@ -106,7 +106,7 @@ end
 function _dotsecenv_trust_always
     set -l dir $argv[1]
     _dotsecenv_ensure_config_dir
-    echo "$dir" >> "$DOTSECENV_TRUSTED_DIRS_FILE"
+    echo "$dir" >>"$DOTSECENV_TRUSTED_DIRS_FILE"
 end
 
 # Add directory to session-only trusted list
@@ -178,13 +178,28 @@ function _dotsecenv_parse_line
         # Check for dotsecenv patterns
         if test "$value" = "{dotsecenv}"
             set -g _DOTSECENV_PARSE_VALUE "$_DOTSECENV_PARSE_KEY"
-            set -g _DOTSECENV_PARSE_TYPE "secret_same"
-        else if string match -qr '^\{dotsecenv:([A-Za-z_][A-Za-z0-9_]*)\}$' "$value"
-            set -g _DOTSECENV_PARSE_VALUE (string replace -r '^\{dotsecenv:([A-Za-z_][A-Za-z0-9_]*)\}$' '$1' "$value")
-            set -g _DOTSECENV_PARSE_TYPE "secret_named"
+            set -g _DOTSECENV_PARSE_TYPE secret_same
+        else if string match -qr '^\{dotsecenv/.*\}$' "$value"
+            # Extract secret name (everything between first / and closing })
+            set -l secret_name (string replace -r '^\{dotsecenv/(.*)\}$' '$1' "$value")
+            # Validate: no additional slashes, valid secret name format
+            if test -z "$secret_name"
+                # Empty name like {dotsecenv/} - treat as plain value silently
+                set -g _DOTSECENV_PARSE_VALUE "$value"
+                set -g _DOTSECENV_PARSE_TYPE plain
+            else if string match -q "*/*" "$secret_name"
+                echo "dotsecenv: error: invalid syntax '$value' - only one '/' allowed" >&2
+                return 1
+            else if string match -qr '^[A-Za-z_][A-Za-z0-9_]*(::[A-Za-z_][A-Za-z0-9_]*)?$' "$secret_name"
+                set -g _DOTSECENV_PARSE_VALUE "$secret_name"
+                set -g _DOTSECENV_PARSE_TYPE secret_named
+            else
+                echo "dotsecenv: error: invalid secret name '$secret_name' in '$value'" >&2
+                return 1
+            end
         else
             set -g _DOTSECENV_PARSE_VALUE "$value"
-            set -g _DOTSECENV_PARSE_TYPE "plain"
+            set -g _DOTSECENV_PARSE_TYPE plain
         end
         return 0
     end
@@ -209,13 +224,15 @@ function _dotsecenv_load_file
             set -l value "$_DOTSECENV_PARSE_VALUE"
             set -l ptype "$_DOTSECENV_PARSE_TYPE"
 
-            if test "$phase" = "1"; and test "$ptype" = "plain"
+            if test "$phase" = 1; and test "$ptype" = plain
                 # Phase 1: load plain variables
                 set -gx $key "$value"
                 set -g -a _DOTSECENV_LOADED_$dir_hash "$key"
                 set -g -a _DOTSECENV_ENV_VARS "$key"
 
-            else if test "$phase" = "2"; and begin; test "$ptype" = "secret_same"; or test "$ptype" = "secret_named"; end
+            else if test "$phase" = 2; and begin
+                    test "$ptype" = secret_same; or test "$ptype" = secret_named
+                end
                 # Phase 2: load secrets via dotsecenv CLI
                 set -l secret_name "$value"
 
@@ -234,7 +251,7 @@ function _dotsecenv_load_file
                 end
             end
         end
-    end < "$file"
+    end <"$file"
 end
 
 # Unload variables for a directory

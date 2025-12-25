@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  format:
+    name: Check formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shfmt
+        run: |
+          curl -sS https://webi.sh/shfmt | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install fish
+        run: |
+          sudo apt-add-repository ppa:fish-shell/release-3 -y
+          sudo apt-get update
+          sudo apt-get install -y fish
+
+      - name: Check shell formatting (shfmt)
+        run: |
+          shfmt -d -i 4 \
+            ./_dotsecenv_core.sh \
+            ./dotsecenv.plugin.bash \
+            ./dotsecenv.plugin.zsh \
+            ./tests/test_plugins.sh \
+            ./tests/test_plugin_managers.sh \
+            ./install.sh
+
+      - name: Check fish formatting (fish_indent)
+        run: |
+          for f in ./conf.d/dotsecenv.fish ./tests/test_plugins.fish; do
+            if ! diff -q "$f" <(fish_indent "$f") > /dev/null 2>&1; then
+              echo "::error file=$f::File is not formatted. Run 'make fmt' to fix."
+              fish_indent "$f" | diff -u "$f" - || true
+              exit 1
+            fi
+          done
+
+  test:
+    name: Run tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install fish (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-add-repository ppa:fish-shell/release-3 -y
+          sudo apt-get update
+          sudo apt-get install -y fish
+
+      - name: Install fish (macOS)
+        if: runner.os == 'macOS'
+        run: brew install fish
+
+      - name: Install bash 5 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install bash
+
+      - name: Run tests
+        run: make test
