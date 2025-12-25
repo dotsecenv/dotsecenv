@@ -78,11 +78,24 @@ var secretGetCmd = &cobra.Command{
 	Short: "Retrieve a secret value",
 	Long: `Retrieve a secret value from the vault.
 
+Secret key formats:
+  Namespaced:     namespace::KEY_NAME  (e.g., myapp::DATABASE_URL)
+  Non-namespaced: KEY_NAME             (e.g., DATABASE_URL)
+
 Options:
   --all   Retrieve all values for the secret across all vaults
   --last  Retrieve the most recent value across all vaults
   --json  Output as JSON`,
-	Args: cobra.ExactArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if err := cobra.ExactArgs(1)(cmd, args); err != nil {
+			return err
+		}
+		// Validate secret key format
+		if _, err := vault.NormalizeSecretKey(args[0]); err != nil {
+			return fmt.Errorf("%s", vault.FormatSecretKeyError(err))
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		secretKey := args[0]
 
@@ -114,11 +127,24 @@ var secretShareCmd = &cobra.Command{
 	Short: "Share a secret with another identity",
 	Long: `Share a secret with another identity by their GPG fingerprint.
 
+Secret key formats:
+  Namespaced:     namespace::KEY_NAME  (e.g., myapp::DATABASE_URL)
+  Non-namespaced: KEY_NAME             (e.g., DATABASE_URL)
+
 The secret will be re-encrypted so the target identity can decrypt it.
 
 Options:
   --all  Share the secret in all vaults where it exists`,
-	Args: cobra.ExactArgs(2),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if err := cobra.ExactArgs(2)(cmd, args); err != nil {
+			return err
+		}
+		// Validate secret key format
+		if _, err := vault.NormalizeSecretKey(args[0]); err != nil {
+			return fmt.Errorf("%s", vault.FormatSecretKeyError(err))
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		secretKey := args[0]
 		targetFingerprint := args[1]
@@ -169,11 +195,24 @@ var secretRevokeCmd = &cobra.Command{
 	Short: "Revoke access to a secret from an identity",
 	Long: `Revoke access to a secret from an identity.
 
+Secret key formats:
+  Namespaced:     namespace::KEY_NAME  (e.g., myapp::DATABASE_URL)
+  Non-namespaced: KEY_NAME             (e.g., DATABASE_URL)
+
 This removes the ability for the specified identity to decrypt the secret.
 
 Options:
   --all  Revoke access from all vaults where the secret is shared`,
-	Args: cobra.ExactArgs(2),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if err := cobra.ExactArgs(2)(cmd, args); err != nil {
+			return err
+		}
+		// Validate secret key format
+		if _, err := vault.NormalizeSecretKey(args[0]); err != nil {
+			return fmt.Errorf("%s", vault.FormatSecretKeyError(err))
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		secretKey := args[0]
 		targetFingerprint := args[1]

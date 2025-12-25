@@ -195,11 +195,10 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int) *Error {
 
 // SecretGet retrieves a secret from the vault.
 // If c.Strict is true (from config), only returns a value if the user has access to the LATEST value of the secret.
-func (c *CLI) SecretGet(secretKeyArg string, all bool, last bool, jsonOutput bool, vaultPath string, fromIndex int) *Error {
-	// Normalize secret key for lookup (validation errors are non-fatal for lookups to support legacy keys)
-	secretKey := secretKeyArg
-	if normalized, normErr := vault.NormalizeSecretKey(secretKeyArg); normErr == nil {
-		secretKey = normalized
+func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, vaultPath string, fromIndex int) *Error {
+	// Validate secret key format
+	if _, err := vault.NormalizeSecretKey(secretKey); err != nil {
+		return NewError(vault.FormatSecretKeyError(err), ExitValidationError)
 	}
 
 	fp, err := c.checkFingerprintRequired("secret get")
