@@ -139,17 +139,6 @@ jobs:
 
 dotsecenv supports shell completions for Bash, Zsh, and Fish.
 
-### Shell Plugins
-
-Shell plugins that automatically load `.env` and `.secenv` files when entering directories
-are available for `zsh`, `bash`, and `fish`.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
-```
-
-For plugin manager installation and additional details, see [github.com/dotsecenv/plugin#installation](https://github.com/dotsecenv/plugin#installation).
-
 #### Bash
 
 Requires the `bash-completion` package:
@@ -211,6 +200,29 @@ If you installed via a package manager (Homebrew, deb, rpm, Arch), completions a
 | Bash  | `$(brew --prefix)/etc/bash_completion.d/dotsecenv`                | `/usr/share/bash-completion/completions/dotsecenv`    |
 | Zsh   | `$(brew --prefix)/share/zsh/site-functions/_dotsecenv`            | `/usr/share/zsh/site-functions/_dotsecenv`            |
 | Fish  | `$(brew --prefix)/share/fish/vendor_completions.d/dotsecenv.fish` | `/usr/share/fish/vendor_completions.d/dotsecenv.fish` |
+
+### Shell Plugins
+
+Shell plugins that automatically load `.env` and `.secenv` files when entering directories
+are available for `zsh`, `bash`, and `fish`.
+
+For example, given a `/path/to/project/.secenv` file, e.g.:
+
+```env
+MY_SECRET={dotsecenv/my:secret}
+```
+
+`MY_SECRET` will be available as an environment variable, when cd-ing into `/path/to/project/`.
+
+#### Install shell plugins
+
+You can install zsh/bash/fish plugins with:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
+```
+
+For plugin manager installation and additional details, see [github.com/dotsecenv/plugin#installation](https://github.com/dotsecenv/plugin#installation).
 
 ### Basic Usage
 
