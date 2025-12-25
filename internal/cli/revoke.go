@@ -14,7 +14,13 @@ import (
 // SecretRevoke re-encrypts a secret without the specified fingerprint, effectively revoking their access.
 // If the secret is shared with the fingerprint, it re-encrypts with every other public key except
 // the one corresponding to the fingerprint, updates available_to, regenerates the hash, and signs it.
-func (c *CLI) SecretRevoke(secretKey, targetFingerprint string, vaultIndex int) *Error {
+func (c *CLI) SecretRevoke(secretKeyArg, targetFingerprint string, vaultIndex int) *Error {
+	// Normalize secret key for lookup (validation errors are non-fatal to support legacy keys)
+	secretKey := secretKeyArg
+	if normalized, normErr := vault.NormalizeSecretKey(secretKeyArg); normErr == nil {
+		secretKey = normalized
+	}
+
 	// If vaultIndex < 0, find the vault that has the secret
 	if vaultIndex < 0 {
 		vaultIndex = c.vaultResolver.FindSecretVaultIndex(secretKey)
@@ -27,7 +33,13 @@ func (c *CLI) SecretRevoke(secretKey, targetFingerprint string, vaultIndex int) 
 }
 
 // SecretRevokeAll revokes access to a secret from a fingerprint across all vaults.
-func (c *CLI) SecretRevokeAll(secretKey, targetFingerprint string) *Error {
+func (c *CLI) SecretRevokeAll(secretKeyArg, targetFingerprint string) *Error {
+	// Normalize secret key for lookup (validation errors are non-fatal to support legacy keys)
+	secretKey := secretKeyArg
+	if normalized, normErr := vault.NormalizeSecretKey(secretKeyArg); normErr == nil {
+		secretKey = normalized
+	}
+
 	vaultCount := c.vaultResolver.VaultCount()
 	if vaultCount == 0 {
 		return NewError("no vaults configured", ExitVaultError)

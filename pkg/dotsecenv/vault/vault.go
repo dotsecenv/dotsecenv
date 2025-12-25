@@ -190,14 +190,15 @@ func (m *Manager) AddIdentity(id Identity) {
 	m.vault.Identities = append(m.vault.Identities, id)
 }
 
-// AddSecret adds a new secret or updates an existing one with a new value
+// AddSecret adds a new secret or updates an existing one with a new value.
+// Secret keys are compared case-insensitively using CompareSecretKeys.
 func (m *Manager) AddSecret(secret Secret) {
-	// Check if secret already exists
+	// Check if secret already exists (case-insensitive comparison)
 	for i, s := range m.vault.Secrets {
-		if s.Key == secret.Key {
+		if CompareSecretKeys(s.Key, secret.Key) {
 			// Add new values to existing secret
 			for _, newVal := range secret.Values {
-				if err := m.writer.AddSecretValue(secret.Key, newVal); err != nil {
+				if err := m.writer.AddSecretValue(s.Key, newVal); err != nil {
 					// Log error but continue
 					continue
 				}

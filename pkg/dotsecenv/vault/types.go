@@ -71,10 +71,11 @@ func (v Vault) GetIdentityByFingerprint(fingerprint string) *Identity {
 }
 
 // GetSecretByKey finds a secret by its key (name).
+// Lookup is case-insensitive - keys are normalized before comparison.
 // Returns nil if no secret with the given key exists.
 func (v Vault) GetSecretByKey(key string) *Secret {
 	for i := range v.Secrets {
-		if v.Secrets[i].Key == key {
+		if CompareSecretKeys(v.Secrets[i].Key, key) {
 			return &v.Secrets[i]
 		}
 	}

@@ -12,7 +12,13 @@ import (
 )
 
 // SecretShare shares a secret with another identity
-func (c *CLI) SecretShare(secretKey, targetFingerprint string, vaultIndex int) *Error {
+func (c *CLI) SecretShare(secretKeyArg, targetFingerprint string, vaultIndex int) *Error {
+	// Normalize secret key for lookup (validation errors are non-fatal to support legacy keys)
+	secretKey := secretKeyArg
+	if normalized, normErr := vault.NormalizeSecretKey(secretKeyArg); normErr == nil {
+		secretKey = normalized
+	}
+
 	// If vaultIndex < 0, find the vault that has the secret
 	if vaultIndex < 0 {
 		vaultIndex = c.vaultResolver.FindSecretVaultIndex(secretKey)
@@ -25,7 +31,13 @@ func (c *CLI) SecretShare(secretKey, targetFingerprint string, vaultIndex int) *
 }
 
 // SecretShareAll shares a secret with a fingerprint across all vaults where the secret exists.
-func (c *CLI) SecretShareAll(secretKey, targetFingerprint string) *Error {
+func (c *CLI) SecretShareAll(secretKeyArg, targetFingerprint string) *Error {
+	// Normalize secret key for lookup (validation errors are non-fatal to support legacy keys)
+	secretKey := secretKeyArg
+	if normalized, normErr := vault.NormalizeSecretKey(secretKeyArg); normErr == nil {
+		secretKey = normalized
+	}
+
 	vaultCount := c.vaultResolver.VaultCount()
 	if vaultCount == 0 {
 		return NewError("no vaults configured", ExitVaultError)

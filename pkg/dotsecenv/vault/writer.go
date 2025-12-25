@@ -234,9 +234,11 @@ func (w *Writer) AddIdentity(id identity.Identity) error {
 
 // AddSecret adds a new secret definition to the vault
 func (w *Writer) AddSecret(s Secret) error {
-	// Check for duplicate
-	if _, exists := w.header.Secrets[s.Key]; exists {
-		return fmt.Errorf("secret already exists: %s", s.Key)
+	// Check for duplicate (case-insensitive)
+	for existingKey := range w.header.Secrets {
+		if CompareSecretKeys(existingKey, s.Key) {
+			return fmt.Errorf("secret already exists: %s", existingKey)
+		}
 	}
 
 	lineNum := w.nextLineNumber()
@@ -263,8 +265,19 @@ func (w *Writer) AddSecret(s Secret) error {
 
 // AddSecretValue adds a new value to an existing secret
 func (w *Writer) AddSecretValue(secretKey string, sv SecretValue) error {
-	idx, exists := w.header.Secrets[secretKey]
-	if !exists {
+	// Find secret by case-insensitive comparison
+	var idx SecretIndex
+	var foundKey string
+	found := false
+	for existingKey, existingIdx := range w.header.Secrets {
+		if CompareSecretKeys(existingKey, secretKey) {
+			idx = existingIdx
+			foundKey = existingKey
+			found = true
+			break
+		}
+	}
+	if !found {
 		return fmt.Errorf("secret not found: %s", secretKey)
 	}
 
@@ -283,16 +296,18 @@ func (w *Writer) AddSecretValue(secretKey string, sv SecretValue) error {
 	// Append entry and update header
 	w.lines = append(w.lines, string(entryJSON))
 	idx.Values = append(idx.Values, lineNum)
-	w.header.Secrets[secretKey] = idx
+	w.header.Secrets[foundKey] = idx
 
 	return w.flush()
 }
 
 // AddSecretWithValues adds a secret definition and its initial values
 func (w *Writer) AddSecretWithValues(s Secret) error {
-	// Check for duplicate
-	if _, exists := w.header.Secrets[s.Key]; exists {
-		return fmt.Errorf("secret already exists: %s", s.Key)
+	// Check for duplicate (case-insensitive)
+	for existingKey := range w.header.Secrets {
+		if CompareSecretKeys(existingKey, s.Key) {
+			return fmt.Errorf("secret already exists: %s", existingKey)
+		}
 	}
 
 	// Add secret definition

@@ -5,6 +5,7 @@ import (
 	"os"
 
 	clilib "github.com/dotsecenv/dotsecenv/internal/cli"
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -20,9 +21,26 @@ var secretPutCmd = &cobra.Command{
 	Short: "Store an encrypted secret",
 	Long: `Store an encrypted secret value.
 
+Secret key formats:
+  Namespaced:     namespace::KEY_NAME  (e.g., myapp::DATABASE_URL)
+  Non-namespaced: KEY_NAME             (e.g., DATABASE_URL)
+
+Keys are case-insensitive and normalized when stored:
+  - Namespace part: lowercase
+  - Key name part: UPPERCASE
+
 The secret value is read from stdin. Use -v to specify which vault
 to store the secret in (either a path or 1-based index).`,
-	Args: cobra.ExactArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if err := cobra.ExactArgs(1)(cmd, args); err != nil {
+			return err
+		}
+		// Validate secret key format
+		if _, err := vault.NormalizeSecretKey(args[0]); err != nil {
+			return fmt.Errorf("%s", vault.FormatSecretKeyError(err))
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		secretKey := args[0]
 
