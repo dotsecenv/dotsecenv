@@ -133,8 +133,8 @@ _dotsecenv_prompt_trust() {
     echo -n "Load secrets? [y]es / [n]o / [a]lways: " >&2
     read -r response
 
-    # Convert to lowercase
-    response="${response,,}"
+    # Convert to lowercase (portable for bash and zsh)
+    response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
 
     case "$response" in
         y|yes)
