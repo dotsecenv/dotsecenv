@@ -164,9 +164,9 @@ func TestCompareSecretKeys(t *testing.T) {
 		{"default::KEY", "KEY", false},
 
 		// Invalid keys - fallback to case-insensitive string compare
-		{"invalid_key_", "INVALID_KEY_", true},  // both invalid, but equal ignoring case
-		{"ns::KEY_", "ns::key_", true},          // both invalid
-		{"ns::KEY", "ns::KEY_", false},          // one valid, one invalid
+		{"invalid_key_", "INVALID_KEY_", true}, // both invalid, but equal ignoring case
+		{"ns::KEY_", "ns::key_", true},         // both invalid
+		{"ns::KEY", "ns::KEY_", false},         // one valid, one invalid
 	}
 
 	for _, tt := range tests {

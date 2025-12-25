@@ -142,6 +142,9 @@ func (vr *VaultResolver) GetSecret(index int, key string) (*SecretValue, error) 
 	vr.mu.RLock()
 	defer vr.mu.RUnlock()
 
+	// Normalize key for lookup (graceful fallback for legacy keys)
+	key = NormalizeKeyForLookup(key)
+
 	if index < 0 || index >= len(vr.vaults) {
 		return nil, fmt.Errorf("vault index %d out of range", index)
 	}

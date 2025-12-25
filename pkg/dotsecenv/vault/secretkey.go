@@ -216,6 +216,16 @@ func NormalizeSecretKey(key string) (string, error) {
 	return sk.String(), nil
 }
 
+// NormalizeKeyForLookup normalizes a secret key for lookup operations.
+// If normalization fails (e.g., legacy key format), returns the original key unchanged.
+// This provides backward compatibility for existing vaults with non-conforming keys.
+func NormalizeKeyForLookup(key string) string {
+	if normalized, err := NormalizeSecretKey(key); err == nil {
+		return normalized
+	}
+	return key
+}
+
 // CompareSecretKeys compares two secret keys for equality, case-insensitively.
 // Both keys are normalized before comparison.
 func CompareSecretKeys(key1, key2 string) bool {
