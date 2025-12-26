@@ -58,10 +58,10 @@ func (c *Config) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-// DefaultConfig returns a new Config with FIPS 140-3 and FIPS 186-5 compliant defaults.
-// Algorithm minimums are set to meet federal compliance requirements:
+// DefaultConfig returns a new Config with FIPS 186-5 compliant algorithm defaults.
+// Algorithm minimums are set per the Digital Signature Standard:
 //   - RSA: 2048 bits minimum (FIPS 186-5)
-//   - ECC: P-384 and P-521 curves (FIPS 186-5: P-256 excluded)
+//   - ECC: P-384 and P-521 curves (FIPS 186-5, P-256 excluded)
 //   - EdDSA: Ed25519 and Ed448 (FIPS 186-5)
 func DefaultConfig() Config {
 	return Config{
@@ -135,7 +135,7 @@ func Save(path string, cfg Config) error {
 
 // IsAlgorithmAllowed checks if an algorithm is in the allow-list
 func (c Config) IsAlgorithmAllowed(algo string, bits int) bool {
-	// All algorithms are validated through asymmetric requirements (FIPS 140-3 compliant by default)
+	// All algorithms are validated through asymmetric requirements (FIPS 186-5 compliant by default)
 	if len(c.ApprovedAlgorithms) <= 0 {
 		return false
 	}

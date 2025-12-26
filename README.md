@@ -1,6 +1,6 @@
 # dotsecenv: Safe Environment Secrets
 
-A complete Go CLI application for securely managing environment secrets with GPG-based encryption, multi-user support, and FIPS 140-3 compliance.
+A complete Go CLI application for securely managing environment secrets with GPG-based encryption, multi-user support, and FIPS 186-5 compliant algorithm defaults.
 
 ## Quick Start
 
@@ -311,7 +311,7 @@ dotsecenv validate --fix  # Attempt to fix issues
 ## Features
 
 - **Explicit Initialization**: Safe bootstrapping of configuration and vaults
-- **Encrypted at Rest**: All secrets are encrypted using FIPS 140-3 compliant algorithms (AES-256-GCM)
+- **Encrypted at Rest**: All secrets are encrypted using AES-256-GCM (RFC 9580)
 - **Multi-User Support**: Secrets can be encrypted for multiple identities using GPG multi-recipient encryption
 - **Portable Vault**: The vault file can be safely committed to git and shared between machines
 - **Secret Sharing**: Share and revoke access to secrets with other team members
@@ -442,7 +442,7 @@ Each entry includes a hash and cryptographic signature to prevent against tamper
 - **[RFC 9580](https://www.rfc-editor.org/rfc/rfc9580.html) OpenPGP compliance**: Modern OpenPGP standard with mandatory AEAD encryption
 - **AES-256-GCM symmetric encryption**: NIST-approved authenticated encryption ([SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final))
 - **[FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final) digital signatures**: RSA, ECDSA, and EdDSA signature schemes for vault entry authenticity and non-repudiation
-- **FIPS 140-3 compliant defaults**: Algorithm minimums meet federal compliance requirements out of the box
+- **FIPS 186-5 compliant defaults**: Algorithm minimums meet the Digital Signature Standard requirements
 - Multi-recipient PGP encryption with hybrid cryptography
 - Hash-based integrity checking (SHA-256/SHA-512)
 - GPG agent integration for secure key management
