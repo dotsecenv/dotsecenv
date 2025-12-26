@@ -14,8 +14,6 @@ var initCmd = &cobra.Command{
 	Long:  `Initialize dotsecenv configuration file or vault files.`,
 }
 
-var initConfigFips bool
-
 var initConfigCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Initialize configuration file",
@@ -26,7 +24,7 @@ Use -c to specify a custom path.`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		targetConfig := clilib.ResolveConfigPath(globalOpts.ConfigPath, globalOpts.Silent, os.Stderr)
-		err := clilib.InitConfig(targetConfig, globalOpts.VaultPaths, initConfigFips, os.Stdout, os.Stderr)
+		err := clilib.InitConfig(targetConfig, globalOpts.VaultPaths, os.Stdout, os.Stderr)
 		if err != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, err)))
 		}
@@ -75,8 +73,6 @@ Note: Both -v and -c cannot be specified at the same time.`,
 }
 
 func init() {
-	initConfigCmd.Flags().BoolVar(&initConfigFips, "fips", false, "Generate config with FIPS 140-3 compliant algorithms only")
-
 	initCmd.AddCommand(initConfigCmd)
 	initCmd.AddCommand(initVaultCmd)
 }

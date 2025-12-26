@@ -11,9 +11,8 @@ import (
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
-// InitConfig initializes a configuration file with defaults
-// If fips is true, generates config with FIPS 140-3 compliant algorithms only
-func InitConfig(configPath string, initialVaults []string, fips bool, stdout, stderr io.Writer) *Error {
+// InitConfig initializes a configuration file with FIPS-compliant defaults
+func InitConfig(configPath string, initialVaults []string, stdout, stderr io.Writer) *Error {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
 		return NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
@@ -29,13 +28,8 @@ func InitConfig(configPath string, initialVaults []string, fips bool, stdout, st
 		return NewError(fmt.Sprintf("failed to create config directory: %v", err), ExitConfigError)
 	}
 
-	// Select config based on fips flag
-	var cfg config.Config
-	if fips {
-		cfg = config.FIPSConfig()
-	} else {
-		cfg = config.DefaultConfig()
-	}
+	// Use FIPS-compliant default configuration
+	cfg := config.DefaultConfig()
 
 	// Inject default vault paths (CLI specific behavior)
 	var vaultPaths []string

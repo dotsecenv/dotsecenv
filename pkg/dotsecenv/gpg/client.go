@@ -87,9 +87,12 @@ var curveMappings = map[string]string{
 	"secp256k1":  "ECC secp256k1",
 	"ed25519":    "EdDSA Ed25519",
 	"Ed25519":    "EdDSA Ed25519",
+	"ed448":      "EdDSA Ed448",
+	"Ed448":      "EdDSA Ed448",
 	"cv25519":    "X25519",
 	"x25519":     "X25519",
 	"curve25519": "X25519",
+	"cv448":      "X448",
 	"x448":       "X448",
 	"curve448":   "X448",
 }

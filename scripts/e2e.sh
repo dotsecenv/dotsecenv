@@ -5,29 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BIN="$PROJECT_DIR/bin/dotsecenv"
 
-# Parse arguments
-FIPS_MODE=false
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -f|--fips)
-            FIPS_MODE=true
-            shift
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Usage: $0 [-f|--fips]"
-            exit 1
-            ;;
-    esac
-done
-
-if [[ "$FIPS_MODE" == "true" ]]; then
-    echo "==> Running in FIPS mode"
-    INIT_FLAGS="--fips"
-else
-    INIT_FLAGS=""
-fi
-
 # Create isolated GPG home
 GNUPGHOME="$(mktemp -d)"
 export GNUPGHOME
@@ -65,8 +42,7 @@ echo "==> Key 2: $KEY2"
 echo "==> Initializing vaults"
 rm -f ~/.config/dotsecenv/config ~/.local/share/dotsecenv/vault .dotsecenv/vault
 mkdir -p ~/.local/share/dotsecenv .dotsecenv
-# shellcheck disable=SC2086
-"$BIN" init config $INIT_FLAGS
+"$BIN" init config
 "$BIN" init vault -v .dotsecenv/vault
 "$BIN" init vault -v ~/.local/share/dotsecenv/vault
 
