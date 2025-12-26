@@ -353,12 +353,7 @@ function _dotsecenv_cd_hook --on-variable PWD
     # Update previous directory tracker
     set -g _DOTSECENV_PREV_PWD "$PWD"
 
-    # Skip if directory hasn't actually changed
-    if test "$old_dir" = "$new_dir"
-        return
-    end
-
-    # Process the directory change
+    # Process the directory change (allows cd . to reload .secenv files)
     _dotsecenv_on_cd "$old_dir" "$new_dir"
 end
 

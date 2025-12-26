@@ -23,34 +23,33 @@ else
     return 1
 fi
 
-# Track the previous directory for change detection
+# Track the previous directory
 _DOTSECENV_PREV_PWD=""
 
-# Hook function called via PROMPT_COMMAND
-_dotsecenv_prompt_command() {
+# Hook function to process directory change (allows cd . to reload .secenv files)
+_dotsecenv_chdir_hook() {
     local old_dir="$_DOTSECENV_PREV_PWD"
-    local new_dir="$PWD"
-
-    # Update previous directory tracker
     _DOTSECENV_PREV_PWD="$PWD"
-
-    # Skip if directory hasn't actually changed
-    [[ "$old_dir" == "$new_dir" ]] && return
-
-    # Process the directory change
-    _dotsecenv_on_cd "$old_dir" "$new_dir"
+    _dotsecenv_on_cd "$old_dir" "$PWD"
 }
 
-# Register the hook via PROMPT_COMMAND
-# Prepend our function to ensure it runs before other hooks
-if [[ -z "$PROMPT_COMMAND" ]]; then
-    PROMPT_COMMAND="_dotsecenv_prompt_command"
-else
-    # Check if already registered
-    if [[ "$PROMPT_COMMAND" != *"_dotsecenv_prompt_command"* ]]; then
-        PROMPT_COMMAND="_dotsecenv_prompt_command${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
-    fi
-fi
+# Wrap cd to trigger directory change processing
+cd() {
+    builtin cd "$@" || return $?
+    _dotsecenv_chdir_hook
+}
+
+# Wrap pushd to trigger directory change processing
+pushd() {
+    builtin pushd "$@" || return $?
+    _dotsecenv_chdir_hook
+}
+
+# Wrap popd to trigger directory change processing
+popd() {
+    builtin popd "$@" || return $?
+    _dotsecenv_chdir_hook
+}
 
 # Process current directory on plugin load (initial shell startup)
-_dotsecenv_prompt_command
+_dotsecenv_chdir_hook

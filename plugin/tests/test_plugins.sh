@@ -149,8 +149,8 @@ run_with_plugin_bash() {
         source '$SHELL_DIR/_dotsecenv_core.sh'
         source '$SHELL_DIR/dotsecenv.plugin.bash'
         cd '$test_dir'
-        # Trigger the prompt command
-        _dotsecenv_prompt_command
+        # Trigger directory change hook
+        _dotsecenv_chdir_hook
         $cmd
     " 2>&1
 }
@@ -364,7 +364,7 @@ EOF
             source '$SHELL_DIR/_dotsecenv_core.sh'
             source '$SHELL_DIR/dotsecenv.plugin.bash'
             cd '$test_dir'
-            _dotsecenv_prompt_command
+            _dotsecenv_chdir_hook
             echo \"\$API_KEY\"
         " 2>&1)
     else

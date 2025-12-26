@@ -392,7 +392,7 @@ EOF
         source ~/.bashrc 2>/dev/null || true
         source ~/.oh-my-bash/custom/plugins/dotsecenv/_dotsecenv_core.sh
         source ~/.oh-my-bash/custom/plugins/dotsecenv/dotsecenv.plugin.bash
-        _dotsecenv_prompt_command
+        _dotsecenv_chdir_hook
 
         if [[ "$TEST_SECRET" == "secret-value-12345" ]]; then
             echo "SUCCESS: Oh My Bash plugin works"

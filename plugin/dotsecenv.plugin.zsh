@@ -34,10 +34,7 @@ _dotsecenv_chpwd() {
     # Update previous directory tracker
     _DOTSECENV_PREV_PWD="$PWD"
 
-    # Skip if directory hasn't actually changed
-    [[ "$old_dir" == "$new_dir" ]] && return
-
-    # Process the directory change
+    # Process the directory change (allows cd . to reload .secenv files)
     _dotsecenv_on_cd "$old_dir" "$new_dir"
 }
 
