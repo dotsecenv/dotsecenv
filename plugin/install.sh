@@ -6,7 +6,7 @@
 #
 # Options:
 #   --shell=SHELL    Install for specific shell (bash, zsh, fish, or all). Default: all
-#   --dir=DIR        Installation directory. Default: ~/.local/share/dotsecenv/shell
+#   --dir=DIR        Installation directory. Default: ~/.local/share/dotsecenv
 #   --no-rc          Don't modify shell RC files
 #   --uninstall      Remove installed plugins
 
@@ -15,7 +15,7 @@ set -euo pipefail
 # Configuration
 REPO_URL="https://github.com/dotsecenv/plugin.git"
 REPO_BRANCH="main"
-DEFAULT_INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/dotsecenv/shell"
+DEFAULT_INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/dotsecenv"
 
 # Colors (if terminal supports them)
 if [[ -t 1 ]]; then
