@@ -8,10 +8,28 @@ before:
     - make build completions man docs
 
 builds:
-  - env:
-      - CGO_ENABLED=0
+  # Linux builds with BoringCrypto (FIPS-approved cryptography)
+  - id: linux
+    env:
+      - CGO_ENABLED=1
+      - GOEXPERIMENT=boringcrypto
     goos:
       - linux
+    goarch:
+      - amd64
+      - arm64
+    binary: dotsecenv
+    main: ./cmd/dotsecenv
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+  # macOS builds (BoringCrypto not available, use standard crypto)
+  - id: darwin
+    env:
+      - CGO_ENABLED=0
+    goos:
       - darwin
     goarch:
       - amd64

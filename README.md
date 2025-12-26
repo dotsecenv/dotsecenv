@@ -443,6 +443,7 @@ Each entry includes a hash and cryptographic signature to prevent against tamper
 - **AES-256-GCM symmetric encryption**: NIST-approved authenticated encryption ([SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final))
 - **[FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final) digital signatures**: RSA, ECDSA, and EdDSA signature schemes for vault entry authenticity and non-repudiation
 - **FIPS 186-5 compliant defaults**: Algorithm minimums meet the Digital Signature Standard requirements
+- **BoringCrypto (Linux)**: Linux release binaries are built with Go's BoringCrypto backend (`GOEXPERIMENT=boringcrypto`) for FIPS-validated cryptographic primitives
 - Multi-recipient PGP encryption with hybrid cryptography
 - Hash-based integrity checking (SHA-256/SHA-512)
 - GPG agent integration for secure key management
@@ -566,9 +567,14 @@ GPG error: gpg: decryption failed: No secret key
 ### Building
 
 ```bash
-# Build the binary
+# Build with BoringCrypto (FIPS-approved, requires CGO)
 make build
+
+# Build static binary (no CGO, standard Go crypto)
+make build-static
 ```
+
+The default `make build` uses `GOEXPERIMENT=boringcrypto` which provides FIPS-validated cryptographic primitives on Linux. This requires CGO to be enabled. For environments where CGO is not available, use `make build-static`.
 
 ### Testing
 
