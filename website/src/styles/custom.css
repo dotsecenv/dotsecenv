@@ -1,0 +1,342 @@
+/* dotsecenv custom theme - Dark mode optimized */
+
+:root {
+  /* Typography */
+  --sl-font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Line height for readability */
+  --sl-line-height: 1.65;
+  --sl-line-height-headings: 1.3;
+
+  /* Content width - single readable column */
+  --sl-content-width: 70ch;
+}
+
+/* Dark theme colors */
+:root,
+:root[data-theme='dark'] {
+  /* Neutral backgrounds */
+  --sl-color-bg: #0f0f0f;
+  --sl-color-bg-nav: #0a0a0a;
+  --sl-color-bg-sidebar: #0a0a0a;
+  --sl-color-bg-inline-code: #1a1a1a;
+
+  /* Accent color for links and buttons */
+  --sl-color-accent: #60a5fa;
+  --sl-color-accent-low: #1e3a5f;
+  --sl-color-accent-high: #93c5fd;
+
+  /* Text colors */
+  --sl-color-text: #e5e5e5;
+  --sl-color-text-accent: #60a5fa;
+
+  /* Borders */
+  --sl-color-hairline: #262626;
+  --sl-color-hairline-light: #1a1a1a;
+
+  /* Code blocks */
+  --sl-color-code-bg: #0d0d0d;
+}
+
+/* Light theme adjustments */
+:root[data-theme='light'] {
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #fafafa;
+  --sl-color-bg-sidebar: #fafafa;
+  --sl-color-bg-inline-code: #f5f5f5;
+
+  --sl-color-accent: #2563eb;
+  --sl-color-accent-low: #dbeafe;
+  --sl-color-accent-high: #1d4ed8;
+
+  --sl-color-text: #171717;
+
+  --sl-color-hairline: #e5e5e5;
+  --sl-color-hairline-light: #f5f5f5;
+
+  --sl-color-code-bg: #f8f8f8;
+}
+
+/* Monospaced headers for terminal aesthetic */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--sl-font-mono);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* Improved heading spacing */
+.sl-markdown-content h1 {
+  font-size: 2rem;
+  margin-top: 0;
+}
+
+.sl-markdown-content h2 {
+  font-size: 1.5rem;
+  margin-top: 2.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+.sl-markdown-content h3 {
+  font-size: 1.25rem;
+  margin-top: 2rem;
+}
+
+/* Terminal-like code blocks */
+pre {
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 6px;
+}
+
+/* Inline code styling */
+:not(pre) > code {
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+/* Table styling - clean borders */
+table {
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+
+th, td {
+  border: 1px solid var(--sl-color-hairline);
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+
+th {
+  background: var(--sl-color-bg-inline-code);
+  font-family: var(--sl-font-mono);
+  font-weight: 500;
+  font-size: 0.9em;
+}
+
+.sl-markdown-content > table td, th {
+  padding: 0.5em !important;
+}
+
+/* Sidebar styling */
+.sidebar-content {
+  font-size: 0.9rem;
+}
+
+/* Clean link styling */
+a {
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Blockquotes */
+blockquote {
+  border-left: 3px solid var(--sl-color-accent);
+  padding-left: 1rem;
+  margin-left: 0;
+  color: var(--sl-color-gray-3);
+  font-style: italic;
+}
+
+/* Focus states for accessibility */
+:focus-visible {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: 2px;
+}
+
+/* Install tabs custom styling */
+.install-tabs {
+  margin: 1.5rem 0;
+}
+
+.install-tabs [role="tablist"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--sl-color-hairline);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.install-tabs [role="tab"] {
+  font-family: var(--sl-font-mono);
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  color: var(--sl-color-gray-3);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.install-tabs [role="tab"]:hover {
+  background: var(--sl-color-bg-inline-code);
+  color: var(--sl-color-text);
+}
+
+.install-tabs [role="tab"][aria-selected="true"] {
+  background: var(--sl-color-bg-inline-code);
+  border-color: var(--sl-color-hairline);
+  border-bottom-color: var(--sl-color-bg);
+  color: var(--sl-color-accent);
+  margin-bottom: -1px;
+}
+
+/* Hero section styling for homepage */
+.hero-section {
+  text-align: center;
+  padding: 2rem 0 3rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+.hero-section h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.hero-tagline {
+  font-size: 1.25rem;
+  color: var(--sl-color-gray-3);
+  margin-bottom: 1.5rem;
+}
+
+/* Feature grid */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.feature-card {
+  padding: 1.25rem;
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 8px;
+  background: var(--sl-color-bg-inline-code);
+}
+
+.feature-card h3 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+  color: var(--sl-color-accent);
+}
+
+.feature-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--sl-color-gray-3);
+}
+
+/* Principles list styling */
+.principles-list {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0;
+}
+
+.principles-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--sl-color-hairline-light);
+}
+
+.principles-list li:last-child {
+  border-bottom: none;
+}
+
+.principles-list .icon {
+  color: var(--sl-color-accent);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+/* Command reference sections */
+.command-section {
+  margin-bottom: 3rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+.command-section:last-child {
+  border-bottom: none;
+}
+
+.command-synopsis {
+  font-family: var(--sl-font-mono);
+  background: var(--sl-color-code-bg);
+  padding: 1rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.command-flags {
+  margin: 1rem 0;
+}
+
+.command-flags dt {
+  font-family: var(--sl-font-mono);
+  color: var(--sl-color-accent);
+  margin-top: 1rem;
+}
+
+.command-flags dd {
+  margin-left: 0;
+  padding-left: 1.5rem;
+  color: var(--sl-color-gray-3);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  :root {
+    --sl-content-width: 100%;
+  }
+
+  .hero-section h1 {
+    font-size: 2rem;
+  }
+
+  .hero-tagline {
+    font-size: 1.1rem;
+  }
+
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Starlight hero section - reduce vertical spacing */
+.hero {
+  padding-block: 0rem !important;
+}
+
+/* Adjust hero logo vertical alignment */
+.hero img {
+  margin-bottom: -3rem;
+}
+
+/* Site header title color */
+.title-wrapper span {
+  color: #42a26a;
+}
+
+/* Print styles */
+@media print {
+  .sidebar,
+  .right-sidebar,
+  [data-pagefind-ignore] {
+    display: none !important;
+  }
+
+  .main-pane {
+    max-width: 100% !important;
+  }
+}

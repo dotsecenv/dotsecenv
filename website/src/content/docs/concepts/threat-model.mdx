@@ -1,0 +1,350 @@
+---
+title: Security Model
+description: What dotsecenv protects against and its security boundaries
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Overview
+
+dotsecenv uses a layered encryption model combining symmetric and asymmetric cryptography. Understanding what it protects—and what it doesn't—helps you use it effectively.
+
+## Encryption Model
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Secret Value                            │
+│                    "my-password"                            │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│           Symmetric Encryption (AES-256-GCM)                │
+│                                                             │
+│   Random session key (256-bit) + Nonce (96-bit)            │
+│   → Encrypted data + Authentication tag                     │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│             Asymmetric Encryption (GPG)                     │
+│                                                             │
+│   Session key encrypted for each recipient's public key    │
+│   → One key blob per authorized identity                    │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│            Cryptographic Signature (GPG)                    │
+│                                                             │
+│   SHA-256/SHA-512 hash signed with originator's key        │
+│   → Detached signature for integrity + non-repudiation     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Why Hybrid Encryption?
+
+Asymmetric encryption (RSA/ECC) is slow for large data. Symmetric encryption (AES) is fast but requires secure key exchange.
+
+Hybrid encryption gets the best of both:
+
+1. Generate a random **session key** (fast)
+2. Encrypt data with **AES-256-GCM** using session key (fast, authenticated)
+3. Encrypt session key with each **recipient's public key** (slow, but small data)
+4. Sign the result with **originator's private key** (authenticity)
+
+### Multi-Recipient Efficiency
+
+When sharing a secret with 5 people, the secret is encrypted **once**. Only the session key is encrypted 5 times:
+
+```
+Secret Value  → AES-256-GCM  → Encrypted Data (1 copy)
+                    │
+                    ├─→ Session key encrypted for Alice
+                    ├─→ Session key encrypted for Bob
+                    ├─→ Session key encrypted for Carol
+                    ├─→ Session key encrypted for Dave
+                    └─→ Session key encrypted for Eve
+```
+
+---
+
+## What dotsecenv Protects Against
+
+### Accidental Git Commits
+
+The primary threat model. Secrets are encrypted in the vault file, so committing it doesn't expose plaintext.
+
+```bash
+git add vault.jsonl   # Safe—secrets are encrypted
+git push              # Only encrypted blobs pushed
+```
+
+An attacker who obtains the vault file cannot read secrets without the private keys.
+
+### Unauthorized File Access
+
+If someone accesses your filesystem (backup, shared drive, stolen laptop), they see only:
+
+- Encrypted JSONL entries
+- Public key metadata (fingerprints, UIDs)
+- Timestamps
+
+**No plaintext secrets.**
+
+### Tampering
+
+Every vault entry includes a cryptographic signature. If someone modifies an entry:
+
+```bash
+dotsecenv validate
+# Error: signature verification failed for entry 42
+```
+
+The signature is created with the originator's private key, so:
+
+- You know who created each entry
+- You can detect modifications
+- There's non-repudiation for audits
+
+### Algorithm Downgrade
+
+The config file specifies minimum algorithm requirements:
+
+```yaml
+approved_algorithms:
+  - rsa:3072
+  - ecdsa:p384
+  - eddsa:ed25519
+```
+
+dotsecenv refuses to encrypt/decrypt with weaker algorithms.
+
+### SUID Privilege Escalation
+
+In SUID mode, dotsecenv blocks write operations to prevent privilege escalation attacks. Read operations only.
+
+---
+
+## What dotsecenv Does NOT Protect Against
+
+<Aside type="caution" title="Security boundaries">
+No tool provides absolute security. Understanding these limits is essential.
+</Aside>
+
+### Root/Admin Access
+
+An attacker with root access to your system can:
+
+- Read process memory
+- Intercept GPG passphrase entry
+- Access decrypted secrets in environment variables
+- Attach debuggers to running processes
+
+**Mitigation:** Full-disk encryption, secure boot, hardware security modules (HSMs).
+
+### Compromised Private Key
+
+If your GPG private key is stolen, the attacker can:
+
+- Decrypt any secret encrypted to your key
+- Impersonate you (create signatures)
+- Access historical vault entries
+
+**Mitigation:** Strong passphrase, hardware tokens (YubiKey), key rotation.
+
+### Environment Snooping
+
+Once a secret is decrypted and set as an environment variable, any process can read it:
+
+```bash
+# Other processes can see this
+cat /proc/$$/environ | tr '\0' '\n' | grep SECRET
+```
+
+**Mitigation:** Minimal scope, process isolation, containers.
+
+### Side-Channel Attacks
+
+Timing attacks, cache attacks, and other side-channel techniques are out of scope:
+
+- Requires specialized hardware/software
+- Mitigated at the GPG/OpenSSL layer
+- Defense in depth with secure infrastructure
+
+### Quantum Attacks
+
+Current public-key cryptography (RSA, ECC) is vulnerable to quantum computers:
+
+- Shor's algorithm breaks RSA/ECC
+- AES-256 remains strong (Grover's algorithm halves effective key size)
+
+**Mitigation:** GPG is working on post-quantum algorithms. When available, dotsecenv will support them.
+
+### Time-Tampering
+
+dotsecenv trusts the system clock. Timestamps in vault entries can be manipulated by setting system time before storage.
+
+This is acceptable because:
+- Attackers can't modify existing entries (signatures prevent this)
+- Consumers can choose to trust/distrust specific fingerprints
+- The primary use case is developer workflows, not forensic timestamping
+
+---
+
+## Cryptographic Guarantees
+
+| Property | Mechanism | Strength |
+|----------|-----------|----------|
+| Confidentiality | AES-256-GCM | 256-bit symmetric |
+| Key protection | GPG (RSA/ECC) | 2048-bit+ RSA, P-384+ ECC |
+| Integrity | AEAD + HMAC | 128-bit authentication tag |
+| Authenticity | Detached signatures | SHA-256/SHA-512 |
+| Non-repudiation | GPG signatures | Tied to specific key |
+
+---
+
+## Standards Compliance
+
+dotsecenv cryptographic operations align with the following NIST and IETF standards:
+
+### Symmetric Encryption
+
+**[RFC 9580](https://www.rfc-editor.org/rfc/rfc9580.html)** — OpenPGP (2024 revision)
+- Mandates AEAD (Authenticated Encryption with Associated Data)
+- AES-256-GCM as the default symmetric cipher
+- Replaces RFC 4880's CFB mode with modern authenticated encryption
+
+<Aside type="note" title="Cipher negotiation">
+dotsecenv uses gopenpgp's `profile.RFC9580()` which sets AES-256-GCM as the preferred cipher and enables AEAD mode. However, OpenPGP performs cipher negotiation based on recipient key preferences. The actual cipher used depends on what the recipient's public key advertises it supports. RFC 9580-compliant keys must support AES-256-GCM, so messages between modern keys will use it. When decrypting messages from older RFC 4880 implementations, legacy ciphers may be encountered.
+</Aside>
+
+**[NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final)** — GCM Mode
+- Specifies Galois/Counter Mode for AES
+- Provides both confidentiality and authenticity
+- 128-bit authentication tags prevent tampering
+
+### Digital Signatures
+
+**[FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final)** — Digital Signature Standard (2023)
+- Approves RSA, ECDSA, and EdDSA for digital signatures
+- Deprecates DSA (removed from dotsecenv's approved algorithms)
+- EdDSA (Ed25519, Ed448) added as approved algorithms
+
+Vault entries are signed using FIPS 186-5 compliant algorithms:
+- **RSA** — RSASSA-PKCS1-v1_5 or RSASSA-PSS (2048-bit minimum)
+- **ECDSA** — P-384, P-521 curves
+- **EdDSA** — Ed25519 for performance, Ed448 for higher security
+
+### Cryptographic Modules
+
+**[FIPS 140-3](https://csrc.nist.gov/pubs/fips/140-3/final)** — Security Requirements for Cryptographic Modules
+- Default configuration enforces FIPS-compliant algorithm minimums
+- Actual compliance depends on underlying GPG/libgcrypt installation
+- Use FIPS-validated cryptographic libraries in regulated environments
+
+### BoringCrypto (Linux Builds)
+
+Linux release binaries are built with Go's BoringCrypto backend (`GOEXPERIMENT=boringcrypto`), which provides FIPS-validated cryptographic primitives:
+
+- BoringCrypto replaces Go's standard crypto implementations with BoringSSL
+- BoringSSL is a fork of OpenSSL maintained by Google, certified for FIPS 140-2/140-3
+- Provides hardware-accelerated AES, SHA, and RSA/ECC operations
+- macOS builds use standard Go cryptography (BoringCrypto not available)
+
+<Aside type="tip">
+For maximum standards compliance, combine dotsecenv with a FIPS-validated GPG installation built against a certified libgcrypt or OpenSSL module.
+</Aside>
+
+---
+
+## Default Algorithm Requirements
+
+dotsecenv uses FIPS 186-5 compliant defaults out of the box:
+
+| Component | Algorithm |
+|-----------|-----------|
+| Symmetric | AES-256-GCM |
+| Hash | SHA-256/SHA-512 |
+| Asymmetric | RSA 2048+, ECC P-384/P-521, EdDSA Ed25519/Ed448 |
+
+<Aside type="note">
+Compliance is only as strong as your underlying GPG installation. For regulated environments, ensure you're using a FIPS-validated OpenSSL/libgcrypt.
+</Aside>
+
+---
+
+## Secure Memory Handling
+
+dotsecenv implements secure memory practices:
+
+| Technique | Purpose |
+|-----------|---------|
+| `mlock()` | Prevent swapping secret data to disk |
+| Secure zeroing | Overwrite memory after use |
+| Process isolation | GPG operations in separate processes |
+| File locking | Prevent concurrent corruption |
+
+---
+
+## Signature Verification
+
+Every vault entry is signed. Verification happens on read:
+
+```
+Entry signature covers:
+├── Secret key name
+├── Available-to list (fingerprints)
+├── Encrypted value blob
+├── Timestamp
+└── Originator fingerprint
+```
+
+If any field is modified, verification fails:
+
+```bash
+dotsecenv validate
+# ✓ Vault header: valid
+# ✓ Identity entries: 2 valid
+# ✗ Secret entry 5: signature mismatch
+# Error: vault validation failed
+```
+
+---
+
+## Vault Safety in Public Repositories
+
+The vault is designed to be safe in public repositories:
+
+- All secrets encrypted with AES-256-GCM
+- Session keys protected by GPG public-key encryption
+- No plaintext secrets in any entry
+- Public keys and fingerprints are not sensitive
+
+**However**, defense in depth recommends:
+
+- Private repositories when possible
+- Access control at repository level
+- Regular key rotation
+
+<Aside type="caution">
+The security of your vault depends on:
+1. Strength of GPG keys (use 4096-bit RSA or ECC)
+2. Security of private key storage (passphrase, hardware token)
+3. Not sharing private keys
+</Aside>
+
+---
+
+## Summary
+
+| Threat | Protected? | Notes |
+|--------|------------|-------|
+| Git exposure | Yes | Encrypted at rest |
+| File theft | Yes | Requires private key |
+| Tampering | Yes | Signature verification |
+| Weak algorithms | Yes | Config-enforced minimums |
+| Root access | No | OS-level compromise |
+| Key theft | No | Guard your private key |
+| Env snooping | No | Post-decryption risk |
+| Quantum | No | Future GPG update |

@@ -1,0 +1,249 @@
+---
+title: Installation
+description: Step-by-step installation guide for all platforms
+---
+
+import { Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components';
+
+## Goal
+
+Install dotsecenv on your system and verify it's working correctly.
+
+## Steps
+
+<Steps>
+
+1. **Choose your installation method**
+
+   <Tabs>
+     <TabItem label="macOS (Homebrew)">
+       Homebrew is the recommended method for macOS:
+
+       ```bash
+       brew tap dotsecenv/tap
+       brew install dotsecenv
+       ```
+
+       This automatically installs shell completions.
+     </TabItem>
+
+     <TabItem label="macOS (Binary)">
+       Download the binary directly:
+
+       ```bash
+       # Apple Silicon (M1/M2/M3)
+       curl -LO https://get.dotsecenv.com/darwin/dotsecenv_0.0.13_Darwin_arm64.tar.gz
+
+       # Intel Mac
+       curl -LO https://get.dotsecenv.com/darwin/dotsecenv_0.0.13_Darwin_x86_64.tar.gz
+
+       # Verify checksum
+       curl -s https://get.dotsecenv.com/darwin/checksums.txt | sha256sum -c --ignore-missing
+
+       # Extract and install
+       tar -xzf dotsecenv_*.tar.gz
+       sudo mv dotsecenv /usr/local/bin/
+       ```
+     </TabItem>
+
+     <TabItem label="Debian/Ubuntu">
+       Add the apt repository:
+
+       ```bash
+       # Trust the GPG key
+       curl -fsSL https://get.dotsecenv.com/key.asc | \
+         sudo gpg --dearmor -o /etc/apt/keyrings/dotsecenv.gpg
+
+       # Add the repository
+       echo "deb [signed-by=/etc/apt/keyrings/dotsecenv.gpg] \
+         https://get.dotsecenv.com/apt/ ./" | \
+         sudo tee /etc/apt/sources.list.d/dotsecenv.list
+
+       # Install
+       sudo apt-get update
+       sudo apt-get install dotsecenv
+       ```
+     </TabItem>
+
+     <TabItem label="Fedora/RHEL">
+       Add the yum repository:
+
+       ```bash
+       cat <<EOF | sudo tee /etc/yum.repos.d/dotsecenv.repo
+       [dotsecenv]
+       name=DotSecEnv Repository
+       baseurl=https://get.dotsecenv.com/yum/
+       enabled=1
+       gpgcheck=1
+       repo_gpgcheck=1
+       gpgkey=https://get.dotsecenv.com/key.asc
+       EOF
+
+       sudo dnf install dotsecenv
+       ```
+     </TabItem>
+
+     <TabItem label="Arch Linux">
+       Add to pacman:
+
+       ```bash
+       # Add to pacman.conf
+       cat <<'EOF' | sudo tee -a /etc/pacman.conf
+       [dotsecenv]
+       Server = https://get.dotsecenv.com/arch/$arch
+       SigLevel = Required DatabaseOptional
+       EOF
+
+       # Trust the key
+       curl -fsSL https://get.dotsecenv.com/key.asc | sudo pacman-key --add -
+       sudo pacman-key --lsign-key E60A1740BAEF49284D22EA7D3C376348F0921C59
+
+       # Install
+       sudo pacman -Sy dotsecenv
+       ```
+     </TabItem>
+
+     <TabItem label="mise">
+       If you use [mise](https://mise.jdx.dev/):
+
+       ```bash
+       mise use github:dotsecenv/dotsecenv
+       ```
+     </TabItem>
+
+     <TabItem label="From Source">
+       Build from source (requires Go 1.25+):
+
+       ```bash
+       git clone https://github.com/dotsecenv/dotsecenv.git
+       cd dotsecenv
+       make build
+       sudo mv bin/dotsecenv /usr/local/bin/
+       ```
+     </TabItem>
+   </Tabs>
+
+2. **Verify the installation**
+
+   ```bash
+   dotsecenv version
+   ```
+
+   You should see output like:
+   ```
+   dotsecenv version 0.0.13
+   ```
+
+3. **Install shell completions** (if not automatic)
+
+   <Tabs>
+     <TabItem label="Bash">
+       ```bash
+       # System-wide
+       dotsecenv completion bash | sudo tee /etc/bash_completion.d/dotsecenv
+
+       # Or user-level (add to ~/.bashrc)
+       eval "$(dotsecenv completion bash)"
+       ```
+     </TabItem>
+
+     <TabItem label="Zsh">
+       ```bash
+       # Add to ~/.zshrc
+       eval "$(dotsecenv completion zsh)"
+       ```
+     </TabItem>
+
+     <TabItem label="Fish">
+       ```bash
+       # Add to ~/.config/fish/config.fish
+       dotsecenv completion fish | source
+       ```
+     </TabItem>
+   </Tabs>
+
+</Steps>
+
+## Expected Result
+
+After installation, you should be able to:
+
+```bash
+# Check version
+dotsecenv version
+
+# See available commands
+dotsecenv --help
+
+# Tab-complete commands (after shell restart)
+dotsecenv <TAB>
+```
+
+## Variations
+
+### Installing a Specific Version
+
+Download a specific version from GitHub releases:
+
+```bash
+VERSION="0.0.12"
+curl -LO "https://github.com/dotsecenv/dotsecenv/releases/download/v${VERSION}/dotsecenv_${VERSION}_Linux_x86_64.tar.gz"
+```
+
+### Verifying Package Signatures
+
+All packages are signed with the dotsecenv release key:
+
+```
+pub   rsa4096 2025-12-19 [SC] [expires: 2027-12-19]
+      E60A1740BAEF49284D22EA7D3C376348F0921C59
+uid   DotSecEnv Releases <release@dotsecenv.com>
+```
+
+Verify the key from multiple sources:
+
+```bash
+# OpenPGP Keyserver
+gpg --keyserver keys.openpgp.org --recv-keys E60A1740BAEF49284D22EA7D3C376348F0921C59
+
+# Keybase
+curl https://keybase.io/dotsecenv/pgp_keys.asc | gpg --import
+```
+
+### Uninstalling
+
+<Tabs>
+  <TabItem label="Homebrew">
+    ```bash
+    brew uninstall dotsecenv
+    brew untap dotsecenv/tap
+    ```
+  </TabItem>
+
+  <TabItem label="apt">
+    ```bash
+    sudo apt-get remove dotsecenv
+    sudo rm /etc/apt/sources.list.d/dotsecenv.list
+    ```
+  </TabItem>
+
+  <TabItem label="Binary">
+    ```bash
+    sudo rm /usr/local/bin/dotsecenv
+    ```
+  </TabItem>
+</Tabs>
+
+<Aside type="note">
+Uninstalling dotsecenv does not remove your vault or config files. To remove all data:
+```bash
+rm -rf ~/.config/dotsecenv
+```
+</Aside>
+
+---
+
+## Next Steps
+
+- [First Secret](/tutorials/first-secret/) — Store and use your first secret
+- [Getting Started](/getting-started/) — Complete initial setup

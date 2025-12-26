@@ -1,0 +1,25 @@
+{
+  "name": "dotsecenv-website",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=25"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.32.0",
+    "asciinema-player": "^3.13.5",
+    "astro": "^5.1.1",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@fontsource/inter": "^5.1.1",
+    "@fontsource/jetbrains-mono": "^5.1.1"
+  }
+}

@@ -1,0 +1,238 @@
+---
+title: dotsecenv
+description: Safe environment variables, encrypted at rest using GPG
+template: splash
+hero:
+  image:
+    file: ../../assets/logo.png
+    alt: dotsecenv logo
+  tagline: Safe environment variables — encrypted at rest, safe to commit, easy to share.
+  actions:
+    - text: Get Started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/dotsecenv
+      icon: external
+---
+
+import { Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import AsciinemaPlayer from '../../components/AsciinemaPlayer.astro';
+
+## What can go wrong?
+
+```bash
+echo "AWS_SECRET_ACCESS_KEY=your-secret-key" > .env
+git add --all && git commit -m "..."
+git push
+
+# Credentials leaked to the world!
+```
+
+In 2024, [according to GitHub](https://resources.github.com/enterprise/understanding-secret-leak-exposure/) 39 million secrets were committed to public repositories. Once exposed, attackers can compromise your infrastructure, sometimes within minutes.
+
+## How `dotsecenv` helps
+
+`dotsecenv` encrypts your secrets at rest using GPG and AES-256-GCM, making them safe to commit alongside your code:
+
+```bash
+# Store a secret (encrypted in vault, safe to commit)
+echo "your-secret-key" | dotsecenv secret put AWS_SECRET_ACCESS_KEY
+
+# Retrieve when needed (decrypted on-demand)
+dotsecenv secret get AWS_SECRET_ACCESS_KEY
+
+# Share with teammates
+dotsecenv secret share AWS_SECRET_ACCESS_KEY teammate@company.com
+
+# Decrypt on-demand using the dotsecenv shell plugin
+echo 'echo "AWS_SECRET_ACCESS_KEY={dotsecenv}" > .secenv'
+cd . # loads secrets defined in .secenv
+echo "$AWS_SECRET_ACCESS_KEY" # is now set to 'your-secret-key'
+```
+
+## Principles
+
+<CardGrid>
+  <Card title="Open source" icon="open-book">
+    Fully open source. Audit the code yourself.
+  </Card>
+  <Card title="No data collection" icon="approve-check">
+    No telemetry, no call-home features. Your secrets stay yours.
+  </Card>
+  <Card title="No centralized keys" icon="random">
+    Uses existing GPG keys. No cloud services required.
+  </Card>
+  <Card title="Unix philosophy" icon="puzzle">
+    Does one thing well. Composable with git, gpg, and your shell.
+    <a href="/concepts/philosophy/">Read more →</a>
+  </Card>
+</CardGrid>
+
+## What It Does
+
+dotsecenv is a secrets management CLI and shell integration that protects credentials from accidental exposure. It uses hybrid encryption (AES-256-GCM for data, GPG for key exchange) to encrypt secrets in a portable vault file that's safe to commit to git.
+
+Key capabilities:
+- **Store secrets** encrypted in a JSONL vault file
+- **Share secrets** with teammates using GPG multi-recipient encryption
+- **Auto-load secrets** when entering directories, via  shell plugins (zsh/bash/fish)
+- **Built-in auditability** with append-only operations
+- **Validate integrity** with cryptographic signatures
+
+---
+
+## Demo
+
+Here's what a typical dotsecenv workflow looks like:
+
+```bash
+# 1. Configure dotsecenv
+dotsecenv init config
+dotsecenv init vault
+dotsecenv login [YOUR_PUBLIC_KEY_FINGERPRINT] # see `gpg --list-secret-keys` 
+
+# 2. Create your first secret
+echo "my-database-password" | dotsecenv secret put DATABASE_PASSWORD
+
+# 3. Retrieve it
+dotsecenv secret get DATABASE_PASSWORD
+# Output: my-database-password
+
+# 4. Load secrets ondemand with built-in shell integration
+echo 'DATABASE_PASSWORD={dotsecenv}' > .secenv
+cd .  # Trigger shell plugin
+echo $DATABASE_PASSWORD
+# Output: my-database-password
+```
+
+<AsciinemaPlayer src="/demo.cast" rows={24} cols={125} idleTimeLimit={2} />
+
+---
+
+## Install
+
+<Tabs>
+  <TabItem label="macOS">
+    ```bash
+    # Homebrew (recommended)
+    brew tap dotsecenv/tap
+    brew install dotsecenv
+    ```
+
+    Or download directly:
+    ```bash
+    # Apple Silicon (M1/M2/M3)
+    curl -LO https://get.dotsecenv.com/darwin/dotsecenv_0.0.13_Darwin_arm64.tar.gz
+
+    # Intel
+    curl -LO https://get.dotsecenv.com/darwin/dotsecenv_0.0.13_Darwin_x86_64.tar.gz
+
+    # Verify and install
+    curl -s https://get.dotsecenv.com/darwin/checksums.txt | sha256sum -c --ignore-missing
+    tar -xzf dotsecenv_*.tar.gz
+    sudo mv dotsecenv /usr/local/bin/
+    ```
+  </TabItem>
+
+  <TabItem label="Ubuntu/Debian">
+    ```bash
+    # 1. Trust the GPG key
+    curl -fsSL https://get.dotsecenv.com/key.asc | \
+      sudo gpg --dearmor -o /etc/apt/keyrings/dotsecenv.gpg
+
+    # 2. Add the repository
+    echo "deb [signed-by=/etc/apt/keyrings/dotsecenv.gpg] \
+      https://get.dotsecenv.com/apt/ ./" | \
+      sudo tee /etc/apt/sources.list.d/dotsecenv.list
+
+    # 3. Install
+    sudo apt-get update
+    sudo apt-get install dotsecenv
+    ```
+  </TabItem>
+
+  <TabItem label="Fedora/RHEL">
+    ```bash
+    # 1. Add the repository
+    cat <<EOF | sudo tee /etc/yum.repos.d/dotsecenv.repo
+    [dotsecenv]
+    name=DotSecEnv Repository
+    baseurl=https://get.dotsecenv.com/yum/
+    enabled=1
+    gpgcheck=1
+    repo_gpgcheck=1
+    gpgkey=https://get.dotsecenv.com/key.asc
+    EOF
+
+    # 2. Install
+    sudo dnf install dotsecenv
+    ```
+  </TabItem>
+
+  <TabItem label="Arch">
+    ```bash
+    # 1. Add to pacman.conf
+    cat <<'EOF' | sudo tee -a /etc/pacman.conf
+    [dotsecenv]
+    Server = https://get.dotsecenv.com/arch/$arch
+    SigLevel = Required DatabaseOptional
+    EOF
+
+    # 2. Trust the key
+    curl -fsSL https://get.dotsecenv.com/key.asc | sudo pacman-key --add -
+    sudo pacman-key --lsign-key E60A1740BAEF49284D22EA7D3C376348F0921C59
+
+    # 3. Install
+    sudo pacman -Sy dotsecenv
+    ```
+  </TabItem>
+
+  <TabItem label="Binary">
+    ```bash
+    # Linux x86_64
+    curl -LO https://get.dotsecenv.com/linux/dotsecenv_0.0.13_Linux_x86_64.tar.gz
+
+    # Linux ARM64
+    curl -LO https://get.dotsecenv.com/linux/dotsecenv_0.0.13_Linux_arm64.tar.gz
+
+    # Verify and install
+    curl -s https://get.dotsecenv.com/linux/checksums.txt | sha256sum -c --ignore-missing
+    tar -xzf dotsecenv_*.tar.gz
+    sudo mv dotsecenv /usr/local/bin/
+    ```
+  </TabItem>
+
+  <TabItem label="mise">
+    ```bash
+    mise use github:dotsecenv/dotsecenv
+    ```
+
+    [mise](https://mise.jdx.dev/) is a universal version manager.
+  </TabItem>
+</Tabs>
+
+---
+
+## Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Encrypted at Rest** | All secrets encrypted using AES-256-GCM (RFC 9580) |
+| **Portable Vault** | Vault files are safe to commit to git and share between machines |
+| **Multi-User Support** | Share secrets with teammates using GPG multi-recipient encryption |
+| **Shell Integration** | Automatically load secrets when entering directories via `.secenv` files |
+| **Append-Only Audit Trail** | Cryptographic history preserved for compliance and security audits |
+| **SLSA Build Level 3** | Release binaries include verified provenance attestations |
+
+---
+
+## Next Steps
+
+<CardGrid>
+  <LinkCard title="Getting Started" description="Get up and running in 5 minutes" href="/getting-started/" />
+  <LinkCard title="Installation Guide" description="Detailed platform-specific instructions" href="/tutorials/installation/" />
+  <LinkCard title="Security Model" description="Understand how dotsecenv protects your secrets" href="/concepts/threat-model/" />
+  <LinkCard title="CLI Reference" description="Complete command documentation" href="/reference/" />
+</CardGrid>

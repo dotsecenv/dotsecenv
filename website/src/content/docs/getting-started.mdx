@@ -1,0 +1,149 @@
+---
+title: Getting Started
+description: Get up and running with dotsecenv in 5 minutes
+---
+
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+This guide gets you from zero to encrypted secrets in about 5 minutes. By the end, you'll have:
+
+- dotsecenv installed
+- A vault configured with your GPG identity
+- Your first secret stored and retrieved
+
+## Prerequisites
+
+You need a GPG key. Most developers already have one for signing git commits. If not:
+
+```bash
+# Generate a new GPG key
+gpg --full-generate-key
+# Select: (1) RSA and RSA, 4096 bits, key does not expire
+# Enter your name and email
+```
+
+## Quick Setup
+
+<Steps>
+
+1. **Install dotsecenv**
+
+   <Tabs>
+     <TabItem label="macOS">
+       ```bash
+       brew tap dotsecenv/tap
+       brew install dotsecenv
+       ```
+     </TabItem>
+     <TabItem label="Linux">
+       ```bash
+       # Debian/Ubuntu
+       curl -fsSL https://get.dotsecenv.com/key.asc | \
+         sudo gpg --dearmor -o /etc/apt/keyrings/dotsecenv.gpg
+       echo "deb [signed-by=/etc/apt/keyrings/dotsecenv.gpg] \
+         https://get.dotsecenv.com/apt/ ./" | \
+         sudo tee /etc/apt/sources.list.d/dotsecenv.list
+       sudo apt-get update && sudo apt-get install dotsecenv
+       ```
+     </TabItem>
+   </Tabs>
+
+   Verify installation:
+   ```bash
+   dotsecenv version
+   ```
+
+2. **Initialize configuration**
+
+   Create a config file:
+   ```bash
+   dotsecenv init config
+   ```
+
+   This creates `~/.config/dotsecenv/config` with default settings.
+
+3. **Create a vault**
+
+   ```bash
+   dotsecenv init vault
+   ```
+
+   This creates an encrypted vault file at `~/.config/dotsecenv/vault`.
+
+4. **Login with your GPG key**
+
+   Find your GPG fingerprint:
+   ```bash
+   gpg --list-secret-keys --keyid-format long
+   ```
+
+   Look for the fingerprint (40-character hex string) and login:
+   ```bash
+   dotsecenv login YOUR_FINGERPRINT
+   ```
+
+   Or, if you have a single key, use this one-liner to auto-detect it:
+   ```bash
+   dotsecenv login \
+      $(gpg --list-keys --with-colons | awk -F: '/^fpr/ {print $10; exit}')
+   ```
+
+5. **Store your first secret**
+
+   ```bash
+   echo "my-secret-database-password" | dotsecenv secret put DATABASE_PASSWORD
+   ```
+
+   The secret is now encrypted in your vault.
+
+6. **Retrieve the secret**
+
+   ```bash
+   dotsecenv secret get DATABASE_PASSWORD
+   # Output: my-secret-database-password
+   ```
+
+</Steps>
+
+## What Just Happened?
+
+1. **Config file** (`~/.config/dotsecenv/config`) stores your settings and vault location
+2. **Vault file** (`~/.config/dotsecenv/vault`) is an encrypted JSONL file containing:
+   - Your identity (GPG public key fingerprint)
+   - Encrypted secrets
+3. **Login** associated your GPG key with dotsecenv so it knows which key to use for encryption/decryption
+
+## Next: Shell Integration
+
+The real power comes from automatic secret loading. Install the shell plugin:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
+```
+
+Then create a `.secenv` file in your project:
+
+```bash
+# .secenv - secrets loaded automatically when you cd into the directory
+DATABASE_PASSWORD={dotsecenv}
+API_KEY={dotsecenv/MY_API_KEY}
+```
+
+When you `cd` into the directory, dotsecenv prompts you to load the secrets.
+
+---
+
+## Verification Checklist
+
+Before moving on, verify:
+
+- `dotsecenv version` shows version info
+- `dotsecenv vault list` shows your vault with your identity
+- `dotsecenv secret get DATABASE_PASSWORD` returns your secret
+
+## What's Next?
+
+- [Your First Secret](/tutorials/first-secret/) — Deeper dive into secrets and shell plugins
+- [Share a Secret](/tutorials/share-secret/) — Share secrets with teammates
+- [Security Model](/concepts/threat-model/) — Understand how encryption works
+- [CLI Reference](/reference/) — Full command documentation

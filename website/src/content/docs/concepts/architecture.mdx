@@ -1,0 +1,399 @@
+---
+title: Architecture
+description: Vault format, encryption model, identities, and data structures
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Vault Structure
+
+The vault is a JSONL (JSON Lines) file where each line is a self-contained JSON entry. This append-only format enables:
+
+- Safe concurrent git merges
+- Efficient incremental updates
+- Complete audit trail
+- Simple conflict resolution
+
+### File Format
+
+```
+Line 1: Header with metadata and indexes
+Line 2+: Identity entries, secret definitions, and secret values
+```
+
+Example structure:
+
+```json
+{"version":1,"identities":[["ABC123",2],["DEF456",3]],"secrets":{"DATABASE_URL":{"secret":4,"values":[5]}}}
+{"type":"identity","data":{"fingerprint":"ABC123","uid":"alice@example.com","algorithm":"rsa4096"}}
+{"type":"identity","data":{"fingerprint":"DEF456","uid":"bob@example.com","algorithm":"ed25519"}}
+{"type":"secret","data":{"name":"DATABASE_URL","created_by":"ABC123","created_at":"2025-01-01T00:00:00Z"}}
+{"type":"value","secret":"DATABASE_URL","data":{"available_to":["ABC123","DEF456"],"value":"encrypted..."}}
+```
+
+### Header (Line 1)
+
+The header provides fast lookup without scanning the entire file:
+
+| Field | Purpose |
+|-------|---------|
+| `version` | Format version (currently 1) |
+| `identities` | Map of fingerprint to line number |
+| `secrets` | Map of secret name to definition line and value lines |
+
+### Entry Types
+
+**Identity Entry:**
+```json
+{
+  "type": "identity",
+  "data": {
+    "fingerprint": "E60A1740BAEF49284D22EA7D3C376348F0921C59",
+    "uid": "alice@example.com",
+    "algorithm": "rsa4096",
+    "created_at": "2025-01-01T00:00:00Z",
+    "signature": "..."
+  }
+}
+```
+
+**Secret Definition:**
+```json
+{
+  "type": "secret",
+  "data": {
+    "name": "DATABASE_PASSWORD",
+    "created_by": "E60A1740BAEF49284D22EA7D3C376348F0921C59",
+    "created_at": "2025-01-01T00:00:00Z",
+    "namespace": null,
+    "signature": "..."
+  }
+}
+```
+
+**Secret Value:**
+```json
+{
+  "type": "value",
+  "secret": "DATABASE_PASSWORD",
+  "data": {
+    "available_to": ["E60A1740...", "DEF456..."],
+    "value": "base64-encoded-encrypted-blob",
+    "created_by": "E60A1740...",
+    "created_at": "2025-01-01T00:00:00Z",
+    "signature": "..."
+  }
+}
+```
+
+---
+
+## Identity Model
+
+An identity represents a user who can access secrets. Each identity is:
+
+- A GPG key (public + private)
+- Identified by fingerprint (40-character hex)
+- Stored in the vault (public key info only)
+
+### Identity Fields
+
+| Field | Description |
+|-------|-------------|
+| `fingerprint` | 40-character GPG key fingerprint |
+| `uid` | User ID (typically email) from GPG key |
+| `algorithm` | Key algorithm and size (e.g., `rsa4096`, `ed25519`) |
+| `created_at` | When identity was added to vault |
+| `signature` | Signature proving identity owns the key |
+
+### Identity Workflow
+
+```
+1. User generates GPG key pair
+2. Public key exported and shared
+3. Vault admin imports public key to keyring
+4. Vault admin adds identity: dotsecenv vault identity add FINGERPRINT
+5. Identity now exists in vault, can receive shared secrets
+```
+
+---
+
+## Secret Model
+
+A secret has two components:
+
+1. **Secret Definition** — Name, creator, timestamps
+2. **Secret Values** — Encrypted versions of the actual value
+
+### Why Separate?
+
+This separation enables:
+
+- Multiple values per secret (version history)
+- Different access per value (sharing/revoking)
+- Audit trail of who changed what when
+
+### Namespaces
+
+Secrets can be namespaced using `::` separator:
+
+```
+prod::DATABASE_URL      → Production database URL
+staging::DATABASE_URL   → Staging database URL
+api::JWT_SECRET         → API service JWT secret
+```
+
+Benefits:
+- Environment isolation
+- Organizational clarity
+- Bulk operations (`prod::*`)
+
+---
+
+## Encrypted Value Structure
+
+dotsecenv uses [RFC 9580](https://www.rfc-editor.org/rfc/rfc9580.html) (OpenPGP) with mandatory AEAD encryption. Each secret value is a blob containing:
+
+```
+┌─────────────────────────────────────────┐
+│ Encrypted Value Blob                    │
+├─────────────────────────────────────────┤
+│ AES-256-GCM nonce (96 bits)            │
+│ AES-256-GCM ciphertext                 │
+│ AES-256-GCM auth tag (128 bits)        │
+│ GPG-encrypted session key (per-user)   │
+│ Detached GPG signature (FIPS 186-5)    │
+└─────────────────────────────────────────┘
+```
+
+The symmetric encryption follows [NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final) (GCM mode), while signatures comply with [FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final) (Digital Signature Standard).
+
+### Decryption Flow
+
+```
+1. Find entry where your fingerprint is in available_to
+2. Decrypt session key using your GPG private key
+3. Decrypt AES-256-GCM ciphertext using session key
+4. Verify signature against originator's public key
+5. Return plaintext value
+```
+
+---
+
+## Access Control
+
+The `available_to` field tracks who can decrypt each value:
+
+```json
+{
+  "available_to": [
+    "E60A1740BAEF49284D22EA7D3C376348F0921C59",
+    "ABC123DEF456789012345678901234567890ABCD"
+  ]
+}
+```
+
+### Share Operation
+
+When you share a secret:
+
+```
+1. Decrypt value using your key
+2. Generate new random session key
+3. Re-encrypt value with new session key
+4. Encrypt session key for all recipients (including new one)
+5. Sign with your key
+6. Append new entry to vault
+```
+
+### Revoke Operation
+
+When you revoke access:
+
+```
+1. Decrypt value using your key
+2. Generate new random session key
+3. Re-encrypt value with new session key
+4. Encrypt session key for remaining recipients (excluding revoked)
+5. Sign with your key
+6. Append new entry to vault
+```
+
+<Aside type="caution">
+The old entry remains in the vault. The revoked user can still decrypt the **old** value but not the **new** one. This is why rotating secrets after revocation is essential.
+</Aside>
+
+---
+
+## Append-Only Design
+
+The vault never modifies existing entries—only appends:
+
+| Operation | Action |
+|-----------|--------|
+| Add secret | Append definition + value entry |
+| Update secret | Append new value entry |
+| Share secret | Append new value entry with more recipients |
+| Revoke access | Append new value entry with fewer recipients |
+| Add identity | Append identity entry |
+
+### Benefits
+
+1. **Audit trail** — Full history preserved
+2. **Git-friendly** — No conflicts from concurrent edits
+3. **Crash-safe** — Partial writes don't corrupt existing data
+4. **Simple merge** — Just concatenate and dedupe
+
+### Defragmentation
+
+Over time, the vault accumulates obsolete entries. Defrag compacts it:
+
+```bash
+dotsecenv vault defrag --dry-run  # Preview
+dotsecenv vault defrag             # Execute
+```
+
+This removes:
+- Old value entries (keeps latest per recipient set)
+- Removed identities
+- Duplicate entries
+
+<Aside type="note">
+Defragmentation loses historical values. Run only when you're sure you don't need the history.
+</Aside>
+
+---
+
+## Configuration
+
+Configuration lives at `~/.config/dotsecenv/config` (or `$XDG_CONFIG_HOME/dotsecenv/config`):
+
+```yaml
+# Vault file path(s)
+vault:
+  - ~/.config/dotsecenv/vault
+  - ~/work/project/secrets/vault
+
+# Active user fingerprint
+fingerprint: E60A1740BAEF49284D22EA7D3C376348F0921C59
+
+# Approved algorithms (minimum strength)
+approved_algorithms:
+  - rsa:3072
+  - ecdsa:p384
+  - eddsa:ed25519
+
+# Strict mode: treat warnings as errors
+strict: false
+```
+
+### Config Override
+
+```bash
+# CLI flag
+dotsecenv -c /path/to/config secret get KEY
+
+# Environment variable
+DOTSECENV_CONFIG=/path/to/config dotsecenv secret get KEY
+```
+
+---
+
+## Multi-Vault Support
+
+dotsecenv can work with multiple vaults:
+
+```yaml
+vault:
+  - name: personal
+    path: ~/.config/dotsecenv/vault
+  - name: work
+    path: ~/work/secrets/vault.jsonl
+```
+
+Access by name or index:
+
+```bash
+dotsecenv secret get -v personal DATABASE_PASSWORD
+dotsecenv secret get -v 2 API_KEY  # Index is 1-based
+```
+
+---
+
+## File Permissions
+
+Recommended permissions:
+
+| File | Mode | Notes |
+|------|------|-------|
+| Config | `600` | User read/write only |
+| Vault | `600` | User read/write only |
+| GPG home | `700` | Directory: user only |
+| Private key | `600` | User read/write only |
+
+dotsecenv warns if permissions are too open.
+
+---
+
+## Integration Points
+
+### Git
+
+Vault files are designed for git:
+
+```bash
+# Add vault to git
+git add vault.jsonl
+git commit -m "Add secrets"
+
+# On conflict (rare due to append-only)
+git merge --strategy-option=ours  # or theirs, then re-share
+```
+
+### Shell Plugins
+
+The `.secenv` file syntax:
+
+```bash
+# Load secret with same name as variable
+DATABASE_PASSWORD={dotsecenv}
+
+# Load specific secret
+API_KEY={dotsecenv/prod::API_KEY}
+
+# Plain values (not encrypted)
+DATABASE_HOST=localhost
+```
+
+### CI/CD
+
+```yaml
+# GitHub Actions example
+- name: Setup GPG
+  run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import
+
+- name: Get secrets
+  run: |
+    export API_KEY=$(dotsecenv secret get API_KEY)
+    ./deploy.sh
+```
+
+---
+
+## Data Flow Summary
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  User Input │ ──▶ │ dotsecenv   │ ──▶ │   Vault     │
+│  (stdin)    │     │ CLI         │     │   (JSONL)   │
+└─────────────┘     └─────────────┘     └─────────────┘
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │    GPG      │
+                    │ (Encrypt/   │
+                    │  Decrypt)   │
+                    └─────────────┘
+```
+
+All cryptographic operations go through GPG. dotsecenv orchestrates the workflow and manages the vault format.

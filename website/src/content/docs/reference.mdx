@@ -1,0 +1,573 @@
+---
+title: CLI Reference
+description: Complete command reference for dotsecenv
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Complete reference for all dotsecenv commands. Use `dotsecenv --help` or `dotsecenv <command> --help` for inline help.
+
+---
+
+## Global Options
+
+These options work with all commands:
+
+| Option | Description |
+|--------|-------------|
+| `-c, --config PATH` | Path to config file (default: `~/.config/dotsecenv/config`) |
+| `-v, --vault PATH` | Path to vault file or vault index (1-based) |
+| `-s, --silent` | Silent mode (suppress warnings) |
+| `-h, --help` | Show help for command |
+
+---
+
+## dotsecenv
+
+Safe environment secrets management.
+
+```bash
+dotsecenv [flags]
+dotsecenv [command]
+```
+
+A secure tool for managing environment secrets using GPG encryption. Secrets are stored in vault files and can be shared between team members.
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `init` | Initialize configuration or vault files |
+| `login` | Initialize user identity |
+| `secret` | Manage secrets |
+| `vault` | Manage vaults |
+| `validate` | Validate vault and config |
+| `completion` | Generate shell completion scripts |
+| `version` | Show version information |
+
+---
+
+## init
+
+Initialize configuration or vault files.
+
+### init config
+
+Initialize a new configuration file.
+
+```bash
+dotsecenv init config [flags]
+```
+
+By default, creates a configuration file at the XDG config location (`~/.config/dotsecenv/config`). Use `-c` to specify a custom path.
+
+The default configuration uses FIPS 186-5 compliant algorithm minimums: RSA 2048+, ECC P-384+, EdDSA Ed25519/Ed448.
+
+**Examples:**
+
+```bash
+# Create default config (FIPS-compliant by default)
+dotsecenv init config
+
+# Create config at custom location
+dotsecenv init config -c ~/my-project/dotsecenv.yaml
+```
+
+### init vault
+
+Initialize vault file(s).
+
+```bash
+dotsecenv init vault [flags]
+```
+
+Two modes of operation:
+1. With `-v PATH`: Initialize a specific vault file at the given path
+2. Without `-v`: Interactive mode using vaults from configuration
+
+<Aside type="note">
+Both `-v` and `-c` cannot be specified at the same time.
+</Aside>
+
+**Examples:**
+
+```bash
+# Initialize vault(s) from config
+dotsecenv init vault
+
+# Initialize specific vault
+dotsecenv init vault -v ~/project/secrets/vault.jsonl
+```
+
+---
+
+## login
+
+Initialize user identity with the given GPG fingerprint.
+
+```bash
+dotsecenv login FINGERPRINT [flags]
+```
+
+The fingerprint should be the full 40-character GPG key fingerprint of the user who will be accessing secrets.
+
+**Examples:**
+
+```bash
+# Login with specific fingerprint
+dotsecenv login E60A1740BAEF49284D22EA7D3C376348F0921C59
+
+# Auto-detect fingerprint (bash)
+dotsecenv login $(gpg --list-secret-keys --keyid-format long | \
+  grep -oP '(?<=sec\s{3}rsa4096/)[A-F0-9]+' | head -1)
+```
+
+---
+
+## secret
+
+Manage secrets in the vault.
+
+### secret get
+
+Retrieve a secret value from the vault.
+
+```bash
+dotsecenv secret get SECRET [flags]
+```
+
+**Secret key formats:**
+- Namespaced: `namespace::KEY_NAME` (e.g., `myapp::DATABASE_URL`)
+- Non-namespaced: `KEY_NAME` (e.g., `DATABASE_URL`)
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Retrieve all values for the secret |
+| `--last` | Retrieve the most recent value across all vaults |
+| `--json` | Output as JSON |
+
+**Examples:**
+
+```bash
+# Get a secret
+dotsecenv secret get DATABASE_PASSWORD
+
+# Get namespaced secret
+dotsecenv secret get prod::API_KEY
+
+# Get all versions
+dotsecenv secret get DATABASE_PASSWORD --all
+
+# Get as JSON
+dotsecenv secret get DATABASE_PASSWORD --json
+
+# Get from specific vault
+dotsecenv secret get -v 2 DATABASE_PASSWORD
+```
+
+### secret put
+
+Store an encrypted secret value.
+
+```bash
+dotsecenv secret put SECRET [flags]
+```
+
+**Secret key formats:**
+- Namespaced: `namespace::KEY_NAME` (e.g., `myapp::DATABASE_URL`)
+- Non-namespaced: `KEY_NAME` (e.g., `DATABASE_URL`)
+
+Keys are case-insensitive and normalized when stored:
+- Namespace part: lowercase
+- Key name part: UPPERCASE
+
+The secret value is read from stdin. Use `-v` to specify which vault to store the secret in.
+
+**Examples:**
+
+```bash
+# Store a secret (pipe from echo)
+echo "my-secret-value" | dotsecenv secret put DATABASE_PASSWORD
+
+# Store a namespaced secret
+echo "prod-password" | dotsecenv secret put prod::DATABASE_PASSWORD
+
+# Store interactively (type value, then Ctrl+D)
+dotsecenv secret put API_KEY
+
+# Store from file
+cat ~/.ssh/private_key | dotsecenv secret put SSH_PRIVATE_KEY
+
+# Store in specific vault
+echo "value" | dotsecenv secret put -v ./vault.jsonl SECRET_NAME
+```
+
+### secret share
+
+Share a secret with another identity.
+
+```bash
+dotsecenv secret share SECRET FINGERPRINT [flags]
+```
+
+The secret will be re-encrypted so the target identity can decrypt it.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Share the secret in all vaults where it exists |
+
+**Examples:**
+
+```bash
+# Share a single secret
+dotsecenv secret share DATABASE_PASSWORD E60A1740BAEF49284D22EA7D3C376348F0921C59
+
+# Share in all vaults
+dotsecenv secret share DATABASE_PASSWORD E60A1740... --all
+
+# Share namespaced secret
+dotsecenv secret share prod::API_KEY FINGERPRINT
+```
+
+### secret revoke
+
+Revoke access to a secret from an identity.
+
+```bash
+dotsecenv secret revoke SECRET FINGERPRINT [flags]
+```
+
+This removes the ability for the specified identity to decrypt the secret.
+
+<Aside type="caution">
+Revoking access only affects future values. The revoked identity can still decrypt previously shared values. Always rotate secrets after revoking access.
+</Aside>
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Revoke access from all vaults where the secret is shared |
+
+**Examples:**
+
+```bash
+# Revoke access to a secret
+dotsecenv secret revoke DATABASE_PASSWORD FINGERPRINT
+
+# Revoke from all vaults
+dotsecenv secret revoke DATABASE_PASSWORD FINGERPRINT --all
+
+# Then rotate the secret
+echo "new-value" | dotsecenv secret put DATABASE_PASSWORD
+```
+
+---
+
+## vault
+
+Manage vaults.
+
+### vault list
+
+List all configured vaults and the secrets they contain.
+
+```bash
+dotsecenv vault list [flags]
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+
+**Examples:**
+
+```bash
+# List all vaults and secrets
+dotsecenv vault list
+
+# Output as JSON
+dotsecenv vault list --json
+
+# List specific vault
+dotsecenv vault list -v 1
+```
+
+**Sample output:**
+
+```
+Vault: ~/.config/dotsecenv/vault
+
+Identities:
+  E60A1740... (alice@example.com) [rsa4096]
+  ABC12345... (bob@example.com) [ed25519]
+
+Secrets:
+  DATABASE_PASSWORD
+    available_to: [E60A1740..., ABC12345...]
+  prod::API_KEY
+    available_to: [E60A1740...]
+```
+
+### vault defrag
+
+Analyze vault fragmentation and optionally defragment.
+
+```bash
+dotsecenv vault defrag [flags]
+```
+
+Prompts to select a vault if multiple are configured. Use `--dry-run` to only show stats without making changes.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Show fragmentation stats without defragmenting |
+| `--json` | Output as JSON |
+| `-y, --yes` | Skip confirmation prompt |
+
+**Examples:**
+
+```bash
+# Preview defragmentation
+dotsecenv vault defrag --dry-run
+
+# Defragment with confirmation
+dotsecenv vault defrag
+
+# Defragment without confirmation
+dotsecenv vault defrag --yes
+
+# Output stats as JSON
+dotsecenv vault defrag --dry-run --json
+```
+
+### vault identity add
+
+Add an identity to one or more vaults.
+
+```bash
+dotsecenv vault identity add FINGERPRINT [flags]
+```
+
+The identity must have their GPG public key imported into your keyring first.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Add identity to all configured vaults |
+
+**Examples:**
+
+```bash
+# Add identity to default vault
+dotsecenv vault identity add E60A1740BAEF49284D22EA7D3C376348F0921C59
+
+# Add to all vaults
+dotsecenv vault identity add FINGERPRINT --all
+
+# Add to specific vault
+dotsecenv vault identity add -v 2 FINGERPRINT
+```
+
+### vault identity list
+
+List all identities in the configured vaults.
+
+```bash
+dotsecenv vault identity list [flags]
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+
+**Examples:**
+
+```bash
+# List identities
+dotsecenv vault identity list
+
+# Output as JSON
+dotsecenv vault identity list --json
+```
+
+---
+
+## validate
+
+Validate the vault and configuration files.
+
+```bash
+dotsecenv validate [flags]
+```
+
+Checks for:
+- Config file syntax and validity
+- Vault header integrity
+- Identity entries
+- Secret entries and signatures
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--fix` | Attempt to fix any issues found |
+
+**Examples:**
+
+```bash
+# Validate configuration and vault
+dotsecenv validate
+
+# Validate and fix issues
+dotsecenv validate --fix
+
+# Validate specific vault
+dotsecenv validate -v ./project/vault.jsonl
+```
+
+**Sample output:**
+
+```
+✓ Config file: valid
+✓ Vault header: valid
+✓ Identity entries: 2 valid
+✓ Secret entries: 5 valid
+✓ All signatures verified
+```
+
+---
+
+## completion
+
+Generate shell completion scripts for dotsecenv.
+
+```bash
+dotsecenv completion [bash|zsh|fish]
+```
+
+### Bash
+
+```bash
+# Load for current session
+source <(dotsecenv completion bash)
+
+# Install permanently (Linux)
+dotsecenv completion bash > /etc/bash_completion.d/dotsecenv
+
+# Install permanently (macOS with Homebrew)
+dotsecenv completion bash > $(brew --prefix)/etc/bash_completion.d/dotsecenv
+```
+
+### Zsh
+
+```bash
+# Enable shell completion if not already enabled
+echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+# Install completions
+dotsecenv completion zsh > "${fpath[1]}/_dotsecenv"
+
+# Restart shell
+```
+
+### Fish
+
+```bash
+# Load for current session
+dotsecenv completion fish | source
+
+# Install permanently
+dotsecenv completion fish > ~/.config/fish/completions/dotsecenv.fish
+```
+
+---
+
+## version
+
+Show version information.
+
+```bash
+dotsecenv version
+```
+
+**Example output:**
+
+```
+dotsecenv version 0.0.13
+```
+
+---
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DOTSECENV_CONFIG` | Override config file path |
+| `GNUPGHOME` | Override GPG home directory |
+
+---
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | General error |
+| `2` | Invalid arguments |
+| `3` | Config/vault not found |
+| `4` | GPG error |
+| `5` | Secret not found |
+| `6` | Permission denied |
+| `7` | Validation failed |
+
+---
+
+## Configuration File
+
+Default location: `~/.config/dotsecenv/config` (or `$XDG_CONFIG_HOME/dotsecenv/config`)
+
+```yaml
+# Vault file path(s)
+vault:
+  - ~/.config/dotsecenv/vault
+
+# Or with names:
+vault:
+  - name: personal
+    path: ~/.config/dotsecenv/vault
+  - name: work
+    path: ~/work/secrets/vault.jsonl
+
+# Active user fingerprint
+fingerprint: E60A1740BAEF49284D22EA7D3C376348F0921C59
+
+# Approved algorithms (minimum strength)
+approved_algorithms:
+  - rsa:3072
+  - ecdsa:p384
+  - eddsa:ed25519
+
+# Strict mode: treat warnings as errors
+strict: false
+```
+
+---
+
+## See Also
+
+- [Getting Started](/getting-started/) — Quick setup guide
+- [First Secret Tutorial](/tutorials/first-secret/) — Store your first secret
+- [Share a Secret](/tutorials/share-secret/) — Team sharing workflow
+- [How-To Guides](/how-to/) — Common tasks

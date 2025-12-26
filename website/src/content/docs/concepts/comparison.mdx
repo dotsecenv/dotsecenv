@@ -1,0 +1,264 @@
+---
+title: Comparison
+description: How dotsecenv compares to SOPS, Vault, Doppler, direnv, and Infisical
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Quick Comparison
+
+| Tool | Type | Encryption | Multi-User | Shell Integration | Cost |
+|------|------|------------|------------|-------------------|------|
+| **dotsecenv** | File-based CLI | GPG | Yes | Built-in | Free |
+| **SOPS** | File-based CLI | GPG, Cloud KMS | Limited | No | Free |
+| **direnv** | Shell extension | None | No | Yes | Free |
+| **HashiCorp Vault** | Server | Transit/AES | Yes | Via client | Free/Paid |
+| **Doppler** | SaaS | Managed | Yes | Via CLI | Freemium |
+| **Infisical** | SaaS/Self-hosted | AES-256 | Yes | Via CLI | Freemium |
+
+---
+
+## dotsecenv vs SOPS
+
+[SOPS](https://getsops.io/) (Secrets OPerationS) is Mozilla's tool for encrypting configuration files.
+
+### What SOPS Does Well
+
+SOPS is an excellent, battle-tested tool for production secrets:
+
+- **In-place encryption** of YAML, JSON, ENV, and INI files
+- **Multiple backends**: GPG, AWS KMS, GCP KMS, Azure Key Vault, HashiCorp Vault
+- **Partial encryption**: Encrypt only values, leaving keys readable
+- **Editor integration**: Decrypt, edit, re-encrypt seamlessly
+
+### Key Differences
+
+| Aspect | dotsecenv | SOPS |
+|--------|-----------|------|
+| **Primary use case** | Developer workflow | Production config |
+| **File format** | Dedicated vault (JSONL) | Existing configs (YAML/JSON) |
+| **Identity management** | First-class (share/revoke) | None (manage keys yourself) |
+| **Shell integration** | Built-in `.secenv` plugins | None (use with direnv) |
+| **Audit trail** | Append-only history | Git history |
+| **Cloud KMS** | No | Yes (AWS, GCP, Azure) |
+
+### When to Choose
+
+**Choose dotsecenv if:**
+- You want integrated shell plugins for auto-loading
+- You need explicit share/revoke commands for team management
+- You prefer GPG-only with no cloud dependencies
+- Developer workflow is your primary use case
+
+**Choose SOPS if:**
+- You use cloud KMS (AWS, GCP, Azure)
+- You want to encrypt existing config files in-place
+- You need HashiCorp Vault integration
+- Production secrets management is the priority
+
+<Aside type="note">
+SOPS can use GPG for multi-recipient encryption, but you manage the key list manually in `.sops.yaml`. dotsecenv provides explicit `share` and `revoke` commands.
+</Aside>
+
+---
+
+## dotsecenv vs direnv
+
+[direnv](https://direnv.net/) is an environment switcher for shells—it loads and unloads environment variables as you change directories.
+
+### Similarities
+
+Both tools:
+- Integrate with bash, zsh, and fish
+- Load environment variables on directory change
+- Have trust/allow mechanisms for security
+
+### Key Differences
+
+| Aspect | dotsecenv | direnv |
+|--------|-----------|--------|
+| **Configuration** | Key-value `.secenv` files | Shell script `.envrc` files |
+| **Encryption** | Yes (GPG) | None |
+| **Execution** | Loads values only | Runs arbitrary shell commands |
+| **Security model** | Trust + encryption | Trust only |
+
+### Using Together
+
+direnv and dotsecenv complement each other:
+
+```bash
+# .envrc (direnv) - Non-sensitive setup
+export PATH="$PWD/bin:$PATH"
+layout python
+eval "$(dotsecenv completion bash)"
+
+# .secenv (dotsecenv) - Encrypted secrets
+DATABASE_PASSWORD={dotsecenv}
+API_KEY={dotsecenv}
+```
+
+**Choose direnv for:** PATH manipulation, language version switching, project-specific shell setup
+
+**Choose dotsecenv for:** Encrypted secrets that should never appear in plaintext files
+
+---
+
+## dotsecenv vs HashiCorp Vault
+
+[HashiCorp Vault](https://www.vaultproject.io/) is an enterprise secrets management platform with extensive features.
+
+### What Vault Does Well
+
+Vault is the industry standard for production secrets:
+
+- **Dynamic secrets**: Generate database credentials on-demand
+- **Secret rotation**: Automatic credential rotation
+- **PKI**: Certificate authority for TLS
+- **Transit encryption**: Encrypt data without storing it
+- **Access policies**: Fine-grained RBAC
+- **Audit logging**: Comprehensive activity tracking
+
+### Key Differences
+
+| Aspect | dotsecenv | HashiCorp Vault |
+|--------|-----------|-----------------|
+| **Architecture** | File-based, no server | Client-server |
+| **Deployment** | None required | Server infrastructure |
+| **Dynamic secrets** | No | Yes |
+| **Secret rotation** | Manual | Automatic |
+| **Complexity** | Low | High |
+| **Cost** | Free | Free (OSS) / Enterprise |
+
+### When to Choose
+
+**Choose dotsecenv if:**
+- You want simple, file-based secrets without infrastructure
+- Your team is small to medium size
+- You prefer git-based workflows
+- Developer workflow is the focus
+
+**Choose Vault if:**
+- You need dynamic secrets (rotating DB passwords)
+- You require enterprise features (namespaces, HSM, replication)
+- You have a dedicated platform team
+- Production-scale secrets management is required
+
+<Aside type="note">
+Vault can be overkill for developer workflows. Many teams use dotsecenv for development and Vault for production.
+</Aside>
+
+---
+
+## dotsecenv vs Doppler
+
+[Doppler](https://www.doppler.com/) is a SaaS secrets management platform with team collaboration features.
+
+### What Doppler Does Well
+
+- **Web dashboard**: Visual secrets management
+- **Team collaboration**: Invite users, manage permissions
+- **Environment sync**: Automatic sync to cloud providers
+- **Integrations**: 50+ platform integrations
+- **Audit logs**: Track all secret access
+
+### Key Differences
+
+| Aspect | dotsecenv | Doppler |
+|--------|-----------|---------|
+| **Hosting** | Self-hosted files | SaaS (cloud) |
+| **Encryption control** | GPG (your keys) | Managed by Doppler |
+| **Offline access** | Yes | Limited |
+| **Data location** | Your systems | Doppler servers |
+| **Cost** | Free | Free tier / Paid plans |
+| **Privacy** | Secrets never leave your control | Third-party storage |
+
+### When to Choose
+
+**Choose dotsecenv if:**
+- You want to keep secrets under your direct control
+- You prefer file/git-based workflows
+- You don't want third-party dependencies
+- Offline access is important
+
+**Choose Doppler if:**
+- You want a managed platform with web UI
+- You need extensive integrations out of the box
+- Your organization allows third-party secret storage
+- Team onboarding simplicity is a priority
+
+---
+
+## dotsecenv vs Infisical
+
+[Infisical](https://infisical.com/) is an open-source secrets management platform with both SaaS and self-hosted options.
+
+### What Infisical Does Well
+
+- **Open source**: Self-host for full control
+- **Web dashboard**: Visual management
+- **Secret rotation**: Automatic rotation support
+- **Dynamic secrets**: Generate credentials on-demand
+- **Compliance**: SOC 2, HIPAA, FIPS 140-3
+
+### Key Differences
+
+| Aspect | dotsecenv | Infisical |
+|--------|-----------|-----------|
+| **Architecture** | File-based, no server | Web service |
+| **Self-hosting** | Files only | Full platform |
+| **Encryption** | GPG (client-side) | AES-256 (server-side) |
+| **Dynamic secrets** | No | Yes |
+| **Web UI** | No | Yes |
+| **Complexity** | Low | Medium |
+
+### When to Choose
+
+**Choose dotsecenv if:**
+- You want zero infrastructure (just files)
+- Client-side encryption with GPG is preferred
+- Simple CLI-based workflow
+
+**Choose Infisical if:**
+- You want open-source with self-hosting option
+- Web dashboard is important
+- Dynamic secrets and rotation are needed
+- Enterprise compliance features required
+
+---
+
+## Feature Matrix
+
+| Feature | dotsecenv | SOPS | direnv | Vault | Doppler | Infisical |
+|---------|-----------|------|--------|-------|---------|-----------|
+| Encryption at rest | Yes | Yes | No | Yes | Yes | Yes |
+| Multi-user sharing | Yes | Limited | No | Yes | Yes | Yes |
+| Shell auto-load | Yes | No | Yes | No | Yes | Yes |
+| No server required | Yes | Yes | Yes | No | No | No |
+| Git-friendly | Yes | Yes | No | No | No | No |
+| Built-in audit trail | Yes | Via git | No | Yes | Yes | Yes |
+| Dynamic secrets | No | No | No | Yes | Yes | Yes |
+| Cloud KMS | No | Yes | N/A | Yes | Yes | Yes |
+| FIPS compliance | Yes | Partial | N/A | Enterprise | N/A | Yes |
+| Free tier | Yes (all) | Yes (all) | Yes (all) | Yes (OSS) | Limited | Limited |
+| Self-hostable | Files | Files | N/A | Yes | No | Yes |
+
+---
+
+## Summary: When to Use What
+
+| Use Case | Recommended Tool |
+|----------|------------------|
+| Developer workflow, small team | **dotsecenv** |
+| Encrypt existing YAML/JSON configs | **SOPS** |
+| Production with cloud KMS | **SOPS** or **Vault** |
+| Enterprise with dynamic secrets | **HashiCorp Vault** |
+| SaaS with web dashboard | **Doppler** |
+| Open-source with self-hosting | **Infisical** |
+| Project-specific shell setup | **direnv** (with dotsecenv) |
+
+<Aside type="tip">
+Tools aren't mutually exclusive. A common pattern:
+- **dotsecenv** for development secrets
+- **HashiCorp Vault** for production secrets
+- **direnv** for PATH and environment setup
+</Aside>

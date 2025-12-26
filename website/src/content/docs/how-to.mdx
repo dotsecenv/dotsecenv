@@ -1,0 +1,504 @@
+---
+title: How-To Guides
+description: Common tasks and solutions for working with dotsecenv
+---
+
+import { Tabs, TabItem, Aside, Steps } from '@astrojs/starlight/components';
+
+Quick solutions for common tasks. Each section is a self-contained guide.
+
+---
+
+## Work with .env Files
+
+dotsecenv works seamlessly alongside `.env` files. Use `.env` for non-sensitive config and `.secenv` for secrets.
+
+### Recommended Setup
+
+```bash
+# .env — Non-sensitive configuration
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=myapp
+LOG_LEVEL=debug
+
+# .secenv — Encrypted secrets from vault
+DATABASE_PASSWORD={dotsecenv}
+API_KEY={dotsecenv/prod::API_KEY}
+```
+
+### Loading Both Files
+
+With the shell plugin installed, both files load automatically when you `cd` into the directory:
+
+1. `.env` loads first (plain values)
+2. `.secenv` loads second (decrypted secrets)
+
+Variables from `.secenv` can override `.env` if names match.
+
+---
+
+## Migrate Secrets from .env
+
+Move sensitive values from a plaintext `.env` to encrypted storage.
+
+<Steps>
+
+1. **Identify sensitive values**
+
+   Common sensitive values:
+   - Passwords: `DATABASE_PASSWORD`, `ADMIN_PASSWORD`
+   - API keys: `API_KEY`, `SECRET_KEY`, `AUTH_TOKEN`
+   - Connection strings with credentials
+   - Private keys or certificates
+
+2. **Store each secret**
+
+   ```bash
+   # From .env: DATABASE_PASSWORD=super-secret
+   echo "super-secret" | dotsecenv secret put DATABASE_PASSWORD
+
+   # From .env: API_KEY=sk-abc123
+   echo "sk-abc123" | dotsecenv secret put API_KEY
+   ```
+
+3. **Create .secenv file**
+
+   ```bash
+   cat > .secenv << 'EOF'
+   DATABASE_PASSWORD={dotsecenv}
+   API_KEY={dotsecenv}
+   EOF
+   ```
+
+4. **Update .env**
+
+   Remove the sensitive values:
+
+   ```bash
+   # .env (updated)
+   DATABASE_HOST=localhost
+   DATABASE_PORT=5432
+   # DATABASE_PASSWORD=  ← Removed, now in .secenv
+   ```
+
+5. **Add .env to .gitignore** (if not already)
+
+   ```bash
+   echo ".env" >> .gitignore
+   ```
+
+6. **Commit .secenv** (safe—it contains no secrets)
+
+   ```bash
+   git add .secenv
+   git commit -m "Move secrets to dotsecenv"
+   ```
+
+</Steps>
+
+---
+
+## Create a Secret
+
+Store a new encrypted secret in your vault.
+
+### From stdin (recommended)
+
+```bash
+echo "my-secret-value" | dotsecenv secret put SECRET_NAME
+```
+
+### Interactive input
+
+```bash
+dotsecenv secret put SECRET_NAME
+# Type or paste the value
+# Press Ctrl+D when done
+```
+
+### From a file
+
+```bash
+cat ~/.ssh/private_key | dotsecenv secret put SSH_PRIVATE_KEY
+```
+
+### With a namespace
+
+```bash
+echo "prod-password" | dotsecenv secret put prod::DATABASE_PASSWORD
+echo "dev-password" | dotsecenv secret put dev::DATABASE_PASSWORD
+```
+
+### To a specific vault
+
+```bash
+echo "value" | dotsecenv secret put -v ./project/vault.jsonl PROJECT_SECRET
+```
+
+<Aside type="tip">
+Reading from stdin prevents the secret from appearing in shell history.
+</Aside>
+
+---
+
+## Retrieve a Secret
+
+Get a decrypted secret value.
+
+### Basic retrieval
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD
+# Output: my-secret-value
+```
+
+### As JSON
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD --json
+# {"name":"DATABASE_PASSWORD","value":"my-secret-value","available_to":["..."]}
+```
+
+### Get all versions
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD --all
+# Lists all historical values
+```
+
+### Get latest version only
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD --last
+```
+
+### From a specific vault
+
+```bash
+dotsecenv secret get -v 2 DATABASE_PASSWORD  # Vault index (1-based)
+dotsecenv secret get -v ./path/to/vault.jsonl DATABASE_PASSWORD
+```
+
+---
+
+## Share a Secret
+
+Give another identity access to decrypt a secret.
+
+<Steps>
+
+1. **Import their GPG public key**
+
+   ```bash
+   gpg --import teammate-public.asc
+   ```
+
+2. **Add them to the vault**
+
+   ```bash
+   dotsecenv vault identity add THEIR_FINGERPRINT
+   ```
+
+3. **Share the secret**
+
+   ```bash
+   dotsecenv secret share DATABASE_PASSWORD THEIR_FINGERPRINT
+   ```
+
+4. **Commit and push**
+
+   ```bash
+   git add vault.jsonl
+   git commit -m "Share DATABASE_PASSWORD with teammate"
+   git push
+   ```
+
+</Steps>
+
+### Share all secrets at once
+
+```bash
+dotsecenv secret share "*" THEIR_FINGERPRINT --all
+```
+
+---
+
+## Revoke Access to a Secret
+
+Remove someone's ability to decrypt future values.
+
+```bash
+dotsecenv secret revoke DATABASE_PASSWORD THEIR_FINGERPRINT
+```
+
+<Aside type="danger" title="Important">
+Revoking access does NOT prevent them from decrypting the old value. Always rotate the secret after revoking:
+
+```bash
+echo "new-value" | dotsecenv secret put DATABASE_PASSWORD
+```
+</Aside>
+
+### Revoke from all secrets
+
+```bash
+dotsecenv secret revoke "*" THEIR_FINGERPRINT --all
+```
+
+---
+
+## Validate Configuration and Vault
+
+Check for issues with your config and vault files.
+
+### Basic validation
+
+```bash
+dotsecenv validate
+```
+
+Output:
+```
+✓ Config file: valid
+✓ Vault header: valid
+✓ Identity entries: 2 valid
+✓ Secret entries: 5 valid
+✓ All signatures verified
+```
+
+### Auto-fix issues
+
+```bash
+dotsecenv validate --fix
+```
+
+This can fix:
+- Regenerate corrupted header indexes
+- Remove orphaned entries
+- Update outdated format versions
+
+### Validate specific vault
+
+```bash
+dotsecenv validate -v ./project/vault.jsonl
+```
+
+---
+
+## List All Secrets
+
+View secrets and their access.
+
+### Simple list
+
+```bash
+dotsecenv vault list
+```
+
+Output:
+```
+Vault: ~/.config/dotsecenv/vault
+
+Identities:
+  E60A1740... (alice@example.com)
+  ABC12345... (bob@example.com)
+
+Secrets:
+  DATABASE_PASSWORD
+    available_to: [E60A1740..., ABC12345...]
+  API_KEY
+    available_to: [E60A1740...]
+```
+
+### JSON output
+
+```bash
+dotsecenv vault list --json
+```
+
+### Filter by namespace
+
+```bash
+dotsecenv vault list | grep "prod::"
+```
+
+---
+
+## Use Multiple Vaults
+
+Work with secrets from different vaults.
+
+### Configure multiple vaults
+
+```yaml
+# ~/.config/dotsecenv/config
+vault:
+  - name: personal
+    path: ~/.config/dotsecenv/vault
+  - name: work
+    path: ~/work/secrets/vault
+```
+
+### Access by name
+
+```bash
+dotsecenv secret get -v personal DATABASE_PASSWORD
+dotsecenv secret get -v work CORP_API_KEY
+```
+
+### Access by index
+
+```bash
+dotsecenv secret get -v 1 DATABASE_PASSWORD  # personal (1-based)
+dotsecenv secret get -v 2 CORP_API_KEY       # work
+```
+
+---
+
+## Set Up Shell Completions
+
+Enable tab completion for dotsecenv commands.
+
+<Tabs>
+  <TabItem label="Bash">
+    ```bash
+    # Add to ~/.bashrc
+    eval "$(dotsecenv completion bash)"
+
+    # Or install system-wide
+    dotsecenv completion bash | sudo tee /etc/bash_completion.d/dotsecenv
+    ```
+  </TabItem>
+
+  <TabItem label="Zsh">
+    ```bash
+    # Add to ~/.zshrc
+    eval "$(dotsecenv completion zsh)"
+    ```
+  </TabItem>
+
+  <TabItem label="Fish">
+    ```bash
+    # Add to ~/.config/fish/config.fish
+    dotsecenv completion fish | source
+    ```
+  </TabItem>
+</Tabs>
+
+Reload your shell to activate:
+
+```bash
+source ~/.bashrc  # or ~/.zshrc
+```
+
+---
+
+## Export Secrets as Environment Variables
+
+Export all secrets for a shell session or script.
+
+### Export to current shell
+
+```bash
+eval "$(dotsecenv env export)"
+```
+
+### Use in a script
+
+```bash
+#!/bin/bash
+eval "$(dotsecenv env export)"
+./my-app
+```
+
+### Export specific secrets
+
+```bash
+export DATABASE_PASSWORD=$(dotsecenv secret get DATABASE_PASSWORD)
+export API_KEY=$(dotsecenv secret get API_KEY)
+```
+
+---
+
+## Defragment the Vault
+
+Remove old entries and optimize vault size.
+
+### Preview changes
+
+```bash
+dotsecenv vault defrag --dry-run
+```
+
+Output:
+```
+Would remove 15 obsolete entries
+Would reduce vault from 2.4 KB to 1.1 KB
+```
+
+### Execute defrag
+
+```bash
+dotsecenv vault defrag --yes
+```
+
+<Aside type="caution">
+Defragmenting removes historical values. Make sure you don't need the history before running.
+</Aside>
+
+---
+
+## Use with CI/CD
+
+Access secrets in CI/CD pipelines.
+
+### GitHub Actions
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dotsecenv
+        run: |
+          curl -LO https://get.dotsecenv.com/linux/dotsecenv_latest_Linux_x86_64.tar.gz
+          tar -xzf dotsecenv_*.tar.gz
+          sudo mv dotsecenv /usr/local/bin/
+
+      - name: Import GPG key
+        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import
+
+      - name: Deploy
+        run: |
+          export DATABASE_PASSWORD=$(dotsecenv secret get DATABASE_PASSWORD)
+          ./deploy.sh
+```
+
+### GitLab CI
+
+```yaml
+deploy:
+  script:
+    - apt-get update && apt-get install -y gpg
+    - curl -LO https://get.dotsecenv.com/linux/dotsecenv_latest_Linux_x86_64.tar.gz
+    - tar -xzf dotsecenv_*.tar.gz && mv dotsecenv /usr/local/bin/
+    - echo "$GPG_PRIVATE_KEY" | gpg --import
+    - export API_KEY=$(dotsecenv secret get API_KEY)
+    - ./deploy.sh
+```
+
+---
+
+## Troubleshooting Quick Reference
+
+| Problem | Solution |
+|---------|----------|
+| "Not logged in" | `dotsecenv login FINGERPRINT` |
+| "Secret not found" | Check vault: `dotsecenv vault list` |
+| "Cannot decrypt" | Verify you're in `available_to` |
+| "GPG error" | Check key: `gpg --list-secret-keys` |
+| "Config not found" | Run: `dotsecenv init config` |
+| "Vault not found" | Run: `dotsecenv init vault` |
