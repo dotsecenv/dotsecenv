@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/profile"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
@@ -55,7 +56,8 @@ func SignData(privateKey *crypto.Key, data []byte) (string, error) {
 		return "", fmt.Errorf("key is nil")
 	}
 
-	pgp := crypto.PGP()
+	// Use RFC9580 profile for consistency across all cryptographic operations
+	pgp := crypto.PGPWithProfile(profile.RFC9580())
 
 	// Create signer with detached signature
 	signer, err := pgp.Sign().SigningKey(privateKey).Detached().New()

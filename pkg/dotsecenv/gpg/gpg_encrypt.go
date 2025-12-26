@@ -6,6 +6,7 @@ import (
 
 	"github.com/ProtonMail/gopenpgp/v3/constants"
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/profile"
 )
 
 // EncryptToRecipients encrypts data to multiple recipients and returns armored ciphertext.
@@ -16,7 +17,9 @@ func (c *GPGClient) EncryptToRecipients(plaintext []byte, publicKeyBase64List []
 		return "", fmt.Errorf("no recipients specified")
 	}
 
-	pgp := crypto.PGP()
+	// Use RFC9580 profile which enforces AEAD with AES-256-GCM
+	// RFC 9580 is the updated OpenPGP standard with mandatory AEAD support
+	pgp := crypto.PGPWithProfile(profile.RFC9580())
 
 	// Build keyring for multiple recipients
 	recipients, err := crypto.NewKeyRing(nil)

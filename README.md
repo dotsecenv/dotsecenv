@@ -451,11 +451,13 @@ Each entry includes a hash and cryptographic signature to prevent against tamper
 
 ## Security Features
 
-- FIPS 140-3 algorithm enforcement (if desired)
-- Multi-recipient PGP encryption
-- Detached signatures for identity and secret verification
-- Hash-based integrity checking
-- GPG agent integration for key management
+- **[RFC 9580](https://www.rfc-editor.org/rfc/rfc9580.html) OpenPGP compliance**: Modern OpenPGP standard with mandatory AEAD encryption
+- **AES-256-GCM symmetric encryption**: NIST-approved authenticated encryption ([SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final))
+- **[FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final) digital signatures**: RSA, ECDSA, and EdDSA signature schemes for vault entry authenticity and non-repudiation
+- **FIPS 140-3 mode**: Optional strict algorithm enforcement for regulated environments
+- Multi-recipient PGP encryption with hybrid cryptography
+- Hash-based integrity checking (SHA-256/SHA-512)
+- GPG agent integration for secure key management
 - Full secret encryption/decryption lifecycle
 - Validation logic with optional auto-fix
 - SUID mode restrictions for elevated privilege protection

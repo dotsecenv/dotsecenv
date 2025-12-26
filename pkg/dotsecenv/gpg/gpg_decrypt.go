@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/profile"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
@@ -82,7 +83,8 @@ func DecryptWithKey(privateKey *crypto.Key, ciphertext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("private key is nil")
 	}
 
-	pgp := crypto.PGP()
+	// Use RFC9580 profile for AEAD/AES-256-GCM support
+	pgp := crypto.PGPWithProfile(profile.RFC9580())
 
 	// Ciphertext is armored message (as bytes), use directly
 	armoredCiphertext := string(ciphertext)
