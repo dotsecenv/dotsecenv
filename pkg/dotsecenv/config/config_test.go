@@ -16,34 +16,33 @@ func TestDefaultConfig(t *testing.T) {
 		t.Error("DefaultConfig should have approved algorithms")
 	}
 
-	// Check for RSA
-	hasRSA := false
+	// Verify FIPS-compliant minimums
 	for _, algo := range cfg.ApprovedAlgorithms {
-		if algo.Algo == "RSA" {
-			hasRSA = true
-			if algo.MinBits != 1024 {
-				t.Errorf("expected RSA min bits 1024, got %d", algo.MinBits)
+		switch algo.Algo {
+		case "RSA":
+			if algo.MinBits < 2048 {
+				t.Errorf("RSA min bits should be >= 2048 (FIPS 186-5), got %d", algo.MinBits)
 			}
-		}
-	}
-	if !hasRSA {
-		t.Error("DefaultConfig missing RSA")
-	}
-}
-
-func TestFIPSConfig(t *testing.T) {
-	cfg := FIPSConfig()
-
-	for _, algo := range cfg.ApprovedAlgorithms {
-		if algo.Algo == "RSA" {
-			if algo.MinBits < 3072 {
-				t.Errorf("FIPS RSA min bits should be >= 3072, got %d", algo.MinBits)
-			}
-		}
-		if algo.Algo == "ECC" {
+		case "ECC":
 			if algo.MinBits < 384 {
-				t.Errorf("FIPS ECC min bits should be >= 384, got %d", algo.MinBits)
+				t.Errorf("ECC min bits should be >= 384 (FIPS 186-5), got %d", algo.MinBits)
 			}
+		case "EdDSA":
+			if algo.MinBits < 255 {
+				t.Errorf("EdDSA min bits should be >= 255 (Ed25519), got %d", algo.MinBits)
+			}
+		}
+	}
+
+	// Verify required algorithms are present
+	algoMap := make(map[string]bool)
+	for _, algo := range cfg.ApprovedAlgorithms {
+		algoMap[algo.Algo] = true
+	}
+
+	for _, required := range []string{"RSA", "ECC", "EdDSA"} {
+		if !algoMap[required] {
+			t.Errorf("DefaultConfig missing required algorithm: %s", required)
 		}
 	}
 }
@@ -57,13 +56,19 @@ func TestIsAlgorithmAllowed(t *testing.T) {
 		bits    int
 		allowed bool
 	}{
+		// RSA: minimum 2048 bits (FIPS 186-5)
+		{"RSA-4096", "RSA", 4096, true},
+		{"RSA-3072", "RSA", 3072, true},
 		{"RSA-2048", "RSA", 2048, true},
-		{"RSA-1024", "RSA", 1024, true},
-		{"RSA-512", "RSA", 512, false},
-		{"ECC P-256", "ECC P-256", 256, true},
+		{"RSA-1024", "RSA", 1024, false}, // Below FIPS minimum
+		// ECC: P-384 and P-521 only (FIPS 186-5)
+		{"ECC P-521", "ECC P-521", 521, true},
 		{"ECC P-384", "ECC P-384", 384, true},
+		{"ECC P-256", "ECC P-256", 256, false}, // Excluded for FIPS compliance
 		{"ECC Unknown", "ECC Unknown", 256, false},
+		// EdDSA: Ed25519 and Ed448
 		{"EdDSA Ed25519", "EdDSA Ed25519", 255, true},
+		{"EdDSA Ed448", "EdDSA Ed448", 448, true},
 		{"Unknown", "Unknown", 1024, false},
 	}
 

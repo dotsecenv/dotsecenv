@@ -7,7 +7,7 @@ import (
 )
 
 // AlgorithmValidator validates cryptographic algorithms against a policy.
-// It can be used to enforce FIPS 140-3 compliance or custom algorithm policies.
+// It can be used to enforce FIPS 186-5 compliance or custom algorithm policies.
 type AlgorithmValidator struct {
 	allowedCiphers    map[string]bool
 	allowedHashing    map[string]bool
@@ -55,7 +55,7 @@ func (av AlgorithmValidator) ValidateAsymmetric(algo string) error {
 	return nil
 }
 
-// FIPS 140-3 compliant algorithm constants.
+// FIPS 186-5 approved algorithm constants.
 const (
 	FIPSKeyAlgorithmECCP521 = "ECC-P521"
 	FIPSKeyAlgorithmRSA4096 = "RSA-4096"
@@ -65,8 +65,8 @@ const (
 	FIPSSignatureAlgorithm  = "ECDSA"
 )
 
-// ValidateFIPS140_3Compliance checks if an algorithm is FIPS 140-3 compliant.
-func ValidateFIPS140_3Compliance(algo string) error {
+// ValidateFIPS186_5Compliance checks if an algorithm is FIPS 186-5 approved.
+func ValidateFIPS186_5Compliance(algo string) error {
 	approvedAlgos := map[string]bool{
 		FIPSKeyAlgorithmECCP521: true,
 		FIPSKeyAlgorithmRSA4096: true,
@@ -77,7 +77,7 @@ func ValidateFIPS140_3Compliance(algo string) error {
 	}
 
 	if !approvedAlgos[algo] {
-		return fmt.Errorf("algorithm not FIPS 140-3 compliant: %s", algo)
+		return fmt.Errorf("algorithm not FIPS 186-5 approved: %s", algo)
 	}
 	return nil
 }
@@ -124,7 +124,7 @@ func GetAlgorithmDetails(algorithm string) (name string, bits int) {
 	return ExtractAlgorithmName(algorithm), ExtractBitLength(algorithm)
 }
 
-// NewFIPSValidator creates a new validator enforcing FIPS 140-3 standards.
+// NewFIPSValidator creates a new validator enforcing FIPS 186-5 standards.
 func NewFIPSValidator() AlgorithmValidator {
 	return NewAlgorithmValidator(
 		[]string{FIPSCipherAlgorithm},

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/profile"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
@@ -30,7 +31,8 @@ func VerifySignature(publicKeyBase64 string, data []byte, signatureHex string) (
 		return false, fmt.Errorf("failed to parse public key: %w", err)
 	}
 
-	pgp := crypto.PGP()
+	// Use RFC9580 profile for consistency across all cryptographic operations
+	pgp := crypto.PGPWithProfile(profile.RFC9580())
 
 	// Create verifier
 	verifier, err := pgp.Verify().VerificationKey(publicKey).New()
