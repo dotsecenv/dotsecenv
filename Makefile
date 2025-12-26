@@ -1,7 +1,9 @@
 .PHONY: help
 help:
 	@echo "dotsecenv Makefile targets:"
-	@echo "  make build          - Build the dotsecenv binary"
+	@echo "  make build          - Build for current OS (auto-detect)"
+	@echo "  make build-linux    - Build for Linux with BoringCrypto (FIPS)"
+	@echo "  make build-darwin   - Build for macOS (standard crypto)"
 	@echo "  make test           - Run tests"
 	@echo "  make test-race      - Run tests with race condition detection"
 	@echo "  make clean          - Clean build artifacts"
@@ -14,10 +16,33 @@ help:
 .PHONY: all
 all: clean update lint build test test-race man docs completions init e2e validate
 
+# Common ldflags for version info
+LDFLAGS := -X main.version=$$(git describe --tags --always --dirty) -X main.commit=$$(git rev-parse --short HEAD) -X main.date=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Auto-detect OS and dispatch to platform-specific target
 .PHONY: build
 build:
-	@echo "Building dotsecenv..."
-	@go build -ldflags "-X main.version=$$(git describe --tags --always --dirty) -X main.commit=$$(git rev-parse --short HEAD) -X main.date=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/dotsecenv ./cmd/dotsecenv
+ifeq ($(shell uname -s),Linux)
+	@$(MAKE) build-linux
+else ifeq ($(shell uname -s),Darwin)
+	@$(MAKE) build-darwin
+else
+	@echo "Unsupported OS: $$(uname -s). Use build-linux or build-darwin explicitly."
+	@exit 1
+endif
+
+# Linux: BoringCrypto for FIPS-approved cryptography (requires CGO)
+.PHONY: build-linux
+build-linux:
+	@echo "Building dotsecenv for Linux with BoringCrypto (FIPS-approved)..."
+	CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -ldflags "$(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
+	@echo "Binary built at: bin/dotsecenv"
+
+# macOS: Standard crypto (BoringCrypto not available on Darwin)
+.PHONY: build-darwin
+build-darwin:
+	@echo "Building dotsecenv for macOS (standard crypto)..."
+	CGO_ENABLED=0 go build -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
 	@echo "Binary built at: bin/dotsecenv"
 
 .PHONY: test
