@@ -96,7 +96,7 @@ Both `-v` and `-c` cannot be specified at the same time.
 dotsecenv init vault
 
 # Initialize specific vault
-dotsecenv init vault -v ~/project/secrets/vault.jsonl
+dotsecenv init vault -v ~/project/secrets/vault
 ```
 
 ---
@@ -201,7 +201,7 @@ dotsecenv secret put API_KEY
 cat ~/.ssh/private_key | dotsecenv secret put SSH_PRIVATE_KEY
 
 # Store in specific vault
-echo "value" | dotsecenv secret put -v ./vault.jsonl SECRET_NAME
+echo "value" | dotsecenv secret put -v ./vault SECRET_NAME
 ```
 
 ### secret share
@@ -434,7 +434,7 @@ dotsecenv validate
 dotsecenv validate --fix
 
 # Validate specific vault
-dotsecenv validate -v ./project/vault.jsonl
+dotsecenv validate -v ./project/vault
 ```
 
 **Sample output:**
@@ -548,7 +548,7 @@ vault:
   - name: personal
     path: ~/.config/dotsecenv/vault
   - name: work
-    path: ~/work/secrets/vault.jsonl
+    path: ~/work/secrets/vault
 
 # Active user fingerprint
 fingerprint: E60A1740BAEF49284D22EA7D3C376348F0921C59

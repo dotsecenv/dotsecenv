@@ -21,7 +21,7 @@ dotsecenv uses a layered encryption model combining symmetric and asymmetric cry
 ┌─────────────────────────────────────────────────────────────┐
 │           Symmetric Encryption (AES-256-GCM)                │
 │                                                             │
-│   Random session key (256-bit) + Nonce (96-bit)            │
+│   Random session key (256-bit) + Nonce (96-bit)             │
 │   → Encrypted data + Authentication tag                     │
 └─────────────────────────────────────────────────────────────┘
                             │
@@ -29,7 +29,7 @@ dotsecenv uses a layered encryption model combining symmetric and asymmetric cry
 ┌─────────────────────────────────────────────────────────────┐
 │             Asymmetric Encryption (GPG)                     │
 │                                                             │
-│   Session key encrypted for each recipient's public key    │
+│   Session key encrypted for each recipient's public key     │
 │   → One key blob per authorized identity                    │
 └─────────────────────────────────────────────────────────────┘
                             │
@@ -37,10 +37,12 @@ dotsecenv uses a layered encryption model combining symmetric and asymmetric cry
 ┌─────────────────────────────────────────────────────────────┐
 │            Cryptographic Signature (GPG)                    │
 │                                                             │
-│   SHA-256/SHA-512 hash signed with originator's key        │
-│   → Detached signature for integrity + non-repudiation     │
+│   SHA-256/SHA-512 hash signed with originator's key         │
+│   → Detached signature for integrity + non-repudiation      │
 └─────────────────────────────────────────────────────────────┘
 ```
+The choice of SHA-256/SHA-512 depends on the originator's
+key strength.
 
 ### Why Hybrid Encryption?
 
@@ -76,8 +78,8 @@ Secret Value  → AES-256-GCM  → Encrypted Data (1 copy)
 The primary threat model. Secrets are encrypted in the vault file, so committing it doesn't expose plaintext.
 
 ```bash
-git add vault.jsonl   # Safe—secrets are encrypted
-git push              # Only encrypted blobs pushed
+git add vault   # Safe—secrets are encrypted
+git push        # Only encrypted blobs pushed
 ```
 
 An attacker who obtains the vault file cannot read secrets without the private keys.
@@ -86,7 +88,7 @@ An attacker who obtains the vault file cannot read secrets without the private k
 
 If someone accesses your filesystem (backup, shared drive, stolen laptop), they see only:
 
-- Encrypted JSONL entries
+- Encrypted vault entries
 - Public key metadata (fingerprints, UIDs)
 - Timestamps
 
@@ -271,19 +273,6 @@ dotsecenv uses FIPS 186-5 compliant defaults out of the box:
 <Aside type="note">
 Compliance is only as strong as your underlying GPG installation. For regulated environments, ensure you're using a FIPS-validated OpenSSL/libgcrypt.
 </Aside>
-
----
-
-## Secure Memory Handling
-
-dotsecenv implements secure memory practices:
-
-| Technique | Purpose |
-|-----------|---------|
-| `mlock()` | Prevent swapping secret data to disk |
-| Secure zeroing | Overwrite memory after use |
-| Process isolation | GPG operations in separate processes |
-| File locking | Prevent concurrent corruption |
 
 ---
 

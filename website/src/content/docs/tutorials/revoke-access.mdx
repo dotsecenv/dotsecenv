@@ -81,7 +81,7 @@ Revoke someone's access to a secret. Understand what revocation does and doesn't
 6. **Commit the changes**
 
    ```bash
-   git add vault.jsonl
+   git add vault
    git commit -m "Revoke access and rotate DATABASE_PASSWORD"
    git push
    ```
@@ -193,7 +193,7 @@ echo "new-value" | dotsecenv secret put API_KEY
 # ... repeat for all secrets
 
 # 4. Commit
-git add vault.jsonl
+git add vault
 git commit -m "Offboard: revoke access for $FINGERPRINT"
 git push
 ```

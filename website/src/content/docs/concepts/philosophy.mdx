@@ -7,7 +7,16 @@ import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
 ## Design Philosophy
 
-dotsecenv prioritizes usability. Security tools that frustrate developers don't get used.
+**`dotsecenv` prioritizes usability**. Security tools that frustrate developers don't get used.
+
+| Philosophy | Implementation |
+|------------|----------------|
+| UX-first | Simple commands, minimal config |
+| UNIX philosophy | Do one thing well, be composable |
+| Decentralized | GPG keys, no clouds required |
+| Offline-first | Works without a network |
+| Development focus | SDLC, not production |
+| Append-only | Auditability, additive changes by default |
 
 ### Core Principles
 
@@ -136,7 +145,7 @@ SOPS can use GPG alone, but the multi-identity workflow requires manual key mana
 
 dotsecenv deliberately **does not** aim to:
 
-### Production Secrets Management
+### Manage Production Secrets
 
 dotsecenv is for the **development lifecycle (SDLC)**—bringing simple encryption to developers' daily operations.
 
@@ -145,25 +154,23 @@ For production, consider:
 - AWS Secrets Manager / GCP Secret Manager
 - Kubernetes Secrets with external operators
 
-### Centralized Key Management
+### Centralize Key Management
 
 No key servers. No cloud dependencies. Everything works offline with local GPG keys.
 
-### Time-Tampering Protection
+### Protect against Time-Tampering
 
 dotsecenv trusts the system clock. If you set your clock to the past before storing a secret, that timestamp will be recorded.
 
 This is intentional: an attacker with write access can't modify existing entries anyway—each entry includes the originating fingerprint and a signature by the corresponding secret key.
 
-### Complete History Erasure
+### Protect against History Erasure
 
 The append-only design means:
 
 - Old entries remain readable to original recipients
 - Revocation doesn't delete history
-- Defrag can compact, but audit trail may be lost
-
-This is a feature for compliance, not a bug.
+- Defrag can compact, but auditability will be lost (unless changes are committed to a git repository)
 
 ---
 
@@ -191,10 +198,10 @@ dotsecenv is designed to work alongside other tools:
 
 ```bash
 # With git
-git add vault.jsonl && git commit -m "Add API keys"
+git add vault && git commit -m "Add API keys"
 
-# With shell
-eval "$(dotsecenv env export)"
+# With shell integration
+curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
 
 # With scripts
 DB_PASS=$(dotsecenv secret get DATABASE_PASSWORD)
@@ -207,16 +214,3 @@ export API_KEY=$(dotsecenv secret get API_KEY)
 ```
 
 The vault is just a file. Secrets come through stdout. JSON output for parsing. Standard UNIX patterns.
-
----
-
-## Summary
-
-| Philosophy | Implementation |
-|------------|----------------|
-| UX-first | Simple commands, minimal config |
-| UNIX philosophy | Do one thing, composable |
-| Decentralized | GPG keys, no cloud required |
-| Offline-first | Works without network |
-| Development focus | SDLC, not production |
-| Append-only | Audit trail, no data loss |

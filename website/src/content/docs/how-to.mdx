@@ -133,7 +133,7 @@ echo "dev-password" | dotsecenv secret put dev::DATABASE_PASSWORD
 ### To a specific vault
 
 ```bash
-echo "value" | dotsecenv secret put -v ./project/vault.jsonl PROJECT_SECRET
+echo "value" | dotsecenv secret put -v ./project/vault PROJECT_SECRET
 ```
 
 <Aside type="tip">
@@ -177,7 +177,7 @@ dotsecenv secret get DATABASE_PASSWORD --last
 
 ```bash
 dotsecenv secret get -v 2 DATABASE_PASSWORD  # Vault index (1-based)
-dotsecenv secret get -v ./path/to/vault.jsonl DATABASE_PASSWORD
+dotsecenv secret get -v ./path/to/vault DATABASE_PASSWORD
 ```
 
 ---
@@ -209,7 +209,7 @@ Give another identity access to decrypt a secret.
 4. **Commit and push**
 
    ```bash
-   git add vault.jsonl
+   git add vault
    git commit -m "Share DATABASE_PASSWORD with teammate"
    git push
    ```
@@ -281,7 +281,7 @@ This can fix:
 ### Validate specific vault
 
 ```bash
-dotsecenv validate -v ./project/vault.jsonl
+dotsecenv validate -v ./project/vault
 ```
 
 ---
@@ -398,17 +398,21 @@ source ~/.bashrc  # or ~/.zshrc
 
 Export all secrets for a shell session or script.
 
-### Export to current shell
+### Install shell plugins
 
 ```bash
-eval "$(dotsecenv env export)"
+curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
 ```
 
-### Use in a script
+### Auto-load secrets
 
 ```bash
-#!/bin/bash
-eval "$(dotsecenv env export)"
+# define a secret: /path/to/directory/.secenv
+
+# the secret(s) will be auto-loaded on cd
+cd /path/to/directory
+
+# and your app can use them
 ./my-app
 ```
 

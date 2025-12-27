@@ -308,7 +308,7 @@ vault:
   - name: personal
     path: ~/.config/dotsecenv/vault
   - name: work
-    path: ~/work/secrets/vault.jsonl
+    path: ~/work/secrets/vault
 ```
 
 Access by name or index:
@@ -343,7 +343,7 @@ Vault files are designed for git:
 
 ```bash
 # Add vault to git
-git add vault.jsonl
+git add vault
 git commit -m "Add secrets"
 
 # On conflict (rare due to append-only)
@@ -371,6 +371,9 @@ DATABASE_HOST=localhost
 # GitHub Actions example
 - name: Setup GPG
   run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import
+
+# Install dotsecenv in your GitHub workflow
+- uses: dotsecenv/dotsecenv@v0
 
 - name: Get secrets
   run: |
