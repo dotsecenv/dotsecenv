@@ -30,6 +30,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y rpm
 
+      - name: Install Zig (for CGO cross-compilation)
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.13.0
+
       - name: Setup GPG key
         id: setup_gpg
         env:
