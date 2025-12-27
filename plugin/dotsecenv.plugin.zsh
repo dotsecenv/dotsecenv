@@ -26,23 +26,31 @@ fi
 # Track the previous directory for change detection
 typeset -g _DOTSECENV_PREV_PWD=""
 
-# Hook function called on directory change
-_dotsecenv_chpwd() {
+# Hook function to process directory change (allows cd . to reload .secenv files)
+_dotsecenv_chdir_hook() {
     local old_dir="$_DOTSECENV_PREV_PWD"
-    local new_dir="$PWD"
-
-    # Update previous directory tracker
     _DOTSECENV_PREV_PWD="$PWD"
-
-    # Process the directory change (allows cd . to reload .secenv files)
-    _dotsecenv_on_cd "$old_dir" "$new_dir"
+    _dotsecenv_on_cd "$old_dir" "$PWD"
 }
 
-# Register the hook
-autoload -Uz add-zsh-hook
-add-zsh-hook chpwd _dotsecenv_chpwd
+# Wrap cd to trigger directory change processing
+# (zsh's chpwd hook doesn't fire for cd . since directory doesn't technically change)
+cd() {
+    builtin cd "$@" || return $?
+    _dotsecenv_chdir_hook
+}
+
+# Wrap pushd to trigger directory change processing
+pushd() {
+    builtin pushd "$@" || return $?
+    _dotsecenv_chdir_hook
+}
+
+# Wrap popd to trigger directory change processing
+popd() {
+    builtin popd "$@" || return $?
+    _dotsecenv_chdir_hook
+}
 
 # Process current directory on plugin load (initial shell startup)
-_dotsecenv_chpwd
-
-# secretcp is defined in core.sh for copying secrets to clipboard
+_dotsecenv_chdir_hook
