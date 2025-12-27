@@ -272,6 +272,7 @@ _dotsecenv_load_file() {
                     _dotsecenv_array_append "$vars_var" "$key"
                 else
                     echo "dotsecenv: warning: secret '$secret_name' not found in vault, $key left unset" >&2
+                    echo "run: \`dotsecenv secret put $secret_name\` to create it." >&2
                 fi
             fi
         fi

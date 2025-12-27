@@ -248,6 +248,7 @@ function _dotsecenv_load_file
                     set -g -a _DOTSECENV_LOADED_$dir_hash "$key"
                 else
                     echo "dotsecenv: warning: secret '$secret_name' not found in vault, $key left unset" >&2
+                    echo "run: \`dotsecenv secret put $secret_name\` to create it." >&2
                 end
             end
         end
