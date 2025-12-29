@@ -1,0 +1,12 @@
+# lefthook.yml - Git hooks configuration
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  commands:
+    lint:
+      run: make lint
+
+pre-push:
+  commands:
+    test:
+      run: make clean test e2e

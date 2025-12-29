@@ -14,6 +14,7 @@ help:
 	@echo "  make completions    - Generate shell completions"
 	@echo "  make docs           - Generate markdown documentation"
 	@echo "  make man            - Generate man pages"
+	@echo "  make hooks          - Install git hooks (lefthook)"
 
 .PHONY: all
 all: clean update build lint test test-race e2e completions docs man
@@ -112,3 +113,14 @@ docs:
 man:
 	@echo "Generating man pages..."
 	@go run -tags gendocs ./cmd/dotsecenv -o man/man1
+
+LEFTHOOK := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/lefthook
+
+.PHONY: hooks
+hooks:
+	@if ! [ -x "$(LEFTHOOK)" ]; then \
+		echo "Installing lefthook..."; \
+		go install github.com/evilmartians/lefthook/v2@v2.0.13; \
+	fi
+	@echo "Installing git hooks..."
+	@$(LEFTHOOK) install
