@@ -84,7 +84,7 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 	var vaultResolver *vault.VaultResolver
 
 	// Determine output writer for warnings
-	var warnWriter = stderr
+	warnWriter := stderr
 	if silent {
 		warnWriter = io.Discard
 	}
@@ -222,7 +222,7 @@ func (c *CLI) getFingerprintFromEnv() string {
 func (c *CLI) checkFingerprintRequired(operation string) (string, *Error) {
 	fp := c.getFingerprintFromEnv()
 	if fp == "" {
-		msg := fmt.Sprintf("select a user identity before running '%s'; run 'dotsecenv login FINGERPRINT'", operation)
+		msg := fmt.Sprintf("select a user identity before running '%s'\n  run: `dotsecenv login FINGERPRINT`", operation)
 		return "", NewError(msg, ExitFingerprintRequired)
 	}
 	return fp, nil
