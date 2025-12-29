@@ -5,7 +5,7 @@ project_name: dotsecenv
 before:
   hooks:
     - go mod tidy
-    - make build completions man docs
+    - make build completions docs man
 
 builds:
   # Linux amd64 with BoringCrypto (FIPS-approved cryptography)

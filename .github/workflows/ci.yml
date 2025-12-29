@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -45,7 +47,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache-dependency-path: 'go.sum'
-      - run: make build man docs completions
+      - run: make build completions docs man
 
   action:
     name: Test Action (${{ matrix.os }})
