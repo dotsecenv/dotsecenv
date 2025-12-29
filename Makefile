@@ -14,11 +14,17 @@ help:
 	@echo "  make completions    - Generate shell completions"
 
 .PHONY: all
-all: clean update lint build test test-race man docs completions init e2e validate
+all: clean build lint test test-race e2e update completions docs man
 
 # Common ldflags for version info
 LDFLAGS := -X main.version=$$(git describe --tags --always --dirty) -X main.commit=$$(git rev-parse --short HEAD) -X main.date=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+.PHONY: clean
+clean:
+	@rm -rf bin/ build/ dist/ docs/ man/ completions/
+	echo "Reinitializing dotsecenv vault..."
+	go clean -testcache
+	
 # Auto-detect OS and dispatch to platform-specific target
 .PHONY: build
 build:
@@ -45,45 +51,6 @@ build-darwin:
 	CGO_ENABLED=0 go build -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
 	@echo "Binary built at: bin/dotsecenv"
 
-.PHONY: test
-test:
-	@echo "Running tests..."
-	@go test -v ./...
-
-.PHONY: test-race
-test-race:
-	@echo "Running tests with race condition detection..."
-	@go test -race -v ./...
-
-.PHONY: clean
-clean:
-	@rm -rf bin/ build/ dist/ docs/ man/ completions/
-	echo "Reinitializing dotsecenv vault..."
-	rm -f ~/.config/dotsecenv/config ~/.local/share/dotsecenv/vault .dotsecenv/vault
-	go clean -testcache
-
-.PHONY: init
-init: clean build
-	echo "Reinitializing dotsecenv vault..."
-	mkdir -p ~/.local/share/dotsecenv .dotsecenv
-	bin/dotsecenv init config
-	bin/dotsecenv init vault -v .dotsecenv/vault
-	bin/dotsecenv init vault -v ~/.local/share/dotsecenv/vault
-	
-.PHONY: e2e
-e2e: build
-	@./scripts/e2e.sh $(E2E_FLAGS)
-
-.PHONY: validate
-validate: build
-	@echo "Validating vault integrity..."
-	@bin/dotsecenv validate
-
-.PHONY: update
-update:
-	@echo "Updating dependencies..."
-	@go get -u ./...
-
 GOLANGCI_LINT_VERSION := latest
 GOLANGCI_LINT := $(shell go env GOPATH)/bin/golangci-lint
 
@@ -107,15 +74,24 @@ lint: install-lint
 	@echo "Running golangci-lint..."
 	@$(GOLANGCI_LINT) run ./...
 
-.PHONY: man
-man:
-	@echo "Generating man pages..."
-	@go run -tags gendocs ./cmd/dotsecenv -o man/man1
+.PHONY: test
+test:
+	@echo "Running tests..."
+	@go test -v ./...
 
-.PHONY: docs
-docs:
-	@echo "Generating markdown documentation..."
-	@go run -tags gendocs ./cmd/dotsecenv markdown -o docs/cli
+.PHONY: test-race
+test-race:
+	@echo "Running tests with race condition detection..."
+	@go test -race -v ./...
+
+.PHONY: e2e
+e2e: build
+	@./scripts/e2e.sh $(E2E_FLAGS)
+
+.PHONY: update
+update:
+	@echo "Updating dependencies..."
+	@go get -u ./...
 
 .PHONY: completions
 completions: build
@@ -124,3 +100,13 @@ completions: build
 	@bin/dotsecenv completion bash > completions/dotsecenv.bash
 	@bin/dotsecenv completion zsh > completions/dotsecenv.zsh
 	@bin/dotsecenv completion fish > completions/dotsecenv.fish
+
+.PHONY: docs
+docs:
+	@echo "Generating markdown documentation..."
+	@go run -tags gendocs ./cmd/dotsecenv markdown -o docs/cli
+
+.PHONY: man
+man:
+	@echo "Generating man pages..."
+	@go run -tags gendocs ./cmd/dotsecenv -o man/man1
