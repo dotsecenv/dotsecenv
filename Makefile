@@ -1,20 +1,22 @@
 .PHONY: help
 help:
 	@echo "dotsecenv Makefile targets:"
+	@echo "  make all            - Run all targets"
+	@echo "  make clean          - Clean build artifacts"
+	@echo "  make update         - Update go dependencies"
 	@echo "  make build          - Build for current OS (auto-detect)"
 	@echo "  make build-linux    - Build for Linux with BoringCrypto (FIPS)"
 	@echo "  make build-darwin   - Build for macOS (standard crypto)"
+	@echo "  make lint           - Run linting (vet + fmt check)"
 	@echo "  make test           - Run tests"
 	@echo "  make test-race      - Run tests with race condition detection"
-	@echo "  make clean          - Clean build artifacts"
-	@echo "  make vet            - Run go vet"
-	@echo "  make lint           - Run linting (vet + fmt check)"
-	@echo "  make man            - Generate man pages"
-	@echo "  make docs           - Generate markdown documentation"
+	@echo "  make e2e            - Run end-to-end tests using the compiled binary"
 	@echo "  make completions    - Generate shell completions"
+	@echo "  make docs           - Generate markdown documentation"
+	@echo "  make man            - Generate man pages"
 
 .PHONY: all
-all: clean build lint test test-race e2e update completions docs man
+all: clean update build lint test test-race e2e completions docs man
 
 # Common ldflags for version info
 LDFLAGS := -X main.version=$$(git describe --tags --always --dirty) -X main.commit=$$(git rev-parse --short HEAD) -X main.date=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
