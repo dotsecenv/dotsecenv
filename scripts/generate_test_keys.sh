@@ -22,6 +22,7 @@ Key-Usage: sign
 Subkey-Type: $algo
 Subkey-Length: 3072
 Subkey-Usage: encrypt
+Preferences: AES256 SHA512 Uncompressed
 Name-Real: $name
 Name-Email: $email
 Expire-Date: 0
@@ -58,6 +59,7 @@ Key-Usage: sign
 Subkey-Type: ECDH
 Subkey-Curve: $curve
 Subkey-Usage: encrypt
+Preferences: AES256 SHA512 Uncompressed
 Name-Real: $name
 Name-Email: $email
 Expire-Date: 0
@@ -73,6 +75,7 @@ Key-Usage: sign
 Subkey-Type: $algo
 Subkey-Length: 3072
 Subkey-Usage: encrypt
+Preferences: AES256 SHA512 Uncompressed
 Name-Real: $name
 Name-Email: $email
 Expire-Date: 0
@@ -90,6 +93,7 @@ Key-Usage: sign
 Subkey-Type: RSA
 Subkey-Length: 4096
 Subkey-Usage: encrypt
+Preferences: AES256 SHA512 Uncompressed
 Name-Real: $name
 Name-Email: $email
 Expire-Date: 0

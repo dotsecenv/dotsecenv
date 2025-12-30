@@ -25,6 +25,7 @@ Key-Usage: sign
 Subkey-Type: RSA
 Subkey-Length: 4096
 Subkey-Usage: encrypt
+Preferences: AES256 SHA512 Uncompressed
 Name-Real: DotSecEnv Releases
 Name-Comment: Automated Release Signing Key
 Name-Email: release@dotsecenv.com

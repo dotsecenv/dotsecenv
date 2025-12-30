@@ -14,9 +14,11 @@ trap "rm -rf $GNUPGHOME" EXIT
 echo "==> Generating test keys in $GNUPGHOME"
 
 # Generate two test keys
+# Preferences exclude S2 (3DES) to avoid "invalid item 'S2'" warning on GPG 2.4+
 gpg --batch --gen-key <<EOF
 Key-Type: RSA
 Key-Length: 3072
+Preferences: AES256 SHA512 Uncompressed
 Name-Real: Test User One
 Name-Email: test1@dotsecenv.com
 %no-protection
@@ -26,6 +28,7 @@ EOF
 gpg --batch --gen-key <<EOF
 Key-Type: RSA
 Key-Length: 3072
+Preferences: AES256 SHA512 Uncompressed
 Name-Real: Test User Two
 Name-Email: test2@dotsecenv.com
 %no-protection
