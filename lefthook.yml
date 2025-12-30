@@ -2,11 +2,13 @@
 # https://github.com/evilmartians/lefthook
 
 pre-commit:
+  follow: true
   commands:
     lint:
       run: make lint
 
 pre-push:
+  follow: true
   commands:
     test:
       run: make clean test e2e

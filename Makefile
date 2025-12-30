@@ -80,12 +80,12 @@ lint: install-lint
 .PHONY: test
 test:
 	@echo "Running tests..."
-	@go test -v ./...
+	go test -v -p 1 ./...
 
 .PHONY: test-race
 test-race:
 	@echo "Running tests with race condition detection..."
-	@go test -race -v ./...
+	go test -race -v -p 1 ./...
 
 .PHONY: e2e
 e2e: build
