@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-
-	"golang.org/x/sys/unix"
 )
 
 // Manager handles vault file operations with locking
@@ -65,12 +63,7 @@ func (m *Manager) OpenAndLock() error {
 
 	// Lock the file
 	// Use shared lock for read-only access, exclusive for read-write
-	lockType := unix.LOCK_EX
-	if m.readOnly {
-		lockType = unix.LOCK_SH
-	}
-
-	if err := unix.Flock(int(file.Fd()), lockType); err != nil {
+	if err := lockFile(file, !m.readOnly); err != nil {
 		_ = file.Close()
 		return fmt.Errorf("failed to lock vault file: %w", err)
 	}
@@ -115,7 +108,7 @@ func (m *Manager) Unlock() error {
 	}
 
 	if m.locked {
-		_ = unix.Flock(int(m.file.Fd()), unix.LOCK_UN)
+		_ = unlockFile(m.file)
 		m.locked = false
 	}
 
