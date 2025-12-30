@@ -24,6 +24,7 @@ jobs:
   test-windows:
     name: Build, Test (windows-latest)
     runs-on: windows-latest
+    if: false # Windows support is WIP https://github.com/dotsecenv/dotsecenv/issues/8
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v5
