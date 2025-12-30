@@ -46,22 +46,40 @@ func resolveGPGPath() string {
 }
 
 // DetectGPGPath attempts to find GPG in common locations.
-// Returns the path if found, empty string if not found.
+// Returns the first path found, empty string if not found.
 // This is used by "init config" to suggest a path.
 func DetectGPGPath() string {
-	// First, check if gpg is already in PATH
+	paths := DetectAllGPGPaths()
+	if len(paths) > 0 {
+		return paths[0]
+	}
+	return ""
+}
+
+// DetectAllGPGPaths finds all GPG executables on the system.
+// Returns a slice of paths, with PATH entries first, then common locations.
+// Duplicates are removed.
+func DetectAllGPGPaths() []string {
+	seen := make(map[string]bool)
+	var paths []string
+
+	// First, check if gpg is in PATH
 	if path, err := exec.LookPath("gpg"); err == nil {
-		return path
+		if !seen[path] {
+			seen[path] = true
+			paths = append(paths, path)
+		}
 	}
 
 	// Try platform-specific common locations
 	for _, path := range commonGPGPaths() {
-		if isExecutable(path) {
-			return path
+		if isExecutable(path) && !seen[path] {
+			seen[path] = true
+			paths = append(paths, path)
 		}
 	}
 
-	return ""
+	return paths
 }
 
 // isExecutable checks if a file exists and is executable.

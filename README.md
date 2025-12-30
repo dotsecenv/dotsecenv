@@ -380,23 +380,27 @@ approved_algorithms:
 vault:
   - /path/to/vault1
 strict: false
-gpg_program: ""  # Path to GPG executable (empty = use PATH)
+gpg:
+  program: gpg  # Path to GPG executable
 ```
 
-### GPG Program Configuration
+### GPG Configuration
 
-The `gpg_program` option specifies the path to the GPG executable. When left empty (default), dotsecenv looks for `gpg` in your system PATH.
+The `gpg.program` option specifies the path to the GPG executable. By default, it is set to `gpg` which is looked up in your system PATH.
 
-**When to use this option:**
+**Automatic detection**: When running `dotsecenv init config`, dotsecenv will detect available GPG installations and set `gpg.program` to the detected path. If multiple GPG installations are found, you'll be prompted to choose one.
 
-- **Windows**: If Gpg4win is not in your PATH, set the full path:
+**Manual configuration:**
+
+- **Windows**: If Gpg4win is not in your PATH:
+
   ```yaml
-  gpg_program: "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe"
+  gpg:
+    program: "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe"
   ```
+
 - **Custom installations**: If GPG is installed in a non-standard location
 - **Multiple GPG versions**: To use a specific GPG version
-
-**Automatic detection**: When running `dotsecenv init config`, if GPG is not found in PATH, dotsecenv will attempt to detect it in common installation locations and automatically set `gpg_program`.
 
 ## Vault File Format
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/dotsecenv/dotsecenv/internal/xdg"
@@ -45,17 +44,32 @@ func InitConfig(configPath string, initialVaults []string, stdout, stderr io.Wri
 	}
 	cfg.Vault = vaultPaths
 
-	// Detect GPG path
-	// If gpg is not in PATH, try to find it in common locations
-	if _, err := exec.LookPath("gpg"); err != nil {
-		// GPG not in PATH, try to detect it
-		detectedPath := gpg.DetectGPGPath()
-		if detectedPath != "" {
-			cfg.GPGProgram = detectedPath
-			_, _ = fmt.Fprintf(stdout, "GPG not found in PATH, detected at: %s\n", detectedPath)
+	// Detect GPG paths and let user choose if multiple are found
+	gpgPaths := gpg.DetectAllGPGPaths()
+
+	switch len(gpgPaths) {
+	case 0:
+		_, _ = fmt.Fprintf(stderr, "Warning: GPG not found. Please install GPG and ensure it's in your PATH,\n")
+		_, _ = fmt.Fprintf(stderr, "         or set gpg.program in the config file.\n")
+		// Keep default "gpg" - will fail at runtime if not installed
+	case 1:
+		// Single GPG found - always set it explicitly
+		cfg.GPG.Program = gpgPaths[0]
+		_, _ = fmt.Fprintf(stdout, "Using GPG: %s\n", gpgPaths[0])
+	default:
+		// Multiple GPG installations found, let user choose
+		_, _ = fmt.Fprintf(stdout, "Multiple GPG installations found:\n")
+
+		// Try interactive selection
+		idx, selectErr := HandleInteractiveSelection(gpgPaths, "Select GPG to use (Arrow Up/Down, Enter to select):", stderr)
+		if selectErr != nil {
+			// Interactive selection failed (no terminal, Windows, etc.)
+			// Fall back to first detected path
+			cfg.GPG.Program = gpgPaths[0]
+			_, _ = fmt.Fprintf(stderr, "Could not prompt for selection, using first detected: %s\n", gpgPaths[0])
 		} else {
-			_, _ = fmt.Fprintf(stderr, "Warning: GPG not found. Please install GPG and ensure it's in your PATH,\n")
-			_, _ = fmt.Fprintf(stderr, "         or set gpg_program in the config file.\n")
+			cfg.GPG.Program = gpgPaths[idx]
+			_, _ = fmt.Fprintf(stdout, "Selected GPG: %s\n", gpgPaths[idx])
 		}
 	}
 
