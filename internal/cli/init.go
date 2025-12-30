@@ -49,9 +49,8 @@ func InitConfig(configPath string, initialVaults []string, stdout, stderr io.Wri
 
 	switch len(gpgPaths) {
 	case 0:
-		_, _ = fmt.Fprintf(stderr, "Warning: GPG not found. Please install GPG and ensure it's in your PATH,\n")
-		_, _ = fmt.Fprintf(stderr, "         or set gpg.program in the config file.\n")
-		// Keep default "gpg" - will fail at runtime if not installed
+		// Fail to generate the config
+		return NewError("GPG not found. Please install GPG and ensure it's in your PATH, then try again\n  run: `dotsecenv init config`", ExitConfigError)
 	case 1:
 		// Single GPG found - always set it explicitly
 		cfg.GPG.Program = gpgPaths[0]

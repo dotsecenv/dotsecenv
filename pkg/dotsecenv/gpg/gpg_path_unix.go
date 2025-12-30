@@ -24,5 +24,5 @@ func isExecutableFile(path string) bool {
 		return false
 	}
 	// Check if it's a regular file and has executable bit
-	return info.Mode().IsRegular() && info.Mode()&0111 != 0
+	return info.Mode().IsRegular() && info.Mode()&0o111 != 0
 }

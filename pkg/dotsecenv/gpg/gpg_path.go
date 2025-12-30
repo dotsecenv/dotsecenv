@@ -45,17 +45,6 @@ func resolveGPGPath() string {
 	return "gpg"
 }
 
-// DetectGPGPath attempts to find GPG in common locations.
-// Returns the first path found, empty string if not found.
-// This is used by "init config" to suggest a path.
-func DetectGPGPath() string {
-	paths := DetectAllGPGPaths()
-	if len(paths) > 0 {
-		return paths[0]
-	}
-	return ""
-}
-
 // DetectAllGPGPaths finds all GPG executables on the system.
 // Returns a slice of paths, with PATH entries first, then common locations.
 // Duplicates are removed.
