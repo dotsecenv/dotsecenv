@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/dotsecenv/dotsecenv/internal/xdg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/config"
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
@@ -42,6 +44,20 @@ func InitConfig(configPath string, initialVaults []string, stdout, stderr io.Wri
 		vaultPaths = append(vaultPaths, defaultVaults...)
 	}
 	cfg.Vault = vaultPaths
+
+	// Detect GPG path
+	// If gpg is not in PATH, try to find it in common locations
+	if _, err := exec.LookPath("gpg"); err != nil {
+		// GPG not in PATH, try to detect it
+		detectedPath := gpg.DetectGPGPath()
+		if detectedPath != "" {
+			cfg.GPGProgram = detectedPath
+			_, _ = fmt.Fprintf(stdout, "GPG not found in PATH, detected at: %s\n", detectedPath)
+		} else {
+			_, _ = fmt.Fprintf(stderr, "Warning: GPG not found. Please install GPG and ensure it's in your PATH,\n")
+			_, _ = fmt.Fprintf(stderr, "         or set gpg_program in the config file.\n")
+		}
+	}
 
 	// Save config
 	if err := config.Save(configPath, cfg); err != nil {

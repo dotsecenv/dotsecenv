@@ -64,7 +64,14 @@ sudo pacman -U dotsecenv_amd64.pkg.tar.zst
 
 #### Windows
 
-Please [open a GitHub issue](https://github.com/dotsecenv/dotsecenv/issues/new/choose) if you need a Windows variant!
+Download the `.zip` file for your architecture from the [Releases page](https://github.com/dotsecenv/dotsecenv/releases):
+
+- `dotsecenv_vX.X.X_Windows_x86_64.zip` for 64-bit Intel/AMD
+- `dotsecenv_vX.X.X_Windows_arm64.zip` for ARM64
+
+Extract and add the binary location to your PATH.
+
+**GPG Requirement**: Install [Gpg4win](https://www.gpg4win.org/) for GPG support. If GPG is not in your PATH, `dotsecenv init config` will attempt to detect it automatically, or you can set `gpg_program` in your config file.
 
 #### Build from Source
 
@@ -137,7 +144,7 @@ jobs:
 
 ### Shell Completions
 
-dotsecenv supports shell completions for Bash, Zsh, and Fish.
+dotsecenv supports shell completions for Bash, Zsh, Fish, and PowerShell.
 
 #### Bash
 
@@ -189,6 +196,17 @@ Add to `~/.config/fish/config.fish`:
 if command -v dotsecenv &> /dev/null
   dotsecenv completion fish | source
 end
+```
+
+#### PowerShell
+
+Add to your PowerShell profile (`$PROFILE`):
+
+```powershell
+# dotsecenv completions
+if (Get-Command dotsecenv -ErrorAction SilentlyContinue) {
+  dotsecenv completion powershell | Out-String | Invoke-Expression
+}
 ```
 
 #### Pre-installed Paths
@@ -362,7 +380,23 @@ approved_algorithms:
 vault:
   - /path/to/vault1
 strict: false
+gpg_program: ""  # Path to GPG executable (empty = use PATH)
 ```
+
+### GPG Program Configuration
+
+The `gpg_program` option specifies the path to the GPG executable. When left empty (default), dotsecenv looks for `gpg` in your system PATH.
+
+**When to use this option:**
+
+- **Windows**: If Gpg4win is not in your PATH, set the full path:
+  ```yaml
+  gpg_program: "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe"
+  ```
+- **Custom installations**: If GPG is installed in a non-standard location
+- **Multiple GPG versions**: To use a specific GPG version
+
+**Automatic detection**: When running `dotsecenv init config`, if GPG is not found in PATH, dotsecenv will attempt to detect it in common installation locations and automatically set `gpg_program`.
 
 ## Vault File Format
 

@@ -77,6 +77,9 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
 	}
 
+	// Set GPG program path from config (if specified)
+	gpg.SetGPGProgram(cfg.GPGProgram)
+
 	// Compute effective strict mode early (CLI flag or config setting)
 	effectiveStrict := strict || cfg.Strict
 

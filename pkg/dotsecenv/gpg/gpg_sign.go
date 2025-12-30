@@ -24,7 +24,7 @@ func (c *GPGClient) SignDataWithAgent(fingerprint string, data []byte) (string, 
 	}
 
 	// Use gpg to create a detached signature via gpg-agent (without armor)
-	cmd := exec.Command("gpg", "--detach-sign", "-u", fingerprint)
+	cmd := exec.Command(GetGPGProgram(), "--detach-sign", "-u", fingerprint)
 	cmd.Stdin = strings.NewReader(string(data))
 
 	// Capture stderr to include in error messages for better debugging
