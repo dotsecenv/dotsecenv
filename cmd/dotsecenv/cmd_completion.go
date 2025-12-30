@@ -7,7 +7,7 @@ import (
 )
 
 var completionCmd = &cobra.Command{
-	Use:   "completion [bash|zsh|fish]",
+	Use:   "completion [bash|zsh|fish|powershell]",
 	Short: "Generate shell completion scripts",
 	Long: `Generate shell completion scripts for dotsecenv.
 
@@ -37,9 +37,15 @@ Fish:
 
   # To load completions for each session, execute once:
   $ dotsecenv completion fish > ~/.config/fish/completions/dotsecenv.fish
+
+PowerShell:
+  PS> dotsecenv completion powershell | Out-String | Invoke-Expression
+
+  # To load completions for each session, add to your PowerShell profile:
+  PS> dotsecenv completion powershell >> $PROFILE
 `,
 	DisableFlagsInUseLine: true,
-	ValidArgs:             []string{"bash", "zsh", "fish"},
+	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
 	Args:                  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
@@ -53,6 +59,8 @@ Fish:
 			_ = cmd.Root().GenZshCompletion(os.Stdout)
 		case "fish":
 			_ = cmd.Root().GenFishCompletion(os.Stdout, true)
+		case "powershell":
+			_ = cmd.Root().GenPowerShellCompletionWithDesc(os.Stdout)
 		default:
 			_ = cmd.Help()
 		}

@@ -7,6 +7,7 @@ help:
 	@echo "  make build          - Build for current OS (auto-detect)"
 	@echo "  make build-linux    - Build for Linux with BoringCrypto (FIPS)"
 	@echo "  make build-darwin   - Build for macOS (standard crypto)"
+	@echo "  make build-windows  - Build for Windows (standard crypto)"
 	@echo "  make lint           - Run linting (vet + fmt check)"
 	@echo "  make test           - Run tests"
 	@echo "  make test-race      - Run tests with race condition detection"
@@ -35,8 +36,14 @@ ifeq ($(shell uname -s),Linux)
 	@$(MAKE) build-linux
 else ifeq ($(shell uname -s),Darwin)
 	@$(MAKE) build-darwin
+else ifneq (,$(findstring MINGW,$(shell uname -s)))
+	@$(MAKE) build-windows
+else ifneq (,$(findstring MSYS,$(shell uname -s)))
+	@$(MAKE) build-windows
+else ifeq ($(OS),Windows_NT)
+	@$(MAKE) build-windows
 else
-	@echo "Unsupported OS: $$(uname -s). Use build-linux or build-darwin explicitly."
+	@echo "Unsupported OS: $$(uname -s). Use build-linux, build-darwin, or build-windows explicitly."
 	@exit 1
 endif
 
@@ -53,6 +60,13 @@ build-darwin:
 	@echo "Building dotsecenv for macOS (standard crypto)..."
 	CGO_ENABLED=0 go build -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
 	@echo "Binary built at: bin/dotsecenv"
+
+# Windows: Standard crypto (no CGO)
+.PHONY: build-windows
+build-windows:
+	@echo "Building dotsecenv for Windows (standard crypto)..."
+	CGO_ENABLED=0 GOOS=windows go build -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv.exe ./cmd/dotsecenv
+	@echo "Binary built at: bin/dotsecenv.exe"
 
 GOLANGCI_LINT_VERSION := latest
 GOLANGCI_LINT := $(shell go env GOPATH)/bin/golangci-lint
@@ -103,6 +117,7 @@ completions: build
 	@bin/dotsecenv completion bash > completions/dotsecenv.bash
 	@bin/dotsecenv completion zsh > completions/dotsecenv.zsh
 	@bin/dotsecenv completion fish > completions/dotsecenv.fish
+	@bin/dotsecenv completion powershell > completions/dotsecenv.ps1
 
 .PHONY: docs
 docs:
