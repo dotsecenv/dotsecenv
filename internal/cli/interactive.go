@@ -13,7 +13,7 @@ import (
 var ErrUserCancelled = errors.New("cancelled by user")
 
 // selectVaultFromTTY implements a simple list selection using raw terminal mode.
-// It reads input from the provided tty file and writes output to stdout.
+// It reads input from the provided tty file and writes output to stderr.
 // Returns the selected index, or ErrUserCancelled if the user presses Ctrl-C or Escape.
 func selectVaultFromTTY(options []string, tty *os.File) (int, error) {
 	fd := int(tty.Fd())
@@ -28,21 +28,21 @@ func selectVaultFromTTY(options []string, tty *os.File) (int, error) {
 		ShowCursor = "\033[?25h"
 	)
 
-	fmt.Print(HideCursor)
-	defer fmt.Print(ShowCursor)
+	_, _ = fmt.Fprint(os.Stderr, HideCursor)
+	defer func() { _, _ = fmt.Fprint(os.Stderr, ShowCursor) }()
 
 	current := 0
 
 	render := func() {
 		for i, opt := range options {
 			if i == current {
-				fmt.Printf("\r> %s\r\n", opt)
+				_, _ = fmt.Fprintf(os.Stderr, "\r> %s\r\n", opt)
 			} else {
-				fmt.Printf("\r  %s\r\n", opt)
+				_, _ = fmt.Fprintf(os.Stderr, "\r  %s\r\n", opt)
 			}
 		}
 		if len(options) > 0 {
-			fmt.Printf("\033[%dA", len(options))
+			_, _ = fmt.Fprintf(os.Stderr, "\033[%dA", len(options))
 		}
 	}
 
@@ -57,18 +57,18 @@ func selectVaultFromTTY(options []string, tty *os.File) (int, error) {
 
 		// Handle Ctrl-C (0x03)
 		if n >= 1 && buf[0] == 3 {
-			fmt.Printf("\033[%dB", len(options))
+			_, _ = fmt.Fprintf(os.Stderr, "\033[%dB", len(options))
 			return 0, ErrUserCancelled
 		}
 
 		// Handle Escape key (0x1B alone, not part of arrow key sequence)
 		if n == 1 && buf[0] == 27 {
-			fmt.Printf("\033[%dB", len(options))
+			_, _ = fmt.Fprintf(os.Stderr, "\033[%dB", len(options))
 			return 0, ErrUserCancelled
 		}
 
 		if n == 1 && (buf[0] == '\n' || buf[0] == '\r') {
-			fmt.Printf("\033[%dB", len(options))
+			_, _ = fmt.Fprintf(os.Stderr, "\033[%dB", len(options))
 			return current, nil
 		} else if n == 3 && buf[0] == 27 && buf[1] == 91 {
 			switch buf[2] {

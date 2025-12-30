@@ -55,10 +55,10 @@ func InitConfig(configPath string, initialVaults []string, stdout, stderr io.Wri
 	case 1:
 		// Single GPG found - always set it explicitly
 		cfg.GPG.Program = gpgPaths[0]
-		_, _ = fmt.Fprintf(stdout, "Using GPG: %s\n", gpgPaths[0])
+		_, _ = fmt.Fprintf(stderr, "Using GPG: %s\n", gpgPaths[0])
 	default:
 		// Multiple GPG installations found, let user choose
-		_, _ = fmt.Fprintf(stdout, "Multiple GPG installations found:\n")
+		_, _ = fmt.Fprintf(stderr, "Multiple GPG installations found:\n")
 
 		// Try interactive selection
 		idx, selectErr := HandleInteractiveSelection(gpgPaths, "Select GPG to use (Arrow Up/Down, Enter to select):", stderr)
@@ -69,7 +69,7 @@ func InitConfig(configPath string, initialVaults []string, stdout, stderr io.Wri
 			_, _ = fmt.Fprintf(stderr, "Could not prompt for selection, using first detected: %s\n", gpgPaths[0])
 		} else {
 			cfg.GPG.Program = gpgPaths[idx]
-			_, _ = fmt.Fprintf(stdout, "Selected GPG: %s\n", gpgPaths[idx])
+			_, _ = fmt.Fprintf(stderr, "Selected GPG: %s\n", gpgPaths[idx])
 		}
 	}
 
@@ -78,7 +78,7 @@ func InitConfig(configPath string, initialVaults []string, stdout, stderr io.Wri
 		return NewError(fmt.Sprintf("failed to save config: %v", err), ExitConfigError)
 	}
 
-	_, _ = fmt.Fprintf(stdout, "Initialized config file: %s\n", configPath)
+	_, _ = fmt.Fprintf(stderr, "Initialized config file: %s\n", configPath)
 	return nil
 }
 
@@ -107,7 +107,7 @@ func InitVaultFile(vaultPath string, stdout, stderr io.Writer) *Error {
 	}
 	_ = vm.Unlock()
 
-	_, _ = fmt.Fprintf(stdout, "Initialized empty vault: %s\n", vaultPath)
+	_, _ = fmt.Fprintf(stderr, "Initialized empty vault: %s\n", vaultPath)
 	return nil
 }
 
@@ -139,7 +139,7 @@ func InitVaultInteractiveStandalone(configPath string, stdout, stderr io.Writer)
 	var selectedPath string
 	if len(options) == 1 {
 		selectedPath = paths[0]
-		_, _ = fmt.Fprintf(stdout, "Auto-selected single vault: %s\n", options[0])
+		_, _ = fmt.Fprintf(stderr, "Auto-selected single vault: %s\n", options[0])
 	} else {
 		idx, selectErr := HandleInteractiveSelection(options, "Select vault to initialize (Arrow Up/Down, Enter to select):", stderr)
 		if selectErr != nil {
