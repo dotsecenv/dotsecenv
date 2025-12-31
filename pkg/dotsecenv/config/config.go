@@ -26,9 +26,9 @@ type GPGConfig struct {
 type Config struct {
 	ApprovedAlgorithms []ApprovedAlgorithm `yaml:"approved_algorithms"`
 	Fingerprint        string              `yaml:"fingerprint,omitempty"`
-	Vault              []string            `yaml:"vault"`  // List of vault paths
-	Strict             bool                `yaml:"strict"` // Strict mode: certain warnings become errors
-	GPG                GPGConfig           `yaml:"gpg"`    // GPG configuration
+	Vault              []string            `yaml:"vault"`         // List of vault paths
+	Strict             bool                `yaml:"strict"`        // Strict mode: certain warnings become errors
+	GPG                GPGConfig           `yaml:"gpg,omitempty"` // GPG configuration
 }
 
 // UnmarshalYAML provides custom YAML unmarshaling with better error messages for vault configuration
