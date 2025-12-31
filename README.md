@@ -64,6 +64,8 @@ sudo pacman -U dotsecenv_amd64.pkg.tar.zst
 
 #### Windows
 
+> **NOTICE:** dotsecenv on Windows is currently WIP. You can follow [this issue](https://github.com/dotsecenv/dotsecenv/issues/8) for updates.
+
 Download the `.zip` file for your architecture from the [Releases page](https://github.com/dotsecenv/dotsecenv/releases):
 
 - `dotsecenv_vX.X.X_Windows_x86_64.zip` for 64-bit Intel/AMD
@@ -100,18 +102,18 @@ The action downloads the appropriate binary for your runner's architecture and v
 
 Release binaries achieve [SLSA Build Level 3](#security-features) compliance with verified provenance attestations. Using `build-from-source: true` or `verify-provenance: false` bypasses these security guarantees and is generally NOT recommended.
 
-| Input | Default | Description |
-| ----- | ------- | ----------- |
-| `version` | `latest` | Version to install (e.g., `v1.2.3` or `latest`) |
-| `build-from-source` | `false` | Build from source instead of downloading a release |
-| `verify-provenance` | `true` | Verify GPG signatures, checksums, and attestations |
+| Input               | Default  | Description                                        |
+| ------------------- | -------- | -------------------------------------------------- |
+| `version`           | `latest` | Version to install (e.g., `v1.2.3` or `latest`)    |
+| `build-from-source` | `false`  | Build from source instead of downloading a release |
+| `verify-provenance` | `true`   | Verify GPG signatures, checksums, and attestations |
 
 #### Outputs
 
-| Output | Description |
-| ------ | ----------- |
-| `version` | The version of dotsecenv that was installed |
-| `binary-path` | Full path to the installed binary |
+| Output        | Description                                 |
+| ------------- | ------------------------------------------- |
+| `version`     | The version of dotsecenv that was installed |
+| `binary-path` | Full path to the installed binary           |
 
 #### Examples
 
@@ -381,7 +383,7 @@ vault:
   - /path/to/vault1
 strict: false
 gpg:
-  program: gpg  # Path to GPG executable
+  program: gpg # Path to GPG executable
 ```
 
 ### GPG Configuration
@@ -555,6 +557,7 @@ failed to get public key: failed to parse public key: gopenpgp: error in reading
 **Workaround**: Use Ed25519 keys instead, which are fully supported and provide equivalent security for most use cases. Ed25519 keys use the OpenPGP v4 format which has full library support.
 
 **Status**: This limitation will be resolved when:
+
 - GnuPG adopts RFC 9580 v6 format for Ed448 keys, OR
 - go-crypto adds compatibility for GnuPG's v5 Ed448 format
 
