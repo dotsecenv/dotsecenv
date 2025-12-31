@@ -19,7 +19,7 @@ type ApprovedAlgorithm struct {
 
 // GPGConfig holds GPG-related configuration
 type GPGConfig struct {
-	Program string `yaml:"program"` // Path to GPG executable
+	Program string `yaml:"program,omitempty"` // Path to GPG executable
 }
 
 // Config represents the dotsecenv configuration
@@ -95,8 +95,8 @@ func DefaultConfig() Config {
 		},
 		Fingerprint: "",
 		Strict:      false,
-		Vault:       []string{}, // No default vaults from library; caller must populate
-		GPG:         GPGConfig{Program: "gpg"},
+		Vault:       []string{},             // No default vaults from library; caller must populate
+		GPG:         GPGConfig{Program: ""}, // Empty by default; will be inferred from PATH
 	}
 }
 

@@ -77,11 +77,19 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
 	}
 
-	// Set GPG program path from config
-	gpg.SetGPGProgram(cfg.GPG.Program)
-
 	// Compute effective strict mode early (CLI flag or config setting)
 	effectiveStrict := strict || cfg.Strict
+
+	// Determine stderr for warnings (respect silent mode)
+	gpgWarnWriter := stderr
+	if silent {
+		gpgWarnWriter = nil
+	}
+
+	// Validate and set GPG program path from config
+	if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program, effectiveStrict, gpgWarnWriter); err != nil {
+		return nil, NewError(fmt.Sprintf("failed: %v", err), ExitGPGError)
+	}
 
 	// Create vault resolver
 	var vaultResolver *vault.VaultResolver

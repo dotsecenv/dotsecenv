@@ -188,6 +188,12 @@ func TestSecretRevoke_Self(t *testing.T) {
 	configPathStrict := filepath.Join(tmpDir, "config-strict.yaml")
 	configPathNonStrict := filepath.Join(tmpDir, "config.yaml")
 
+	// Get the gpg path for strict mode config
+	gpgPath, err := exec.LookPath("gpg")
+	if err != nil {
+		t.Fatalf("failed to find gpg: %v", err)
+	}
+
 	configContentStrict := fmt.Sprintf(`
 approved_algorithms:
   - algo: RSA
@@ -195,7 +201,9 @@ approved_algorithms:
 vault:
   - "%s"
 strict: true
-`, vaultPath)
+gpg:
+  program: "%s"
+`, vaultPath, gpgPath)
 
 	configContentNonStrict := fmt.Sprintf(`
 approved_algorithms:

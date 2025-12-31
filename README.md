@@ -386,21 +386,38 @@ gpg:
 
 ### GPG Configuration
 
-The `gpg.program` option specifies the path to the GPG executable. By default, it is set to `gpg` which is looked up in your system PATH.
+The `gpg.program` option specifies the path to the GPG executable. The behavior depends on whether the value is specified and whether strict mode is enabled:
 
-**Automatic detection**: When running `dotsecenv init config`, dotsecenv will detect available GPG installations and set `gpg.program` to the detected path. If multiple GPG installations are found, you'll be prompted to choose one.
+**Resolution order:**
 
-**Manual configuration:**
+1. **Explicit configuration**: If `gpg.program` is set, it must be an absolute path to an existing, executable program
+2. **PATH inference**: If `gpg.program` is not set (or empty), dotsecenv will look up `gpg` from your system PATH and print a warning to stderr
+3. **Strict mode**: In strict mode (`strict: true`), `gpg.program` must be explicitly configured - PATH inference is not allowed
 
-- **Windows**: If Gpg4win is not in your PATH:
+**Examples:**
 
-  ```yaml
-  gpg:
-    program: "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe"
-  ```
+```yaml
+# Explicit path (recommended for production/strict mode)
+gpg:
+  program: /usr/bin/gpg
 
-- **Custom installations**: If GPG is installed in a non-standard location
-- **Multiple GPG versions**: To use a specific GPG version
+# Not specified - will infer from PATH with a warning
+gpg:
+  program: ""
+
+# Windows with Gpg4win
+gpg:
+  program: "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe"
+```
+
+**Automatic detection**: When running `dotsecenv init config`, dotsecenv will detect available GPG installations and set `gpg.program` to the detected absolute path. If multiple GPG installations are found, you'll be prompted to choose one.
+
+**When to use explicit paths:**
+
+- In strict mode (required)
+- When you have multiple GPG versions installed
+- When GPG is installed in a non-standard location
+- In CI/CD environments where PATH may vary
 
 ## Vault File Format
 
