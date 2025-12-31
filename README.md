@@ -258,6 +258,10 @@ dotsecenv init config -c /path/to/config
 dotsecenv init config -v /path/to/vault
 ## Customize both the config and the vault location
 dotsecenv init config -c ... -v ...
+## Skip GPG detection (for systems without GPG installed)
+dotsecenv init config --no-gpg-program
+## Set GPG program path explicitly (without validation)
+dotsecenv init config --gpg-program /usr/local/bin/gpg
 
 # Initialize a vault
 ## Interactive prompt, asking which vault to initialize
@@ -312,21 +316,21 @@ dotsecenv validate --fix  # Attempt to fix issues
 
 ### Commands
 
-| Command                                     | Description                                  |
-| ------------------------------------------- | -------------------------------------------- |
-| `init config`                               | Initialize configuration file                |
-| `init vault`                                | Initialize vault file(s)                     |
-| `login FINGERPRINT`                         | Initialize user identity                     |
-| `secret put SECRET`                         | Store an encrypted secret (reads from stdin) |
-| `secret get SECRET [--all\|--last\|--json]` | Retrieve a secret value                      |
-| `secret share SECRET FINGERPRINT [--all]`   | Share a secret with another identity         |
-| `secret revoke SECRET FINGERPRINT [--all]`  | Revoke access to a secret                    |
-| `vault list [--json]`                       | List configured vaults and their secrets     |
-| `vault identity add FINGERPRINT [--all]`    | Add an identity to vault(s)                  |
-| `vault identity list [--json]`              | List identities in configured vaults         |
-| `validate [--fix]`                          | Validate vault and config integrity          |
-| `version`                                   | Show version information                     |
-| `completion`                                | Generate shell completion scripts            |
+| Command                                         | Description                                  |
+| ----------------------------------------------- | -------------------------------------------- |
+| `init config [--gpg-program\|--no-gpg-program]` | Initialize configuration file                |
+| `init vault`                                    | Initialize vault file(s)                     |
+| `login FINGERPRINT`                             | Initialize user identity                     |
+| `secret put SECRET`                             | Store an encrypted secret (reads from stdin) |
+| `secret get SECRET [--all\|--last\|--json]`     | Retrieve a secret value                      |
+| `secret share SECRET FINGERPRINT [--all]`       | Share a secret with another identity         |
+| `secret revoke SECRET FINGERPRINT [--all]`      | Revoke access to a secret                    |
+| `vault list [--json]`                           | List configured vaults and their secrets     |
+| `vault identity add FINGERPRINT [--all]`        | Add an identity to vault(s)                  |
+| `vault identity list [--json]`                  | List identities in configured vaults         |
+| `validate [--fix]`                              | Validate vault and config integrity          |
+| `version`                                       | Show version information                     |
+| `completion`                                    | Generate shell completion scripts            |
 
 ## Features
 
