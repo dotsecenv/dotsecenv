@@ -241,15 +241,20 @@ function _dotsecenv_load_file
                     echo "dotsecenv: warning: $key from .secenv overrides value from .env" >&2
                 end
 
-                # Fetch secret from vault
-                set -l secret_value
-                if set secret_value (dotsecenv secret get "$secret_name" 2>/dev/null)
-                    set -gx $key "$secret_value"
+                # Fetch secret from vault (capture stderr separately to preserve secret value)
+                set -l secret_stderr_file (mktemp)
+                set -l secret_result (dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
+                set -l secret_status $status
+                if test $secret_status -eq 0
+                    set -gx $key "$secret_result"
                     set -g -a _DOTSECENV_LOADED_$dir_hash "$key"
+                    # Show any warnings that were emitted
+                    test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
                 else
-                    echo "dotsecenv: warning: secret '$secret_name' not found in vault, $key left unset" >&2
-                    echo "run: \`dotsecenv secret put $secret_name\` to create it." >&2
+                    echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
+                    cat "$secret_stderr_file" >&2
                 end
+                rm -f "$secret_stderr_file"
             end
         end
     end <"$file"

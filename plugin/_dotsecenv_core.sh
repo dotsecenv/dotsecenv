@@ -266,14 +266,19 @@ _dotsecenv_load_file() {
                     fi
                 done
 
-                # Fetch secret from vault
-                if secret_value=$(dotsecenv secret get "$secret_name" 2>/dev/null); then
-                    export "$key=$secret_value"
+                # Fetch secret from vault (capture stderr separately to preserve secret value)
+                local secret_result secret_stderr_file
+                secret_stderr_file=$(mktemp)
+                if secret_result=$(dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
+                    export "$key=$secret_result"
                     _dotsecenv_array_append "$vars_var" "$key"
+                    # Show any warnings that were emitted
+                    [[ -s "$secret_stderr_file" ]] && cat "$secret_stderr_file" >&2
                 else
-                    echo "dotsecenv: warning: secret '$secret_name' not found in vault, $key left unset" >&2
-                    echo "run: \`dotsecenv secret put $secret_name\` to create it." >&2
+                    echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
+                    cat "$secret_stderr_file" >&2
                 fi
+                rm -f "$secret_stderr_file"
             fi
         fi
     done <"$file"
