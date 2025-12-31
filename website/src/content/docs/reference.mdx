@@ -63,6 +63,13 @@ By default, creates a configuration file at the XDG config location (`~/.config/
 
 The default configuration uses FIPS 186-5 compliant algorithm minimums: RSA 2048+, ECC P-384+, EdDSA Ed25519/Ed448.
 
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--gpg-program PATH` | Set gpg.program to this path (without validation) |
+| `--no-gpg-program` | Skip GPG detection (leave gpg.program empty) |
+
 **Examples:**
 
 ```bash
@@ -71,6 +78,12 @@ dotsecenv init config
 
 # Create config at custom location
 dotsecenv init config -c ~/my-project/dotsecenv.yaml
+
+# Skip GPG detection (for systems without GPG)
+dotsecenv init config --no-gpg-program
+
+# Set GPG path explicitly
+dotsecenv init config --gpg-program /usr/local/bin/gpg
 ```
 
 ### init vault
@@ -561,6 +574,36 @@ approved_algorithms:
 
 # Strict mode: treat warnings as errors
 strict: false
+
+# GPG executable path (absolute path required if specified)
+gpg:
+  program: /usr/bin/gpg
+```
+
+### GPG Program Configuration
+
+The `gpg.program` option specifies the path to the GPG executable:
+
+| Scenario | Behavior |
+|----------|----------|
+| `gpg.program` specified | Must be an absolute path to an existing, executable program |
+| `gpg.program` empty/omitted | Infers `gpg` from PATH, prints warning to stderr |
+| Strict mode + empty | **Error**: must be explicitly configured |
+
+**Examples:**
+
+```yaml
+# Explicit path (recommended for strict mode)
+gpg:
+  program: /usr/bin/gpg
+
+# Windows
+gpg:
+  program: "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe"
+
+# Omit to infer from PATH (prints warning)
+gpg:
+  program: ""
 ```
 
 ---

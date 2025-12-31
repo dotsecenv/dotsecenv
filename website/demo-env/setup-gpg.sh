@@ -20,6 +20,7 @@ cat > "$BATCH_FILE" <<EOF
 %echo Generating demo GPG key...
 Key-Type: RSA
 Key-Length: 2048
+Preferences: AES256 SHA512 Uncompressed
 Name-Real: DotSecEnv Demo
 Name-Email: $IDENTITY
 Expire-Date: 0
