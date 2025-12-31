@@ -243,7 +243,7 @@ func (c *GPGClient) ExtractAlgorithmAndCurve(fullAlgorithm string) (algorithm st
 
 // getPublicKeyBinary retrieves the public key from GPG and returns it as binary.
 func getPublicKeyBinary(fingerprint string) ([]byte, error) {
-	cmd := exec.Command("gpg", "--export", fingerprint)
+	cmd := exec.Command(GetGPGProgram(), "--export", fingerprint)
 	cmd.Stderr = nil
 
 	output, err := cmd.Output()
@@ -419,7 +419,7 @@ func getAlgorithmBitsFromKey(entity interface{}) int {
 
 // getAlgorithmBitsFromFingerprint retrieves the algorithm bit length from GPG.
 func getAlgorithmBitsFromFingerprint(fingerprint string) int {
-	cmd := exec.Command("gpg", "--with-colons", "--list-public-keys", fingerprint)
+	cmd := exec.Command(GetGPGProgram(), "--with-colons", "--list-public-keys", fingerprint)
 	cmd.Stderr = nil
 
 	output, err := cmd.Output()
@@ -445,7 +445,7 @@ func getAlgorithmBitsFromFingerprint(fingerprint string) int {
 
 // GetKeyCreationTime retrieves the key creation time from GPG.
 func (c *GPGClient) GetKeyCreationTime(fingerprint string) time.Time {
-	cmd := exec.Command("gpg", "--with-colons", "--list-public-keys", fingerprint)
+	cmd := exec.Command(GetGPGProgram(), "--with-colons", "--list-public-keys", fingerprint)
 	cmd.Stderr = nil
 
 	output, err := cmd.Output()
@@ -471,7 +471,7 @@ func (c *GPGClient) GetKeyCreationTime(fingerprint string) time.Time {
 
 // GetKeyExpiration retrieves the key expiration time from GPG.
 func (c *GPGClient) GetKeyExpiration(fingerprint string) *time.Time {
-	cmd := exec.Command("gpg", "--with-colons", "--list-public-keys", fingerprint)
+	cmd := exec.Command(GetGPGProgram(), "--with-colons", "--list-public-keys", fingerprint)
 	cmd.Stderr = nil
 
 	output, err := cmd.Output()
@@ -498,7 +498,7 @@ func (c *GPGClient) GetKeyExpiration(fingerprint string) *time.Time {
 
 // isKeyExpired checks if a key is expired using gpg --list-keys.
 func (c *GPGClient) isKeyExpired(fingerprint string) bool {
-	cmd := exec.Command("gpg", "--list-keys", "--with-colons", fingerprint)
+	cmd := exec.Command(GetGPGProgram(), "--list-keys", "--with-colons", fingerprint)
 	output, err := cmd.Output()
 	if err != nil {
 		return false
@@ -623,7 +623,7 @@ func (c *GPGClient) GetSecretKeyFromAgent(fingerprint string) (*crypto.Key, erro
 		return nil, fmt.Errorf("fingerprint cannot be empty")
 	}
 
-	cmd := exec.Command("gpg", "--with-colons", "--list-secret-keys", fingerprint)
+	cmd := exec.Command(GetGPGProgram(), "--with-colons", "--list-secret-keys", fingerprint)
 	cmd.Stderr = nil
 
 	output, err := cmd.Output()

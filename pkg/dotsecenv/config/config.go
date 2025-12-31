@@ -17,12 +17,18 @@ type ApprovedAlgorithm struct {
 	MinBits int      `yaml:"min_bits"`         // Minimum bit length
 }
 
+// GPGConfig holds GPG-related configuration
+type GPGConfig struct {
+	Program string `yaml:"program,omitempty"` // Path to GPG executable
+}
+
 // Config represents the dotsecenv configuration
 type Config struct {
 	ApprovedAlgorithms []ApprovedAlgorithm `yaml:"approved_algorithms"`
 	Fingerprint        string              `yaml:"fingerprint,omitempty"`
-	Vault              []string            `yaml:"vault"`  // List of vault paths
-	Strict             bool                `yaml:"strict"` // Strict mode: certain warnings become errors
+	Vault              []string            `yaml:"vault"`         // List of vault paths
+	Strict             bool                `yaml:"strict"`        // Strict mode: certain warnings become errors
+	GPG                GPGConfig           `yaml:"gpg,omitempty"` // GPG configuration
 }
 
 // UnmarshalYAML provides custom YAML unmarshaling with better error messages for vault configuration
@@ -89,7 +95,8 @@ func DefaultConfig() Config {
 		},
 		Fingerprint: "",
 		Strict:      false,
-		Vault:       []string{}, // No default vaults from library; caller must populate
+		Vault:       []string{},             // No default vaults from library; caller must populate
+		GPG:         GPGConfig{Program: ""}, // Empty by default; will be inferred from PATH
 	}
 }
 

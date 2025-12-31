@@ -64,7 +64,16 @@ sudo pacman -U dotsecenv_amd64.pkg.tar.zst
 
 #### Windows
 
-Please [open a GitHub issue](https://github.com/dotsecenv/dotsecenv/issues/new/choose) if you need a Windows variant!
+> **NOTICE:** dotsecenv on Windows is currently WIP. You can follow [this issue](https://github.com/dotsecenv/dotsecenv/issues/8) for updates.
+
+Download the `.zip` file for your architecture from the [Releases page](https://github.com/dotsecenv/dotsecenv/releases):
+
+- `dotsecenv_vX.X.X_Windows_x86_64.zip` for 64-bit Intel/AMD
+- `dotsecenv_vX.X.X_Windows_arm64.zip` for ARM64
+
+Extract and add the binary location to your PATH.
+
+**GPG Requirement**: Install [Gpg4win](https://www.gpg4win.org/) for GPG support. If GPG is not in your PATH, `dotsecenv init config` will attempt to detect it automatically, or you can set `gpg_program` in your config file.
 
 #### Build from Source
 
@@ -93,18 +102,18 @@ The action downloads the appropriate binary for your runner's architecture and v
 
 Release binaries achieve [SLSA Build Level 3](#security-features) compliance with verified provenance attestations. Using `build-from-source: true` or `verify-provenance: false` bypasses these security guarantees and is generally NOT recommended.
 
-| Input | Default | Description |
-| ----- | ------- | ----------- |
-| `version` | `latest` | Version to install (e.g., `v1.2.3` or `latest`) |
-| `build-from-source` | `false` | Build from source instead of downloading a release |
-| `verify-provenance` | `true` | Verify GPG signatures, checksums, and attestations |
+| Input               | Default  | Description                                        |
+| ------------------- | -------- | -------------------------------------------------- |
+| `version`           | `latest` | Version to install (e.g., `v1.2.3` or `latest`)    |
+| `build-from-source` | `false`  | Build from source instead of downloading a release |
+| `verify-provenance` | `true`   | Verify GPG signatures, checksums, and attestations |
 
 #### Outputs
 
-| Output | Description |
-| ------ | ----------- |
-| `version` | The version of dotsecenv that was installed |
-| `binary-path` | Full path to the installed binary |
+| Output        | Description                                 |
+| ------------- | ------------------------------------------- |
+| `version`     | The version of dotsecenv that was installed |
+| `binary-path` | Full path to the installed binary           |
 
 #### Examples
 
@@ -137,7 +146,7 @@ jobs:
 
 ### Shell Completions
 
-dotsecenv supports shell completions for Bash, Zsh, and Fish.
+dotsecenv supports shell completions for Bash, Zsh, Fish, and PowerShell.
 
 #### Bash
 
@@ -191,6 +200,17 @@ if command -v dotsecenv &> /dev/null
 end
 ```
 
+#### PowerShell
+
+Add to your PowerShell profile (`$PROFILE`):
+
+```powershell
+# dotsecenv completions
+if (Get-Command dotsecenv -ErrorAction SilentlyContinue) {
+  dotsecenv completion powershell | Out-String | Invoke-Expression
+}
+```
+
 #### Pre-installed Paths
 
 If you installed via a package manager (Homebrew, deb, rpm, Arch), completions are pre-installed at these paths:
@@ -238,6 +258,10 @@ dotsecenv init config -c /path/to/config
 dotsecenv init config -v /path/to/vault
 ## Customize both the config and the vault location
 dotsecenv init config -c ... -v ...
+## Skip GPG detection (for systems without GPG installed)
+dotsecenv init config --no-gpg-program
+## Set GPG program path explicitly (without validation)
+dotsecenv init config --gpg-program /usr/local/bin/gpg
 
 # Initialize a vault
 ## Interactive prompt, asking which vault to initialize
@@ -292,21 +316,21 @@ dotsecenv validate --fix  # Attempt to fix issues
 
 ### Commands
 
-| Command                                     | Description                                  |
-| ------------------------------------------- | -------------------------------------------- |
-| `init config`                               | Initialize configuration file                |
-| `init vault`                                | Initialize vault file(s)                     |
-| `login FINGERPRINT`                         | Initialize user identity                     |
-| `secret put SECRET`                         | Store an encrypted secret (reads from stdin) |
-| `secret get SECRET [--all\|--last\|--json]` | Retrieve a secret value                      |
-| `secret share SECRET FINGERPRINT [--all]`   | Share a secret with another identity         |
-| `secret revoke SECRET FINGERPRINT [--all]`  | Revoke access to a secret                    |
-| `vault list [--json]`                       | List configured vaults and their secrets     |
-| `vault identity add FINGERPRINT [--all]`    | Add an identity to vault(s)                  |
-| `vault identity list [--json]`              | List identities in configured vaults         |
-| `validate [--fix]`                          | Validate vault and config integrity          |
-| `version`                                   | Show version information                     |
-| `completion`                                | Generate shell completion scripts            |
+| Command                                         | Description                                  |
+| ----------------------------------------------- | -------------------------------------------- |
+| `init config [--gpg-program\|--no-gpg-program]` | Initialize configuration file                |
+| `init vault`                                    | Initialize vault file(s)                     |
+| `login FINGERPRINT`                             | Initialize user identity                     |
+| `secret put SECRET`                             | Store an encrypted secret (reads from stdin) |
+| `secret get SECRET [--all\|--last\|--json]`     | Retrieve a secret value                      |
+| `secret share SECRET FINGERPRINT [--all]`       | Share a secret with another identity         |
+| `secret revoke SECRET FINGERPRINT [--all]`      | Revoke access to a secret                    |
+| `vault list [--json]`                           | List configured vaults and their secrets     |
+| `vault identity add FINGERPRINT [--all]`        | Add an identity to vault(s)                  |
+| `vault identity list [--json]`                  | List identities in configured vaults         |
+| `validate [--fix]`                              | Validate vault and config integrity          |
+| `version`                                       | Show version information                     |
+| `completion`                                    | Generate shell completion scripts            |
 
 ## Features
 
@@ -362,7 +386,44 @@ approved_algorithms:
 vault:
   - /path/to/vault1
 strict: false
+gpg:
+  program: gpg # Path to GPG executable
 ```
+
+### GPG Configuration
+
+The `gpg.program` option specifies the path to the GPG executable. The behavior depends on whether the value is specified and whether strict mode is enabled:
+
+**Resolution order:**
+
+1. **Explicit configuration**: If `gpg.program` is set, it must be an absolute path to an existing, executable program
+2. **PATH inference**: If `gpg.program` is not set (or empty), dotsecenv will look up `gpg` from your system PATH and print a warning to stderr
+3. **Strict mode**: In strict mode (`strict: true`), `gpg.program` must be explicitly configured - PATH inference is not allowed
+
+**Examples:**
+
+```yaml
+# Explicit path (recommended for production/strict mode)
+gpg:
+  program: /usr/bin/gpg
+
+# Not specified - will infer from PATH with a warning
+gpg:
+  program: ""
+
+# Windows with Gpg4win
+gpg:
+  program: "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe"
+```
+
+**Automatic detection**: When running `dotsecenv init config`, dotsecenv will detect available GPG installations and set `gpg.program` to the detected absolute path. If multiple GPG installations are found, you'll be prompted to choose one.
+
+**When to use explicit paths:**
+
+- In strict mode (required)
+- When you have multiple GPG versions installed
+- When GPG is installed in a non-standard location
+- In CI/CD environments where PATH may vary
 
 ## Vault File Format
 
@@ -500,6 +561,7 @@ failed to get public key: failed to parse public key: gopenpgp: error in reading
 **Workaround**: Use Ed25519 keys instead, which are fully supported and provide equivalent security for most use cases. Ed25519 keys use the OpenPGP v4 format which has full library support.
 
 **Status**: This limitation will be resolved when:
+
 - GnuPG adopts RFC 9580 v6 format for Ed448 keys, OR
 - go-crypto adds compatibility for GnuPG's v5 Ed448 format
 

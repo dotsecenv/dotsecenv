@@ -53,9 +53,9 @@ func (c *GPGClient) DecryptWithAgent(ciphertext []byte, fingerprint string) ([]b
 	// If fingerprint is provided, use it to restrict which secret key is tried.
 	var cmd *exec.Cmd
 	if fingerprint != "" {
-		cmd = exec.Command("gpg", "--decrypt", "--try-secret-key", fingerprint, "--quiet")
+		cmd = exec.Command(GetGPGProgram(), "--decrypt", "--try-secret-key", fingerprint, "--quiet")
 	} else {
-		cmd = exec.Command("gpg", "--decrypt", "--quiet")
+		cmd = exec.Command(GetGPGProgram(), "--decrypt", "--quiet")
 	}
 	cmd.Stdin = strings.NewReader(armoredCiphertext)
 

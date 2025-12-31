@@ -8,11 +8,14 @@ import (
 
 	"github.com/dotsecenv/dotsecenv/internal/xdg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/config"
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
-// InitConfig initializes a configuration file with FIPS-compliant defaults
-func InitConfig(configPath string, initialVaults []string, stdout, stderr io.Writer) *Error {
+// InitConfig initializes a configuration file with FIPS-compliant defaults.
+// gpgProgram: if non-empty, use this value for gpg.program (without validation)
+// noGPGProgram: if true, skip GPG detection entirely and leave gpg.program empty
+func InitConfig(configPath string, initialVaults []string, gpgProgram string, noGPGProgram bool, stdout, stderr io.Writer) *Error {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
 		return NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
@@ -43,12 +46,54 @@ func InitConfig(configPath string, initialVaults []string, stdout, stderr io.Wri
 	}
 	cfg.Vault = vaultPaths
 
+	// Handle GPG program configuration
+	switch {
+	case gpgProgram != "":
+		// Explicit path provided via --gpg-program (no validation)
+		cfg.GPG.Program = gpgProgram
+		_, _ = fmt.Fprintf(stderr, "Using GPG program: %s\n", gpgProgram)
+
+	case noGPGProgram:
+		// Skip GPG detection entirely
+		cfg.GPG.Program = ""
+		_, _ = fmt.Fprintf(stderr, "Skipping GPG program detection (gpg.program will be empty)\n")
+
+	default:
+		// Auto-detect GPG paths and let user choose if multiple are found
+		gpgPaths := gpg.DetectAllGPGPaths()
+
+		switch len(gpgPaths) {
+		case 0:
+			// Fail to generate the config
+			return NewError("GPG not found. Please install GPG and ensure it's in your PATH, then try again.\n  Use --no-gpg-program to skip GPG detection, or --gpg-program to specify a path.", ExitConfigError)
+		case 1:
+			// Single GPG found - always set it explicitly
+			cfg.GPG.Program = gpgPaths[0]
+			_, _ = fmt.Fprintf(stderr, "Using GPG: %s\n", gpgPaths[0])
+		default:
+			// Multiple GPG installations found, let user choose
+			_, _ = fmt.Fprintf(stderr, "Multiple GPG installations found:\n")
+
+			// Try interactive selection
+			idx, selectErr := HandleInteractiveSelection(gpgPaths, "Select GPG to use (Arrow Up/Down, Enter to select):", stderr)
+			if selectErr != nil {
+				// Interactive selection failed (no terminal, Windows, etc.)
+				// Fall back to first detected path
+				cfg.GPG.Program = gpgPaths[0]
+				_, _ = fmt.Fprintf(stderr, "Could not prompt for selection, using first detected: %s\n", gpgPaths[0])
+			} else {
+				cfg.GPG.Program = gpgPaths[idx]
+				_, _ = fmt.Fprintf(stderr, "Selected GPG: %s\n", gpgPaths[idx])
+			}
+		}
+	}
+
 	// Save config
 	if err := config.Save(configPath, cfg); err != nil {
 		return NewError(fmt.Sprintf("failed to save config: %v", err), ExitConfigError)
 	}
 
-	_, _ = fmt.Fprintf(stdout, "Initialized config file: %s\n", configPath)
+	_, _ = fmt.Fprintf(stderr, "Initialized config file: %s\n", configPath)
 	return nil
 }
 
@@ -77,7 +122,7 @@ func InitVaultFile(vaultPath string, stdout, stderr io.Writer) *Error {
 	}
 	_ = vm.Unlock()
 
-	_, _ = fmt.Fprintf(stdout, "Initialized empty vault: %s\n", vaultPath)
+	_, _ = fmt.Fprintf(stderr, "Initialized empty vault: %s\n", vaultPath)
 	return nil
 }
 
@@ -109,7 +154,7 @@ func InitVaultInteractiveStandalone(configPath string, stdout, stderr io.Writer)
 	var selectedPath string
 	if len(options) == 1 {
 		selectedPath = paths[0]
-		_, _ = fmt.Fprintf(stdout, "Auto-selected single vault: %s\n", options[0])
+		_, _ = fmt.Fprintf(stderr, "Auto-selected single vault: %s\n", options[0])
 	} else {
 		idx, selectErr := HandleInteractiveSelection(options, "Select vault to initialize (Arrow Up/Down, Enter to select):", stderr)
 		if selectErr != nil {
