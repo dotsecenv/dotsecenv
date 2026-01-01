@@ -188,7 +188,7 @@ function test_parse_secret_named
 end
 
 function test_missing_secret_warning
-    log "[fish] Testing missing secret warning..."
+    log "[fish] Testing missing secret error..."
     set TESTS_RUN (math $TESTS_RUN + 1)
 
     set test_dir "$TEMP_DIR/test_missing_secret"
@@ -209,10 +209,10 @@ function test_missing_secret_warning
         echo \"VAR=\$MISSING_SECRET\"
     " 2>&1)
 
-    if string match -q "*warning*" "$result"; and string match -q "*not found*" "$result"
-        pass "[fish] Missing secret warning displayed correctly"
+    if string match -q "*error*" "$result"; and string match -q "*fetching secret*" "$result"
+        pass "[fish] Missing secret error displayed correctly"
     else
-        fail "[fish] Missing secret warning not displayed, got: $result"
+        fail "[fish] Missing secret error not displayed, got: $result"
     end
 end
 

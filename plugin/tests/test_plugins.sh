@@ -270,7 +270,7 @@ EOF
 
 test_missing_secret_warning() {
     local shell="$1"
-    log "[$shell] Testing missing secret warning..."
+    log "[$shell] Testing missing secret error..."
     ((TESTS_RUN++)) || true
 
     local test_dir="$TEMP_DIR/test_missing_secret"
@@ -291,10 +291,10 @@ EOF
         result=$(run_with_plugin_zsh "$test_dir" "$mock_path" 'echo "VAR=$MISSING_SECRET"')
     fi
 
-    if [[ "$result" == *"warning"* && "$result" == *"not found"* ]]; then
-        pass "[$shell] Missing secret warning displayed correctly"
+    if [[ "$result" == *"error"* && "$result" == *"fetching secret"* ]]; then
+        pass "[$shell] Missing secret error displayed correctly"
     else
-        fail "[$shell] Missing secret warning not displayed, got: $result"
+        fail "[$shell] Missing secret error not displayed, got: $result"
     fi
 }
 
