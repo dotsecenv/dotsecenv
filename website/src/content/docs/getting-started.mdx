@@ -49,6 +49,7 @@ gpg --full-generate-key
    </Tabs>
 
    Verify installation:
+
    ```bash
    dotsecenv version
    ```
@@ -56,6 +57,7 @@ gpg --full-generate-key
 2. **Initialize configuration**
 
    Create a config file:
+
    ```bash
    dotsecenv init config
    ```
@@ -73,16 +75,19 @@ gpg --full-generate-key
 4. **Login with your GPG key**
 
    Find your GPG fingerprint:
+
    ```bash
    gpg --list-secret-keys --keyid-format long
    ```
 
    Look for the fingerprint (40-character hex string) and login:
+
    ```bash
    dotsecenv login YOUR_FINGERPRINT
    ```
 
    Or, if you have a single key, use this one-liner to auto-detect it:
+
    ```bash
    dotsecenv login \
       $(gpg --list-keys --with-colons | awk -F: '/^fpr/ {print $10; exit}')

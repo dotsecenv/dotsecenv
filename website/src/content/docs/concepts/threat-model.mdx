@@ -11,7 +11,7 @@ dotsecenv uses a layered encryption model combining symmetric and asymmetric cry
 
 ## Encryption Model
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                     Secret Value                            │
 │                    "my-password"                            │
@@ -41,6 +41,7 @@ dotsecenv uses a layered encryption model combining symmetric and asymmetric cry
 │   → Detached signature for integrity + non-repudiation      │
 └─────────────────────────────────────────────────────────────┘
 ```
+
 The choice of SHA-256/SHA-512 depends on the originator's
 key strength.
 
@@ -59,7 +60,7 @@ Hybrid encryption gets the best of both:
 
 When sharing a secret with 5 people, the secret is encrypted **once**. Only the session key is encrypted 5 times:
 
-```
+```text
 Secret Value  → AES-256-GCM  → Encrypted Data (1 copy)
                     │
                     ├─→ Session key encrypted for Alice
@@ -197,6 +198,7 @@ gpg:
 ```
 
 This enables:
+
 - Audit logging of all cryptographic operations
 - Policy enforcement (block certain operations)
 - Integration with hardware security modules (HSMs)
@@ -280,6 +282,7 @@ Current public-key cryptography (RSA, ECC) is vulnerable to quantum computers:
 dotsecenv trusts the system clock. Timestamps in vault entries can be manipulated by setting system time before storage.
 
 This is acceptable because:
+
 - Attackers can't modify existing entries (signatures prevent this)
 - Consumers can choose to trust/distrust specific fingerprints
 - The primary use case is developer workflows, not forensic timestamping
@@ -305,6 +308,7 @@ dotsecenv cryptographic operations align with the following NIST and IETF standa
 ### Symmetric Encryption
 
 **[RFC 9580](https://www.rfc-editor.org/rfc/rfc9580.html)** — OpenPGP (2024 revision)
+
 - Mandates AEAD (Authenticated Encryption with Associated Data)
 - AES-256-GCM as the default symmetric cipher
 - Replaces RFC 4880's CFB mode with modern authenticated encryption
@@ -314,6 +318,7 @@ dotsecenv uses gopenpgp's `profile.RFC9580()` which sets AES-256-GCM as the pref
 </Aside>
 
 **[NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final)** — GCM Mode
+
 - Specifies Galois/Counter Mode for AES
 - Provides both confidentiality and authenticity
 - 128-bit authentication tags prevent tampering
@@ -321,11 +326,13 @@ dotsecenv uses gopenpgp's `profile.RFC9580()` which sets AES-256-GCM as the pref
 ### Digital Signatures
 
 **[FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final)** — Digital Signature Standard (2023)
+
 - Approves RSA, ECDSA, and EdDSA for digital signatures
 - Deprecates DSA (removed from dotsecenv's approved algorithms)
 - EdDSA (Ed25519, Ed448) added as approved algorithms
 
 Vault entries are signed using FIPS 186-5 compliant algorithms:
+
 - **RSA** — RSASSA-PKCS1-v1_5 or RSASSA-PSS (2048-bit minimum)
 - **ECDSA** — P-384, P-521 curves
 - **EdDSA** — Ed25519 for performance, Ed448 for higher security
@@ -333,6 +340,7 @@ Vault entries are signed using FIPS 186-5 compliant algorithms:
 ### Cryptographic Modules
 
 **[FIPS 140-3](https://csrc.nist.gov/pubs/fips/140-3/final)** — Security Requirements for Cryptographic Modules
+
 - Default configuration enforces FIPS-compliant algorithm minimums
 - Actual compliance depends on underlying GPG/libgcrypt installation
 - Use FIPS-validated cryptographic libraries in regulated environments
@@ -372,7 +380,7 @@ Compliance is only as strong as your underlying GPG installation. For regulated 
 
 Every vault entry is signed. Verification happens on read:
 
-```
+```text
 Entry signature covers:
 ├── Secret key name
 ├── Available-to list (fingerprints)

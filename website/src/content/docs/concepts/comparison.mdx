@@ -45,12 +45,14 @@ SOPS is an excellent, battle-tested tool for production secrets:
 ### When to Choose
 
 **Choose dotsecenv if:**
+
 - You want integrated shell plugins for auto-loading
 - You need explicit share/revoke commands for team management
 - You prefer GPG-only with no cloud dependencies
 - Developer workflow is your primary use case
 
 **Choose SOPS if:**
+
 - You use cloud KMS (AWS, GCP, Azure)
 - You want to encrypt existing config files in-place
 - You need HashiCorp Vault integration
@@ -69,6 +71,7 @@ SOPS can use GPG for multi-recipient encryption, but you manage the key list man
 ### Similarities
 
 Both tools:
+
 - Integrate with bash, zsh, and fish
 - Load environment variables on directory change
 - Have trust/allow mechanisms for security
@@ -132,12 +135,14 @@ Vault is the industry standard for production secrets:
 ### When to Choose
 
 **Choose dotsecenv if:**
+
 - You want simple, file-based secrets without infrastructure
 - Your team is small to medium size
 - You prefer git-based workflows
 - Developer workflow is the focus
 
 **Choose Vault if:**
+
 - You need dynamic secrets (rotating DB passwords)
 - You require enterprise features (namespaces, HSM, replication)
 - You have a dedicated platform team
@@ -175,12 +180,14 @@ Vault can be overkill for developer workflows. Many teams use dotsecenv for deve
 ### When to Choose
 
 **Choose dotsecenv if:**
+
 - You want to keep secrets under your direct control
 - You prefer file/git-based workflows
 - You don't want third-party dependencies
 - Offline access is important
 
 **Choose Doppler if:**
+
 - You want a managed platform with web UI
 - You need extensive integrations out of the box
 - Your organization allows third-party secret storage
@@ -214,11 +221,13 @@ Vault can be overkill for developer workflows. Many teams use dotsecenv for deve
 ### When to Choose
 
 **Choose dotsecenv if:**
+
 - You want zero infrastructure (just files)
 - Client-side encryption with GPG is preferred
 - Simple CLI-based workflow
 
 **Choose Infisical if:**
+
 - You want open-source with self-hosting option
 - Web dashboard is important
 - Dynamic secrets and rotation are needed

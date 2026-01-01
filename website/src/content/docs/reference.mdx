@@ -95,6 +95,7 @@ dotsecenv init vault [flags]
 ```
 
 Two modes of operation:
+
 1. With `-v PATH`: Initialize a specific vault file at the given path
 2. Without `-v`: Interactive mode using vaults from configuration
 
@@ -150,6 +151,7 @@ dotsecenv secret get SECRET [flags]
 ```
 
 **Secret key formats:**
+
 - Namespaced: `namespace::KEY_NAME` (e.g., `myapp::DATABASE_URL`)
 - Non-namespaced: `KEY_NAME` (e.g., `DATABASE_URL`)
 
@@ -189,10 +191,12 @@ dotsecenv secret put SECRET [flags]
 ```
 
 **Secret key formats:**
+
 - Namespaced: `namespace::KEY_NAME` (e.g., `myapp::DATABASE_URL`)
 - Non-namespaced: `KEY_NAME` (e.g., `DATABASE_URL`)
 
 Keys are case-insensitive and normalized when stored:
+
 - Namespace part: lowercase
 - Key name part: UPPERCASE
 
@@ -314,7 +318,7 @@ dotsecenv vault list -v 1
 
 **Sample output:**
 
-```
+```text
 Vault: ~/.config/dotsecenv/vault
 
 Identities:
@@ -426,6 +430,7 @@ dotsecenv validate [flags]
 ```
 
 Checks for:
+
 - Config file syntax and validity
 - Vault header integrity
 - Identity entries
@@ -452,7 +457,7 @@ dotsecenv validate -v ./project/vault
 
 **Sample output:**
 
-```
+```text
 ✓ Config file: valid
 ✓ Vault header: valid
 ✓ Identity entries: 2 valid
@@ -517,8 +522,8 @@ dotsecenv version
 
 **Example output:**
 
-```
-dotsecenv version 0.0.13
+```text
+dotsecenv version 0.2.1
 ```
 
 ---

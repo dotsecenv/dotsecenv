@@ -238,6 +238,7 @@ Revoking access does NOT prevent them from decrypting the old value. Always rota
 ```bash
 echo "new-value" | dotsecenv secret put DATABASE_PASSWORD
 ```
+
 </Aside>
 
 ### Revoke from all secrets
@@ -259,7 +260,8 @@ dotsecenv validate
 ```
 
 Output:
-```
+
+```text
 ✓ Config file: valid
 ✓ Vault header: valid
 ✓ Identity entries: 2 valid
@@ -274,6 +276,7 @@ dotsecenv validate --fix
 ```
 
 This can fix:
+
 - Regenerate corrupted header indexes
 - Remove orphaned entries
 - Update outdated format versions
@@ -297,7 +300,8 @@ dotsecenv vault list
 ```
 
 Output:
-```
+
+```text
 Vault: ~/.config/dotsecenv/vault
 
 Identities:
@@ -436,7 +440,8 @@ dotsecenv vault defrag --dry-run
 ```
 
 Output:
-```
+
+```text
 Would remove 15 obsolete entries
 Would reduce vault from 2.4 KB to 1.1 KB
 ```

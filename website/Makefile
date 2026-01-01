@@ -1,6 +1,5 @@
-.PHONY: help install dev start build preview clean distclean favicons
-
 # Default target
+.PHONY: help
 help:
 	@echo "Usage: make [target]"
 	@echo ""
@@ -12,6 +11,9 @@ help:
 	@echo "  build      Build for production (output to dist/)"
 	@echo "  preview    Preview production build"
 	@echo ""
+	@echo "Quality:"
+	@echo "  lint       Lint MDX files (markdownlint + eslint)"
+	@echo ""
 	@echo "Assets:"
 	@echo "  favicons   Generate favicons from src/assets/logo.png"
 	@echo ""
@@ -21,28 +23,41 @@ help:
 	@echo "  distclean  Remove dist/ and node_modules/"
 
 # Development
+.PHONY: dev
 dev:
 	pnpm dev
 
+.PHONY: start
 start: dev
 
 # Production build
-build:
+.PHONY: build
+build: favicons
 	pnpm build
 
+.PHONY: preview
 preview:
 	pnpm preview
 
+# Quality
+.PHONY: lint
+lint:
+	pnpm lint
+
 # Assets
+.PHONY: favicons
 favicons:
 	node scripts/generate-favicons.mjs
 
 # Setup & Maintenance
+.PHONY: install
 install:
-	pnpm install
+	pnpm install --frozen-lockfile
 
+.PHONY: clean
 clean:
 	rm -rf dist/
 
+.PHONY: distclean
 distclean: clean
 	rm -rf node_modules/

@@ -28,7 +28,7 @@ Revoke someone's access to a secret. Understand what revocation does and doesn't
 
    Look for the `available_to` field:
 
-   ```
+   ```text
    DATABASE_PASSWORD
      available_to: [YOUR_FINGERPRINT, TEAMMATE_FINGERPRINT]
    ```
@@ -55,7 +55,7 @@ Revoke someone's access to a secret. Understand what revocation does and doesn't
 
    The identity should no longer appear in `available_to`:
 
-   ```
+   ```text
    DATABASE_PASSWORD
      available_to: [YOUR_FINGERPRINT]
    ```

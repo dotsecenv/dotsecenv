@@ -34,10 +34,10 @@ jobs:
           version: 10
 
       - name: Install dependencies
-        run: pnpm install
+        run: make install
 
       - name: Build website
-        run: pnpm build
+        run: make build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

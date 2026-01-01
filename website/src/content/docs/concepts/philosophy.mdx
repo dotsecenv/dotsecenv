@@ -150,6 +150,7 @@ dotsecenv deliberately **does not** aim to:
 dotsecenv is for the **development lifecycle (SDLC)**—bringing simple encryption to developers' daily operations.
 
 For production, consider:
+
 - HashiCorp Vault (dynamic secrets, PKI, enterprise features)
 - AWS Secrets Manager / GCP Secret Manager
 - Kubernetes Secrets with external operators
@@ -177,12 +178,14 @@ The append-only design means:
 ## Threat Model Summary
 
 **dotsecenv protects against:**
+
 - Accidental git commits (secrets are encrypted)
 - Unauthorized file access (GPG encryption)
 - Tampering (cryptographic signatures)
 - Plaintext on disk (always encrypted at rest)
 
 **dotsecenv does NOT protect against:**
+
 - Root/admin access (can read memory)
 - Compromised GPG private key
 - Post-decryption environment snooping
