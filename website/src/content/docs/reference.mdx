@@ -284,6 +284,40 @@ dotsecenv secret revoke DATABASE_PASSWORD FINGERPRINT --all
 echo "new-value" | dotsecenv secret put DATABASE_PASSWORD
 ```
 
+### secret forget
+
+Mark a secret as deleted in the vault.
+
+```bash
+dotsecenv secret forget SECRET [flags]
+```
+
+This adds a deletion marker to the secret. The secret will no longer be returned by `secret get` and will be shown as deleted in `vault list`.
+
+<Aside type="note">
+The deletion is a soft delete — the secret's history is preserved in the vault file. Use `vault defrag` to permanently remove deleted secrets.
+</Aside>
+
+**Examples:**
+
+```bash
+# Mark a secret as deleted
+dotsecenv secret forget DATABASE_PASSWORD
+
+# Delete from specific vault
+dotsecenv secret forget -v 2 prod::API_KEY
+
+# Delete using vault path
+dotsecenv secret forget -v ./project/vault SECRET_NAME
+```
+
+**Behavior after deletion:**
+
+- `secret get SECRET` — Returns error: "secret has been deleted"
+- `secret get --all` — Skips values from vaults where the secret is deleted
+- `secret get --last` — Does not consider deleted secrets
+- `vault list` — Shows `(deleted)` next to the secret name
+
 ---
 
 ## vault
@@ -320,17 +354,10 @@ dotsecenv vault list -v 1
 **Sample output:**
 
 ```text
-Vault: ~/.config/dotsecenv/vault
-
-Identities:
-  E60A1740... (alice@example.com) [rsa4096]
-  ABC12345... (bob@example.com) [ed25519]
-
-Secrets:
-  DATABASE_PASSWORD
-    available_to: [E60A1740..., ABC12345...]
-  prod::API_KEY
-    available_to: [E60A1740...]
+Vault 1 (~/.config/dotsecenv/vault):
+  - DATABASE_PASSWORD
+  - OLD_SECRET (deleted)
+  - prod::API_KEY
 ```
 
 ### vault defrag
