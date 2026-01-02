@@ -15,10 +15,11 @@ var secretCmd = &cobra.Command{
 	Long:  `Commands for managing secrets: put, get, share, revoke.`,
 }
 
-// secret put
+// secret put (alias: store)
 var secretPutCmd = &cobra.Command{
-	Use:   "put SECRET",
-	Short: "Store an encrypted secret",
+	Use:     "put SECRET",
+	Aliases: []string{"store"},
+	Short:   "Store an encrypted secret",
 	Long: `Store an encrypted secret value.
 
 Secret key formats:
