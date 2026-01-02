@@ -19,7 +19,7 @@
     "@astrojs/starlight": "^0.32.0",
     "asciinema-player": "^3.13.5",
     "astro": "^5.1.1",
-    "sharp": "^0.33.5"
+    "sharp": "^0.34.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
