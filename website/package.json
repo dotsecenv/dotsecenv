@@ -16,7 +16,7 @@
     "lint:eslint": "eslint 'src/**/*.{mdx,ts}' 'scripts/**/*.{js,mjs}'"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.32.0",
+    "@astrojs/starlight": "^0.37.0",
     "asciinema-player": "^3.13.5",
     "astro": "^5.1.1",
     "sharp": "^0.34.0"

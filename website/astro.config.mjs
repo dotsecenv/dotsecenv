@@ -14,10 +14,10 @@ export default defineConfig({
       tagline: 'Safe environment variables',
       description: 'Secure secrets management CLI that encrypts environment variables at rest using GPG, making them safe to commit to version control.',
 
-      social: {
-        github: 'https://github.com/dotsecenv/dotsecenv',
-        'x.com': 'https://x.com/dotsecenv',
-      },
+      social: [
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/dotsecenv/dotsecenv' },
+        { icon: 'x.com', label: 'X', href: 'https://x.com/dotsecenv' },
+      ],
 
       editLink: {
         baseUrl: 'https://github.com/dotsecenv/website/edit/main/',
