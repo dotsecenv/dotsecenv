@@ -1,6 +1,6 @@
 module github.com/dotsecenv/dotsecenv
 
-go 1.25.0
+go 1.25.5
 
 require (
 	github.com/ProtonMail/go-crypto v1.3.0

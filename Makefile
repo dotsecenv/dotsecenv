@@ -4,10 +4,7 @@ help:
 	@echo "  make all            - Run all targets"
 	@echo "  make clean          - Clean build artifacts"
 	@echo "  make update         - Update go dependencies"
-	@echo "  make build          - Build for current OS (auto-detect)"
-	@echo "  make build-linux    - Build for Linux with BoringCrypto (FIPS)"
-	@echo "  make build-darwin   - Build for macOS (standard crypto)"
-	@echo "  make build-windows  - Build for Windows (standard crypto)"
+	@echo "  make build          - Build with FIPS 140-3 crypto (no CGO)"
 	@echo "  make lint           - Run linting (vet + fmt check)"
 	@echo "  make test           - Run tests"
 	@echo "  make test-race      - Run tests with race condition detection"
@@ -15,7 +12,9 @@ help:
 	@echo "  make completions    - Generate shell completions"
 	@echo "  make docs           - Generate markdown documentation"
 	@echo "  make man            - Generate man pages"
-	@echo "  make hooks          - Install git hooks (lefthook)"
+	@echo "  make hooks          - Install git hooks using lefthook"
+	@echo "  make release-test   - Test release build (snapshot)"
+	@echo "  make install-tools  - Install all dev tools"
 
 .PHONY: all
 all: clean update build lint test test-race e2e completions docs man
@@ -29,54 +28,13 @@ clean:
 	echo "Reinitializing dotsecenv vault..."
 	go clean -testcache
 	
-# Auto-detect OS and dispatch to platform-specific target
+# Build with Go's native FIPS 140-3 module (no CGO required)
+# See: https://go.dev/blog/fips140
 .PHONY: build
 build:
-ifeq ($(shell uname -s),Linux)
-	@$(MAKE) build-linux
-else ifeq ($(shell uname -s),Darwin)
-	@$(MAKE) build-darwin
-else ifneq (,$(findstring MINGW,$(shell uname -s)))
-	@$(MAKE) build-windows
-else ifneq (,$(findstring MSYS,$(shell uname -s)))
-	@$(MAKE) build-windows
-else ifeq ($(OS),Windows_NT)
-	@$(MAKE) build-windows
-else
-	@echo "Unsupported OS: $$(uname -s). Use build-linux, build-darwin, or build-windows explicitly."
-	@exit 1
-endif
-
-# Linux: BoringCrypto for FIPS-approved cryptography (requires CGO)
-.PHONY: build-linux
-build-linux:
-	@echo "Building dotsecenv for Linux with BoringCrypto (FIPS-approved)..."
-	CGO_ENABLED=1 GOEXPERIMENT=boringcrypto go build -ldflags "$(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
+	@echo "Building dotsecenv with FIPS 140-3 crypto..."
+	CGO_ENABLED=0 GOFIPS140=v1.0.0 go build -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
 	@echo "Binary built at: bin/dotsecenv"
-
-# macOS: Standard crypto (BoringCrypto not available on Darwin)
-.PHONY: build-darwin
-build-darwin:
-	@echo "Building dotsecenv for macOS (standard crypto)..."
-	CGO_ENABLED=0 go build -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
-	@echo "Binary built at: bin/dotsecenv"
-
-# Windows: Standard crypto (no CGO)
-.PHONY: build-windows
-build-windows:
-	@echo "Building dotsecenv for Windows (standard crypto)..."
-	CGO_ENABLED=0 GOOS=windows go build -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv.exe ./cmd/dotsecenv
-	@echo "Binary built at: bin/dotsecenv.exe"
-
-GOLANGCI_LINT_VERSION := latest
-GOLANGCI_LINT := $(shell go env GOPATH)/bin/golangci-lint
-
-.PHONY: install-lint
-install-lint:
-	@if ! [ -x "$(GOLANGCI_LINT)" ]; then \
-		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION); \
-	fi
 
 .PHONY: lint
 lint: install-lint
@@ -129,13 +87,56 @@ man:
 	@echo "Generating man pages..."
 	@go run -tags gendocs ./cmd/dotsecenv -o man/man1
 
+.PHONY: hooks
+hooks: install-lefthook
+	@echo "Installing git hooks..."
+	@$(LEFTHOOK) install
+
+.PHONY: release-test
+release-test: install-goreleaser install-syft
+	@echo "Testing release build..."
+	@$(GORELEASER) release --snapshot --clean --skip=sign,publish,nfpm
+
+# =============================================================================
+# Development Tool Installation
+# =============================================================================
+
+.PHONY: install-tools
+install-tools: install-lefthook install-lint install-syft install-goreleaser
+
 LEFTHOOK := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/lefthook
 
-.PHONY: hooks
-hooks:
+.PHONY: install-lefthook
+install-lefthook:
 	@if ! [ -x "$(LEFTHOOK)" ]; then \
 		echo "Installing lefthook..."; \
 		go install github.com/evilmartians/lefthook/v2@v2.0.13; \
 	fi
-	@echo "Installing git hooks..."
-	@$(LEFTHOOK) install
+
+GOLANGCI_LINT_VERSION := latest
+GOLANGCI_LINT := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/golangci-lint
+
+.PHONY: install-lint
+install-lint:
+	@if ! [ -x "$(GOLANGCI_LINT)" ]; then \
+		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $${GOBIN:-$$(go env GOPATH)/bin} $(GOLANGCI_LINT_VERSION); \
+	fi
+
+SYFT := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/syft
+
+.PHONY: install-syft
+install-syft:
+	@if ! [ -x "$(SYFT)" ]; then \
+		echo "Installing syft..."; \
+		curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b $${GOBIN:-$$(go env GOPATH)/bin}; \
+	fi
+
+GORELEASER := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/goreleaser
+
+.PHONY: install-goreleaser
+install-goreleaser:
+	@if ! [ -x "$(GORELEASER)" ]; then \
+		echo "Installing goreleaser..."; \
+		go install github.com/goreleaser/goreleaser/v2@latest; \
+	fi
