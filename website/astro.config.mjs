@@ -6,6 +6,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'dotsecenv',
+      routeMiddleware: ['./src/route-data'],
       logo: {
         src: './src/assets/logo.png',
         alt: 'logo',
