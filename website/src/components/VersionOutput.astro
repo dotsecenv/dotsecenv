@@ -1,0 +1,14 @@
+---
+/**
+ * VersionOutput - Renders the dotsecenv version command output.
+ *
+ * Usage:
+ *   <VersionOutput />
+ */
+import { Code } from '@astrojs/starlight/components';
+import { DOTSECENV_VERSION } from '../config/version';
+
+const version = await DOTSECENV_VERSION;
+---
+
+<Code code={`dotsecenv version ${version}`} lang="text" />

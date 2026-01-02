@@ -1,8 +1,10 @@
 import js from "@eslint/js";
+import tseslint from "typescript-eslint";
 import * as mdx from "eslint-plugin-mdx";
 
 export default [
   js.configs.recommended,
+  ...tseslint.configs.recommended,
   {
     files: ["scripts/**/*.{js,mjs}"],
     languageOptions: {
@@ -15,6 +17,18 @@ export default [
         __dirname: "readonly",
         __filename: "readonly",
         URL: "readonly",
+      },
+    },
+  },
+  {
+    files: ["src/**/*.{js,ts}"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        fetch: "readonly",
       },
     },
   },
@@ -36,6 +50,7 @@ export default [
     files: ["**/*.mdx"],
     rules: {
       "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "off",
     },
   },
   {

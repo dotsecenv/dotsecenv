@@ -4,6 +4,9 @@ description: Step-by-step installation guide for all platforms
 ---
 
 import { Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components';
+import DownloadCommands from '../../../components/DownloadCommands.astro';
+import VersionOutput from '../../../components/VersionOutput.astro';
+import VersionExample from '../../../components/VersionExample.astro';
 
 ## Goal
 
@@ -30,20 +33,7 @@ Install dotsecenv on your system and verify it's working correctly.
      <TabItem label="macOS (Binary)">
        Download the binary directly:
 
-       ```bash
-       # Apple Silicon (M1/M2/M3)
-       curl -LO https://get.dotsecenv.com/darwin/dotsecenv_0.2.1_Darwin_arm64.tar.gz
-
-       # Intel Mac
-       curl -LO https://get.dotsecenv.com/darwin/dotsecenv_0.2.1_Darwin_x86_64.tar.gz
-
-       # Verify checksum
-       curl -s https://get.dotsecenv.com/darwin/checksums.txt | sha256sum -c --ignore-missing
-
-       # Extract and install
-       tar -xzf dotsecenv_*.tar.gz
-       sudo mv dotsecenv /usr/local/bin/
-       ```
+       <DownloadCommands platform="darwin" />
      </TabItem>
 
      <TabItem label="Debian/Ubuntu">
@@ -153,9 +143,7 @@ Install dotsecenv on your system and verify it's working correctly.
 
    You should see output like:
 
-   ```text
-   dotsecenv version 0.2.1
-   ```
+   <VersionOutput />
 
 3. **Install shell completions** (if not automatic)
 
@@ -219,10 +207,7 @@ dotsecenv <TAB>
 
 Download a specific version from GitHub releases:
 
-```bash
-VERSION="0.2.1"
-curl -LO "https://github.com/dotsecenv/dotsecenv/releases/download/v${VERSION}/dotsecenv_${VERSION}_Linux_x86_64.tar.gz"
-```
+<VersionExample />
 
 ### Verifying Package Signatures
 

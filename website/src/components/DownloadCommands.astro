@@ -1,0 +1,49 @@
+---
+/**
+ * DownloadCommands - Renders download commands with versioned URLs.
+ *
+ * Usage:
+ *   <DownloadCommands platform="darwin" />
+ *   <DownloadCommands platform="linux" />
+ */
+import { Code } from '@astrojs/starlight/components';
+import { DOTSECENV_VERSION } from '../config/version';
+
+interface Props {
+  /** Platform: darwin or linux */
+  platform: 'darwin' | 'linux';
+  /** Show verification and install steps */
+  showInstall?: boolean;
+}
+
+const { platform, showInstall = true } = Astro.props;
+const version = await DOTSECENV_VERSION;
+
+const platformConfig = {
+  darwin: {
+    name: 'Darwin',
+    arch1: { label: 'Apple Silicon (M1/M2/M3)', suffix: 'arm64' },
+    arch2: { label: 'Intel Mac', suffix: 'x86_64' },
+  },
+  linux: {
+    name: 'Linux',
+    arch1: { label: 'Linux x86_64', suffix: 'x86_64' },
+    arch2: { label: 'Linux ARM64', suffix: 'arm64' },
+  },
+};
+
+const config = platformConfig[platform];
+
+const code = `# ${config.arch1.label}
+curl -LO https://get.dotsecenv.com/${platform}/dotsecenv_${version}_${config.name}_${config.arch1.suffix}.tar.gz
+
+# ${config.arch2.label}
+curl -LO https://get.dotsecenv.com/${platform}/dotsecenv_${version}_${config.name}_${config.arch2.suffix}.tar.gz${showInstall ? `
+
+# Verify and install
+curl -s https://get.dotsecenv.com/${platform}/checksums.txt | sha256sum -c --ignore-missing
+tar -xzf dotsecenv_*.tar.gz
+sudo mv dotsecenv /usr/local/bin/` : ''}`;
+---
+
+<Code code={code} lang="bash" />

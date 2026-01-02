@@ -13,7 +13,7 @@
     "astro": "astro",
     "lint": "pnpm lint:md && pnpm lint:eslint",
     "lint:md": "markdownlint 'src/**/*.{md,mdx}'",
-    "lint:eslint": "eslint 'src/**/*.mdx' 'scripts/**/*.{js,mjs}'"
+    "lint:eslint": "eslint 'src/**/*.{mdx,ts}' 'scripts/**/*.{js,mjs}'"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.32.0",
@@ -27,6 +27,7 @@
     "@fontsource/jetbrains-mono": "^5.1.1",
     "eslint": "^9.39.2",
     "eslint-plugin-mdx": "^3.6.2",
-    "markdownlint-cli": "^0.47.0"
+    "markdownlint-cli": "^0.47.0",
+    "typescript-eslint": "^8.51.0"
   }
 }
