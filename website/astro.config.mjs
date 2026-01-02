@@ -1,11 +1,12 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { SITE_TITLE } from './src/consts';
 
 export default defineConfig({
   site: 'https://dotsecenv.com',
   integrations: [
     starlight({
-      title: 'dotsecenv',
+      title: SITE_TITLE,
       routeMiddleware: ['./src/route-data'],
       logo: {
         src: './src/assets/logo.png',

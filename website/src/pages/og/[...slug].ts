@@ -1,5 +1,6 @@
 import { getCollection } from 'astro:content';
 import { OGImageRoute } from 'astro-og-canvas';
+import { SITE_TITLE } from '../../consts';
 
 const entries = await getCollection('docs');
 
@@ -11,7 +12,7 @@ export const { getStaticPaths, GET } = OGImageRoute({
   param: 'slug',
   pages,
   getImageOptions: (_path, page: (typeof pages)[string]) => ({
-    title: page.data.title,
+    title: `${SITE_TITLE}: ${page.data.title}`,
     description: page.data.description,
     logo: {
       path: './src/assets/logo.png',
