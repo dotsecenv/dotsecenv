@@ -56,7 +56,8 @@ func PrintVersion(w io.Writer, version, commit, date string) {
 	}
 	_, _ = fmt.Fprintf(w, "version: %s\n", version)
 	_, _ = fmt.Fprintf(w, "commit: %s\n", commit)
-	_, _ = fmt.Fprintf(w, "built at: %s\n", date)
+	_, _ = fmt.Fprintf(w, "build at: %s\n", date)
+	_, _ = fmt.Fprintf(w, "go version: %s\n", runtime.Version())
 	_, _ = fmt.Fprintf(w, "crypto: %s\n", cryptoStatus())
 }
 
@@ -70,7 +71,7 @@ func cryptoStatus() string {
 	if fips140.Enabled() {
 		status = "FIPS 140-3 mode enabled"
 	}
-	return fmt.Sprintf("%s GOFIPS140=%s (%s)", runtime.Version(), fipsSetting, status)
+	return fmt.Sprintf("GOFIPS140=%s (%s)", fipsSetting, status)
 }
 
 // fipsBuildSetting returns the GOFIPS140 setting used at build time, if any.
@@ -98,8 +99,8 @@ type VersionInfo struct {
 
 // CryptoInfo represents cryptographic module information.
 type CryptoInfo struct {
-	GOFIPS140 string `json:"GOFIPS140,omitempty"`
-	Enabled   bool   `json:"enabled"`
+	GOFIPS140      string `json:"GOFIPS140,omitempty"`
+	FIPS140Enabled bool   `json:"fips140Enabled"`
 }
 
 // PrintVersionJSON prints version information as JSON.
@@ -120,8 +121,8 @@ func PrintVersionJSON(w io.Writer, version, commit, date string) {
 		BuiltAt:        date,
 		GoBuildVersion: runtime.Version(),
 		Crypto: CryptoInfo{
-			GOFIPS140: fipsBuildSetting(),
-			Enabled:   fips140.Enabled(),
+			GOFIPS140:      fipsBuildSetting(),
+			FIPS140Enabled: fips140.Enabled(),
 		},
 	}
 
