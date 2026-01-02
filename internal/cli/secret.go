@@ -23,10 +23,70 @@ type SecretValueJSON struct {
 	Vault   string    `json:"vault,omitempty"`
 }
 
+// resolveWritableVaultIndex resolves which vault to write to based on vaultPath and fromIndex.
+// Returns the 0-based vault index or an error.
+func (c *CLI) resolveWritableVaultIndex(vaultPath string, fromIndex int) (int, *Error) {
+	if vaultPath != "" {
+		expandedPath := vault.ExpandPath(vaultPath)
+
+		// Check if file exists/writable
+		if _, err := os.Stat(expandedPath); err != nil {
+			if os.IsNotExist(err) {
+				return -1, NewError(fmt.Sprintf("vault file does not exist: %s", expandedPath), ExitVaultError)
+			}
+			return -1, NewError(fmt.Sprintf("cannot access vault file: %v", err), ExitVaultError)
+		}
+		f, openErr := os.OpenFile(expandedPath, os.O_WRONLY, 0)
+		if openErr != nil {
+			return -1, NewError(fmt.Sprintf("vault file is not writable: %s", expandedPath), ExitVaultError)
+		}
+		_ = f.Close()
+
+		// Find in loaded paths
+		loadedPaths := c.vaultResolver.GetVaultPaths()
+		for i, p := range loadedPaths {
+			if vault.ExpandPath(p) == expandedPath {
+				return i, nil
+			}
+		}
+		return -1, NewError(fmt.Sprintf("vault path '%s' is not loaded in current session", expandedPath), ExitGeneralError)
+	}
+
+	if fromIndex != 0 {
+		configEntries := c.vaultResolver.GetConfig().Entries
+		if fromIndex <= 0 {
+			return -1, NewError("-v index must be a positive integer (N >= 1)", ExitGeneralError)
+		}
+		if fromIndex > len(configEntries) {
+			_, _ = fmt.Fprintf(c.output.Stderr(), "Configured vaults:\n")
+			for i, p := range configEntries {
+				_, _ = fmt.Fprintf(c.output.Stderr(), "  %d: %s\n", i+1, p.Path)
+			}
+			return -1, NewError(fmt.Sprintf("-v index %d exceeds number of configured vaults (%d)", fromIndex, len(configEntries)), ExitGeneralError)
+		}
+		return fromIndex - 1, nil
+	}
+
+	// No flags - interactive selection or default
+	vaultPaths := c.vaultResolver.GetVaultPaths()
+	if len(vaultPaths) == 0 {
+		return -1, NewError("no vaults configured", ExitVaultError)
+	}
+	if len(vaultPaths) == 1 {
+		return 0, nil
+	}
+
+	// Multiple vaults: interactive selection
+	selectedIndex, selectErr := HandleInteractiveSelection(vaultPaths, "Multiple vaults configured. Select target vault:", c.output.Stderr())
+	if selectErr != nil {
+		return -1, selectErr
+	}
+	return selectedIndex, nil
+}
+
 // SecretPut stores a secret in the vault
 func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int) *Error {
-	// Validate and normalize secret key
-	normalizedKey, normErr := vault.NormalizeSecretKey(secretKeyArg)
+	secretKey, normErr := vault.NormalizeSecretKey(secretKeyArg)
 	if normErr != nil {
 		return NewError(vault.FormatSecretKeyError(normErr), ExitValidationError)
 	}
@@ -36,73 +96,9 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int) *Error {
 		return err
 	}
 
-	secretKey := normalizedKey
-	targetIndex := -1
-
-	if vaultPath != "" {
-		// -v PATH specified
-		expandedPath := vault.ExpandPath(vaultPath)
-
-		// Check if file exists/writable
-		_, statErr := os.Stat(expandedPath)
-		if statErr != nil {
-			if os.IsNotExist(statErr) {
-				return NewError(fmt.Sprintf("vault file does not exist: %s", expandedPath), ExitVaultError)
-			}
-			return NewError(fmt.Sprintf("cannot access vault file: %v", statErr), ExitVaultError)
-		}
-		f, openErr := os.OpenFile(expandedPath, os.O_WRONLY, 0)
-		if openErr != nil {
-			return NewError(fmt.Sprintf("vault file is not writable: %s", expandedPath), ExitVaultError)
-		}
-		_ = f.Close()
-
-		// Check if path is in loaded config
-		loadedPaths := c.vaultResolver.GetVaultPaths()
-		found := false
-		for i, p := range loadedPaths {
-			if vault.ExpandPath(p) == expandedPath {
-				targetIndex = i
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return NewError(fmt.Sprintf("vault path '%s' is not loaded in current session", expandedPath), ExitGeneralError)
-		}
-
-	} else if fromIndex != 0 {
-		// -v N specified
-		configEntries := c.vaultResolver.GetConfig().Entries
-		if fromIndex <= 0 {
-			return NewError("-v index must be a positive integer (N >= 1)", ExitGeneralError)
-		}
-		if fromIndex > len(configEntries) {
-			_, _ = fmt.Fprintf(c.output.Stderr(), "Configured vaults:\n")
-			for i, p := range configEntries {
-				_, _ = fmt.Fprintf(c.output.Stderr(), "  %d: %s\n", i+1, p.Path)
-			}
-			return NewError(fmt.Sprintf("-v index %d exceeds number of configured vaults (%d)", fromIndex, len(configEntries)), ExitGeneralError)
-		}
-		targetIndex = fromIndex - 1
-
-	} else {
-		// No flags. Interactive selection or default.
-		vaultPaths := c.vaultResolver.GetVaultPaths()
-
-		if len(vaultPaths) == 0 {
-			return NewError("no vaults configured", ExitVaultError)
-		} else if len(vaultPaths) == 1 {
-			targetIndex = 0
-		} else {
-			// Multiple vaults: interactive selection
-			selectedIndex, selectErr := HandleInteractiveSelection(vaultPaths, "Multiple vaults configured. Select target vault:", c.output.Stderr())
-			if selectErr != nil {
-				return selectErr
-			}
-			targetIndex = selectedIndex
-		}
+	targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex)
+	if resolveErr != nil {
+		return resolveErr
 	}
 
 	if ensureErr := c.ensureIdentityInVault(fp, targetIndex); ensureErr != nil {
@@ -200,8 +196,7 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int) *Error {
 // SecretForget marks a secret as deleted by adding a deletion marker value.
 // The deletion marker has deleted=true and an empty available_to list.
 func (c *CLI) SecretForget(secretKeyArg, vaultPath string, fromIndex int) *Error {
-	// Validate and normalize secret key
-	normalizedKey, normErr := vault.NormalizeSecretKey(secretKeyArg)
+	secretKey, normErr := vault.NormalizeSecretKey(secretKeyArg)
 	if normErr != nil {
 		return NewError(vault.FormatSecretKeyError(normErr), ExitValidationError)
 	}
@@ -211,76 +206,11 @@ func (c *CLI) SecretForget(secretKeyArg, vaultPath string, fromIndex int) *Error
 		return err
 	}
 
-	secretKey := normalizedKey
-	targetIndex := -1
-
-	if vaultPath != "" {
-		// -v PATH specified
-		expandedPath := vault.ExpandPath(vaultPath)
-
-		// Check if file exists/writable
-		_, statErr := os.Stat(expandedPath)
-		if statErr != nil {
-			if os.IsNotExist(statErr) {
-				return NewError(fmt.Sprintf("vault file does not exist: %s", expandedPath), ExitVaultError)
-			}
-			return NewError(fmt.Sprintf("cannot access vault file: %v", statErr), ExitVaultError)
-		}
-		f, openErr := os.OpenFile(expandedPath, os.O_WRONLY, 0)
-		if openErr != nil {
-			return NewError(fmt.Sprintf("vault file is not writable: %s", expandedPath), ExitVaultError)
-		}
-		_ = f.Close()
-
-		// Check if path is in loaded config
-		loadedPaths := c.vaultResolver.GetVaultPaths()
-		found := false
-		for i, p := range loadedPaths {
-			if vault.ExpandPath(p) == expandedPath {
-				targetIndex = i
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return NewError(fmt.Sprintf("vault path '%s' is not loaded in current session", expandedPath), ExitGeneralError)
-		}
-
-	} else if fromIndex != 0 {
-		// -v N specified
-		configEntries := c.vaultResolver.GetConfig().Entries
-		if fromIndex <= 0 {
-			return NewError("-v index must be a positive integer (N >= 1)", ExitGeneralError)
-		}
-		if fromIndex > len(configEntries) {
-			_, _ = fmt.Fprintf(c.output.Stderr(), "Configured vaults:\n")
-			for i, p := range configEntries {
-				_, _ = fmt.Fprintf(c.output.Stderr(), "  %d: %s\n", i+1, p.Path)
-			}
-			return NewError(fmt.Sprintf("-v index %d exceeds number of configured vaults (%d)", fromIndex, len(configEntries)), ExitGeneralError)
-		}
-		targetIndex = fromIndex - 1
-
-	} else {
-		// No flags. Interactive selection or default.
-		vaultPaths := c.vaultResolver.GetVaultPaths()
-
-		if len(vaultPaths) == 0 {
-			return NewError("no vaults configured", ExitVaultError)
-		} else if len(vaultPaths) == 1 {
-			targetIndex = 0
-		} else {
-			// Multiple vaults: interactive selection
-			selectedIndex, selectErr := HandleInteractiveSelection(vaultPaths, "Multiple vaults configured. Select target vault:", c.output.Stderr())
-			if selectErr != nil {
-				return selectErr
-			}
-			targetIndex = selectedIndex
-		}
+	targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex)
+	if resolveErr != nil {
+		return resolveErr
 	}
 
-	// Check if secret exists in the target vault
 	existingSecret := c.vaultResolver.GetSecretByKeyFromVault(targetIndex, secretKey)
 	if existingSecret == nil {
 		return NewError(fmt.Sprintf("secret '%s' not found in vault", secretKey), ExitVaultError)
