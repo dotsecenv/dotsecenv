@@ -9,11 +9,17 @@ import (
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
+// VaultListSecretJSON represents a secret in the vault list JSON output
+type VaultListSecretJSON struct {
+	Key     string `json:"key"`
+	Deleted bool   `json:"deleted,omitempty"`
+}
+
 // VaultListJSON is the JSON output structure for vault list
 type VaultListJSON struct {
-	Position int      `json:"position"`
-	Vault    string   `json:"vault"`
-	Secrets  []string `json:"secrets"`
+	Position int                   `json:"position"`
+	Vault    string                `json:"vault"`
+	Secrets  []VaultListSecretJSON `json:"secrets"`
 }
 
 // VaultList lists all vaults and their keys
@@ -36,11 +42,16 @@ func (c *CLI) VaultList(jsonOutput bool) *Error {
 
 			if manager != nil {
 				vaultData := manager.Get()
-				secrets := []string{}
+				var secrets []VaultListSecretJSON
 				for _, s := range vaultData.Secrets {
-					secrets = append(secrets, s.Key)
+					secrets = append(secrets, VaultListSecretJSON{
+						Key:     s.Key,
+						Deleted: s.IsDeleted(),
+					})
 				}
-				sort.Strings(secrets)
+				sort.Slice(secrets, func(i, j int) bool {
+					return secrets[i].Key < secrets[j].Key
+				})
 
 				output = append(output, VaultListJSON{
 					Position: i + 1,
@@ -82,15 +93,28 @@ func (c *CLI) VaultList(jsonOutput bool) *Error {
 			if len(vaultData.Secrets) == 0 {
 				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s):\n  (no secrets)\n", displayPos, entry.Path)
 			} else {
-				var secrets []string
-				for _, s := range vaultData.Secrets {
-					secrets = append(secrets, s.Key)
+				type secretInfo struct {
+					key     string
+					deleted bool
 				}
-				sort.Strings(secrets)
+				var secrets []secretInfo
+				for _, s := range vaultData.Secrets {
+					secrets = append(secrets, secretInfo{
+						key:     s.Key,
+						deleted: s.IsDeleted(),
+					})
+				}
+				sort.Slice(secrets, func(i, j int) bool {
+					return secrets[i].key < secrets[j].key
+				})
 
 				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s):\n", displayPos, entry.Path)
-				for _, key := range secrets {
-					_, _ = fmt.Fprintf(c.output.Stdout(), "  - %s\n", key)
+				for _, s := range secrets {
+					if s.deleted {
+						_, _ = fmt.Fprintf(c.output.Stdout(), "  - %s (deleted)\n", s.key)
+					} else {
+						_, _ = fmt.Fprintf(c.output.Stdout(), "  - %s\n", s.key)
+					}
 				}
 			}
 		}

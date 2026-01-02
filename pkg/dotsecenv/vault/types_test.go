@@ -127,3 +127,98 @@ func TestVault_GetAccessibleSecretValue(t *testing.T) {
 		}
 	})
 }
+
+func TestSecret_IsDeleted(t *testing.T) {
+	tests := []struct {
+		name    string
+		secret  Secret
+		deleted bool
+	}{
+		{
+			name:    "empty values",
+			secret:  Secret{Key: "test", Values: []SecretValue{}},
+			deleted: false,
+		},
+		{
+			name: "not deleted",
+			secret: Secret{
+				Key: "test",
+				Values: []SecretValue{
+					{Value: "v1", AvailableTo: []string{"user1"}},
+				},
+			},
+			deleted: false,
+		},
+		{
+			name: "deleted",
+			secret: Secret{
+				Key: "test",
+				Values: []SecretValue{
+					{Value: "v1", AvailableTo: []string{"user1"}},
+					{Value: "", AvailableTo: []string{}, Deleted: true},
+				},
+			},
+			deleted: true,
+		},
+		{
+			name: "deleted then recreated is not deleted",
+			secret: Secret{
+				Key: "test",
+				Values: []SecretValue{
+					{Value: "v1", AvailableTo: []string{"user1"}},
+					{Value: "", AvailableTo: []string{}, Deleted: true},
+					{Value: "v2", AvailableTo: []string{"user1"}, Deleted: false},
+				},
+			},
+			deleted: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.secret.IsDeleted(); got != tt.deleted {
+				t.Errorf("IsDeleted() = %v, want %v", got, tt.deleted)
+			}
+		})
+	}
+}
+
+func TestVault_GetAccessibleSecretValue_Deleted(t *testing.T) {
+	v := Vault{
+		Secrets: []Secret{
+			{
+				Key: "deleted_secret",
+				Values: []SecretValue{
+					{Value: "old", AvailableTo: []string{"user1"}},
+					{Value: "", AvailableTo: []string{}, Deleted: true},
+				},
+			},
+			{
+				Key: "active_secret",
+				Values: []SecretValue{
+					{Value: "value", AvailableTo: []string{"user1"}},
+				},
+			},
+		},
+	}
+
+	t.Run("deleted secret returns nil", func(t *testing.T) {
+		// Even though user1 had access to the old value, deleted secret returns nil
+		val := v.GetAccessibleSecretValue("user1", "deleted_secret", false)
+		if val != nil {
+			t.Error("deleted secret should return nil even for user with previous access")
+		}
+
+		val = v.GetAccessibleSecretValue("user1", "deleted_secret", true)
+		if val != nil {
+			t.Error("deleted secret should return nil in strict mode too")
+		}
+	})
+
+	t.Run("active secret still works", func(t *testing.T) {
+		val := v.GetAccessibleSecretValue("user1", "active_secret", false)
+		if val == nil || val.Value != "value" {
+			t.Error("active secret should be accessible")
+		}
+	})
+}
