@@ -633,3 +633,376 @@ func TestSecretGet_WithFromIndex(t *testing.T) {
 		t.Errorf("Expected output to contain 'vault2_value', got: %s", out)
 	}
 }
+
+// TestSecretForget_Basic tests basic secret forget functionality
+func TestSecretForget_Basic(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	mockVaultResolver := NewMockVaultResolver()
+	testFP := "TESTFINGERPRINT"
+
+	mockVaultResolver.Identities[testFP] = vault.Identity{
+		Fingerprint:   testFP,
+		PublicKey:     "mock_public_key",
+		Algorithm:     "RSA",
+		AlgorithmBits: 2048,
+	}
+
+	mockGPGClient := NewMockGPGClient()
+	mockGPGClient.PublicKeyInfo[testFP] = gpg.KeyInfo{
+		Fingerprint:     testFP,
+		UID:             "Test User <test@example.com>",
+		Algorithm:       "RSA",
+		AlgorithmBits:   2048,
+		CanEncrypt:      true,
+		PublicKeyBase64: "mock_public_key_base64",
+	}
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		},
+		Fingerprint: testFP,
+	}
+
+	tmpFile, err := os.CreateTemp("", "testvault_*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
+
+	vaultPath := tmpFile.Name()
+	mockVaultResolver.VaultPaths = []string{vaultPath}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: vaultPath}}
+
+	// Add identity to vault 0
+	mockVaultResolver.IdentitiesByVault[0] = map[string]vault.Identity{
+		testFP: mockVaultResolver.Identities[testFP],
+	}
+
+	// Add an existing secret
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"MY_SECRET": {
+			Key:     "MY_SECRET",
+			AddedAt: time.Now(),
+			Values: []vault.SecretValue{
+				{Value: "secret_value", AvailableTo: []string{testFP}},
+			},
+		},
+	}
+
+	var addedSecret vault.Secret
+	mockVaultResolver.AddSecretFunc = func(secret vault.Secret, index int) error {
+		addedSecret = secret
+		return nil
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	// Forget the secret
+	forgetErr := cli.SecretForget("MY_SECRET", vaultPath, 0)
+	if forgetErr != nil {
+		t.Fatalf("SecretForget failed unexpectedly: %v", forgetErr)
+	}
+
+	// Verify the deletion marker was created
+	if len(addedSecret.Values) != 1 {
+		t.Fatalf("Expected 1 value (deletion marker), got %d", len(addedSecret.Values))
+	}
+
+	deletionValue := addedSecret.Values[0]
+	if !deletionValue.Deleted {
+		t.Error("Deletion marker should have Deleted=true")
+	}
+	if len(deletionValue.AvailableTo) != 0 {
+		t.Error("Deletion marker should have empty AvailableTo")
+	}
+	if deletionValue.Value != "" {
+		t.Error("Deletion marker should have empty Value")
+	}
+
+	// Verify output
+	if !strings.Contains(stdoutBuf.String(), "marked as deleted") {
+		t.Errorf("Expected success message, got: %s", stdoutBuf.String())
+	}
+}
+
+// TestSecretForget_AlreadyDeleted tests that forgetting an already-deleted secret fails
+func TestSecretForget_AlreadyDeleted(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	mockVaultResolver := NewMockVaultResolver()
+	testFP := "TESTFINGERPRINT"
+
+	mockVaultResolver.Identities[testFP] = vault.Identity{
+		Fingerprint:   testFP,
+		PublicKey:     "mock_public_key",
+		Algorithm:     "RSA",
+		AlgorithmBits: 2048,
+	}
+
+	mockGPGClient := NewMockGPGClient()
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		},
+		Fingerprint: testFP,
+	}
+
+	tmpFile, err := os.CreateTemp("", "testvault_*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
+
+	vaultPath := tmpFile.Name()
+	mockVaultResolver.VaultPaths = []string{vaultPath}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: vaultPath}}
+
+	// Add an already-deleted secret
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"MY_SECRET": {
+			Key:     "MY_SECRET",
+			AddedAt: time.Now(),
+			Values: []vault.SecretValue{
+				{Value: "secret_value", AvailableTo: []string{testFP}},
+				{Value: "", AvailableTo: []string{}, Deleted: true},
+			},
+		},
+	}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(&bytes.Buffer{}, &bytes.Buffer{}),
+	}
+
+	// Try to forget the already-deleted secret
+	forgetErr := cli.SecretForget("MY_SECRET", vaultPath, 0)
+	if forgetErr == nil {
+		t.Fatal("SecretForget should fail for already-deleted secret")
+	}
+
+	if !strings.Contains(forgetErr.Message, "already deleted") {
+		t.Errorf("Expected 'already deleted' error, got: %s", forgetErr.Message)
+	}
+}
+
+// TestSecretForget_NotFound tests that forgetting a non-existent secret fails
+func TestSecretForget_NotFound(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	mockVaultResolver := NewMockVaultResolver()
+	testFP := "TESTFINGERPRINT"
+
+	mockVaultResolver.Identities[testFP] = vault.Identity{
+		Fingerprint:   testFP,
+		PublicKey:     "mock_public_key",
+		Algorithm:     "RSA",
+		AlgorithmBits: 2048,
+	}
+
+	mockGPGClient := NewMockGPGClient()
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		},
+		Fingerprint: testFP,
+	}
+
+	tmpFile, err := os.CreateTemp("", "testvault_*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
+
+	vaultPath := tmpFile.Name()
+	mockVaultResolver.VaultPaths = []string{vaultPath}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: vaultPath}}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(&bytes.Buffer{}, &bytes.Buffer{}),
+	}
+
+	// Try to forget a non-existent secret
+	forgetErr := cli.SecretForget("NONEXISTENT", vaultPath, 0)
+	if forgetErr == nil {
+		t.Fatal("SecretForget should fail for non-existent secret")
+	}
+
+	if !strings.Contains(forgetErr.Message, "not found") {
+		t.Errorf("Expected 'not found' error, got: %s", forgetErr.Message)
+	}
+}
+
+// TestSecretPut_BlockedByDeleted tests that putting to a deleted secret fails
+func TestSecretPut_BlockedByDeleted(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	mockVaultResolver := NewMockVaultResolver()
+	testFP := "TESTFINGERPRINT"
+
+	mockVaultResolver.Identities[testFP] = vault.Identity{
+		Fingerprint:   testFP,
+		PublicKey:     "mock_public_key",
+		Algorithm:     "RSA",
+		AlgorithmBits: 2048,
+	}
+
+	mockGPGClient := NewMockGPGClient()
+	mockGPGClient.PublicKeyInfo[testFP] = gpg.KeyInfo{
+		Fingerprint:     testFP,
+		UID:             "Test User <test@example.com>",
+		Algorithm:       "RSA",
+		AlgorithmBits:   2048,
+		CanEncrypt:      true,
+		PublicKeyBase64: "mock_public_key_base64",
+	}
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		},
+		Fingerprint: testFP,
+	}
+
+	tmpFile, err := os.CreateTemp("", "testvault_*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
+
+	vaultPath := tmpFile.Name()
+	mockVaultResolver.VaultPaths = []string{vaultPath}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: vaultPath}}
+
+	// Add identity to vault 0
+	mockVaultResolver.IdentitiesByVault[0] = map[string]vault.Identity{
+		testFP: mockVaultResolver.Identities[testFP],
+	}
+
+	// Add a deleted secret
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"DELETED_SECRET": {
+			Key:     "DELETED_SECRET",
+			AddedAt: time.Now(),
+			Values: []vault.SecretValue{
+				{Value: "old_value", AvailableTo: []string{testFP}},
+				{Value: "", AvailableTo: []string{}, Deleted: true},
+			},
+		},
+	}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader("new_secret_value\n"),
+		output:        output.NewHandler(&bytes.Buffer{}, &bytes.Buffer{}),
+	}
+
+	// Try to put to a deleted secret
+	putErr := cli.SecretPut("DELETED_SECRET", vaultPath, 0)
+	if putErr == nil {
+		t.Fatal("SecretPut should fail for deleted secret")
+	}
+
+	if !strings.Contains(putErr.Message, "has been deleted") {
+		t.Errorf("Expected 'has been deleted' error, got: %s", putErr.Message)
+	}
+
+	if !strings.Contains(putErr.Message, "cannot overwrite") {
+		t.Errorf("Expected 'cannot overwrite' in error, got: %s", putErr.Message)
+	}
+}
+
+// TestSecretForget_NoAccess tests that forgetting without access fails
+func TestSecretForget_NoAccess(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	mockVaultResolver := NewMockVaultResolver()
+	testFP := "TESTFINGERPRINT"
+	otherFP := "OTHERFINGERPRINT"
+
+	mockVaultResolver.Identities[testFP] = vault.Identity{
+		Fingerprint:   testFP,
+		PublicKey:     "mock_public_key",
+		Algorithm:     "RSA",
+		AlgorithmBits: 2048,
+	}
+
+	mockGPGClient := NewMockGPGClient()
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		},
+		Fingerprint: testFP,
+	}
+
+	tmpFile, err := os.CreateTemp("", "testvault_*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
+
+	vaultPath := tmpFile.Name()
+	mockVaultResolver.VaultPaths = []string{vaultPath}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: vaultPath}}
+
+	// Add a secret that the test user doesn't have access to
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"OTHER_SECRET": {
+			Key:     "OTHER_SECRET",
+			AddedAt: time.Now(),
+			Values: []vault.SecretValue{
+				{Value: "secret_value", AvailableTo: []string{otherFP}}, // Not testFP
+			},
+		},
+	}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(&bytes.Buffer{}, &bytes.Buffer{}),
+	}
+
+	// Try to forget a secret we don't have access to
+	forgetErr := cli.SecretForget("OTHER_SECRET", vaultPath, 0)
+	if forgetErr == nil {
+		t.Fatal("SecretForget should fail without access")
+	}
+
+	if !strings.Contains(forgetErr.Message, "access denied") {
+		t.Errorf("Expected 'access denied' error, got: %s", forgetErr.Message)
+	}
+}

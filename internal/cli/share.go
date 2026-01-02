@@ -183,7 +183,7 @@ func (c *CLI) secretShareInVault(secretKey, targetFingerprint string, vaultIndex
 
 	now := time.Now().UTC()
 	availableTo := strings.Join(newRecipients, ",")
-	valueMetadata := fmt.Sprintf("value:%s:%s:%s:%s:%s", now.Format(time.RFC3339Nano), secretKey, availableTo, fp, encryptedBase64)
+	valueMetadata := fmt.Sprintf("value:%s:%s:%s:%s:%s:%t", now.Format(time.RFC3339Nano), secretKey, availableTo, fp, encryptedBase64, false)
 	algorithmBits := 256
 	signingIdentity := c.vaultResolver.GetIdentityByFingerprint(fp)
 	if signingIdentity != nil {
