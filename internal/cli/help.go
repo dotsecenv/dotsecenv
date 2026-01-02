@@ -2,6 +2,7 @@ package cli
 
 import (
 	"crypto/fips140"
+	"encoding/json"
 	"fmt"
 	"io"
 	"runtime"
@@ -53,7 +54,7 @@ func PrintVersion(w io.Writer, version, commit, date string) {
 	if date == "" {
 		date = "unknown"
 	}
-	_, _ = fmt.Fprintf(w, "dotsecenv version %s\n", version)
+	_, _ = fmt.Fprintf(w, "version: %s\n", version)
 	_, _ = fmt.Fprintf(w, "commit: %s\n", commit)
 	_, _ = fmt.Fprintf(w, "built at: %s\n", date)
 	_, _ = fmt.Fprintf(w, "crypto: %s\n", cryptoStatus())
@@ -84,4 +85,47 @@ func fipsBuildSetting() string {
 		}
 	}
 	return ""
+}
+
+// VersionInfo represents version information as a structured object.
+type VersionInfo struct {
+	Version        string     `json:"version"`
+	Commit         string     `json:"commit"`
+	BuiltAt        string     `json:"builtAt"`
+	GoBuildVersion string     `json:"goBuildVersion"`
+	Crypto         CryptoInfo `json:"crypto"`
+}
+
+// CryptoInfo represents cryptographic module information.
+type CryptoInfo struct {
+	GOFIPS140 string `json:"GOFIPS140,omitempty"`
+	Enabled   bool   `json:"enabled"`
+}
+
+// PrintVersionJSON prints version information as JSON.
+func PrintVersionJSON(w io.Writer, version, commit, date string) {
+	if version == "" {
+		version = "unknown"
+	}
+	if commit == "" {
+		commit = "none"
+	}
+	if date == "" {
+		date = "unknown"
+	}
+
+	info := VersionInfo{
+		Version:        version,
+		Commit:         commit,
+		BuiltAt:        date,
+		GoBuildVersion: runtime.Version(),
+		Crypto: CryptoInfo{
+			GOFIPS140: fipsBuildSetting(),
+			Enabled:   fips140.Enabled(),
+		},
+	}
+
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(info)
 }
