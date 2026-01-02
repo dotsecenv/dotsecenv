@@ -12,7 +12,7 @@ import (
 var secretCmd = &cobra.Command{
 	Use:   "secret",
 	Short: "Manage secrets",
-	Long:  `Commands for managing secrets: put, get, share, revoke.`,
+	Long:  `Commands for managing secrets: put, get, share, revoke, forget.`,
 }
 
 // secret put (alias: store)
@@ -256,6 +256,56 @@ Options:
 	},
 }
 
+// secret forget
+var secretForgetCmd = &cobra.Command{
+	Use:   "forget SECRET",
+	Short: "Mark a secret as deleted",
+	Long: `Mark a secret as deleted in the vault.
+
+Secret key formats:
+  Namespaced:     namespace::KEY_NAME  (e.g., myapp::DATABASE_URL)
+  Non-namespaced: KEY_NAME             (e.g., DATABASE_URL)
+
+This adds a deletion marker to the secret. The secret will no longer be
+returned by 'secret get' and will be shown as deleted in 'vault list'.
+
+Use -v to specify which vault to delete the secret from (either a path
+or 1-based index).`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if err := cobra.ExactArgs(1)(cmd, args); err != nil {
+			return err
+		}
+		// Validate secret key format
+		if _, err := vault.NormalizeSecretKey(args[0]); err != nil {
+			return fmt.Errorf("%s", vault.FormatSecretKeyError(err))
+		}
+		return nil
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		secretKey := args[0]
+
+		vaultPath, fromIndex, err := parseVaultSpec(globalOpts.ConfigPath, globalOpts.VaultPaths)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(int(clilib.ExitGeneralError))
+		}
+
+		// Clear VaultPaths for createCLI if we're using an index
+		if fromIndex > 0 {
+			globalOpts.VaultPaths = []string{}
+		}
+
+		cli, cliErr := createCLI()
+		if cliErr != nil {
+			os.Exit(int(clilib.PrintError(os.Stderr, cliErr)))
+		}
+		defer func() { _ = cli.Close() }()
+
+		exitErr := cli.SecretForget(secretKey, vaultPath, fromIndex)
+		exitWithError(exitErr)
+	},
+}
+
 func init() {
 	// secret get flags
 	secretGetCmd.Flags().BoolVar(&secretGetAll, "all", false, "Retrieve all values")
@@ -272,4 +322,5 @@ func init() {
 	secretCmd.AddCommand(secretGetCmd)
 	secretCmd.AddCommand(secretShareCmd)
 	secretCmd.AddCommand(secretRevokeCmd)
+	secretCmd.AddCommand(secretForgetCmd)
 }

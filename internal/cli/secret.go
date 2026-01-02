@@ -193,6 +193,158 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int) *Error {
 	return nil
 }
 
+// SecretForget marks a secret as deleted by adding a deletion marker value.
+// The deletion marker has deleted=true and an empty available_to list.
+func (c *CLI) SecretForget(secretKeyArg, vaultPath string, fromIndex int) *Error {
+	// Validate and normalize secret key
+	normalizedKey, normErr := vault.NormalizeSecretKey(secretKeyArg)
+	if normErr != nil {
+		return NewError(vault.FormatSecretKeyError(normErr), ExitValidationError)
+	}
+
+	fp, err := c.checkFingerprintRequired("secret forget")
+	if err != nil {
+		return err
+	}
+
+	secretKey := normalizedKey
+	targetIndex := -1
+
+	if vaultPath != "" {
+		// -v PATH specified
+		expandedPath := vault.ExpandPath(vaultPath)
+
+		// Check if file exists/writable
+		_, statErr := os.Stat(expandedPath)
+		if statErr != nil {
+			if os.IsNotExist(statErr) {
+				return NewError(fmt.Sprintf("vault file does not exist: %s", expandedPath), ExitVaultError)
+			}
+			return NewError(fmt.Sprintf("cannot access vault file: %v", statErr), ExitVaultError)
+		}
+		f, openErr := os.OpenFile(expandedPath, os.O_WRONLY, 0)
+		if openErr != nil {
+			return NewError(fmt.Sprintf("vault file is not writable: %s", expandedPath), ExitVaultError)
+		}
+		_ = f.Close()
+
+		// Check if path is in loaded config
+		loadedPaths := c.vaultResolver.GetVaultPaths()
+		found := false
+		for i, p := range loadedPaths {
+			if vault.ExpandPath(p) == expandedPath {
+				targetIndex = i
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return NewError(fmt.Sprintf("vault path '%s' is not loaded in current session", expandedPath), ExitGeneralError)
+		}
+
+	} else if fromIndex != 0 {
+		// -v N specified
+		configEntries := c.vaultResolver.GetConfig().Entries
+		if fromIndex <= 0 {
+			return NewError("-v index must be a positive integer (N >= 1)", ExitGeneralError)
+		}
+		if fromIndex > len(configEntries) {
+			_, _ = fmt.Fprintf(c.output.Stderr(), "Configured vaults:\n")
+			for i, p := range configEntries {
+				_, _ = fmt.Fprintf(c.output.Stderr(), "  %d: %s\n", i+1, p.Path)
+			}
+			return NewError(fmt.Sprintf("-v index %d exceeds number of configured vaults (%d)", fromIndex, len(configEntries)), ExitGeneralError)
+		}
+		targetIndex = fromIndex - 1
+
+	} else {
+		// No flags. Interactive selection or default.
+		vaultPaths := c.vaultResolver.GetVaultPaths()
+
+		if len(vaultPaths) == 0 {
+			return NewError("no vaults configured", ExitVaultError)
+		} else if len(vaultPaths) == 1 {
+			targetIndex = 0
+		} else {
+			// Multiple vaults: interactive selection
+			selectedIndex, selectErr := HandleInteractiveSelection(vaultPaths, "Multiple vaults configured. Select target vault:", c.output.Stderr())
+			if selectErr != nil {
+				return selectErr
+			}
+			targetIndex = selectedIndex
+		}
+	}
+
+	// Check if secret exists in the target vault
+	existingSecret := c.vaultResolver.GetSecretByKeyFromVault(targetIndex, secretKey)
+	if existingSecret == nil {
+		return NewError(fmt.Sprintf("secret '%s' not found in vault", secretKey), ExitVaultError)
+	}
+
+	if len(existingSecret.Values) == 0 {
+		return NewError(fmt.Sprintf("secret '%s' has no values", secretKey), ExitVaultError)
+	}
+
+	// Check if already deleted
+	latestValue := existingSecret.Values[len(existingSecret.Values)-1]
+	if latestValue.Deleted {
+		return NewError(fmt.Sprintf("secret '%s' is already deleted", secretKey), ExitGeneralError)
+	}
+
+	// Check if user has access to the latest value
+	if !slices.Contains(latestValue.AvailableTo, fp) {
+		return NewError(fmt.Sprintf("access denied: you do not have access to the latest value of secret '%s'", secretKey), ExitAccessDenied)
+	}
+
+	identity := c.vaultResolver.GetIdentityByFingerprint(fp)
+	if identity == nil {
+		return NewError(fmt.Sprintf("identity not found in vault\n  run: `dotsecenv vault identity add %s`", fp), ExitAccessDenied)
+	}
+
+	now := time.Now().UTC()
+
+	// Create deletion marker value metadata
+	// Format: value:timestamp:key:available_to:signed_by:value:deleted
+	valueMetadata := fmt.Sprintf("value:%s:%s::%s::deleted", now.Format(time.RFC3339Nano), secretKey, fp)
+	valueHash := ComputeHash([]byte(valueMetadata), identity.AlgorithmBits)
+	valueSig, valueSigErr := c.gpgClient.SignDataWithAgent(fp, []byte(valueHash))
+	if valueSigErr != nil {
+		return NewError(fmt.Sprintf("failed to sign deletion marker: %v", valueSigErr), ExitGeneralError)
+	}
+
+	deletionValue := vault.SecretValue{
+		AddedAt:     now,
+		AvailableTo: []string{}, // Empty list - no one can access a deleted secret
+		Deleted:     true,
+		Hash:        valueHash,
+		Signature:   valueSig,
+		SignedBy:    fp,
+		Value:       "", // No encrypted value for deletion marker
+	}
+
+	// Create a secret with just the deletion value to add
+	deletionSecret := vault.Secret{
+		AddedAt:   existingSecret.AddedAt,
+		Hash:      existingSecret.Hash,
+		Key:       secretKey,
+		Signature: existingSecret.Signature,
+		SignedBy:  existingSecret.SignedBy,
+		Values:    []vault.SecretValue{deletionValue},
+	}
+
+	if err := c.vaultResolver.AddSecret(deletionSecret, targetIndex); err != nil {
+		return NewError(fmt.Sprintf("failed to add deletion marker: %v", err), ExitVaultError)
+	}
+
+	if saveErr := c.vaultResolver.SaveVault(targetIndex); saveErr != nil {
+		return NewError(fmt.Sprintf("failed to save vault: %v", saveErr), ExitVaultError)
+	}
+
+	_, _ = fmt.Fprintf(c.output.Stdout(), "Secret '%s' marked as deleted\n", secretKey)
+	return nil
+}
+
 // SecretGet retrieves a secret from the vault.
 // If c.Strict is true (from config), only returns a value if the user has access to the LATEST value of the secret.
 func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, vaultPath string, fromIndex int) *Error {
@@ -279,6 +431,10 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		for i, entry := range c.vaultResolver.GetConfig().Entries {
 			secretObj := c.vaultResolver.GetSecretByKeyFromVault(i, secretKey)
 			if secretObj != nil {
+				// Skip vaults where the secret is deleted
+				if secretObj.IsDeleted() {
+					continue
+				}
 				for j := range secretObj.Values {
 					allValues = append(allValues, struct {
 						Value     vault.SecretValue
@@ -339,6 +495,15 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		}
 	} else {
 		// Default mode: search all vaults in order, return from first vault that has it
+		// First check if the secret exists but is deleted
+		for i := range c.vaultResolver.GetConfig().Entries {
+			secretObj := c.vaultResolver.GetSecretByKeyFromVault(i, secretKey)
+			if secretObj != nil && secretObj.IsDeleted() {
+				_, _ = fmt.Fprintf(c.output.Stderr(), "error: secret '%s' has been deleted\n", secretKey)
+				return NewError(fmt.Sprintf("secret '%s' has been deleted", secretKey), ExitVaultError)
+			}
+		}
+
 		// Use GetAccessibleSecretFromAnyVault to find a value THIS user can access
 		// If c.Strict is true, only the latest value is considered; otherwise fallback to older values
 		var errGet error
@@ -419,6 +584,12 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 
 	if len(secretObj.Values) == 0 {
 		return NewError(fmt.Sprintf("secret '%s' has no values", key), ExitVaultError)
+	}
+
+	// Check if secret is deleted
+	if secretObj.IsDeleted() {
+		_, _ = fmt.Fprintf(c.output.Stderr(), "error: secret '%s' has been deleted\n", key)
+		return NewError(fmt.Sprintf("secret '%s' has been deleted", key), ExitVaultError)
 	}
 
 	entries := c.vaultResolver.GetConfig().Entries
@@ -554,6 +725,11 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 	for i, entry := range entries {
 		secretObj := c.vaultResolver.GetSecretByKeyFromVault(i, key)
 		if secretObj == nil || len(secretObj.Values) == 0 {
+			continue
+		}
+
+		// Skip vaults where the secret is deleted
+		if secretObj.IsDeleted() {
 			continue
 		}
 
