@@ -117,6 +117,10 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int) *Error {
 	// Check if secret exists and if we have access to the latest value
 	existingSecret := c.vaultResolver.GetSecretByKeyFromVault(targetIndex, secretKey)
 	if existingSecret != nil && len(existingSecret.Values) > 0 {
+		// Check if secret has been deleted
+		if existingSecret.IsDeleted() {
+			return NewError(fmt.Sprintf("secret '%s' has been deleted; cannot overwrite a deleted secret", secretKey), ExitVaultError)
+		}
 		latestValue := existingSecret.Values[len(existingSecret.Values)-1]
 		if !slices.Contains(latestValue.AvailableTo, fp) {
 			return NewError(fmt.Sprintf("access denied: you do not have access to the latest value of secret '%s'", secretKey), ExitAccessDenied)
