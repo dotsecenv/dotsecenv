@@ -1,0 +1,259 @@
+---
+title: Standards Compliance
+description: FIPS 140-3, FIPS 186-5, and RFC 9580 compliance in dotsecenv
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Overview
+
+dotsecenv aligns with several NIST and IETF standards for cryptographic operations. This page documents compliance with:
+
+- **FIPS 140-3** — Security requirements for cryptographic modules
+- **FIPS 186-5** — Digital Signature Standard (approved algorithms)
+- **RFC 9580** — OpenPGP with mandatory AEAD encryption
+
+Understanding these standards helps organizations deploy dotsecenv in regulated environments.
+
+---
+
+## FIPS 140-3: Cryptographic Module
+
+[FIPS 140-3](https://csrc.nist.gov/pubs/fips/140-3/final) defines security requirements for cryptographic modules. dotsecenv leverages Go's native FIPS 140-3 cryptographic module, introduced in Go 1.24 and validated under NIST CAVP certificate A6650.
+
+### Native Go Implementation
+
+This module is built directly into Go's standard library and requires no external C dependencies or cgo bindings. The validated module provides:
+
+- **Mandatory self-tests** — Module integrity verification at startup
+- **NIST SP 800-90A DRBG** — Approved deterministic random bit generator
+- **Approved algorithms** — All cryptographic operations use FIPS-approved algorithms
+
+### Build vs. Runtime Environment
+
+FIPS 140-3 validation applies to the **runtime Operating Environment**—not the build environment. Because Go compiles to standalone, statically-linked binaries with no foreign function interface overhead, the resulting executable is portable and deterministic regardless of where it was compiled.
+
+Our official releases are built on GitHub Actions runners (Ubuntu-based), but the cryptographic operations execute within your deployment environment.
+
+### Validated Operating Environments
+
+When you run dotsecenv on a NIST-listed Operating Environment, the Go Cryptographic Module operates in its validated configuration:
+
+| Platform | Versions |
+|----------|----------|
+| Red Hat Enterprise Linux | 9 |
+| Amazon Linux | 2023 |
+| Oracle Linux | 9 |
+| SUSE Linux Enterprise Server | 15 |
+| Alpine Linux | Latest |
+| macOS (Apple Silicon) | 11–15 |
+| Windows Server | 2016–2025 |
+| FreeBSD | 12–14 |
+
+The Geomys validation (the organization pursuing FIPS 140-3 certification for Go's crypto module) also includes **Vendor Affirmed** coverage for generic Linux 3.10+ on x86-64 and ARM architectures, providing broad compatibility across modern Linux distributions.
+
+### Module Locking
+
+Setting the `GOFIPS140` environment variable during build locks the binary to a specific cryptographic module version:
+
+```bash
+GOFIPS140=v1.0.0 go build -o dotsecenv ./cmd/dotsecenv
+```
+
+This ensures the exact snapshot submitted to CMVP for validation. Verify which module version was embedded in any binary:
+
+```bash
+go version -m ./dotsecenv
+```
+
+<Aside type="tip">
+When dotsecenv is built with `GOFIPS140=v1.0.0`, it locks to the exact cryptographic module snapshot submitted to CMVP, ensuring the runtime behavior matches what was formally tested.
+</Aside>
+
+### Build It Yourself
+
+dotsecenv is open source, and we encourage security-conscious organizations to fork and build the project on infrastructure under their direct control—whether air-gapped systems, internal CI/CD pipelines, or hardened build servers.
+
+| Requirement | Value |
+|-------------|-------|
+| Go version | 1.24 or later |
+| Build flag | `GOFIPS140=v1.0.0` |
+| Runtime | Listed Operating Environment |
+
+---
+
+## FIPS 186-5: Digital Signature Standard
+
+[FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final) (2023) specifies approved algorithms for digital signatures. dotsecenv enforces these standards for all vault signatures.
+
+### Approved Signature Algorithms
+
+| Algorithm | Parameters | Status |
+|-----------|------------|--------|
+| **RSA** | 2048-bit minimum, 3072-bit recommended | Approved |
+| **ECDSA** | P-256, P-384, P-521 curves | Approved |
+| **EdDSA** | Ed25519, Ed448 | Approved |
+| **DSA** | — | Deprecated (removed) |
+
+<Aside type="note">
+FIPS 186-5 formally deprecates DSA. dotsecenv excludes DSA from approved algorithms and will reject keys using this algorithm.
+</Aside>
+
+### GPG Algorithm Compatibility
+
+dotsecenv validates GPG key algorithms against FIPS 186-5 requirements. The default configuration enforces:
+
+```yaml
+approved_algorithms:
+  - rsa:3072
+  - ecdsa:p384
+  - eddsa:ed25519
+```
+
+Keys using weaker algorithms are rejected during encryption and signing operations.
+
+### Signature Coverage
+
+Every vault entry is signed using a FIPS 186-5 compliant algorithm. The signature covers:
+
+```text
+Entry signature covers:
+├── Secret key name
+├── Available-to list (fingerprints)
+├── Encrypted value blob
+├── Timestamp
+└── Originator fingerprint
+```
+
+Modifications to any field cause signature verification to fail:
+
+```bash
+dotsecenv validate
+# ✓ Vault header: valid
+# ✓ Identity entries: 2 valid
+# ✗ Secret entry 5: signature mismatch
+# Error: vault validation failed
+```
+
+### Key Strength Requirements
+
+| Algorithm | Minimum | Recommended |
+|-----------|---------|-------------|
+| RSA | 2048-bit | 3072-bit or 4096-bit |
+| ECDSA | P-256 | P-384 or P-521 |
+| EdDSA | Ed25519 | Ed25519 or Ed448 |
+
+<Aside type="caution">
+For new key generation, use Ed25519 (fast, secure, small signatures) or RSA-4096 (broad compatibility). Avoid P-256 ECDSA for new deployments—while approved, Ed25519 offers better security properties.
+</Aside>
+
+---
+
+## RFC 9580: OpenPGP with AEAD
+
+[RFC 9580](https://www.rfc-editor.org/rfc/rfc9580.html) (2024) is the updated OpenPGP standard, replacing RFC 4880. dotsecenv uses the RFC 9580 profile which enforces authenticated encryption.
+
+### AEAD Encryption
+
+RFC 9580 mandates Authenticated Encryption with Associated Data (AEAD) for all symmetric encryption. dotsecenv uses **AES-256-GCM** as the symmetric cipher:
+
+```go
+// Use RFC9580 profile which enforces AEAD with AES-256-GCM
+// RFC 9580 is the updated OpenPGP standard with mandatory AEAD support
+```
+
+| Property | Value |
+|----------|-------|
+| Cipher | AES-256 |
+| Mode | GCM (Galois/Counter Mode) |
+| Nonce | 12 octets (96 bits) |
+| Auth tag | 16 octets (128 bits) |
+| Standard | NIST SP 800-38D |
+
+### Why AES-256-GCM?
+
+GCM mode provides both confidentiality and integrity in a single operation:
+
+- **Authenticated** — Tampering is detected via the 128-bit authentication tag
+- **Efficient** — Hardware-accelerated on modern CPUs (AES-NI)
+- **Parallelizable** — GCM allows parallel encryption/decryption
+- **FIPS-approved** — Compliant with NIST SP 800-38D
+
+<Aside type="note" title="Cipher negotiation">
+OpenPGP performs cipher negotiation based on recipient key preferences. The actual cipher used depends on what the recipient's public key advertises it supports. RFC 9580-compliant keys must support AES-256-GCM, so messages between modern keys will use it.
+</Aside>
+
+### Key Differences from RFC 4880
+
+| Feature | RFC 4880 | RFC 9580 |
+|---------|----------|----------|
+| Symmetric encryption | CFB mode | AEAD mandatory |
+| Default cipher | 3DES/AES-128 | AES-256-GCM |
+| Signatures | RSA, DSA, ECDSA | Ed25519/Ed448 preferred |
+| Key derivation | S2K (simple) | Argon2 |
+| Version | v4 keys | v6 keys |
+
+### Hybrid Encryption Model
+
+dotsecenv uses hybrid encryption combining symmetric and asymmetric cryptography:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                     Secret Value                            │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│           Symmetric Encryption (AES-256-GCM)                │
+│                                                             │
+│   Random session key (256-bit) + Nonce (96-bit)             │
+│   → Encrypted data + Authentication tag                     │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│             Asymmetric Encryption (GPG)                     │
+│                                                             │
+│   Session key encrypted for each recipient's public key     │
+│   → One key blob per authorized identity                    │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│            Cryptographic Signature (GPG)                    │
+│                                                             │
+│   SHA-256/SHA-512 hash signed with originator's key         │
+│   → Detached signature for integrity + non-repudiation      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Encrypted Value Structure
+
+Each secret value blob contains:
+
+```text
+┌─────────────────────────────────────────┐
+│ Encrypted Value Blob                    │
+├─────────────────────────────────────────┤
+│ AES-256-GCM nonce (96 bits)            │
+│ AES-256-GCM ciphertext                 │
+│ AES-256-GCM auth tag (128 bits)        │
+│ GPG-encrypted session key (per-user)   │
+│ Detached GPG signature (FIPS 186-5)    │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## Summary
+
+| Standard | Scope | dotsecenv Compliance |
+|----------|-------|----------------------|
+| FIPS 140-3 | Cryptographic modules | Go 1.24+ native module (CAVP A6650) |
+| FIPS 186-5 | Digital signatures | RSA, ECDSA, EdDSA; DSA rejected |
+| NIST SP 800-38D | GCM mode | AES-256-GCM for symmetric encryption |
+| RFC 9580 | OpenPGP | AEAD mandatory, v6 key support |
+
+<Aside type="tip">
+For maximum compliance, build dotsecenv with Go 1.24+ and `GOFIPS140=v1.0.0`, deploy to a validated Operating Environment, and use Ed25519 or RSA-4096 keys.
+</Aside>

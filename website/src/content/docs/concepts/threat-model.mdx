@@ -345,14 +345,9 @@ Vault entries are signed using FIPS 186-5 compliant algorithms:
 - Actual compliance depends on underlying GPG/libgcrypt installation
 - Use FIPS-validated cryptographic libraries in regulated environments
 
-### BoringCrypto (Linux Builds)
+### Go Cryptographic Modules
 
-Linux release binaries are built with Go's BoringCrypto backend (`GOEXPERIMENT=boringcrypto`), which provides FIPS-validated cryptographic primitives:
-
-- BoringCrypto replaces Go's standard crypto implementations with BoringSSL
-- BoringSSL is a fork of OpenSSL maintained by Google, certified for FIPS 140-2/140-3
-- Provides hardware-accelerated AES, SHA, and RSA/ECC operations
-- macOS builds use standard Go cryptography (BoringCrypto not available)
+Since v0.3.0, dotsecenv uses Go's native [FIPS 140-3 validated cryptographic modules](https://go.dev/blog/fips140), which provide certified implementations of AES, SHA, RSA, and ECC operations across all supported platforms.
 
 <Aside type="tip">
 For maximum standards compliance, combine dotsecenv with a FIPS-validated GPG installation built against a certified libgcrypt or OpenSSL module.
