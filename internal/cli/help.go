@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"crypto/fips140"
 	"fmt"
 	"io"
+	"runtime"
+	"runtime/debug"
 )
 
 // PrintHelp prints the help message
@@ -53,4 +56,32 @@ func PrintVersion(w io.Writer, version, commit, date string) {
 	_, _ = fmt.Fprintf(w, "dotsecenv version %s\n", version)
 	_, _ = fmt.Fprintf(w, "commit: %s\n", commit)
 	_, _ = fmt.Fprintf(w, "built at: %s\n", date)
+	_, _ = fmt.Fprintf(w, "crypto: %s\n", cryptoStatus())
+}
+
+// cryptoStatus returns a string describing the crypto module status.
+func cryptoStatus() string {
+	fipsSetting := fipsBuildSetting()
+	if fipsSetting == "" {
+		return "Go standard library (not FIPS validated)"
+	}
+	status := "FIPS 140-3 mode disabled"
+	if fips140.Enabled() {
+		status = "FIPS 140-3 mode enabled"
+	}
+	return fmt.Sprintf("%s GOFIPS140=%s (%s)", runtime.Version(), fipsSetting, status)
+}
+
+// fipsBuildSetting returns the GOFIPS140 setting used at build time, if any.
+func fipsBuildSetting() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	for _, setting := range info.Settings {
+		if setting.Key == "GOFIPS140" {
+			return setting.Value
+		}
+	}
+	return ""
 }

@@ -8,61 +8,15 @@ before:
     - make build completions docs man
 
 builds:
-  # Linux amd64 with BoringCrypto (FIPS-approved cryptography)
-  - id: linux-amd64
-    env:
-      - CGO_ENABLED=1
-      - GOEXPERIMENT=boringcrypto
-    goos:
-      - linux
-    goarch:
-      - amd64
-    binary: dotsecenv
-    main: ./cmd/dotsecenv
-    ldflags:
-      - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
-  # Linux arm64 with BoringCrypto using zig cross-compiler
-  - id: linux-arm64
-    env:
-      - CGO_ENABLED=1
-      - GOEXPERIMENT=boringcrypto
-      - CC=zig cc -target aarch64-linux-gnu
-      - CXX=zig c++ -target aarch64-linux-gnu
-    goos:
-      - linux
-    goarch:
-      - arm64
-    binary: dotsecenv
-    main: ./cmd/dotsecenv
-    ldflags:
-      - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
-  # macOS builds (BoringCrypto not available, use standard crypto)
-  - id: darwin
+  # All platforms use Go's native FIPS 140-3 module (no CGO required)
+  # See: https://go.dev/blog/fips140
+  - id: default
     env:
       - CGO_ENABLED=0
+      - GOFIPS140=v1.0.0
     goos:
+      - linux
       - darwin
-    goarch:
-      - amd64
-      - arm64
-    binary: dotsecenv
-    main: ./cmd/dotsecenv
-    ldflags:
-      - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
-  # Windows builds (standard crypto, no CGO)
-  - id: windows
-    env:
-      - CGO_ENABLED=0
-    goos:
       - windows
     goarch:
       - amd64
