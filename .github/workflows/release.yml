@@ -82,7 +82,7 @@ jobs:
 
       - name: Attest Build Provenance
         if: ${{ !github.event.repository.private }}
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: "dist/*"
 
