@@ -3,6 +3,10 @@ name: Deploy Website to GitHub Pages
 on:
   push:
     branches: [main]
+
+  repository_dispatch:
+    types: [publish-site]
+
   workflow_dispatch:
 
 permissions:

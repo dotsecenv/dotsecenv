@@ -9,6 +9,11 @@ import { Code } from '@astrojs/starlight/components';
 import { DOTSECENV_VERSION } from '../config/version';
 
 const version = await DOTSECENV_VERSION;
+const output = `version: v${version}
+commit: abc1234
+build at: 2025-01-15T10:30:00Z
+go version: go1.24.0
+crypto: GOFIPS140=v1.0.0 (FIPS 140-3 mode enabled)`;
 ---
 
-<Code code={`dotsecenv version ${version}`} lang="text" />
+<Code code={output} lang="text" />

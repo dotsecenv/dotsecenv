@@ -545,12 +545,33 @@ dotsecenv completion fish > ~/.config/fish/completions/dotsecenv.fish
 Show version information.
 
 ```bash
-dotsecenv version
+dotsecenv version [flags]
 ```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
 
 **Example output:**
 
 <VersionOutput />
+
+**JSON output (`--json`):**
+
+```json
+{
+  "version": "v0.2.1",
+  "commit": "abc1234",
+  "builtAt": "2025-01-15T10:30:00Z",
+  "goBuildVersion": "go1.24.0",
+  "crypto": {
+    "GOFIPS140": "v1.0.0",
+    "fips140Enabled": true
+  }
+}
+```
 
 ---
 
