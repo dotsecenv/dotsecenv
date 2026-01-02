@@ -79,6 +79,7 @@ type SecretData struct {
 type ValueData struct {
 	AddedAt     time.Time `json:"added_at"`
 	AvailableTo []string  `json:"available_to"`
+	Deleted     bool      `json:"deleted,omitempty"`
 	Hash        string    `json:"hash"`
 	Signature   string    `json:"signature"`
 	SignedBy    string    `json:"signed_by"`
@@ -126,6 +127,7 @@ func (d *ValueData) ToSecretValue() SecretValue {
 	return SecretValue{
 		AddedAt:     d.AddedAt,
 		AvailableTo: d.AvailableTo,
+		Deleted:     d.Deleted,
 		Hash:        d.Hash,
 		Signature:   d.Signature,
 		SignedBy:    d.SignedBy,

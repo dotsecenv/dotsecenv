@@ -15,6 +15,7 @@ type Identity = identity.Identity
 type SecretValue struct {
 	AddedAt     time.Time `json:"added_at"`
 	AvailableTo []string  `json:"available_to"` // List of fingerprints that can decrypt
+	Deleted     bool      `json:"deleted,omitempty"`
 	Hash        string    `json:"hash"`
 	Signature   string    `json:"signature"`
 	SignedBy    string    `json:"signed_by"`
@@ -101,8 +102,17 @@ func (v Vault) CanIdentityAccessSecret(fingerprint, secretKey string) bool {
 	return false
 }
 
+// IsDeleted returns true if the secret's latest value is a deletion marker.
+func (s Secret) IsDeleted() bool {
+	if len(s.Values) == 0 {
+		return false
+	}
+	return s.Values[len(s.Values)-1].Deleted
+}
+
 // GetAccessibleSecretValue returns the most recent secret value accessible to the identity.
 // Returns nil if identity cannot access any version of the secret.
+// Returns nil if the secret is deleted (latest value has Deleted=true).
 // If strict is true, only returns a value if the identity has access to the LATEST value.
 func (v Vault) GetAccessibleSecretValue(fingerprint, secretKey string, strict bool) *SecretValue {
 	secret := v.GetSecretByKey(secretKey)
@@ -111,6 +121,11 @@ func (v Vault) GetAccessibleSecretValue(fingerprint, secretKey string, strict bo
 	}
 
 	if len(secret.Values) == 0 {
+		return nil
+	}
+
+	// If secret is deleted, return nil
+	if secret.IsDeleted() {
 		return nil
 	}
 
