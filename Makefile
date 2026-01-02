@@ -12,7 +12,9 @@ help:
 	@echo "  make completions    - Generate shell completions"
 	@echo "  make docs           - Generate markdown documentation"
 	@echo "  make man            - Generate man pages"
-	@echo "  make hooks          - Install git hooks (lefthook)"
+	@echo "  make hooks          - Install git hooks using lefthook"
+	@echo "  make release-test   - Test release build (snapshot)"
+	@echo "  make install-tools  - Install all dev tools"
 
 .PHONY: all
 all: clean update build lint test test-race e2e completions docs man
@@ -33,16 +35,6 @@ build:
 	@echo "Building dotsecenv with FIPS 140-3 crypto..."
 	CGO_ENABLED=0 GOFIPS140=v1.0.0 go build -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
 	@echo "Binary built at: bin/dotsecenv"
-
-GOLANGCI_LINT_VERSION := latest
-GOLANGCI_LINT := $(shell go env GOPATH)/bin/golangci-lint
-
-.PHONY: install-lint
-install-lint:
-	@if ! [ -x "$(GOLANGCI_LINT)" ]; then \
-		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION); \
-	fi
 
 .PHONY: lint
 lint: install-lint
@@ -95,13 +87,56 @@ man:
 	@echo "Generating man pages..."
 	@go run -tags gendocs ./cmd/dotsecenv -o man/man1
 
+.PHONY: hooks
+hooks: install-lefthook
+	@echo "Installing git hooks..."
+	@$(LEFTHOOK) install
+
+.PHONY: release-test
+release-test: install-goreleaser install-syft
+	@echo "Testing release build..."
+	@$(GORELEASER) release --snapshot --clean --skip=sign,publish,nfpm
+
+# =============================================================================
+# Development Tool Installation
+# =============================================================================
+
+.PHONY: install-tools
+install-tools: install-lefthook install-lint install-syft install-goreleaser
+
 LEFTHOOK := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/lefthook
 
-.PHONY: hooks
-hooks:
+.PHONY: install-lefthook
+install-lefthook:
 	@if ! [ -x "$(LEFTHOOK)" ]; then \
 		echo "Installing lefthook..."; \
 		go install github.com/evilmartians/lefthook/v2@v2.0.13; \
 	fi
-	@echo "Installing git hooks..."
-	@$(LEFTHOOK) install
+
+GOLANGCI_LINT_VERSION := latest
+GOLANGCI_LINT := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/golangci-lint
+
+.PHONY: install-lint
+install-lint:
+	@if ! [ -x "$(GOLANGCI_LINT)" ]; then \
+		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $${GOBIN:-$$(go env GOPATH)/bin} $(GOLANGCI_LINT_VERSION); \
+	fi
+
+SYFT := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/syft
+
+.PHONY: install-syft
+install-syft:
+	@if ! [ -x "$(SYFT)" ]; then \
+		echo "Installing syft..."; \
+		curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b $${GOBIN:-$$(go env GOPATH)/bin}; \
+	fi
+
+GORELEASER := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/goreleaser
+
+.PHONY: install-goreleaser
+install-goreleaser:
+	@if ! [ -x "$(GORELEASER)" ]; then \
+		echo "Installing goreleaser..."; \
+		go install github.com/goreleaser/goreleaser/v2@latest; \
+	fi

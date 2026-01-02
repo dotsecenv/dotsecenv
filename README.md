@@ -504,7 +504,7 @@ Each entry includes a hash and cryptographic signature to prevent against tamper
 - **AES-256-GCM symmetric encryption**: NIST-approved authenticated encryption ([SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final))
 - **[FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final) digital signatures**: RSA, ECDSA, and EdDSA signature schemes for vault entry authenticity and non-repudiation
 - **FIPS 186-5 compliant defaults**: Algorithm minimums meet the Digital Signature Standard requirements
-- **BoringCrypto (Linux)**: Linux release binaries are built with Go's BoringCrypto backend (`GOEXPERIMENT=boringcrypto`) for FIPS-validated cryptographic primitives
+- **FIPS 140-3 Crypto**: Release binaries are built with Go's native FIPS 140-3 cryptographic module (`GOFIPS140=v1.0.0`) for NIST-validated cryptographic primitives on all platforms
 - Multi-recipient PGP encryption with hybrid cryptography
 - Hash-based integrity checking (SHA-256/SHA-512)
 - GPG agent integration for secure key management
@@ -626,17 +626,21 @@ GPG error: gpg: decryption failed: No secret key
 
 ## Development
 
+### Setup
+
+```bash
+# Install all development tools (lefthook, golangci-lint, syft, goreleaser)
+make install-tools
+```
+
 ### Building
 
 ```bash
-# Build with BoringCrypto (FIPS-approved, requires CGO)
+# Build with FIPS 140-3 crypto (no CGO required)
 make build
-
-# Build static binary (no CGO, standard Go crypto)
-make build-static
 ```
 
-The default `make build` uses `GOEXPERIMENT=boringcrypto` which provides FIPS-validated cryptographic primitives on Linux. This requires CGO to be enabled. For environments where CGO is not available, use `make build-static`.
+The default `make build` uses Go's native FIPS 140-3 cryptographic module (`GOFIPS140=v1.0.0`), which provides NIST-validated cryptographic primitives on all platforms without requiring CGO. See [go.dev/blog/fips140](https://go.dev/blog/fips140) for details.
 
 ### Testing
 

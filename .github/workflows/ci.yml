@@ -76,3 +76,17 @@ jobs:
         with:
           build-from-source: true
       - run: dotsecenv version
+
+  release-test:
+    name: Release Test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: 'go.sum'
+      - run: make release-test
