@@ -156,7 +156,7 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int) *Error {
 	}
 
 	availableTo := strings.Join([]string{fp}, ",")
-	valueMetadata := fmt.Sprintf("value:%s:%s:%s:%s:%s", now.Format(time.RFC3339Nano), secretKey, availableTo, fp, encryptedBase64)
+	valueMetadata := fmt.Sprintf("value:%s:%s:%s:%s:%s:%t", now.Format(time.RFC3339Nano), secretKey, availableTo, fp, encryptedBase64, false)
 	valueHash := ComputeHash([]byte(valueMetadata), identity.AlgorithmBits)
 	valueSig, valueSigErr := c.gpgClient.SignDataWithAgent(fp, []byte(valueHash))
 	if valueSigErr != nil {
@@ -306,7 +306,7 @@ func (c *CLI) SecretForget(secretKeyArg, vaultPath string, fromIndex int) *Error
 
 	// Create deletion marker value metadata
 	// Format: value:timestamp:key:available_to:signed_by:value:deleted
-	valueMetadata := fmt.Sprintf("value:%s:%s::%s::deleted", now.Format(time.RFC3339Nano), secretKey, fp)
+	valueMetadata := fmt.Sprintf("value:%s:%s:%s:%s:%s:%t", now.Format(time.RFC3339Nano), secretKey, "", fp, "", true)
 	valueHash := ComputeHash([]byte(valueMetadata), identity.AlgorithmBits)
 	valueSig, valueSigErr := c.gpgClient.SignDataWithAgent(fp, []byte(valueHash))
 	if valueSigErr != nil {

@@ -653,15 +653,16 @@ func verifySecretSignature(secret *vault.Secret, signingIdentity *vault.Identity
 
 // verifySecretValueSignature verifies the cryptographic signature of a secret value
 func verifySecretValueSignature(value *vault.SecretValue, secretKey string, signingIdentity *vault.Identity) (bool, error) {
-	// Reconstruct the canonical data with all fields: type:added_at:secret_key:available_to:signed_by:value
+	// Reconstruct the canonical data with all fields: type:added_at:secret_key:available_to:signed_by:value:deleted
 	// Join recipients with commas for deterministic representation (same as signing)
 	availableTo := strings.Join(value.AvailableTo, ",")
-	canonicalData := fmt.Sprintf("value:%s:%s:%s:%s:%s",
+	canonicalData := fmt.Sprintf("value:%s:%s:%s:%s:%s:%t",
 		value.AddedAt.Format(time.RFC3339Nano),
 		secretKey,
 		availableTo,
 		value.SignedBy,
-		value.Value)
+		value.Value,
+		value.Deleted)
 
 	// Step 1: Verify hash (tampering detection)
 	computedHash := ComputeHash([]byte(canonicalData), signingIdentity.AlgorithmBits)
