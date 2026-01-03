@@ -64,6 +64,16 @@ gpg --full-generate-key
 
    This creates `~/.config/dotsecenv/config` with default settings.
 
+   :::tip[Shortcut: Init + Login in one step]
+   You can combine initialization and login into one command:
+
+   ```bash
+   dotsecenv init config --login YOUR_FINGERPRINT
+   ```
+
+   Add `--strict` for stricter validation (treats warnings as errors).
+   :::
+
 3. **Create a vault**
 
    ```bash

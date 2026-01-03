@@ -70,6 +70,8 @@ The default configuration uses FIPS 186-5 compliant algorithm minimums: RSA 2048
 |------|-------------|
 | `--gpg-program PATH` | Set gpg.program to this path (without validation) |
 | `--no-gpg-program` | Skip GPG detection (leave gpg.program empty) |
+| `--strict` | Initialize config with strict mode enabled |
+| `--login FINGERPRINT` | Initialize config with specified fingerprint |
 
 **Examples:**
 
@@ -85,6 +87,12 @@ dotsecenv init config --no-gpg-program
 
 # Set GPG path explicitly
 dotsecenv init config --gpg-program /usr/local/bin/gpg
+
+# Initialize with strict mode and login in one step
+dotsecenv init config --strict --login E60A1740BAEF49284D22EA7D3C376348F0921C59
+
+# Initialize with strict mode only
+dotsecenv init config --strict
 ```
 
 ### init vault
