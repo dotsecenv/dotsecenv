@@ -23,6 +23,8 @@ func TestParseSecretKey_Valid(t *testing.T) {
 		{"two consecutive underscores", "ns::A__B", "ns::A__B", true},
 		{"two consecutive in namespace", "my__ns::KEY", "my__ns::KEY", true},
 		{"complex valid", "prod_db_1::API_KEY_V2", "prod_db_1::API_KEY_V2", true},
+		{"dotted key", "ns::APP.DOMAIN.ORG", "ns::APP.DOMAIN.ORG", true},
+		{"dotted with underscore", "ns::APP.DOMAIN_ORG", "ns::APP.DOMAIN_ORG", true},
 
 		// Non-namespaced keys (simple)
 		{"simple key", "DATABASE_URL", "DATABASE_URL", false},
@@ -31,6 +33,9 @@ func TestParseSecretKey_Valid(t *testing.T) {
 		{"simple with numbers", "KEY1", "KEY1", false},
 		{"simple leading underscore", "_KEY", "_KEY", false},
 		{"simple two underscores", "A__B", "A__B", false},
+		{"simple dotted", "APP.DOMAIN.ORG", "APP.DOMAIN.ORG", false},
+		{"simple dotted lowercase", "app.domain.org", "APP.DOMAIN.ORG", false},
+		{"simple dotted mixed", "App.DomaIn.Org", "APP.DOMAIN.ORG", false},
 
 		// Edge cases
 		{"whitespace trimmed", "  ns::KEY  ", "ns::KEY", true},
@@ -87,6 +92,9 @@ func TestParseSecretKey_Invalid(t *testing.T) {
 		{"key has special char", "ns::KEY-NAME"},
 		{"key has space", "ns::KEY NAME"},
 		{"key single underscore suffix", "ns::A_"},
+		{"key starts with dot", "ns::.KEY"},
+		{"key ends with dot", "ns::KEY."},
+		{"key consecutive dots", "ns::KEY..NAME"},
 
 		// Simple key validation failures
 		{"simple purely numeric", "123"},
@@ -95,6 +103,9 @@ func TestParseSecretKey_Invalid(t *testing.T) {
 		{"simple ends underscore", "KEY_"},
 		{"simple starts with number", "1KEY"},
 		{"simple special char", "KEY-NAME"},
+		{"simple starts with dot", ".KEY"},
+		{"simple ends with dot", "KEY."},
+		{"simple consecutive dots", "APP..ORG"},
 	}
 
 	for _, tt := range tests {
@@ -186,10 +197,15 @@ func TestIsValidSecretKey(t *testing.T) {
 		{"myns::KEY", true},
 		{"DATABASE_URL", true},
 		{"ns::_KEY", true},
+		{"APP.DOMAIN.ORG", true},
+		{"ns::APP.DOMAIN.ORG", true},
 		{"", false},
 		{"ns::KEY_", false},
 		{"123::KEY", false},
 		{"ns::123", false},
+		{".KEY", false},
+		{"KEY.", false},
+		{"APP..ORG", false},
 	}
 
 	for _, tt := range tests {
