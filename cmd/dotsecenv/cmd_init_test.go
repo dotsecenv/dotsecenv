@@ -1,0 +1,322 @@
+package main_test
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"gopkg.in/yaml.v3"
+)
+
+// configForTest represents the config file structure for test assertions
+type configForTest struct {
+	ApprovedAlgorithms []struct {
+		Algo    string   `yaml:"algo"`
+		Curves  []string `yaml:"curves,omitempty"`
+		MinBits int      `yaml:"min_bits"`
+	} `yaml:"approved_algorithms"`
+	Fingerprint string   `yaml:"fingerprint,omitempty"`
+	Vault       []string `yaml:"vault"`
+	Strict      bool     `yaml:"strict"`
+	GPG         struct {
+		Program string `yaml:"program,omitempty"`
+	} `yaml:"gpg,omitempty"`
+}
+
+func loadConfigForTest(t *testing.T, path string) configForTest {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read config file: %v", err)
+	}
+	var cfg configForTest
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("failed to parse config file: %v", err)
+	}
+	return cfg
+}
+
+func TestInitConfig_StrictFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Run init config with --strict flag
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--strict", "--no-gpg-program")
+	if err != nil {
+		t.Fatalf("init config --strict failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify the config file was created with strict: true
+	cfg := loadConfigForTest(t, configPath)
+	if !cfg.Strict {
+		t.Errorf("expected strict=true, got strict=%v", cfg.Strict)
+	}
+}
+
+func TestInitConfig_LoginFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	testFingerprint := "ABC123DEF456789"
+
+	// Run init config with --login flag
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--login", testFingerprint, "--no-gpg-program")
+	if err != nil {
+		t.Fatalf("init config --login failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify the config file was created with the fingerprint
+	cfg := loadConfigForTest(t, configPath)
+	if cfg.Fingerprint != testFingerprint {
+		t.Errorf("expected fingerprint=%q, got fingerprint=%q", testFingerprint, cfg.Fingerprint)
+	}
+}
+
+func TestInitConfig_StrictAndLoginFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	testFingerprint := "XYZ987654321"
+
+	// Run init config with both --strict and --login flags
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--strict", "--login", testFingerprint, "--no-gpg-program")
+	if err != nil {
+		t.Fatalf("init config --strict --login failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify both settings
+	cfg := loadConfigForTest(t, configPath)
+	if !cfg.Strict {
+		t.Errorf("expected strict=true, got strict=%v", cfg.Strict)
+	}
+	if cfg.Fingerprint != testFingerprint {
+		t.Errorf("expected fingerprint=%q, got fingerprint=%q", testFingerprint, cfg.Fingerprint)
+	}
+}
+
+func TestInitConfig_DefaultStrictIsFalse(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Run init config without --strict flag
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	if err != nil {
+		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify strict defaults to false
+	cfg := loadConfigForTest(t, configPath)
+	if cfg.Strict {
+		t.Errorf("expected strict=false by default, got strict=%v", cfg.Strict)
+	}
+}
+
+func TestInitConfig_DefaultFingerprintIsEmpty(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Run init config without --login flag
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	if err != nil {
+		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify fingerprint defaults to empty
+	cfg := loadConfigForTest(t, configPath)
+	if cfg.Fingerprint != "" {
+		t.Errorf("expected fingerprint to be empty by default, got fingerprint=%q", cfg.Fingerprint)
+	}
+}
+
+func TestInitConfig_NoGPGProgram(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Run init config with --no-gpg-program
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	if err != nil {
+		t.Fatalf("init config --no-gpg-program failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify gpg.program is empty
+	cfg := loadConfigForTest(t, configPath)
+	if cfg.GPG.Program != "" {
+		t.Errorf("expected gpg.program to be empty, got %q", cfg.GPG.Program)
+	}
+
+	// Verify stderr contains the skip message
+	if !strings.Contains(stderr, "Skipping GPG program detection") {
+		t.Errorf("expected stderr to contain skip message, got: %s", stderr)
+	}
+}
+
+func TestInitConfig_GPGProgram(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	customGPGPath := "/custom/path/to/gpg"
+
+	// Run init config with --gpg-program
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--gpg-program", customGPGPath)
+	if err != nil {
+		t.Fatalf("init config --gpg-program failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify gpg.program is set to the custom path
+	cfg := loadConfigForTest(t, configPath)
+	if cfg.GPG.Program != customGPGPath {
+		t.Errorf("expected gpg.program=%q, got %q", customGPGPath, cfg.GPG.Program)
+	}
+}
+
+func TestInitConfig_MutuallyExclusiveGPGFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Run init config with both --gpg-program and --no-gpg-program (should fail)
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--gpg-program", "/path/to/gpg", "--no-gpg-program")
+	if err == nil {
+		t.Fatalf("expected init config to fail with mutually exclusive flags, but it succeeded")
+	}
+
+	// Verify error message
+	if !strings.Contains(stderr, "--no-gpg-program and --gpg-program cannot be used together") {
+		t.Errorf("expected mutual exclusion error message, got: %s", stderr)
+	}
+}
+
+func TestInitConfig_ConfigAlreadyExists(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Create a config file first
+	_, _, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	if err != nil {
+		t.Fatalf("first init config failed: %v", err)
+	}
+
+	// Try to init again (should fail)
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	if err == nil {
+		t.Fatalf("expected second init config to fail, but it succeeded")
+	}
+
+	// Verify error message
+	if !strings.Contains(stderr, "already exists") {
+		t.Errorf("expected 'already exists' error message, got: %s", stderr)
+	}
+}
+
+func TestInitConfig_WithVaultPaths(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	vaultPath1 := filepath.Join(tmpDir, "vault1.yaml")
+	vaultPath2 := filepath.Join(tmpDir, "vault2.yaml")
+
+	// Run init config with -v flags
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "-v", vaultPath1, "-v", vaultPath2, "--no-gpg-program")
+	if err != nil {
+		t.Fatalf("init config with vaults failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify vault paths are in config
+	cfg := loadConfigForTest(t, configPath)
+	if len(cfg.Vault) != 2 {
+		t.Errorf("expected 2 vaults, got %d", len(cfg.Vault))
+	}
+
+	found1, found2 := false, false
+	for _, v := range cfg.Vault {
+		if v == vaultPath1 {
+			found1 = true
+		}
+		if v == vaultPath2 {
+			found2 = true
+		}
+	}
+	if !found1 {
+		t.Errorf("expected vault path %q in config", vaultPath1)
+	}
+	if !found2 {
+		t.Errorf("expected vault path %q in config", vaultPath2)
+	}
+}
+
+func TestInitConfig_AllFlagsCombined(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	vaultPath := filepath.Join(tmpDir, "vault.yaml")
+	testFingerprint := "COMBINED123456"
+	customGPGPath := "/usr/local/bin/gpg"
+
+	// Run init config with all flags
+	_, stderr, err := runCmd("init", "config",
+		"-c", configPath,
+		"-v", vaultPath,
+		"--strict",
+		"--login", testFingerprint,
+		"--gpg-program", customGPGPath,
+	)
+	if err != nil {
+		t.Fatalf("init config with all flags failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify all settings
+	cfg := loadConfigForTest(t, configPath)
+
+	if !cfg.Strict {
+		t.Errorf("expected strict=true")
+	}
+	if cfg.Fingerprint != testFingerprint {
+		t.Errorf("expected fingerprint=%q, got %q", testFingerprint, cfg.Fingerprint)
+	}
+	if cfg.GPG.Program != customGPGPath {
+		t.Errorf("expected gpg.program=%q, got %q", customGPGPath, cfg.GPG.Program)
+	}
+	if len(cfg.Vault) != 1 || cfg.Vault[0] != vaultPath {
+		t.Errorf("expected vault=[%q], got %v", vaultPath, cfg.Vault)
+	}
+}
+
+func TestInitConfig_HasDefaultAlgorithms(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Run init config
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	if err != nil {
+		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify FIPS-compliant algorithms are present
+	cfg := loadConfigForTest(t, configPath)
+	if len(cfg.ApprovedAlgorithms) == 0 {
+		t.Errorf("expected approved_algorithms to be set")
+	}
+
+	// Check for expected algorithms (RSA, ECC, EdDSA)
+	hasRSA, hasECC, hasEdDSA := false, false, false
+	for _, alg := range cfg.ApprovedAlgorithms {
+		switch alg.Algo {
+		case "RSA":
+			hasRSA = true
+			if alg.MinBits < 2048 {
+				t.Errorf("RSA min_bits should be >= 2048, got %d", alg.MinBits)
+			}
+		case "ECC":
+			hasECC = true
+		case "EdDSA":
+			hasEdDSA = true
+		}
+	}
+	if !hasRSA {
+		t.Errorf("expected RSA in approved_algorithms")
+	}
+	if !hasECC {
+		t.Errorf("expected ECC in approved_algorithms")
+	}
+	if !hasEdDSA {
+		t.Errorf("expected EdDSA in approved_algorithms")
+	}
+}

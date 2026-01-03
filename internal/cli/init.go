@@ -15,7 +15,9 @@ import (
 // InitConfig initializes a configuration file with FIPS-compliant defaults.
 // gpgProgram: if non-empty, use this value for gpg.program (without validation)
 // noGPGProgram: if true, skip GPG detection entirely and leave gpg.program empty
-func InitConfig(configPath string, initialVaults []string, gpgProgram string, noGPGProgram bool, stdout, stderr io.Writer) *Error {
+// strict: if true, initialize config with strict mode enabled
+// loginFingerprint: if non-empty, set fingerprint to this value
+func InitConfig(configPath string, initialVaults []string, gpgProgram string, noGPGProgram bool, strict bool, loginFingerprint string, stdout, stderr io.Writer) *Error {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
 		return NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
@@ -33,6 +35,16 @@ func InitConfig(configPath string, initialVaults []string, gpgProgram string, no
 
 	// Use FIPS-compliant default configuration
 	cfg := config.DefaultConfig()
+
+	// Apply strict mode if requested
+	if strict {
+		cfg.Strict = true
+	}
+
+	// Apply fingerprint if provided via --login
+	if loginFingerprint != "" {
+		cfg.Fingerprint = loginFingerprint
+	}
 
 	// Inject default vault paths (CLI specific behavior)
 	var vaultPaths []string
