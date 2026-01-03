@@ -64,7 +64,7 @@ homebrew_casks:
       verified: "github.com/dotsecenv/dotsecenv/"
     commit_msg_template: "Cask update for {{ .ProjectName }} version {{ .Tag }}"
     homepage: "https://dotsecenv.com"
-    description: "Safe environment secrets."
+    description: "Safe environment secrets — encrypted at rest, ready to commit, easy to share."
     dependencies:
       - formula: gnupg
     caveats: |
@@ -111,7 +111,7 @@ homebrew_casks:
 
 nfpms:
   - file_name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}'
-    description: Safe environment secrets
+    description: "Safe environment secrets — encrypted at rest, ready to commit, easy to share."
     homepage:  https://github.com/dotsecenv/dotsecenv
     vendor: DotSecEnv Ltd.
     maintainer: DotSecEnv <release@dotsecenv.com>

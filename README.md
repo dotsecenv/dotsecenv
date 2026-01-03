@@ -1,4 +1,4 @@
-# dotsecenv: Safe Environment Secrets
+# dotsecenv: safe environment secrets
 
 A complete Go CLI application for securely managing environment secrets with GPG-based encryption, multi-user support, and FIPS 186-5 compliant algorithm defaults.
 
