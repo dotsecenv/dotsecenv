@@ -45,9 +45,19 @@ func ParseSecretKey(raw string) (*SecretKey, error) {
 		return nil, fmt.Errorf("secret key cannot be empty")
 	}
 
+	// Check for triple colon or more (common mistake: using ":::" instead of "::")
+	if strings.Contains(raw, ":::") {
+		return nil, fmt.Errorf("invalid secret key %q: too many consecutive colons (did you mean \"::\"?)", raw)
+	}
+
 	// Check for separator
 	if strings.Contains(raw, SecretKeySeparator) {
 		return parseNamespacedKey(raw)
+	}
+
+	// Check for single colon (common mistake: using ":" instead of "::")
+	if strings.Contains(raw, ":") {
+		return nil, fmt.Errorf("invalid secret key %q: single colon is not a valid separator (did you mean \"::\"?)", raw)
 	}
 
 	return parseSimpleKey(raw)

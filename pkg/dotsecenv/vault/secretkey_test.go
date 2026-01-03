@@ -106,6 +106,18 @@ func TestParseSecretKey_Invalid(t *testing.T) {
 		{"simple starts with dot", ".KEY"},
 		{"simple ends with dot", "KEY."},
 		{"simple consecutive dots", "APP..ORG"},
+
+		// Single colon (common typo for ::)
+		{"single colon typo", "ns:KEY"},
+		{"single colon with spaces", "ns : KEY"},
+		{"single colon no namespace", ":KEY"},
+		{"single colon at end", "KEY:"},
+
+		// Triple colon or more (common typo for ::)
+		{"triple colon", "ns:::KEY"},
+		{"quadruple colon", "ns::::KEY"},
+		{"triple colon at start", ":::KEY"},
+		{"triple colon at end", "ns:::"},
 	}
 
 	for _, tt := range tests {
@@ -238,6 +250,36 @@ func TestSecretKey_IsNamespaced(t *testing.T) {
 				t.Errorf("SecretKey(%q).IsNamespaced() = %v, want %v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSingleColonErrorMessage(t *testing.T) {
+	_, err := ParseSecretKey("ns:KEY")
+	if err == nil {
+		t.Fatal("expected error for single colon")
+	}
+
+	errMsg := err.Error()
+	if !contains(errMsg, "did you mean") {
+		t.Errorf("error message should suggest '::': got %q", errMsg)
+	}
+	if !contains(errMsg, "::") {
+		t.Errorf("error message should contain '::': got %q", errMsg)
+	}
+}
+
+func TestTripleColonErrorMessage(t *testing.T) {
+	_, err := ParseSecretKey("ns:::KEY")
+	if err == nil {
+		t.Fatal("expected error for triple colon")
+	}
+
+	errMsg := err.Error()
+	if !contains(errMsg, "did you mean") {
+		t.Errorf("error message should suggest '::': got %q", errMsg)
+	}
+	if !contains(errMsg, "too many") {
+		t.Errorf("error message should mention 'too many': got %q", errMsg)
 	}
 }
 
