@@ -12,8 +12,8 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "dotsecenv",
-	Short: "Safe environment secrets management",
-	Long: `dotsecenv: safe environment secrets
+	Short: "Safe environment secrets",
+	Long: `dotsecenv: safe environment secrets — encrypted at rest, ready to commit, easy to share.
 
 A secure tool for managing environment secrets using GPG encryption.
 Secrets are stored in vault files and can be shared between team members.`,
