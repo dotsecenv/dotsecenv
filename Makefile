@@ -101,10 +101,12 @@ release-test: install-goreleaser install-syft
 # Development Tool Installation
 # =============================================================================
 
+GOBIN := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)
+
 .PHONY: install-tools
 install-tools: install-lefthook install-lint install-syft install-goreleaser
 
-LEFTHOOK := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/lefthook
+LEFTHOOK := $(GOBIN)/lefthook
 
 .PHONY: install-lefthook
 install-lefthook:
@@ -114,7 +116,7 @@ install-lefthook:
 	fi
 
 GOLANGCI_LINT_VERSION := latest
-GOLANGCI_LINT := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/golangci-lint
+GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
 .PHONY: install-lint
 install-lint:
@@ -123,7 +125,7 @@ install-lint:
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $${GOBIN:-$$(go env GOPATH)/bin} $(GOLANGCI_LINT_VERSION); \
 	fi
 
-SYFT := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/syft
+SYFT := $(GOBIN)/syft
 
 .PHONY: install-syft
 install-syft:
@@ -132,7 +134,7 @@ install-syft:
 		curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b $${GOBIN:-$$(go env GOPATH)/bin}; \
 	fi
 
-GORELEASER := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/goreleaser
+GORELEASER := $(GOBIN)/goreleaser
 
 .PHONY: install-goreleaser
 install-goreleaser:
