@@ -63,6 +63,7 @@ jobs:
           repositories: |
             homebrew-tap
             packages
+            website
 
       - name: Install Syft
         uses: anchore/sbom-action@v0
