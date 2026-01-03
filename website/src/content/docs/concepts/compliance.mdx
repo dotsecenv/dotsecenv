@@ -7,11 +7,18 @@ import { Aside } from '@astrojs/starlight/components';
 
 ## Overview
 
-dotsecenv aligns with several NIST and IETF standards for cryptographic operations. This page documents compliance with:
+dotsecenv aligns with several NIST and IETF standards for cryptographic operations. This page documents:
+
+**Compliance Standards** — specify how to use cryptographic primitives securely:
 
 - **FIPS 140-3** — Security requirements for cryptographic modules
 - **FIPS 186-5** — Digital Signature Standard (approved algorithms)
 - **RFC 9580** — OpenPGP with mandatory AEAD encryption
+
+**Foundational Standards** — define the cryptographic primitives themselves:
+
+- **FIPS 197** — Advanced Encryption Standard (AES)
+- **FIPS 180-4** — Secure Hash Standard (SHA-2 family)
 
 Understanding these standards helps organizations deploy dotsecenv in regulated environments.
 
@@ -19,7 +26,19 @@ Understanding these standards helps organizations deploy dotsecenv in regulated 
 
 ## FIPS 140-3: Cryptographic Module
 
-[FIPS 140-3](https://csrc.nist.gov/pubs/fips/140-3/final) defines security requirements for cryptographic modules. dotsecenv leverages Go's native FIPS 140-3 cryptographic module, introduced in Go 1.24 and validated under NIST CAVP certificate A6650.
+[FIPS 140-3](https://csrc.nist.gov/pubs/fips/140-3/final) defines security requirements for cryptographic modules. dotsecenv leverages Go's native FIPS 140-3 cryptographic module, introduced in Go 1.24.
+
+### CAVP Validation
+
+The Go Cryptographic Module v1.0.0 holds [CAVP certificate A6650](https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/details?validation=39260), validating the cryptographic algorithm implementations. This certificate confirms that AES, SHA-2, RSA, ECDSA, and other primitives produce correct outputs per NIST test vectors.
+
+| Identifier | Description |
+|------------|-------------|
+| **A6650** | CAVP certificate number |
+| **v1.0.0** | Module version frozen for validation |
+| **Geomys** | Organization pursuing CMVP certification |
+
+The module is currently on the CMVP Modules In Process list with status "Review Pending" and underwent a security audit by Trail of Bits.
 
 ### Native Go Implementation
 
@@ -60,14 +79,30 @@ Setting the `GOFIPS140` environment variable during build locks the binary to a 
 GOFIPS140=v1.0.0 go build -o dotsecenv ./cmd/dotsecenv
 ```
 
-This ensures the exact snapshot submitted to CMVP for validation. Verify which module version was embedded in any binary:
+Verify which module version was embedded in any binary:
 
 ```bash
 go version -m ./dotsecenv
 ```
 
+### Why v1.0.0 Specifically?
+
+The `v1.0.0` identifier is significant:
+
+| Build Flag | Behavior |
+|------------|----------|
+| `GOFIPS140=v1.0.0` | Locks to the exact snapshot submitted to CAVP/CMVP |
+| `GOFIPS140=latest` | Uses whatever module ships with your Go version |
+| `GOFIPS140=off` | Disables FIPS mode (default) |
+
+Using `v1.0.0` ensures:
+
+- **Validated code path** — The binary uses the exact cryptographic implementation that was formally tested and awarded certificate A6650
+- **Deterministic behavior** — Runtime behavior matches what was audited by Trail of Bits
+- **Compliance evidence** — Auditors can verify the module version matches the NIST validation record
+
 <Aside type="tip">
-When dotsecenv is built with `GOFIPS140=v1.0.0`, it locks to the exact cryptographic module snapshot submitted to CMVP, ensuring the runtime behavior matches what was formally tested.
+Without the `v1.0.0` lock, `GOFIPS140=latest` would use whatever module ships with your Go version—potentially code that has not yet been validated. For regulated environments, always specify the validated version explicitly.
 </Aside>
 
 ### Build It Yourself
@@ -79,6 +114,57 @@ dotsecenv is open source, and we encourage security-conscious organizations to f
 | Go version | 1.24 or later |
 | Build flag | `GOFIPS140=v1.0.0` |
 | Runtime | Listed Operating Environment |
+
+---
+
+## Cryptographic Primitives
+
+The following standards define the cryptographic algorithms themselves. dotsecenv uses these primitives within the compliance framework established by FIPS 140-3 and FIPS 186-5.
+
+### FIPS 197: Advanced Encryption Standard
+
+[FIPS 197](https://csrc.nist.gov/pubs/fips/197/final) defines the AES block cipher algorithm. dotsecenv uses AES-256 exclusively for symmetric encryption of secrets.
+
+| Property | Value |
+|----------|-------|
+| Block size | 128 bits |
+| Key size | 256 bits (AES-256) |
+| Mode | GCM (per NIST SP 800-38D) |
+
+<Aside type="note">
+While OpenPGP supports AES-128, AES-192, and AES-256, dotsecenv's RFC 9580 profile negotiates AES-256-GCM for all encryption operations. This provides the strongest symmetric encryption available.
+</Aside>
+
+### FIPS 180-4: Secure Hash Standard
+
+[FIPS 180-4](https://csrc.nist.gov/pubs/fips/180-4/upd1/final) defines the SHA-2 family of hash functions. dotsecenv uses SHA-256 and SHA-512 for integrity verification and signatures.
+
+| Hash | Output Size | Usage in dotsecenv |
+|------|-------------|-------------------|
+| SHA-256 | 256 bits | Standard key operations |
+| SHA-512 | 512 bits | High-strength keys (RSA-4096, ECC P-521) |
+
+#### Adaptive Hash Selection
+
+dotsecenv automatically selects the appropriate hash strength based on key parameters:
+
+```text
+Key strength ≥ 256 bits (RSA-4096, ECC P-521) → SHA-512
+Key strength < 256 bits (RSA-3072, ECC P-384) → SHA-256
+```
+
+This follows security best practices for matching hash strength to key strength.
+
+#### Hash Usage
+
+SHA-2 hashes serve multiple purposes in dotsecenv:
+
+| Purpose | Description |
+|---------|-------------|
+| **Integrity verification** | Detect tampering in vault entries |
+| **Digital signatures** | Hash-then-sign for identity and secret signatures |
+| **Key binding** | Link subkeys to primary keys in OpenPGP |
+| **Fingerprints** | Key identification (transitioning from SHA-1 to SHA-256) |
 
 ---
 
@@ -193,6 +279,34 @@ OpenPGP performs cipher negotiation based on recipient key preferences. The actu
 | Key derivation | S2K (simple) | Argon2 |
 | Version | v4 keys | v6 keys |
 
+### Compression and Side-Channel Attacks
+
+dotsecenv explicitly disables compression to prevent CRIME/BREACH-style side-channel attacks:
+
+```go
+// Explicitly disable compression per RFC 9580 (avoids CRIME-style side-channel attacks)
+encHandle, err := pgp.Encryption().Recipients(recipients).CompressWith(constants.NoCompression).New()
+```
+
+#### Why Disable Compression?
+
+When data is compressed before encryption, the ciphertext length varies based on plaintext content. Attackers can exploit this:
+
+1. **CRIME attack** — Inject known strings into plaintext
+2. **Observe ciphertext length** — Compressed duplicates are shorter
+3. **Iterate** — Guess secrets character by character
+
+| Compression | Ratio | Speed | Security Risk |
+|-------------|-------|-------|---------------|
+| BZIP2 | Best | Slowest | Length leakage |
+| ZLIB | Good | Fast | Length leakage |
+| ZIP | Good | Fast | Length leakage |
+| **Uncompressed** | None | Fastest | **Safe** |
+
+<Aside type="caution">
+For secrets management, compression provides negligible benefit (secrets are typically small) while introducing a measurable attack surface. dotsecenv uses `constants.NoCompression` for all encryption operations.
+</Aside>
+
 ### Hybrid Encryption Model
 
 dotsecenv uses hybrid encryption combining symmetric and asymmetric cryptography:
@@ -227,6 +341,22 @@ dotsecenv uses hybrid encryption combining symmetric and asymmetric cryptography
 └─────────────────────────────────────────────────────────────┘
 ```
 
+#### Why Hybrid Encryption?
+
+Hybrid encryption enables efficient multi-recipient encryption:
+
+| Component | Size | Operations per Recipient |
+|-----------|------|--------------------------|
+| Session key | 256 bits | Encrypted once per recipient (fast, tiny payload) |
+| Secret data | Variable | Encrypted once total with AES (fast) |
+
+For 10 recipients, this means:
+
+- **1** AES encryption of the full payload
+- **10** RSA/ECC encryptions of the 256-bit session key
+
+Without hybrid encryption, you would need 10 full asymmetric encryptions—orders of magnitude slower for large secrets.
+
 ### Encrypted Value Structure
 
 Each secret value blob contains:
@@ -247,12 +377,25 @@ Each secret value blob contains:
 
 ## Summary
 
+### Compliance Standards
+
+These standards specify how to use cryptographic primitives securely:
+
 | Standard | Scope | dotsecenv Compliance |
 |----------|-------|----------------------|
-| FIPS 140-3 | Cryptographic modules | Go 1.24+ native module (CAVP A6650) |
+| FIPS 140-3 | Cryptographic modules | Go 1.24+ native module ([CAVP A6650](https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/details?validation=39260)) |
 | FIPS 186-5 | Digital signatures | RSA, ECDSA, EdDSA; DSA rejected |
 | NIST SP 800-38D | GCM mode | AES-256-GCM for symmetric encryption |
 | RFC 9580 | OpenPGP | AEAD mandatory, v6 key support |
+
+### Foundational Standards
+
+These standards define the cryptographic primitives themselves:
+
+| Standard | Defines | dotsecenv Usage |
+|----------|---------|-----------------|
+| FIPS 197 | AES block cipher | AES-256 for symmetric encryption |
+| FIPS 180-4 | SHA-2 hash family | SHA-256/SHA-512 for integrity and signatures |
 
 <Aside type="tip">
 For maximum compliance, build dotsecenv with Go 1.24+ and `GOFIPS140=v1.0.0`, deploy to a validated Operating Environment, and use Ed25519 or RSA-4096 keys.
