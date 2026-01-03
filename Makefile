@@ -61,7 +61,19 @@ test-race:
 
 .PHONY: e2e
 e2e: build
-	@./scripts/e2e.sh $(E2E_FLAGS)
+	@E2E_HOME=$$(mktemp -d) && \
+	mkdir -p "$$E2E_HOME/.gnupg" "$$E2E_HOME/.config" "$$E2E_HOME/.local/share" && \
+	chmod 700 "$$E2E_HOME/.gnupg" && \
+	cp bin/dotsecenv "$$E2E_HOME/" && \
+	echo "Running e2e tests in isolated environment: $$E2E_HOME" && \
+	HOME="$$E2E_HOME" \
+	PATH="$$E2E_HOME:$$PATH" \
+	GNUPGHOME="$$E2E_HOME/.gnupg" \
+	XDG_CONFIG_HOME="$$E2E_HOME/.config" \
+	XDG_DATA_HOME="$$E2E_HOME/.local/share" \
+	./scripts/e2e.sh $(E2E_FLAGS) && \
+	rm -rf "$$E2E_HOME" && \
+	echo "Cleaned up $$E2E_HOME"
 
 .PHONY: update
 update:

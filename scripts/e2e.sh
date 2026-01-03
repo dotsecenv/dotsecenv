@@ -5,11 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BIN="$PROJECT_DIR/bin/dotsecenv"
 
-# Create isolated GPG home
-GNUPGHOME="$(mktemp -d)"
-export GNUPGHOME
-# shellcheck disable=SC2064
-trap "rm -rf $GNUPGHOME" EXIT
+# Use existing GNUPGHOME if set, otherwise create isolated GPG home
+# Avoid polluting user's keyrings during tests
+if [ -z "$GNUPGHOME" ]; then
+    GNUPGHOME="$(mktemp -d)"
+    export GNUPGHOME
+    # shellcheck disable=SC2064
+    trap "rm -rf $GNUPGHOME" EXIT
+fi
 
 echo "==> Generating test keys in $GNUPGHOME"
 
