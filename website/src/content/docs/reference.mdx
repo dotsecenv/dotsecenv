@@ -154,7 +154,7 @@ dotsecenv secret get SECRET [flags]
 **Secret key formats:**
 
 - Namespaced: `namespace::KEY_NAME` (e.g., `myapp::DATABASE_URL`)
-- Non-namespaced: `KEY_NAME` (e.g., `DATABASE_URL`)
+- Non-namespaced: `KEY_NAME` (e.g., `DATABASE_URL`, `APP.DOMAIN.ORG`)
 
 **Options:**
 
@@ -194,7 +194,7 @@ dotsecenv secret put SECRET [flags]
 **Secret key formats:**
 
 - Namespaced: `namespace::KEY_NAME` (e.g., `myapp::DATABASE_URL`)
-- Non-namespaced: `KEY_NAME` (e.g., `DATABASE_URL`)
+- Non-namespaced: `KEY_NAME` (e.g., `DATABASE_URL`, `APP.DOMAIN.ORG`)
 
 Keys are case-insensitive and normalized when stored:
 
