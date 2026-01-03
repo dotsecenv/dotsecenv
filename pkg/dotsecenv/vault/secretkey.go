@@ -21,8 +21,8 @@ const SecretKeySeparator = "::"
 var (
 	// Pattern for namespace (after lowercasing): alphanumeric + underscores, must have at least one letter
 	namespacePattern = regexp.MustCompile(`^[a-z0-9_]+$`)
-	// Pattern for key name (after uppercasing): alphanumeric + underscores, must have at least one letter
-	keyNamePattern = regexp.MustCompile(`^[A-Z0-9_]+$`)
+	// Pattern for key name (after uppercasing): alphanumeric + underscores + dots, must have at least one letter
+	keyNamePattern = regexp.MustCompile(`^[A-Z0-9_.]+$`)
 	// Detect three or more consecutive underscores
 	tripleUnderscorePattern = regexp.MustCompile(`_{3,}`)
 	// Detect purely numeric string
@@ -173,6 +173,21 @@ func validateKeyName(name string) error {
 		return fmt.Errorf("key name cannot end with underscore")
 	}
 
+	// Cannot start with a dot
+	if strings.HasPrefix(name, ".") {
+		return fmt.Errorf("key name cannot start with a dot")
+	}
+
+	// Cannot end with a dot
+	if strings.HasSuffix(name, ".") {
+		return fmt.Errorf("key name cannot end with a dot")
+	}
+
+	// Check for consecutive dots
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("key name cannot contain consecutive dots")
+	}
+
 	// Check for triple underscores
 	if tripleUnderscorePattern.MatchString(name) {
 		return fmt.Errorf("key name cannot contain three or more consecutive underscores")
@@ -183,9 +198,9 @@ func validateKeyName(name string) error {
 		return fmt.Errorf("key name must contain at least one letter")
 	}
 
-	// Check overall pattern (alphanumeric + underscores)
+	// Check overall pattern (alphanumeric + underscores + dots)
 	if !keyNamePattern.MatchString(name) {
-		return fmt.Errorf("key name must contain only uppercase letters, digits, and underscores")
+		return fmt.Errorf("key name must contain only uppercase letters, digits, underscores, and dots")
 	}
 
 	return nil
@@ -250,13 +265,14 @@ func IsValidSecretKey(key string) bool {
 func FormatSecretKeyError(err error) string {
 	return fmt.Sprintf("%v\n\nExpected formats:\n"+
 		"  Namespaced:     namespace::KEY_NAME  (e.g., myapp::DATABASE_URL)\n"+
-		"  Non-namespaced: KEY_NAME             (e.g., DATABASE_URL)\n\n"+
+		"  Non-namespaced: KEY_NAME             (e.g., DATABASE_URL, APP.DOMAIN.ORG)\n\n"+
 		"Namespace rules:\n"+
 		"  - Must start with a letter\n"+
 		"  - Cannot start or end with underscore\n"+
 		"  - No three consecutive underscores\n\n"+
 		"Key name rules:\n"+
-		"  - Must start with a letter\n"+
-		"  - Cannot end with underscore\n"+
-		"  - No three consecutive underscores", err)
+		"  - Must start with a letter or underscore\n"+
+		"  - Cannot end with underscore or dot\n"+
+		"  - No three consecutive underscores\n"+
+		"  - No consecutive dots", err)
 }
