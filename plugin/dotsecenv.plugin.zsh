@@ -26,31 +26,21 @@ fi
 # Track the previous directory for change detection
 typeset -g _DOTSECENV_PREV_PWD=""
 
-# Hook function to process directory change (allows cd . to reload .secenv files)
-_dotsecenv_chdir_hook() {
+# Hook function for directory changes
+_dotsecenv_chpwd_hook() {
     local old_dir="$_DOTSECENV_PREV_PWD"
     _DOTSECENV_PREV_PWD="$PWD"
     _dotsecenv_on_cd "$old_dir" "$PWD"
 }
 
-# Wrap cd to trigger directory change processing
-# (zsh's chpwd hook doesn't fire for cd . since directory doesn't technically change)
-cd() {
-    builtin cd "$@" || return $?
-    _dotsecenv_chdir_hook
+# Reload secrets in current directory (for when cd . doesn't trigger chpwd)
+dotsecenv_reload() {
+    _dotsecenv_on_cd "$PWD" "$PWD"
 }
 
-# Wrap pushd to trigger directory change processing
-pushd() {
-    builtin pushd "$@" || return $?
-    _dotsecenv_chdir_hook
-}
-
-# Wrap popd to trigger directory change processing
-popd() {
-    builtin popd "$@" || return $?
-    _dotsecenv_chdir_hook
-}
+# Register the chpwd hook using zsh's hook system
+autoload -Uz add-zsh-hook
+add-zsh-hook chpwd _dotsecenv_chpwd_hook
 
 # Process current directory on plugin load (initial shell startup)
-_dotsecenv_chdir_hook
+_dotsecenv_chpwd_hook
