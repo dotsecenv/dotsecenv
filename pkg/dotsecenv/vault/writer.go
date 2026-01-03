@@ -60,7 +60,7 @@ func newWriter(path string, readOnly bool) (*Writer, error) {
 func (w *Writer) createNewVault() error {
 	// Ensure directory exists
 	dir := filepath.Dir(w.path)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create vault directory: %w", err)
 	}
 
@@ -156,7 +156,7 @@ func (w *Writer) flush() error {
 
 	// Write to temp file first for atomicity
 	tmpPath := w.path + ".tmp"
-	tmpFile, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	tmpFile, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -210,7 +210,7 @@ func (w *Writer) nextLineNumber() int {
 func (w *Writer) AddIdentity(id identity.Identity) error {
 	// Check for duplicate
 	if _, exists := w.header.Identities[id.Fingerprint]; exists {
-		return fmt.Errorf("identity already exists: %s", id.Fingerprint)
+		return fmt.Errorf("skipped, already present: %s", id.Fingerprint)
 	}
 
 	lineNum := w.nextLineNumber()

@@ -87,7 +87,12 @@ func (c *CLI) VaultList(jsonOutput bool) *Error {
 		}
 
 		if manager == nil {
-			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): Failed to load\n", displayPos, entry.Path)
+			loadErr := c.vaultResolver.GetLoadError(i)
+			if loadErr != nil {
+				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): %v\n", displayPos, entry.Path, loadErr)
+			} else {
+				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): not loaded\n", displayPos, entry.Path)
+			}
 		} else {
 			vaultData := manager.Get()
 			if len(vaultData.Secrets) == 0 {
@@ -175,7 +180,11 @@ func (c *CLI) VaultDefrag(dryRun bool, jsonOutput bool, skipConfirm bool, vaultP
 	entry := config.Entries[targetIndex]
 	manager := c.vaultResolver.GetVaultManager(targetIndex)
 	if manager == nil {
-		return NewError(fmt.Sprintf("failed to load vault: %s", entry.Path), ExitVaultError)
+		loadErr := c.vaultResolver.GetLoadError(targetIndex)
+		if loadErr != nil {
+			return NewError(fmt.Sprintf("vault %s: %v", entry.Path, loadErr), ExitVaultError)
+		}
+		return NewError(fmt.Sprintf("vault %s: not loaded", entry.Path), ExitVaultError)
 	}
 
 	// Get fragmentation stats

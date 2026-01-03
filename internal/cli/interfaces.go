@@ -19,6 +19,7 @@ type VaultResolver interface {
 	AddIdentity(identity vault.Identity, index int) error
 	GetConfig() vault.VaultConfig
 	GetVaultPaths() []string
+	GetAvailableVaultPathsWithIndices() []vault.VaultPathWithIndex
 	IsPathInConfig(path string) bool
 	IdentityExistsInVault(fingerprint string, index int) bool
 	SaveVault(index int) error

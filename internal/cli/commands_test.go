@@ -201,6 +201,17 @@ func (m *MockVaultResolver) GetVaultPaths() []string {
 	return m.VaultPaths
 }
 
+func (m *MockVaultResolver) GetAvailableVaultPathsWithIndices() []vault.VaultPathWithIndex {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	// In mock, all configured vaults are considered available
+	var result []vault.VaultPathWithIndex
+	for i, path := range m.VaultPaths {
+		result = append(result, vault.VaultPathWithIndex{Path: path, Index: i})
+	}
+	return result
+}
+
 func (m *MockVaultResolver) IsPathInConfig(path string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
