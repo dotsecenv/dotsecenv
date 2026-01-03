@@ -152,7 +152,10 @@ func (vr *VaultResolver) GetSecret(index int, key string) (*SecretValue, error) 
 	manager := vr.vaults[index]
 	if manager == nil {
 		path := vr.config.Entries[index].Path
-		return nil, fmt.Errorf("Vault %d (%s): failed to load", index+1, path)
+		if loadErr := vr.loadErrors[index]; loadErr != nil {
+			return nil, fmt.Errorf("Vault %d (%s): %v", index+1, path, loadErr)
+		}
+		return nil, fmt.Errorf("Vault %d (%s): not loaded", index+1, path)
 	}
 
 	secret := manager.GetSecretByKey(key)
@@ -222,7 +225,10 @@ func (vr *VaultResolver) AddIdentity(identity Identity, index int) error {
 		}
 		manager := vr.vaults[index]
 		if manager == nil {
-			return fmt.Errorf("vault not available")
+			if loadErr := vr.loadErrors[index]; loadErr != nil {
+				return loadErr
+			}
+			return fmt.Errorf("vault not loaded")
 		}
 		if manager.IsReadOnly() {
 			return fmt.Errorf("is read-only")
@@ -251,7 +257,10 @@ func (vr *VaultResolver) AddSecret(secret Secret, index int) error {
 
 	manager := vr.vaults[index]
 	if manager == nil {
-		return fmt.Errorf("vault not available")
+		if loadErr := vr.loadErrors[index]; loadErr != nil {
+			return loadErr
+		}
+		return fmt.Errorf("vault not loaded")
 	}
 	if manager.IsReadOnly() {
 		return fmt.Errorf("is read-only")
@@ -355,6 +364,28 @@ func (vr *VaultResolver) GetVaultPaths() []string {
 	return paths
 }
 
+// VaultPathWithIndex pairs a vault path with its original configuration index
+type VaultPathWithIndex struct {
+	Path  string
+	Index int
+}
+
+// GetAvailableVaultPathsWithIndices returns only vault paths that were successfully loaded,
+// paired with their original configuration indices. This is useful for interactive selection
+// where we need to map the selected item back to the correct vault index.
+func (vr *VaultResolver) GetAvailableVaultPathsWithIndices() []VaultPathWithIndex {
+	vr.mu.RLock()
+	defer vr.mu.RUnlock()
+
+	var result []VaultPathWithIndex
+	for i, entry := range vr.config.Entries {
+		if vr.vaults[i] != nil {
+			result = append(result, VaultPathWithIndex{Path: entry.Path, Index: i})
+		}
+	}
+	return result
+}
+
 // VaultCount returns the number of vaults in the resolver.
 func (vr *VaultResolver) VaultCount() int {
 	return len(vr.vaults)
@@ -397,7 +428,10 @@ func (vr *VaultResolver) SaveVault(index int) error {
 	}
 	manager := vr.vaults[index]
 	if manager == nil {
-		return fmt.Errorf("vault not available")
+		if loadErr := vr.loadErrors[index]; loadErr != nil {
+			return loadErr
+		}
+		return fmt.Errorf("vault not loaded")
 	}
 
 	if manager.IsReadOnly() {

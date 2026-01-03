@@ -93,6 +93,10 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool) *Error {
 	failureCount := 0
 	reportMode := all || len(targetIndices) > 1
 
+	// Track added vault info for non-reportMode success message
+	var addedVaultPath string
+	var addedVaultPos int
+
 	for _, idx := range targetIndices {
 		vaultPath := loadedConfig.Entries[idx].Path
 		displayPos := idx + 1
@@ -133,7 +137,7 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool) *Error {
 			if reportMode {
 				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, already present\n", displayPos, vaultPath)
 			} else {
-				return NewError(fmt.Sprintf("identity '%s' already exists in vault", fingerprint), ExitGeneralError)
+				return NewError(fmt.Sprintf("Vault %d (%s): skipped, already present", displayPos, vaultPath), ExitGeneralError)
 			}
 			skippedCount++
 			continue
@@ -151,6 +155,9 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool) *Error {
 
 		if reportMode {
 			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): added\n", displayPos, vaultPath)
+		} else {
+			addedVaultPath = vaultPath
+			addedVaultPos = displayPos
 		}
 		addedCount++
 	}
@@ -167,7 +174,7 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool) *Error {
 		}
 
 		if !reportMode {
-			_, _ = fmt.Fprintf(c.output.Stdout(), "Identity added\n")
+			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): added\n", addedVaultPos, addedVaultPath)
 		}
 	}
 

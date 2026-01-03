@@ -40,7 +40,7 @@ Expire-Date: 0
 %no-protection
 %commit
 `
-	if err := os.WriteFile(paramsPath, []byte(params), 0600); err != nil {
+	if err := os.WriteFile(paramsPath, []byte(params), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -99,7 +99,7 @@ vault:
   - "%s"
   - "%s"
 `, vaultAPath, vaultBPath)
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("Config content:\n%s", configContent)
@@ -166,7 +166,7 @@ vault:
   - "%s"
   - "%s"
 `, vaultAPath, vaultBPath)
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -206,8 +206,8 @@ vault:
 	if errDefault == nil {
 		t.Errorf("expected error when adding existing identity to default vault")
 	}
-	if !strings.Contains(stderrDefault, "already exists") {
-		t.Errorf("expected 'already exists' error, got: %s", stderrDefault)
+	if !strings.Contains(stderrDefault, "skipped, already present") {
+		t.Errorf("expected 'skipped, already present' error, got: %s", stderrDefault)
 	}
 }
 
@@ -231,7 +231,7 @@ approved_algorithms:
 vault:
   - "%s"
 `, vaultPath)
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -268,7 +268,7 @@ approved_algorithms:
   - algo: RSA
     min_bits: 2048
 vault: []
-`), 0600); err != nil {
+`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

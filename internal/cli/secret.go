@@ -68,20 +68,28 @@ func (c *CLI) resolveWritableVaultIndex(vaultPath string, fromIndex int) (int, *
 	}
 
 	// No flags - interactive selection or default
-	vaultPaths := c.vaultResolver.GetVaultPaths()
-	if len(vaultPaths) == 0 {
-		return -1, NewError("no vaults configured", ExitVaultError)
+	// Only show vaults that are actually available (exist and were loaded successfully)
+	availableVaults := c.vaultResolver.GetAvailableVaultPathsWithIndices()
+	if len(availableVaults) == 0 {
+		return -1, NewError("no vaults available", ExitVaultError)
 	}
-	if len(vaultPaths) == 1 {
-		return 0, nil
+	if len(availableVaults) == 1 {
+		return availableVaults[0].Index, nil
 	}
 
 	// Multiple vaults: interactive selection
-	selectedIndex, selectErr := HandleInteractiveSelection(vaultPaths, "Multiple vaults configured. Select target vault:", c.output.Stderr())
+	// Extract just the paths for display
+	displayPaths := make([]string, len(availableVaults))
+	for i, v := range availableVaults {
+		displayPaths[i] = v.Path
+	}
+
+	selectedIndex, selectErr := HandleInteractiveSelection(displayPaths, "Multiple vaults configured. Select target vault:", c.output.Stderr())
 	if selectErr != nil {
 		return -1, selectErr
 	}
-	return selectedIndex, nil
+	// Map back to the original configuration index
+	return availableVaults[selectedIndex].Index, nil
 }
 
 // SecretPut stores a secret in the vault
