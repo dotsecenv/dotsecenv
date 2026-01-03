@@ -13,7 +13,7 @@ export default defineConfig({
         alt: 'logo',
       },
       favicon: '/favicon.png',
-      tagline: 'Safe environment variables',
+      tagline: 'Safe environment secrets',
       description: 'Secure secrets management CLI that encrypts environment variables at rest using GPG, making them safe to commit to version control.',
 
       social: [
