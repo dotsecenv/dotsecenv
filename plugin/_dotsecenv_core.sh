@@ -444,6 +444,50 @@ _dotsecenv_clipboard_copy() {
     return 1
 }
 
+# Pin current directory's env vars - prevents them from being unloaded on cd
+dotsecenv_pin() {
+    local dir="${1:-$PWD}"
+    local dir_hash
+    dir_hash=$(_dotsecenv_dir_hash "$dir")
+    local vars_var="_DOTSECENV_LOADED_${dir_hash}"
+    local secrets_var="_DOTSECENV_SECRETS_${dir_hash}"
+
+    # Check if there are any tracked variables
+    local has_vars=0
+    local has_secrets=0
+    local vars_list=""
+    local secrets_list=""
+
+    if eval "[[ \${#${vars_var}[@]} -gt 0 ]]" 2>/dev/null; then
+        has_vars=1
+        eval "vars_list=\$(IFS=', '; echo \"\${${vars_var}[*]}\")"
+    fi
+
+    if eval "[[ \${#${secrets_var}[@]} -gt 0 ]]" 2>/dev/null; then
+        has_secrets=1
+        eval "secrets_list=\$(IFS=', '; echo \"\${${secrets_var}[*]}\")"
+    fi
+
+    if [[ $has_vars -eq 0 && $has_secrets -eq 0 ]]; then
+        echo "dotsecenv: no environment variables to pin in $dir" >&2
+        return 1
+    fi
+
+    # Clear the tracking arrays (variables remain set, just untracked)
+    unset "$vars_var"
+    unset "$secrets_var"
+
+    # Print confirmation
+    if [[ $has_secrets -eq 1 ]]; then
+        echo "dotsecenv: pinned secrets: $secrets_list" >&2
+    fi
+    if [[ $has_vars -eq 1 ]]; then
+        echo "dotsecenv: pinned env vars: $vars_list" >&2
+    fi
+    echo "dotsecenv: these variables will persist when you leave this directory" >&2
+    echo "dotsecenv: you must unset them manually, e.g.: \`unset VARIABLE_NAME\`" >&2
+}
+
 # Aliases - defined as functions to work in both bash and zsh
 dse() {
     dotsecenv "$@"
@@ -453,8 +497,8 @@ secret() {
     dotsecenv secret get "$@"
 }
 
-# secretcp copies output to clipboard
-secretcp() {
+# copysecret copies output to clipboard
+copysecret() {
     local output
     if output=$(dotsecenv secret get "$@"); then
         if echo -n "$output" | _dotsecenv_clipboard_copy; then
@@ -465,4 +509,9 @@ secretcp() {
     else
         return 1
     fi
+}
+
+# pinsecenv - alias for dotsecenv_pin
+pinsecenv() {
+    dotsecenv_pin "$@"
 }

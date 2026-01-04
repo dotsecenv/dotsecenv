@@ -34,7 +34,7 @@ _dotsecenv_chpwd_hook() {
 }
 
 # Reload secrets in current directory (for when cd . doesn't trigger chpwd)
-dotsecenv_reload() {
+reloadsecenv() {
     _dotsecenv_on_cd "$PWD" "$PWD"
 }
 

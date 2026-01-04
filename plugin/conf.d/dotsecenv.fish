@@ -386,8 +386,51 @@ function _dotsecenv_cd_hook --on-variable PWD
 end
 
 # Reload secrets in current directory
-function dotsecenv_reload
+function reloadsecenv
     _dotsecenv_on_cd "$PWD" "$PWD"
+end
+
+# Pin current directory's env vars - prevents them from being unloaded on cd
+function dotsecenv_pin
+    set -l dir (test (count $argv) -gt 0; and echo $argv[1]; or echo $PWD)
+    set -l dir_hash (_dotsecenv_dir_hash "$dir")
+    set -l vars_var "_DOTSECENV_LOADED_$dir_hash"
+    set -l secrets_var "_DOTSECENV_SECRETS_$dir_hash"
+
+    # Check if there are any tracked variables
+    set -l has_vars 0
+    set -l has_secrets 0
+    set -l vars_list ""
+    set -l secrets_list ""
+
+    if set -q $vars_var; and test (count $$vars_var) -gt 0
+        set has_vars 1
+        set vars_list (string join ', ' $$vars_var)
+    end
+
+    if set -q $secrets_var; and test (count $$secrets_var) -gt 0
+        set has_secrets 1
+        set secrets_list (string join ', ' $$secrets_var)
+    end
+
+    if test $has_vars -eq 0; and test $has_secrets -eq 0
+        echo "dotsecenv: no environment variables to pin in $dir" >&2
+        return 1
+    end
+
+    # Clear the tracking arrays (variables remain set, just untracked)
+    set -e $vars_var
+    set -e $secrets_var
+
+    # Print confirmation
+    if test $has_secrets -eq 1
+        echo "dotsecenv: pinned secrets: $secrets_list" >&2
+    end
+    if test $has_vars -eq 1
+        echo "dotsecenv: pinned env vars: $vars_list" >&2
+    end
+    echo "dotsecenv: these variables will persist when you leave this directory" >&2
+    echo "dotsecenv: you must unset them manually, e.g.: \`set -e VARIABLE_NAME\`" >&2
 end
 
 # Clipboard helper - copies stdin to clipboard
@@ -431,8 +474,8 @@ function secret
     dotsecenv secret get $argv
 end
 
-# secretcp: copies secret to clipboard
-function secretcp
+# copysecret: copies secret to clipboard
+function copysecret
     set -l output
     if set output (dotsecenv secret get $argv)
         if echo -n "$output" | _dotsecenv_clipboard_copy
@@ -443,6 +486,11 @@ function secretcp
     else
         return 1
     end
+end
+
+# pinsecenv: alias for dotsecenv_pin
+function pinsecenv
+    dotsecenv_pin $argv
 end
 
 # Process current directory on plugin load

@@ -9,7 +9,7 @@ Shell plugins for [dotsecenv](https://github.com/dotsecenv/dotsecenv) that autom
 - Fetches secrets from your dotsecenv vault using the `{dotsecenv}` or `{dotsecenv/KEY}` syntax
 - Security checks: refuses to load world-writable files or files not owned by you
 - Trust system: prompts before loading `.secenv` files from untrusted directories
-- Convenient aliases: `dse`, `secret`, `secretcp`
+- Convenient aliases: `dse`, `secret`, `copysecret`
 
 ## Installation
 
@@ -143,11 +143,11 @@ If both `.env` and `.secenv` define the same variable, `.secenv` takes precedenc
 | --------------- | ---------------------------------------- | --------------------------- |
 | `dse`           | `dotsecenv`                              | Shorthand for dotsecenv CLI |
 | `secret NAME`   | `dotsecenv secret get NAME`              | Retrieve a secret           |
-| `secretcp NAME` | `dotsecenv secret get NAME \| clipboard` | Copy secret to clipboard    |
+| `copysecret NAME` | `dotsecenv secret get NAME \| clipboard` | Copy secret to clipboard    |
 
 ### Clipboard Support
 
-The `secretcp` alias supports:
+The `copysecret` alias supports:
 
 - **macOS**: `pbcopy`
 - **Linux (X11)**: `xclip` or `xsel`
