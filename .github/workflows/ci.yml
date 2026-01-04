@@ -74,7 +74,23 @@ jobs:
       - uses: actions/checkout@v6
       - uses: ./
         with:
+          version: ${{ github.sha }}
           build-from-source: true
+      - run: dotsecenv version
+
+  action-init-config:
+    name: Test Action with init config (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./
+        with:
+          version: ${{ github.sha }}
+          build-from-source: true
+          init-config: '--strict --no-gpg-program'
       - run: dotsecenv version
 
   release-test:

@@ -9,7 +9,7 @@ branding:
 
 inputs:
   version:
-    description: 'Version to install (e.g., v1.2.3, or "latest" for most recent release)'
+    description: 'Version to install: a release tag (e.g., v1.2.3), branch ref (e.g., main), commit SHA, or "latest" for the most recent release'
     required: false
     default: 'latest'
   build-from-source:
@@ -20,6 +20,10 @@ inputs:
     description: 'Verify attestations, checksums, and GPG signatures (ignored if build-from-source is true)'
     required: false
     default: 'true'
+  init-config:
+    description: 'Arguments for "dotsecenv init config". Set to empty string to run with defaults, or provide flags (e.g., "--strict --login FINGERPRINT"). Leave as "skip" to not run.'
+    required: false
+    default: 'skip'
 
 outputs:
   version:
@@ -43,7 +47,7 @@ runs:
       run: |
         if [[ "${{ inputs.version }}" == "latest" ]]; then
           VERSION=$(gh release view --repo dotsecenv/dotsecenv --json tagName -q .tagName)
-          echo "Resolved latest version: $VERSION"
+          echo "Resolved latest released version: $VERSION"
         else
           VERSION="${{ inputs.version }}"
         fi
@@ -136,7 +140,17 @@ runs:
       run: |
         VERSION="${{ steps.resolve-version.outputs.version }}"
         DEST="${{ runner.temp }}/dotsecenv-download"
-        git clone --depth 1 --branch "$VERSION" https://github.com/dotsecenv/dotsecenv.git "$DEST"
+
+        # Try branch/tag clone first, fall back to SHA checkout
+        if git clone --depth 1 --branch "$VERSION" https://github.com/dotsecenv/dotsecenv.git "$DEST" 2>/dev/null; then
+          echo "Cloned branch/tag: $VERSION"
+        else
+          echo "Branch/tag not found, trying as commit SHA: $VERSION"
+          git clone --no-checkout --depth 1 https://github.com/dotsecenv/dotsecenv.git "$DEST"
+          git -C "$DEST" fetch --depth 1 origin "$VERSION"
+          git -C "$DEST" checkout FETCH_HEAD
+        fi
+
         echo "dir=$DEST" >> $GITHUB_OUTPUT
 
     - name: Set up Go
@@ -166,3 +180,12 @@ runs:
         "$INSTALL_DIR/dotsecenv" version
         echo "$INSTALL_DIR" >> $GITHUB_PATH
         echo "binary-path=$INSTALL_DIR/dotsecenv" >> $GITHUB_OUTPUT
+
+    # ============================================
+    # Initialize config (optional)
+    # ============================================
+    - name: Initialize config
+      if: inputs.init-config != 'skip'
+      shell: bash
+      run: |
+        dotsecenv init config ${{ inputs.init-config }}

@@ -31,3 +31,74 @@ jobs:
           version: ${{ github.event.client_payload.version || 'latest' }}
           build-from-source: true
       - run: dotsecenv version
+
+  test-init-config-defaults:
+    name: Test init-config with defaults
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dotsecenv/dotsecenv@v0
+        with:
+          version: ${{ github.event.client_payload.version || 'latest' }}
+          init-config: ''
+      - run: dotsecenv version
+
+  test-init-config-strict:
+    name: Test init-config --strict
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dotsecenv/dotsecenv@v0
+        with:
+          version: ${{ github.event.client_payload.version || 'latest' }}
+          init-config: '--strict'
+      - run: dotsecenv version
+
+  test-init-config-login:
+    name: Test init-config --login
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GPG key
+        id: gpg
+        run: |
+          cat > /tmp/gpg-key-params <<EOF
+          %no-protection
+          Key-Type: RSA
+          Key-Length: 2048
+          Subkey-Type: RSA
+          Subkey-Length: 2048
+          Name-Real: Test User 4
+          Name-Email: test4@dotsecenv.com
+          Expire-Date: 0
+          EOF
+          gpg --batch --gen-key /tmp/gpg-key-params
+          FINGERPRINT=$(gpg --list-keys --with-colons test4@dotsecenv.com | grep '^fpr' | head -1 | cut -d: -f10)
+          echo "fingerprint=$FINGERPRINT" >> $GITHUB_OUTPUT
+      - uses: dotsecenv/dotsecenv@v0
+        with:
+          version: ${{ github.event.client_payload.version || 'latest' }}
+          init-config: '--login ${{ steps.gpg.outputs.fingerprint }}'
+      - run: dotsecenv version
+
+  test-init-config-gpg-program:
+    name: Test init-config --gpg-program
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dotsecenv/dotsecenv@v0
+        with:
+          version: ${{ github.event.client_payload.version || 'latest' }}
+          init-config: '--gpg-program /usr/bin/gpg'
+      - run: dotsecenv version
+
+  test-init-config-no-gpg-program:
+    name: Test init-config --no-gpg-program
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dotsecenv/dotsecenv@v0
+        with:
+          version: ${{ github.event.client_payload.version || 'latest' }}
+          init-config: '--no-gpg-program'
+      - run: dotsecenv version

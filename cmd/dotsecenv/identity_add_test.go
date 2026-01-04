@@ -34,8 +34,8 @@ Key-Usage: sign
 Subkey-Type: RSA
 Subkey-Length: 2048
 Subkey-Usage: encrypt
-Name-Real: Test User
-Name-Email: test@example.com
+Name-Real: Test User 3
+Name-Email: test3@dotsecenv.com
 Expire-Date: 0
 %no-protection
 %commit
