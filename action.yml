@@ -9,7 +9,7 @@ branding:
 
 inputs:
   version:
-    description: 'Version to install (e.g., v1.2.3, or "latest" for most recent release)'
+    description: 'Version to install: a release tag (e.g., v1.2.3), branch ref (e.g., main), commit SHA, or "latest" for the most recent release'
     required: false
     default: 'latest'
   build-from-source:
