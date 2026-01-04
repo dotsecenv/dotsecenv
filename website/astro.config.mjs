@@ -106,6 +106,7 @@ export default defineConfig({
           label: 'Guides',
           items: [
             { label: 'Shell Plugins', slug: 'guides/shell-plugins' },
+            { label: 'GitHub Action', slug: 'guides/github-action' },
             { label: 'How-To', slug: 'how-to' },
           ],
         },

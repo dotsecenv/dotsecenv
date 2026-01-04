@@ -1,5 +1,7 @@
 # dotsecenv website
 
+[![Publish Website](https://github.com/dotsecenv/website/actions/workflows/deploy-website.yml/badge.svg)](https://github.com/dotsecenv/website/actions/workflows/deploy-website.yml)
+
 This is [dotsecenv](https://github.com/dotsecenv/dotsecenv)'s project website, built with [Astro Starlight](https://starlight.astro.build/).
 
 ## Development

@@ -1,0 +1,316 @@
+---
+title: GitHub Action
+description: Use dotsecenv in GitHub Actions CI/CD pipelines
+---
+
+import { Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components';
+
+## Goal
+
+Install and use `dotsecenv` in GitHub Actions workflows to securely access secrets in CI/CD pipelines.
+
+## Prerequisites
+
+- A GitHub repository with Actions enabled
+- Basic understanding of [GitHub Actions workflows](https://docs.github.com/en/actions)
+- Familiarity with dotsecenv vaults and `.secenv` files (see [Your First Secret](/tutorials/first-secret/))
+
+## Steps
+
+<Steps>
+
+1. **Create a workflow file**
+
+   Create `.github/workflows/build.yml` in your repository:
+
+   ```yaml
+   name: Build
+
+   on:
+     push:
+       branches: [main]
+     pull_request:
+       branches: [main]
+
+   jobs:
+     build:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v4
+   ```
+
+2. **Add the dotsecenv action**
+
+   Add the `dotsecenv/dotsecenv` action to install dotsecenv:
+
+   ```yaml
+         - uses: dotsecenv/dotsecenv@v0
+   ```
+
+   This downloads the latest release, verifies its integrity (GPG signature, checksums, and attestations), and adds it to your PATH.
+
+3. **Configure initialization (optional)**
+
+   If your workflow needs a dotsecenv configuration, use the `init-config` input:
+
+   ```yaml
+         - uses: dotsecenv/dotsecenv@v0
+           with:
+             init-config: ''  # Initialize with a default config
+   ```
+
+   <Aside type="tip">
+     Set `init-config` to an empty string `''` to run `dotsecenv init config` with defaults, or provide specific flags like `--strict` or `--no-gpg-program`.
+   </Aside>
+
+4. **Use dotsecenv in subsequent steps**
+
+   Once installed, dotsecenv is available in all subsequent steps:
+
+   ```yaml
+         - name: Use secrets
+           run: |
+             dotsecenv version
+             # Your commands that use dotsecenv
+   ```
+
+5. **Complete workflow example**
+
+   Here's a complete workflow:
+
+   ```yaml
+   name: Build
+
+   on:
+     push:
+       branches: [main]
+     pull_request:
+       branches: [main]
+
+   jobs:
+     build:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v4
+
+         - uses: dotsecenv/dotsecenv@v0
+           with:
+             init-config: ''
+
+         - name: Build with secrets
+           run: |
+             dotsecenv version
+             # dotsecenv secret get YOUR_SECRET | ...
+   ```
+
+</Steps>
+
+## Expected Result
+
+After the workflow runs:
+
+- dotsecenv is installed and available in PATH
+- The `dotsecenv version` command succeeds
+- Subsequent steps can use dotsecenv commands
+
+You should see output like this in your workflow logs:
+
+```text
+dotsecenv version vX.X.X (commit: abc1234)
+```
+
+## Variations
+
+### Version Pinning
+
+Pin to a specific version for reproducible builds:
+
+```yaml
+- uses: dotsecenv/dotsecenv@v0
+  with:
+    version: v0.1.0
+```
+
+The `version` input accepts:
+
+- **Release tags**: `v0.1.0`, `v1.2.3`
+- **Branch refs**: `main`, `develop`
+- **Commit SHAs**: `abc1234def5678...`
+- **Latest**: `latest` (default) — resolves to the most recent [release](https://github.com/dotsecenv/dotsecenv/releases)
+
+<Aside type="note">
+  Use release tags for production workflows. Branch refs and commit SHAs are useful for testing unreleased changes.
+</Aside>
+
+### Build from Source
+
+Build dotsecenv from source instead of using pre-built binaries:
+
+```yaml
+- uses: dotsecenv/dotsecenv@v0
+  with:
+    build-from-source: true
+```
+
+This is useful for:
+
+- Custom builds or modifications
+- Unsupported architectures
+- Auditing the build process
+
+<Aside type="caution">
+  Building from source requires Go and takes longer than downloading pre-built binaries.
+</Aside>
+
+### Initialization Options
+
+The `init-config` input controls whether `dotsecenv init config` runs after installation:
+
+<Tabs>
+  <TabItem label="Skip (default)">
+    Don't initialize a configuration file:
+
+    ```yaml
+    - uses: dotsecenv/dotsecenv@v0
+      # init-config defaults to 'skip' (which means, it won't be run)
+    ```
+  </TabItem>
+
+  <TabItem label="Defaults">
+    Run with default settings:
+
+    ```yaml
+    - uses: dotsecenv/dotsecenv@v0
+      with:
+        init-config: ''
+    ```
+  </TabItem>
+
+  <TabItem label="Strict Mode">
+    Enable strict mode for enhanced security:
+
+    ```yaml
+    - uses: dotsecenv/dotsecenv@v0
+      with:
+        init-config: '--strict'
+    ```
+  </TabItem>
+
+  <TabItem label="Custom GPG">
+    Specify a custom GPG program:
+
+    ```yaml
+    - uses: dotsecenv/dotsecenv@v0
+      with:
+        init-config: '--gpg-program /usr/bin/gpg'
+    ```
+
+    Or resolve the GPG program at runtime:
+
+    ```yaml
+    - uses: dotsecenv/dotsecenv@v0
+      with:
+        init-config: '--no-gpg-program'
+    ```
+  </TabItem>
+
+  <TabItem label="Login Identity">
+    Sets the GPG identity that will attempt to decrypt secrets:
+
+    ```yaml
+    - uses: dotsecenv/dotsecenv@v0
+      with:
+        init-config: '--login YOUR_GPG_FINGERPRINT'
+    ```
+  </TabItem>
+</Tabs>
+
+### Disabling Provenance Verification
+
+By default, the action verifies GPG signatures, checksums, and attestations. To disable this (not recommended):
+
+```yaml
+- uses: dotsecenv/dotsecenv@v0
+  with:
+    verify-provenance: false
+```
+
+<Aside type="danger">
+  Only disable provenance verification if you have a specific reason. This skips important security checks that protect against tampered binaries.
+</Aside>
+
+### Multi-Platform Workflows
+
+Run on both Ubuntu and macOS:
+
+```yaml
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dotsecenv/dotsecenv@v0
+      - run: dotsecenv version
+```
+
+The action automatically detects the runner's OS and architecture.
+
+### Using Action Outputs
+
+The action provides outputs you can use in subsequent steps:
+
+```yaml
+- uses: dotsecenv/dotsecenv@v0
+  id: dotsecenv
+
+- name: Show installed version
+  run: |
+    echo "Installed version: ${{ steps.dotsecenv.outputs.version }}"
+    echo "Binary path: ${{ steps.dotsecenv.outputs.binary-path }}"
+```
+
+| Output | Description |
+|--------|-------------|
+| `version` | The installed dotsecenv version (e.g., `v0.1.0`) |
+| `binary-path` | Full path to the installed binary |
+
+## Troubleshooting
+
+### "Unsupported OS" or "Unsupported arch" error
+
+The action supports:
+
+- **OS**: Linux, macOS
+- **Architecture**: x86_64 (X64), arm64 (ARM64)
+
+Windows is currently being implemented, but is not supported yet
+(see [#8](https://github.com/dotsecenv/dotsecenv/issues/8)).
+
+### GPG Signature Verification Failed
+
+If GPG verification fails:
+
+1. Ensure your workflow has network access to `get.dotsecenv.com`
+2. Check if there's a key rotation announcement in the [dotsecenv releases](https://github.com/dotsecenv/dotsecenv/releases)
+3. As a last resort, use `verify-provenance: false` (not recommended)
+
+### Attestation Verification Failed
+
+Attestation verification requires the `gh` CLI and `GITHUB_TOKEN`. Ensure your workflow has:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write  # Required for attestation verification
+```
+
+---
+
+## Next Steps
+
+- [Your First Secret](/tutorials/first-secret/) — Learn vault and secret basics
+- [Shell Plugins](/guides/shell-plugins/) — Auto-load secrets in your shell
+- [How-To Guides](/how-to/) — Common tasks and recipes
