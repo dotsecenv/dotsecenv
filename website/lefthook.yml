@@ -1,0 +1,8 @@
+# lefthook.yml - Git hooks configuration
+# https://github.com/evilmartians/lefthook
+
+pre-push:
+  follow: true
+  commands:
+    lint-build:
+      run: make lint build

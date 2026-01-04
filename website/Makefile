@@ -19,6 +19,7 @@ help:
 	@echo ""
 	@echo "Setup & Maintenance:"
 	@echo "  install    Install dependencies"
+	@echo "  hooks      Install git hooks using lefthook"
 	@echo "  clean      Remove build artifacts (dist/)"
 	@echo "  distclean  Remove dist/ and node_modules/"
 
@@ -61,3 +62,24 @@ clean:
 .PHONY: distclean
 distclean: clean
 	rm -rf node_modules/
+
+# Git Hooks
+.PHONY: hooks
+hooks: install-lefthook
+	@echo "Installing git hooks..."
+	@$(LEFTHOOK) install
+
+# =============================================================================
+# Development Tool Installation
+# =============================================================================
+
+GOBIN := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)
+
+LEFTHOOK := $(GOBIN)/lefthook
+
+.PHONY: install-lefthook
+install-lefthook:
+	@if ! [ -x "$(LEFTHOOK)" ]; then \
+		echo "Installing lefthook..."; \
+		go install github.com/evilmartians/lefthook/v2@v2.0.13; \
+	fi

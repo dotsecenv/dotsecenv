@@ -1,0 +1,380 @@
+---
+title: Shell Plugins
+description: Automatic secret loading with shell plugins for Bash, Zsh, and Fish
+---
+
+import { Tabs, TabItem, Aside, Steps } from '@astrojs/starlight/components';
+
+The dotsecenv shell plugins automatically load secrets from `.secenv` files when you `cd` into a directory. When you leave, secrets are automatically unloaded—keeping your environment clean and secure.
+
+## How It Works
+
+1. **On `cd` into a directory**: The plugin checks for `.env` and `.secenv` files
+2. **Security check**: Files must be owned by you (or root) and not world-writable
+3. **Trust prompt**: For `.secenv` files, you're prompted to allow loading (can be remembered)
+4. **Auto-load**: Plain variables from `.env` are loaded, then secrets are fetched from your vault
+5. **On `cd` out**: Variables are automatically unset
+
+```text
+~/project $ cd myapp/
+dotsecenv: found .secenv in /home/user/myapp
+Load secrets? [y]es / [n]o / [a]lways: y
+dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
+
+~/project/myapp $ cd ..
+dotsecenv: unloaded 2 secret(s): DATABASE_URL, API_KEY
+```
+
+## Installation
+
+<Tabs>
+  <TabItem label="Zsh">
+    **Oh-My-Zsh:**
+    ```bash
+    git clone https://github.com/dotsecenv/plugin.git \
+      ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/dotsecenv
+    ```
+
+    Then add `dotsecenv` to your plugins in `~/.zshrc`:
+    ```bash
+    plugins=(... dotsecenv)
+    ```
+
+    **Antigen:**
+    ```bash
+    antigen bundle dotsecenv/plugin
+    ```
+
+    **Manual:**
+    ```bash
+    source /path/to/dotsecenv.plugin.zsh
+    ```
+  </TabItem>
+
+  <TabItem label="Bash">
+    Add to your `~/.bashrc`:
+    ```bash
+    source /path/to/dotsecenv.plugin.bash
+    ```
+
+    Or use the installer:
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
+    ```
+  </TabItem>
+
+  <TabItem label="Fish">
+    **Fisher:**
+    ```bash
+    fisher install dotsecenv/plugin
+    ```
+
+    **Manual:**
+    ```bash
+    source /path/to/conf.d/dotsecenv.fish
+    ```
+  </TabItem>
+</Tabs>
+
+## Provided Commands & Aliases
+
+The plugins provide several convenience commands:
+
+| Command | Description |
+|---------|-------------|
+| `dse` | Shorthand for `dotsecenv` |
+| `secret NAME` | Shorthand for `dotsecenv secret get NAME` |
+| `copysecret NAME` | Copy a secret directly to clipboard |
+| `reloadsecenv` | Reload secrets in the current directory |
+| `pinsecenv` | Pin current secrets to persist across directory changes |
+
+### `dse` — Quick CLI Access
+
+Use `dse` as a shorthand for the `dotsecenv` command:
+
+```bash
+# Instead of:
+dotsecenv secret list
+
+# Use:
+dse secret list
+```
+
+### `secret` — Quick Secret Retrieval
+
+Retrieve a secret with minimal typing:
+
+```bash
+# Instead of:
+dotsecenv secret get DATABASE_PASSWORD
+
+# Use:
+secret DATABASE_PASSWORD
+```
+
+### `copysecret` — Copy to Clipboard
+
+Copy a secret directly to your clipboard without displaying it:
+
+```bash
+copysecret API_KEY
+# Output: dotsecenv: secret copied to clipboard
+```
+
+<Aside type="tip">
+This is safer than piping to `pbcopy` manually since the secret is never displayed on screen or saved to shell history.
+</Aside>
+
+Clipboard support:
+
+- **macOS**: Uses `pbcopy` (built-in)
+- **Wayland**: Uses `wl-copy`
+- **X11**: Uses `xclip` or `xsel`
+
+### `reloadsecenv` — Reload Current Directory
+
+Re-trigger secret loading for the current directory without leaving and re-entering:
+
+```bash
+reloadsecenv
+```
+
+This is useful when:
+
+- You've added new secrets to your vault
+- You've modified the `.secenv` file
+- A secret fetch failed and you want to retry
+
+### `pinsecenv` — Pin Secrets
+
+Pin the current directory's environment variables so they persist even after you `cd` away.
+
+```bash
+pinsecenv
+# Output:
+# dotsecenv: pinned secrets: DATABASE_URL, API_KEY
+# dotsecenv: pinned env vars: NODE_ENV, PORT
+# dotsecenv: these variables will persist when you leave this directory
+# dotsecenv: you must unset them manually, e.g.: `unset VARIABLE_NAME`
+```
+
+## The Pin Use Case
+
+By default, dotsecenv automatically unloads secrets when you leave a directory. This is a security feature—secrets don't linger in your environment longer than needed.
+
+However, there are scenarios where you want secrets to persist:
+
+### Running Background Processes
+
+```bash
+cd ~/myapp
+# Secrets loaded: DATABASE_URL, API_KEY
+
+# Start a background server that needs these env vars
+npm run dev &
+
+# Pin secrets before leaving
+pinsecenv
+
+cd ~/other-project
+# Normally secrets would be unloaded, but they're pinned!
+# Your background server continues working
+```
+
+### Multi-Directory Workflows
+
+```bash
+cd ~/project-a
+# Secrets loaded for project-a
+
+pinsecenv  # Pin them
+
+cd ~/project-b
+# Project-a secrets still available
+# Project-b secrets also loaded (if .secenv exists)
+```
+
+### Long-Running Terminal Sessions
+
+If you're working across multiple projects but need consistent access to certain secrets:
+
+```bash
+cd ~/main-project
+pinsecenv
+
+# Now work anywhere while keeping main-project secrets available
+cd ~/scripts
+./deploy.sh  # Can use pinned DATABASE_URL
+```
+
+<Aside type="caution" title="Remember to Clean Up">
+Pinned variables must be manually unset:
+
+<Tabs>
+  <TabItem label="Bash/Zsh">
+    ```bash
+    unset DATABASE_URL API_KEY
+    ```
+  </TabItem>
+  <TabItem label="Fish">
+    ```bash
+    set -e DATABASE_URL API_KEY
+    ```
+  </TabItem>
+</Tabs>
+</Aside>
+
+## Trust System
+
+The plugin uses a trust system to prevent malicious `.secenv` files from auto-loading secrets:
+
+### Trust Prompt Options
+
+When you `cd` into a directory with an untrusted `.secenv`:
+
+```text
+dotsecenv: found .secenv in /path/to/project
+Load secrets? [y]es / [n]o / [a]lways:
+```
+
+| Option | Behavior |
+|--------|----------|
+| **y** / **yes** | Load secrets for this session only |
+| **n** / **no** | Skip loading for this session |
+| **a** / **always** | Permanently trust this directory |
+
+### Persistent Trust
+
+Directories trusted with "always" are saved to:
+
+```text
+~/.config/dotsecenv/trusted_dirs
+```
+
+To remove trust:
+
+```bash
+# Edit the file and remove the directory path
+vim ~/.config/dotsecenv/trusted_dirs
+```
+
+## Security Checks
+
+Before loading any file, the plugin performs security checks:
+
+1. **Ownership**: File must be owned by you or root
+2. **Permissions**: File must not be world-writable
+
+If a file fails these checks:
+
+```text
+dotsecenv: refusing to load /path/.secenv - not owned by current user or root
+dotsecenv: refusing to load /path/.env - world-writable
+```
+
+<Aside type="tip" title="Fixing Permissions">
+
+```bash
+# Fix ownership
+chown $(whoami) .secenv
+
+# Fix permissions (remove world-write)
+chmod o-w .secenv
+```
+
+</Aside>
+
+## .secenv File Format
+
+The `.secenv` file defines which secrets to load as environment variables:
+
+```bash
+# Load secret with matching name
+DATABASE_PASSWORD={dotsecenv}
+
+# Load secret with different name
+DB_PASS={dotsecenv/DATABASE_PASSWORD}
+
+# Plain values work too (loaded from .secenv, not encrypted)
+NODE_ENV=production
+
+# Load from a namespace
+API_KEY={dotsecenv/production::API_KEY}
+```
+
+See [Your First Secret](/tutorials/first-secret/) for more details on `.secenv` syntax.
+
+## Loading Order
+
+When both `.env` and `.secenv` exist in a directory:
+
+<Steps>
+1. **Phase 1**: Load plain variables from `.env`
+2. **Phase 2**: Load plain variables from `.secenv`
+3. **Phase 3**: Load secrets from `.env` (if any `{dotsecenv}` patterns)
+4. **Phase 4**: Load secrets from `.secenv`
+</Steps>
+
+If a variable is defined in both files, `.secenv` wins with a warning:
+
+```text
+dotsecenv: warning: DATABASE_URL from .secenv overrides value from .env
+```
+
+## Troubleshooting
+
+### Secrets not loading on `cd`
+
+1. Check the plugin is loaded:
+
+   ```bash
+   type reloadsecenv  # Should show it's a function
+   ```
+
+2. Verify `.secenv` exists and has correct permissions:
+
+   ```bash
+   ls -la .secenv
+   ```
+
+3. Try manual reload:
+
+   ```bash
+   reloadsecenv
+   ```
+
+### "No TTY for trust prompt"
+
+The trust prompt requires an interactive terminal. This happens when:
+
+- Running in a script
+- Running in a non-interactive shell
+
+Solution: Pre-trust the directory:
+
+```bash
+echo "/path/to/project" >> ~/.config/dotsecenv/trusted_dirs
+```
+
+### Secret fetch errors
+
+If a secret fails to fetch, you'll see:
+
+```text
+dotsecenv: error fetching secret 'SECRET_NAME' for VAR:
+<error details>
+```
+
+Common causes:
+
+- Secret doesn't exist in vault
+- GPG agent not running
+- Vault locked
+
+---
+
+## Next Steps
+
+- [Your First Secret](/tutorials/first-secret/) — Learn `.secenv` file syntax
+- [CLI Reference](/reference/) — Full command documentation
+- [Security Model](/concepts/threat-model/) — Understand the trust model
