@@ -47,7 +47,7 @@ runs:
       run: |
         if [[ "${{ inputs.version }}" == "latest" ]]; then
           VERSION=$(gh release view --repo dotsecenv/dotsecenv --json tagName -q .tagName)
-          echo "Resolved latest version: $VERSION"
+          echo "Resolved latest released version: $VERSION"
         else
           VERSION="${{ inputs.version }}"
         fi
@@ -140,7 +140,17 @@ runs:
       run: |
         VERSION="${{ steps.resolve-version.outputs.version }}"
         DEST="${{ runner.temp }}/dotsecenv-download"
-        git clone --depth 1 --branch "$VERSION" https://github.com/dotsecenv/dotsecenv.git "$DEST"
+
+        # Try branch/tag clone first, fall back to SHA checkout
+        if git clone --depth 1 --branch "$VERSION" https://github.com/dotsecenv/dotsecenv.git "$DEST" 2>/dev/null; then
+          echo "Cloned branch/tag: $VERSION"
+        else
+          echo "Branch/tag not found, trying as commit SHA: $VERSION"
+          git clone --no-checkout --depth 1 https://github.com/dotsecenv/dotsecenv.git "$DEST"
+          git -C "$DEST" fetch --depth 1 origin "$VERSION"
+          git -C "$DEST" checkout FETCH_HEAD
+        fi
+
         echo "dir=$DEST" >> $GITHUB_OUTPUT
 
     - name: Set up Go
