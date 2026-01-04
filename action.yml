@@ -20,6 +20,10 @@ inputs:
     description: 'Verify attestations, checksums, and GPG signatures (ignored if build-from-source is true)'
     required: false
     default: 'true'
+  init-config:
+    description: 'Arguments for "dotsecenv init config". Set to empty string to run with defaults, or provide flags (e.g., "--strict --login FINGERPRINT"). Leave as "skip" to not run.'
+    required: false
+    default: 'skip'
 
 outputs:
   version:
@@ -166,3 +170,12 @@ runs:
         "$INSTALL_DIR/dotsecenv" version
         echo "$INSTALL_DIR" >> $GITHUB_PATH
         echo "binary-path=$INSTALL_DIR/dotsecenv" >> $GITHUB_OUTPUT
+
+    # ============================================
+    # Initialize config (optional)
+    # ============================================
+    - name: Initialize config
+      if: inputs.init-config != 'skip'
+      shell: bash
+      run: |
+        dotsecenv init config ${{ inputs.init-config }}
