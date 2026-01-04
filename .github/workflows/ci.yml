@@ -77,6 +77,20 @@ jobs:
           build-from-source: true
       - run: dotsecenv version
 
+  action-init-config:
+    name: Test Action with init config (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./
+        with:
+          build-from-source: true
+          init-config: '--no-gpg-program --strict'
+      - run: dotsecenv version
+
   release-test:
     name: Release Test
     runs-on: ubuntu-latest
