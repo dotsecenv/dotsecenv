@@ -1,5 +1,13 @@
 # dotsecenv: safe environment secrets
 
+[![CI](https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml)
+[![Release](https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml)
+[![GitHub Action E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml)
+[![Publish Packages](https://github.com/dotsecenv/packages/actions/workflows/publish.yml/badge.svg)](https://github.com/dotsecenv/packages/actions/workflows/publish.yml)
+[![Homebrew install](https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml/badge.svg)](https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml)
+[![Shell plugins CI](https://github.com/dotsecenv/plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/dotsecenv/plugin/actions/workflows/ci.yml)
+[![Publish Website](https://github.com/dotsecenv/website/actions/workflows/deploy-website.yml/badge.svg)](https://github.com/dotsecenv/website/actions/workflows/deploy-website.yml)
+
 A complete Go CLI application for securely managing environment secrets with GPG-based encryption, multi-user support, and FIPS 186-5 compliant algorithm defaults.
 
 ## Quick Start

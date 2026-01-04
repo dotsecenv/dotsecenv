@@ -63,7 +63,6 @@ jobs:
           repositories: |
             homebrew-tap
             packages
-            website
 
       - name: Install Syft
         uses: anchore/sbom-action@v0
@@ -100,6 +99,7 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: |
             packages
+            website
 
       - name: Trigger packages update
         uses: peter-evans/repository-dispatch@v4
