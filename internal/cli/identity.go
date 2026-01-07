@@ -128,8 +128,6 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 			continue
 		}
 
-		// This vault is targeted - try to add identity
-
 		// Ensure identity is created (lazy)
 		if newIdentity == nil && createErr == nil {
 			newIdentity, createErr = c.createSignedIdentity(publicKeyInfo, fingerprint, signingFP)
