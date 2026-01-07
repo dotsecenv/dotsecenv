@@ -62,7 +62,9 @@ func PrintError(w io.Writer, err error) ExitCode {
 
 	// Check for legacy Error type
 	if clierr, ok := err.(*Error); ok {
-		_, _ = fmt.Fprintf(w, "%s\n", clierr.Message)
+		if clierr.Message != "" {
+			_, _ = fmt.Fprintf(w, "%s\n", clierr.Message)
+		}
 		return clierr.ExitCode
 	}
 

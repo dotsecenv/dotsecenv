@@ -198,16 +198,17 @@ vault:
 		t.Errorf("expected identity NOT in vault B")
 	}
 
-	// Add to default (should be top vault = A)
-	// Since A already has it, it should fail/warn about already existing
-	argsDefault := []string{"-c", configPath, "vault", "identity", "add", fingerprint}
-	_, stderrDefault, errDefault := runCmdWithEnv(env, argsDefault...)
+	// Add to vault A again using -v 1 (since A already has it, should succeed with "already present" message)
+	argsDefault := []string{"-c", configPath, "vault", "identity", "add", "-v", "1", fingerprint}
+	stdoutDefault, _, errDefault := runCmdWithEnv(env, argsDefault...)
 
-	if errDefault == nil {
-		t.Errorf("expected error when adding existing identity to default vault")
+	// Should NOT error in non-strict mode when identity already exists
+	if errDefault != nil {
+		t.Errorf("expected success when identity already exists (non-strict mode), got error: %v", errDefault)
 	}
-	if !strings.Contains(stderrDefault, "skipped, already present") {
-		t.Errorf("expected 'skipped, already present' error, got: %s", stderrDefault)
+	// Status is printed to stdout
+	if !strings.Contains(stdoutDefault, "skipped, already present") {
+		t.Errorf("expected 'skipped, already present' in output, got: %s", stdoutDefault)
 	}
 }
 
@@ -279,14 +280,17 @@ vault: []
 
 	_, _, _ = runCmdWithEnv(env, "init", "vault", "-v", vaultPath)
 
-	// Add identity with -v (not in config) -> Should Warn
+	// Add identity with -v (not in config) -> Should succeed because -v explicitly loads the vault
 	args := []string{"-c", configPath, "vault", "identity", "add", "-v", vaultPath, fingerprint}
-	_, stderr, err := runCmdWithEnv(env, args...)
+	stdout, stderr, err := runCmdWithEnv(env, args...)
 	if err != nil {
-		t.Fatalf("vault identity add failed: %v\nSTDERR: %s", err, stderr)
+		t.Fatalf("vault identity add failed: %v\nSTDERR: %s\nSTDOUT: %s", err, stderr, stdout)
 	}
 
-	if !strings.Contains(stderr, "warning: vault path") || !strings.Contains(stderr, "not in configuration") {
-		t.Errorf("expected warning about unconfigured vault, got: %s", stderr)
+	// Verify the identity was added by listing it
+	listArgs := []string{"-c", configPath, "vault", "identity", "list", "-v", vaultPath}
+	listOut, _, _ := runCmdWithEnv(env, listArgs...)
+	if !strings.Contains(listOut, fingerprint) {
+		t.Errorf("expected identity in vault, got: %s", listOut)
 	}
 }
