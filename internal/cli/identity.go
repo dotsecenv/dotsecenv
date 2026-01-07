@@ -28,27 +28,7 @@ type IdentityInfoJSON struct {
 }
 
 // IdentityAdd adds an identity to the vault
-func (c *CLI) IdentityAdd(fingerprint string, all bool) *Error {
-	// Validate -v paths against config (warn if not present)
-	if len(c.vaultPaths) > 0 {
-		fileVaultCfg, err := vault.ParseVaultConfig(c.config.Vault)
-		for _, path := range c.vaultPaths {
-			expanded := vault.ExpandPath(path)
-			found := false
-			if err == nil {
-				for _, entry := range fileVaultCfg.Entries {
-					if vault.ExpandPath(entry.Path) == expanded {
-						found = true
-						break
-					}
-				}
-			}
-			if !found {
-				c.Warnf("vault path '%s' is not in configuration", expanded)
-			}
-		}
-	}
-
+func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIndex int) *Error {
 	// Determine target indices
 	var targetIndices []int
 
@@ -59,13 +39,21 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool) *Error {
 	}
 
 	if all {
-		// Add to all vaults
-		for i := range loadedConfig.Entries {
-			targetIndices = append(targetIndices, i)
+		// Add to all available vaults (skip non-existent ones)
+		availableVaults := c.vaultResolver.GetAvailableVaultPathsWithIndices()
+		if len(availableVaults) == 0 {
+			return NewError("no vaults available (all configured vaults are missing or inaccessible)", ExitVaultError)
+		}
+		for _, v := range availableVaults {
+			targetIndices = append(targetIndices, v.Index)
 		}
 	} else {
-		// Add to first vault only
-		targetIndices = append(targetIndices, 0)
+		// Use shared vault selection logic (handles -v flag and interactive selection)
+		targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex)
+		if resolveErr != nil {
+			return resolveErr
+		}
+		targetIndices = append(targetIndices, targetIndex)
 	}
 
 	signingFP := c.getFingerprintFromEnv()
@@ -89,92 +77,104 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool) *Error {
 	var createErr *Error
 
 	addedCount := 0
-	skippedCount := 0
+	skippedAlreadyPresent := 0
 	failureCount := 0
-	reportMode := all || len(targetIndices) > 1
+	showAllVaults := all // Only show all vaults when --all flag is used
 
-	// Track added vault info for non-reportMode success message
-	var addedVaultPath string
-	var addedVaultPos int
-
+	// Build a set of target indices for quick lookup
+	targetSet := make(map[int]bool)
 	for _, idx := range targetIndices {
-		vaultPath := loadedConfig.Entries[idx].Path
-		displayPos := idx + 1
+		targetSet[idx] = true
+	}
 
-		// Ensure identity is created
+	// Get full config for correct display positions
+	fullVaultCfg, _ := vault.ParseVaultConfig(c.config.Vault)
+
+	// Iterate through configured vaults
+	for idx, entry := range loadedConfig.Entries {
+		vaultPath := entry.Path
+		isTarget := targetSet[idx]
+
+		// Find the correct display position from full config
+		displayPos := idx + 1
+		expandedPath := vault.ExpandPath(entry.Path)
+		for i, fullEntry := range fullVaultCfg.Entries {
+			if vault.ExpandPath(fullEntry.Path) == expandedPath {
+				displayPos = i + 1
+				break
+			}
+		}
+
+		manager := c.vaultResolver.GetVaultManager(idx)
+
+		// Check if vault is accessible
+		if manager == nil {
+			if showAllVaults || isTarget {
+				loadErr := c.vaultResolver.GetLoadError(idx)
+				errMsg := "unknown error"
+				if loadErr != nil {
+					errMsg = loadErr.Error()
+				}
+				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, %s\n", displayPos, vaultPath, errMsg)
+			}
+			continue
+		}
+
+		// Vault exists but not targeted - only show in --all mode
+		if !isTarget {
+			if showAllVaults {
+				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, not selected\n", displayPos, vaultPath)
+			}
+			continue
+		}
+
+		// This vault is targeted - try to add identity
+
+		// Ensure identity is created (lazy)
 		if newIdentity == nil && createErr == nil {
 			newIdentity, createErr = c.createSignedIdentity(publicKeyInfo, fingerprint, signingFP)
 		}
 
 		if createErr != nil {
-			if reportMode {
-				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): failed: %v\n", displayPos, vaultPath, createErr)
-			} else {
-				return NewError(fmt.Sprintf("Vault %d (%s): failed: %v", displayPos, vaultPath, createErr), createErr.ExitCode)
-			}
+			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): failed, %v\n", displayPos, vaultPath, createErr)
 			failureCount++
 			continue
 		}
 
-		manager := c.vaultResolver.GetVaultManager(idx)
-		if manager == nil {
-			loadErr := c.vaultResolver.GetLoadError(idx)
-			errMsg := "unknown error"
-			if loadErr != nil {
-				errMsg = loadErr.Error()
-			}
-
-			if reportMode {
-				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, %s\n", displayPos, vaultPath, errMsg)
-				skippedCount++
-				continue
-			} else {
-				return NewError(fmt.Sprintf("failed to access vault: %s", errMsg), ExitVaultError)
-			}
-		}
-
 		if c.vaultResolver.IdentityExistsInVault(fingerprint, idx) {
-			if reportMode {
-				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, already present\n", displayPos, vaultPath)
-			} else {
-				return NewError(fmt.Sprintf("Vault %d (%s): skipped, already present", displayPos, vaultPath), ExitGeneralError)
-			}
-			skippedCount++
+			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, already present\n", displayPos, vaultPath)
+			skippedAlreadyPresent++
 			continue
 		}
 
 		if err := c.vaultResolver.AddIdentity(*newIdentity, idx); err != nil {
-			if reportMode {
-				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped: %v\n", displayPos, vaultPath, err)
-				failureCount++
-				continue
-			} else {
-				return NewError(fmt.Sprintf("failed to add identity to vault %d: %v", displayPos, err), ExitVaultError)
-			}
+			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): failed, %v\n", displayPos, vaultPath, err)
+			failureCount++
+			continue
 		}
 
-		if reportMode {
-			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): added\n", displayPos, vaultPath)
-		} else {
-			addedVaultPath = vaultPath
-			addedVaultPos = displayPos
-		}
+		_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): added\n", displayPos, vaultPath)
 		addedCount++
 	}
 
-	if reportMode {
-		if addedCount == 0 && failureCount > 0 && skippedCount == 0 {
-			return NewError("failed to add identity to any vault", ExitVaultError)
+	// In strict mode, error only if identity was NOT added to any vault
+	if c.Strict && addedCount == 0 {
+		if skippedAlreadyPresent > 0 {
+			return NewError("strict mode error: identity already exists in all viable vaults", ExitGeneralError)
 		}
+		if failureCount > 0 {
+			return NewError("strict mode error: failed to add identity to any vault", ExitVaultError)
+		}
+	}
+
+	// In non-strict mode, error only if all targets had actual failures (not "already present")
+	if !c.Strict && addedCount == 0 && failureCount > 0 && skippedAlreadyPresent == 0 {
+		return NewError("failed to add identity to any vault", ExitVaultError)
 	}
 
 	if addedCount > 0 {
 		if saveErr := c.vaultResolver.SaveAll(); saveErr != nil {
 			return NewError(fmt.Sprintf("failed to save vault: %v", saveErr), ExitVaultError)
-		}
-
-		if !reportMode {
-			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): added\n", addedVaultPos, addedVaultPath)
 		}
 	}
 

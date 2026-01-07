@@ -52,7 +52,8 @@ var vaultIdentityAddCmd = &cobra.Command{
 	Long: `Add an identity to one or more vaults.
 
 Options:
-  --all  Add identity to all configured vaults`,
+  --all  Add identity to all configured vaults
+  -v     Target vault (path or 1-based index)`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fingerprint := args[0]
@@ -63,7 +64,12 @@ Options:
 		}
 		defer func() { _ = cli.Close() }()
 
-		exitErr := cli.IdentityAdd(fingerprint, vaultIdentityAddAll)
+		vaultPath, fromIndex, parseErr := parseVaultSpec(globalOpts.ConfigPath, globalOpts.VaultPaths)
+		if parseErr != nil {
+			os.Exit(int(clilib.PrintError(os.Stderr, clilib.NewError(parseErr.Error(), clilib.ExitGeneralError))))
+		}
+
+		exitErr := cli.IdentityAdd(fingerprint, vaultIdentityAddAll, vaultPath, fromIndex)
 		exitWithError(exitErr)
 	},
 }
