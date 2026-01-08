@@ -183,9 +183,11 @@ func MarshalHeader(h *Header) ([]byte, error) {
 // New vaults always use this format.
 const HeaderMarker = "# === VAULT HEADER ==="
 
-// headerMarkerPrefix is the common prefix for all valid header markers.
-// Used for backward compatibility with old versioned markers.
-const headerMarkerPrefix = "# === VAULT HEADER"
+// legacyMarkerPrefix is the prefix for old versioned header markers.
+const legacyMarkerPrefix = "# === VAULT HEADER v"
+
+// legacyMarkerSuffix is the suffix for old versioned header markers.
+const legacyMarkerSuffix = " ==="
 
 // ValidateHeaderMarker checks if a header marker line is valid.
 // Accepts both the new versionless format and old versioned formats for backward compatibility.
@@ -196,10 +198,24 @@ func ValidateHeaderMarker(markerLine string) error {
 		return nil
 	}
 	// Accept old versioned format (e.g., "# === VAULT HEADER v1 ===")
-	if strings.HasPrefix(markerLine, headerMarkerPrefix) && strings.HasSuffix(markerLine, " ===") {
-		return nil
+	if strings.HasPrefix(markerLine, legacyMarkerPrefix) && strings.HasSuffix(markerLine, legacyMarkerSuffix) {
+		// Extract version part and verify it's numeric
+		middle := markerLine[len(legacyMarkerPrefix) : len(markerLine)-len(legacyMarkerSuffix)]
+		if len(middle) > 0 && isNumeric(middle) {
+			return nil
+		}
 	}
 	return fmt.Errorf("invalid vault header marker: %q", markerLine)
+}
+
+// isNumeric checks if a string contains only digits.
+func isNumeric(s string) bool {
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // HeaderMarkerForVersion returns the header marker (version-independent).

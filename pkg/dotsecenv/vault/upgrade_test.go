@@ -31,6 +31,21 @@ func TestValidateHeaderMarker(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "old v123 marker (backward compatible)",
+			marker:  "# === VAULT HEADER v123 ===",
+			wantErr: false,
+		},
+		{
+			name:    "invalid - non-numeric version",
+			marker:  "# === VAULT HEADER vABC ===",
+			wantErr: true,
+		},
+		{
+			name:    "invalid - missing version number",
+			marker:  "# === VAULT HEADER v ===",
+			wantErr: true,
+		},
+		{
 			name:    "invalid marker",
 			marker:  "not a valid marker",
 			wantErr: true,
