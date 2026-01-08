@@ -235,9 +235,9 @@ strict: false
 	// Init vault (use non-strict config for setup)
 	_, _, _ = runCmdWithEnv(envA, "init", "vault", "-v", vaultPath)
 
-	// Add identities
-	_, _, _ = runCmdWithEnv(envA, "-c", configPathNonStrict, "vault", "identity", "add", fpA)
-	_, _, _ = runCmdWithEnv(envA, "-c", configPathNonStrict, "vault", "identity", "add", fpB)
+	// Add identities (must specify -v 1 since interactive selection is required without it)
+	_, _, _ = runCmdWithEnv(envA, "-c", configPathNonStrict, "vault", "identity", "add", "-v", "1", fpA)
+	_, _, _ = runCmdWithEnv(envA, "-c", configPathNonStrict, "vault", "identity", "add", "-v", "1", fpB)
 
 	// 1. Put secret SEC1 (User A)
 	cmd := exec.Command(binaryPath, "-c", configPathNonStrict, "secret", "put", "SEC1")

@@ -48,12 +48,32 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 			targetIndices = append(targetIndices, v.Index)
 		}
 	} else {
-		// Use shared vault selection logic (handles -v flag and interactive selection)
-		targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex)
-		if resolveErr != nil {
-			return resolveErr
+		// Handle explicit vault selection via -v flag or path
+		if vaultPath != "" || fromIndex != 0 {
+			targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex)
+			if resolveErr != nil {
+				return resolveErr
+			}
+			targetIndices = append(targetIndices, targetIndex)
+		} else {
+			// No explicit vault specified - always prompt for selection (never assume)
+			availableVaults := c.vaultResolver.GetAvailableVaultPathsWithIndices()
+			if len(availableVaults) == 0 {
+				return NewError("no vaults available (all configured vaults are missing or inaccessible)", ExitVaultError)
+			}
+
+			// Always show interactive selection, even for a single vault
+			displayPaths := make([]string, len(availableVaults))
+			for i, v := range availableVaults {
+				displayPaths[i] = v.Path
+			}
+
+			selectedIndex, selectErr := HandleInteractiveSelection(displayPaths, "Select target vault for identity:", c.output.Stderr())
+			if selectErr != nil {
+				return selectErr
+			}
+			targetIndices = append(targetIndices, availableVaults[selectedIndex].Index)
 		}
-		targetIndices = append(targetIndices, targetIndex)
 	}
 
 	signingFP := c.getFingerprintFromEnv()
