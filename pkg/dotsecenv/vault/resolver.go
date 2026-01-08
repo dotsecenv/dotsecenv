@@ -43,7 +43,7 @@ func (vr *VaultResolver) OpenVaults(stderr io.Writer) error {
 		fileInfo, err := os.Stat(entry.Path)
 		if err != nil {
 			errmsg := fmt.Sprintf("vault '%s': no such file or directory", entry.Path)
-			vr.loadErrors[i] = fmt.Errorf("no such file or directory")
+			vr.loadErrors[i] = fmt.Errorf("no such file or directory: %w", os.ErrNotExist)
 			errors = append(errors, errmsg)
 
 			if stderr != nil {
