@@ -37,12 +37,12 @@ func DetectVaultVersion(path string) (int, error) {
 	}
 	markerLine := scanner.Text()
 
-	// Try to extract version from marker (preferred, heuristic)
-	if version, err := detectVersionFromMarker(markerLine); err == nil {
-		return version, nil
+	// Validate header marker
+	if err := ValidateHeaderMarker(markerLine); err != nil {
+		return 0, err
 	}
 
-	// Fallback: peek at JSON header (line 2)
+	// Line 2: JSON header (contains version)
 	if !scanner.Scan() {
 		return 0, fmt.Errorf("missing header JSON line")
 	}

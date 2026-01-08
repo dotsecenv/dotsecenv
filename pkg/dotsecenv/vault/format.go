@@ -3,8 +3,6 @@ package vault
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
@@ -180,38 +178,22 @@ func MarshalHeader(h *Header) ([]byte, error) {
 	return MarshalHeaderVersioned(h, LatestFormatVersion)
 }
 
-// ValidateHeaderMarker checks if a header marker line is valid and returns the version.
-// Returns the version number and nil error if valid, or 0 and an error if invalid.
-// Valid markers are: "# === VAULT HEADER v1 ===", "# === VAULT HEADER v2 ===", etc.
-func ValidateHeaderMarker(markerLine string) (int, error) {
-	return detectVersionFromMarker(markerLine)
+// HeaderMarker is the constant marker line that precedes the vault header JSON.
+const HeaderMarker = "# === VAULT HEADER ==="
+
+// ValidateHeaderMarker checks if a header marker line is valid.
+// Returns nil if the marker is valid, or an error if invalid.
+func ValidateHeaderMarker(markerLine string) error {
+	if markerLine != HeaderMarker {
+		return fmt.Errorf("invalid vault header marker: %q (expected %q)", markerLine, HeaderMarker)
+	}
+	return nil
 }
 
-// detectVersionFromMarker extracts version from the header marker line.
-// Input:  "# === VAULT HEADER v1 ===" -> 1
-// Input:  "# === VAULT HEADER v2 ===" -> 2
-func detectVersionFromMarker(markerLine string) (int, error) {
-	const prefix = "# === VAULT HEADER v"
-	const suffix = " ==="
-
-	if !strings.HasPrefix(markerLine, prefix) {
-		return 0, fmt.Errorf("invalid vault header marker: %q", markerLine)
-	}
-
-	rest := strings.TrimPrefix(markerLine, prefix)
-	versionStr := strings.TrimSuffix(rest, suffix)
-
-	version, err := strconv.Atoi(versionStr)
-	if err != nil {
-		return 0, fmt.Errorf("invalid version in header marker: %q", versionStr)
-	}
-
-	return version, nil
-}
-
-// HeaderMarkerForVersion returns the appropriate header marker for a version.
-func HeaderMarkerForVersion(version int) string {
-	return fmt.Sprintf("# === VAULT HEADER v%d ===", version)
+// HeaderMarkerForVersion returns the header marker (version-independent).
+// Deprecated: The version parameter is ignored. Use HeaderMarker constant directly.
+func HeaderMarkerForVersion(_ int) string {
+	return HeaderMarker
 }
 
 // detectVersionFromJSON extracts the version from header JSON without full parsing.

@@ -8,12 +8,8 @@ import (
 	"strings"
 )
 
-const (
-	// DataMarker separates the header from data entries
-	DataMarker = "# === VAULT DATA ==="
-	// HeaderMarker is kept for backward compatibility, use HeaderMarkerForVersion instead
-	HeaderMarker = HeaderMarkerV1
-)
+// DataMarker separates the header from data entries
+const DataMarker = "# === VAULT DATA ==="
 
 // Reader provides efficient access to vault data using the header index
 type Reader struct {
@@ -91,8 +87,13 @@ func (r *Reader) loadHeader() error {
 		return fmt.Errorf("vault file missing valid header")
 	}
 
-	// Detect version from marker line (heuristic)
-	version, err := detectVersionFromMarker(markerLine)
+	// Validate header marker
+	if err := ValidateHeaderMarker(markerLine); err != nil {
+		return fmt.Errorf("invalid vault file: %w", err)
+	}
+
+	// Detect version from JSON header
+	version, err := detectVersionFromJSON([]byte(headerLine))
 	if err != nil {
 		return fmt.Errorf("failed to detect vault version: %w", err)
 	}

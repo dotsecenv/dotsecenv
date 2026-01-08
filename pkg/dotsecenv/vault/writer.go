@@ -68,7 +68,7 @@ func (w *Writer) createNewVault() error {
 	w.header = NewHeader()
 	w.version = LatestFormatVersion
 	w.lines = []string{
-		HeaderMarkerForVersion(LatestFormatVersion),
+		HeaderMarker,
 		"", // placeholder for header JSON
 		DataMarker,
 	}
@@ -95,7 +95,7 @@ func (w *Writer) loadExisting() error {
 			w.header = NewHeader()
 			w.version = LatestFormatVersion
 			w.lines = []string{
-				HeaderMarkerForVersion(LatestFormatVersion),
+				HeaderMarker,
 				"", // will be populated if we ever need to read
 				DataMarker,
 			}
@@ -134,7 +134,7 @@ func (w *Writer) loadExisting() error {
 			w.header = NewHeader()
 			w.version = LatestFormatVersion
 			w.lines = []string{
-				HeaderMarkerForVersion(LatestFormatVersion),
+				HeaderMarker,
 				"",
 				DataMarker,
 			}
@@ -144,8 +144,13 @@ func (w *Writer) loadExisting() error {
 		return w.createNewVault()
 	}
 
-	// Detect version from marker line (heuristic)
-	version, err := detectVersionFromMarker(markerLine)
+	// Validate header marker
+	if err := ValidateHeaderMarker(markerLine); err != nil {
+		return fmt.Errorf("invalid vault file: %w", err)
+	}
+
+	// Detect version from JSON header
+	version, err := detectVersionFromJSON([]byte(headerLine))
 	if err != nil {
 		return fmt.Errorf("failed to detect vault version: %w", err)
 	}
@@ -431,7 +436,7 @@ func (w *Writer) RewriteFromVaultWithVersion(v Vault, version int) error {
 	w.header = NewHeader()
 	w.version = version
 	w.lines = []string{
-		HeaderMarkerForVersion(version),
+		HeaderMarker,
 		"", // placeholder for header JSON
 		DataMarker,
 	}

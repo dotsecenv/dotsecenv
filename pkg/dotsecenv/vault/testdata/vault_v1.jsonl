@@ -1,4 +1,4 @@
-# === VAULT HEADER v1 ===
+# === VAULT HEADER ===
 {"version":1,"identities":[["ABC123DEF456",4],["XYZ789GHI012",5]],"secrets":{"TEST_SECRET":{"secret":6,"values":[7]}}}
 # === VAULT DATA ===
 {"type":"identity","data":{"added_at":"2024-01-01T00:00:00Z","algorithm":"RSA","algorithm_bits":4096,"fingerprint":"ABC123DEF456","hash":"idhash1","public_key":"pk1","signed_by":"ABC123DEF456","signature":"sig1","uid":"test1@example.com"}}

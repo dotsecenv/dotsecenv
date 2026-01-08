@@ -406,18 +406,20 @@ func validateVaultFileStructure(header *vault.Header, lines []string) []Validati
 	}
 
 	// Check header marker (line 1, index 0)
-	version, err := vault.ValidateHeaderMarker(lines[0])
-	if err != nil {
+	if err := vault.ValidateHeaderMarker(lines[0]); err != nil {
 		errors = append(errors, ValidationError{
 			Level:   "STRUCTURE",
 			Message: fmt.Sprintf("invalid header marker: %v", err),
 			Path:    "line 1",
 		})
-	} else if version < vault.MinSupportedVersion || version > vault.LatestFormatVersion {
+	}
+
+	// Check version from header JSON (line 2, index 1)
+	if header != nil && (header.Version < vault.MinSupportedVersion || header.Version > vault.LatestFormatVersion) {
 		errors = append(errors, ValidationError{
 			Level:   "STRUCTURE",
-			Message: fmt.Sprintf("unsupported vault format version %d (supported: v%d-v%d)", version, vault.MinSupportedVersion, vault.LatestFormatVersion),
-			Path:    "line 1",
+			Message: fmt.Sprintf("unsupported vault format version %d (supported: v%d-v%d)", header.Version, vault.MinSupportedVersion, vault.LatestFormatVersion),
+			Path:    "line 2 (header JSON)",
 		})
 	}
 

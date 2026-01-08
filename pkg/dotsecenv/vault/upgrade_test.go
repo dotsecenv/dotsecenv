@@ -9,54 +9,39 @@ import (
 	"testing"
 )
 
-func TestDetectVersionFromMarker(t *testing.T) {
+func TestValidateHeaderMarker(t *testing.T) {
 	tests := []struct {
-		name        string
-		marker      string
-		wantVersion int
-		wantErr     bool
+		name    string
+		marker  string
+		wantErr bool
 	}{
 		{
-			name:        "v1 marker",
-			marker:      "# === VAULT HEADER v1 ===",
-			wantVersion: 1,
-			wantErr:     false,
+			name:    "valid marker",
+			marker:  "# === VAULT HEADER ===",
+			wantErr: false,
 		},
 		{
-			name:        "v2 marker",
-			marker:      "# === VAULT HEADER v2 ===",
-			wantVersion: 2,
-			wantErr:     false,
+			name:    "invalid marker",
+			marker:  "not a valid marker",
+			wantErr: true,
 		},
 		{
-			name:        "v10 marker",
-			marker:      "# === VAULT HEADER v10 ===",
-			wantVersion: 10,
-			wantErr:     false,
+			name:    "empty marker",
+			marker:  "",
+			wantErr: true,
 		},
 		{
-			name:        "invalid marker",
-			marker:      "not a valid marker",
-			wantVersion: 0,
-			wantErr:     true,
-		},
-		{
-			name:        "empty marker",
-			marker:      "",
-			wantVersion: 0,
-			wantErr:     true,
+			name:    "old v1 marker (now invalid)",
+			marker:  "# === VAULT HEADER v1 ===",
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := detectVersionFromMarker(tt.marker)
+			err := ValidateHeaderMarker(tt.marker)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("detectVersionFromMarker() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.wantVersion {
-				t.Errorf("detectVersionFromMarker() = %v, want %v", got, tt.wantVersion)
+				t.Errorf("ValidateHeaderMarker() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -359,13 +344,13 @@ func TestUpgradeV1ToV2(t *testing.T) {
 			len(vaultBefore.Secrets), len(vaultAfter.Secrets))
 	}
 
-	// Verify file on disk has v2 format
+	// Verify file on disk has new marker format
 	data, err := os.ReadFile(vaultPath)
 	if err != nil {
 		t.Fatalf("failed to read upgraded vault: %v", err)
 	}
-	if !strings.HasPrefix(string(data), "# === VAULT HEADER v2 ===") {
-		t.Errorf("upgraded vault should have v2 marker, got: %s", string(data[:50]))
+	if !strings.HasPrefix(string(data), HeaderMarker) {
+		t.Errorf("upgraded vault should have marker %q, got: %s", HeaderMarker, string(data[:50]))
 	}
 }
 
@@ -397,13 +382,13 @@ func TestStrictModeNoUpgrade(t *testing.T) {
 		t.Error("strict mode should not upgrade vault")
 	}
 
-	// Verify file unchanged
+	// Verify file unchanged (still has v1 content in JSON)
 	data, err := os.ReadFile(vaultPath)
 	if err != nil {
 		t.Fatalf("failed to read vault: %v", err)
 	}
-	if !strings.HasPrefix(string(data), "# === VAULT HEADER v1 ===") {
-		t.Errorf("vault should still have v1 marker in strict mode")
+	if !strings.Contains(string(data), `"version":1`) {
+		t.Errorf("vault should still have version 1 in header JSON in strict mode")
 	}
 }
 
@@ -457,9 +442,8 @@ func TestNewVaultUsesLatestVersion(t *testing.T) {
 		t.Fatalf("failed to read vault: %v", err)
 	}
 
-	expectedMarker := HeaderMarkerForVersion(LatestFormatVersion)
-	if !strings.HasPrefix(string(data), expectedMarker) {
-		t.Errorf("new vault should have marker %q, got: %s", expectedMarker, string(data[:50]))
+	if !strings.HasPrefix(string(data), HeaderMarker) {
+		t.Errorf("new vault should have marker %q, got: %s", HeaderMarker, string(data[:50]))
 	}
 }
 
@@ -550,13 +534,14 @@ func TestManagerStrictModeNoUpgrade(t *testing.T) {
 }
 
 func TestHeaderMarkerForVersion(t *testing.T) {
+	// HeaderMarkerForVersion now returns a constant marker regardless of version
 	tests := []struct {
 		version  int
 		expected string
 	}{
-		{1, "# === VAULT HEADER v1 ==="},
-		{2, "# === VAULT HEADER v2 ==="},
-		{10, "# === VAULT HEADER v10 ==="},
+		{1, HeaderMarker},
+		{2, HeaderMarker},
+		{10, HeaderMarker},
 	}
 
 	for _, tt := range tests {
