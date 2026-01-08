@@ -729,8 +729,21 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 	return nil
 }
 
-// readSecretFromStdin reads a secret from stdin
+// readSecretFromStdin reads a secret from stdin.
+// If stdin is a TTY, it uses term.ReadPassword to hide the input.
 func (c *CLI) readSecretFromStdin() (string, error) {
+	// Check if stdin is a TTY - if so, use secure password reading
+	if f, ok := c.stdin.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
+		password, err := term.ReadPassword(int(f.Fd()))
+		if err != nil {
+			return "", err
+		}
+		// Print newline since ReadPassword doesn't echo it
+		_, _ = fmt.Fprintln(c.output.Stderr())
+		return string(password), nil
+	}
+
+	// Non-TTY: read normally (e.g., piped input)
 	scanner := bufio.NewScanner(c.stdin)
 	if scanner.Scan() {
 		return scanner.Text(), nil
