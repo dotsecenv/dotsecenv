@@ -2,7 +2,9 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"time"
@@ -56,23 +58,115 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 			}
 			targetIndices = append(targetIndices, targetIndex)
 		} else {
-			// No explicit vault specified - always prompt for selection (never assume)
+			// No explicit vault specified - prompt for selection if multiple vaults
 			availableVaults := c.vaultResolver.GetAvailableVaultPathsWithIndices()
 			if len(availableVaults) == 0 {
 				return NewError("no vaults available (all configured vaults are missing or inaccessible)", ExitVaultError)
 			}
 
-			// Always show interactive selection, even for a single vault
-			displayPaths := make([]string, len(availableVaults))
-			for i, v := range availableVaults {
-				displayPaths[i] = v.Path
+			// Auto-select if only one vault is available
+			if len(availableVaults) == 1 {
+				targetIndices = append(targetIndices, availableVaults[0].Index)
+			} else {
+				// Show interactive selection for multiple vaults
+				displayPaths := make([]string, len(availableVaults))
+				for i, v := range availableVaults {
+					displayPaths[i] = v.Path
+				}
+
+				selectedIndex, selectErr := HandleInteractiveSelection(displayPaths, "Select target vault for identity:", c.output.Stderr())
+				if selectErr != nil {
+					return selectErr
+				}
+				targetIndices = append(targetIndices, availableVaults[selectedIndex].Index)
+			}
+		}
+	}
+
+	// Build a set of target indices for quick lookup
+	targetSet := make(map[int]bool)
+	for _, idx := range targetIndices {
+		targetSet[idx] = true
+	}
+
+	// Get full config for correct display positions
+	fullVaultCfg, _ := vault.ParseVaultConfig(c.config.Vault)
+
+	// In strict mode, pre-flight check: fail if any vault has a parsing error (not just missing)
+	if c.Strict {
+		// First pass: collect failed vault display positions and their errors
+		type vaultError struct {
+			displayPos int
+			path       string
+			errMsg     string
+		}
+		var failedVaults []vaultError
+		var failedDisplayPositions []string
+
+		for idx, entry := range loadedConfig.Entries {
+			manager := c.vaultResolver.GetVaultManager(idx)
+			if manager == nil {
+				loadErr := c.vaultResolver.GetLoadError(idx)
+				isNotExist := loadErr != nil && errors.Is(loadErr, os.ErrNotExist)
+				if !isNotExist {
+					displayPos := idx + 1
+					expandedPath := vault.ExpandPath(entry.Path)
+					for i, fullEntry := range fullVaultCfg.Entries {
+						if vault.ExpandPath(fullEntry.Path) == expandedPath {
+							displayPos = i + 1
+							break
+						}
+					}
+					errMsg := "unknown error"
+					if loadErr != nil {
+						errMsg = loadErr.Error()
+					}
+					failedVaults = append(failedVaults, vaultError{displayPos, entry.Path, errMsg})
+					failedDisplayPositions = append(failedDisplayPositions, fmt.Sprintf("%d", displayPos))
+				}
+			}
+		}
+
+		if len(failedVaults) > 0 {
+			// Build the list of failing vault numbers for the skip message
+			failedVaultsList := failedDisplayPositions[0]
+			for i := 1; i < len(failedDisplayPositions); i++ {
+				failedVaultsList += ", " + failedDisplayPositions[i]
+			}
+			vaultWord := "vault"
+			if len(failedDisplayPositions) > 1 {
+				vaultWord = "vaults"
 			}
 
-			selectedIndex, selectErr := HandleInteractiveSelection(displayPaths, "Select target vault for identity:", c.output.Stderr())
-			if selectErr != nil {
-				return selectErr
+			// Print header and iterate through all vaults in order
+			_, _ = fmt.Fprintf(c.output.Stdout(), "Strict mode: vault errors detected, no changes made\n")
+			for idx, entry := range loadedConfig.Entries {
+				displayPos := idx + 1
+				expandedPath := vault.ExpandPath(entry.Path)
+				for i, fullEntry := range fullVaultCfg.Entries {
+					if vault.ExpandPath(fullEntry.Path) == expandedPath {
+						displayPos = i + 1
+						break
+					}
+				}
+
+				manager := c.vaultResolver.GetVaultManager(idx)
+				if manager == nil {
+					loadErr := c.vaultResolver.GetLoadError(idx)
+					isNotExist := loadErr != nil && errors.Is(loadErr, os.ErrNotExist)
+					if !isNotExist {
+						errMsg := "unknown error"
+						if loadErr != nil {
+							errMsg = loadErr.Error()
+						}
+						_, _ = fmt.Fprintf(c.output.Stdout(), "  Vault %d (%s): error, %s\n", displayPos, entry.Path, errMsg)
+					}
+					// Skip non-existent vaults silently
+				} else if targetSet[idx] {
+					_, _ = fmt.Fprintf(c.output.Stdout(), "  Vault %d (%s): would add identity (skipped due to errors in %s %s)\n", displayPos, entry.Path, vaultWord, failedVaultsList)
+				}
 			}
-			targetIndices = append(targetIndices, availableVaults[selectedIndex].Index)
+			return NewError("strict mode error: one or more vaults failed to load", ExitVaultError)
 		}
 	}
 
@@ -101,15 +195,6 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 	failureCount := 0
 	showAllVaults := all // Only show all vaults when --all flag is used
 
-	// Build a set of target indices for quick lookup
-	targetSet := make(map[int]bool)
-	for _, idx := range targetIndices {
-		targetSet[idx] = true
-	}
-
-	// Get full config for correct display positions
-	fullVaultCfg, _ := vault.ParseVaultConfig(c.config.Vault)
-
 	// Iterate through configured vaults
 	for idx, entry := range loadedConfig.Entries {
 		vaultPath := entry.Path
@@ -129,8 +214,10 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 
 		// Check if vault is accessible
 		if manager == nil {
-			if showAllVaults || isTarget {
-				loadErr := c.vaultResolver.GetLoadError(idx)
+			loadErr := c.vaultResolver.GetLoadError(idx)
+			// Only print non-existing vaults with --all; always print other errors (e.g., parse failures)
+			isNotExist := loadErr != nil && errors.Is(loadErr, os.ErrNotExist)
+			if showAllVaults || !isNotExist {
 				errMsg := "unknown error"
 				if loadErr != nil {
 					errMsg = loadErr.Error()
