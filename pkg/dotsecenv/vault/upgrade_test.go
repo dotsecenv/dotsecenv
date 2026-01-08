@@ -75,20 +75,38 @@ func TestDetectVersionFromJSON(t *testing.T) {
 		wantErr     bool
 	}{
 		{
-			name:        "v1 json",
+			name:        "v1 json - version first",
 			json:        `{"version":1,"identities":[]}`,
 			wantVersion: 1,
 			wantErr:     false,
 		},
 		{
-			name:        "v2 json",
+			name:        "v2 json - version first",
 			json:        `{"version":2,"identities":{}}`,
 			wantVersion: 2,
 			wantErr:     false,
 		},
 		{
-			name:        "invalid json prefix",
-			json:        `{"identities":{}}`,
+			name:        "version not first - fallback",
+			json:        `{"identities":[],"version":1}`,
+			wantVersion: 1,
+			wantErr:     false,
+		},
+		{
+			name:        "version with whitespace after colon",
+			json:        `{"version": 2,"identities":{}}`,
+			wantVersion: 2,
+			wantErr:     false,
+		},
+		{
+			name:        "version field missing",
+			json:        `{"identities":[]}`,
+			wantVersion: 0,
+			wantErr:     true,
+		},
+		{
+			name:        "version is string - rejected",
+			json:        `{"version":"1","identities":[]}`,
 			wantVersion: 0,
 			wantErr:     true,
 		},

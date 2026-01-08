@@ -225,22 +225,44 @@ func HeaderMarkerForVersion(_ int) string {
 }
 
 // detectVersionFromJSON extracts the version from header JSON without full parsing.
-// Uses a quick prefix check for efficiency.
+// Uses a heuristic approach:
+// 1. Fast path: assume version field is first ({"version":N,...)
+// 2. Fallback: search for "version": anywhere in the JSON
+// 3. Fails if version value is a string (no string-to-int conversion)
 func detectVersionFromJSON(data []byte) (int, error) {
-	// Quick check for version at start of JSON
-	// Format: {"version":N,...}
-	const prefix = `{"version":`
 	str := string(data)
-	if len(str) < len(prefix)+1 {
+	if len(str) < 12 { // minimum: {"version":1}
 		return 0, fmt.Errorf("header JSON too short")
 	}
 
-	if str[:len(prefix)] != prefix {
-		return 0, fmt.Errorf("cannot detect version from header JSON")
+	// Fast path: version field is first
+	const fastPrefix = `{"version":`
+	var rest string
+	if strings.HasPrefix(str, fastPrefix) {
+		rest = str[len(fastPrefix):]
+	} else {
+		// Fallback: search for "version": anywhere in the JSON
+		const versionKey = `"version":`
+		idx := strings.Index(str, versionKey)
+		if idx == -1 {
+			return 0, fmt.Errorf("version field not found in header JSON")
+		}
+		rest = str[idx+len(versionKey):]
 	}
 
-	// Extract digits after "version":
-	rest := str[len(prefix):]
+	// Skip whitespace after colon
+	rest = strings.TrimLeft(rest, " \t")
+
+	if len(rest) == 0 {
+		return 0, fmt.Errorf("version field has no value")
+	}
+
+	// Check if value is a string (starts with quote) - we don't parse string versions
+	if rest[0] == '"' {
+		return 0, fmt.Errorf("version must be an integer, not a string")
+	}
+
+	// Extract digits
 	var versionStr string
 	for _, c := range rest {
 		if c >= '0' && c <= '9' {
