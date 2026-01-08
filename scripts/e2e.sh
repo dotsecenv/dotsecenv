@@ -1,18 +1,27 @@
 #!/bin/bash
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BIN="$PROJECT_DIR/bin/dotsecenv"
+# SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+BIN="./dotsecenv"
+
+# Create isolated test environment to avoid polluting user's config/data
+TEST_HOME="$(mktemp -d)"
+export XDG_CONFIG_HOME="$TEST_HOME/config"
+export XDG_DATA_HOME="$TEST_HOME/data"
+mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
 
 # Use existing GNUPGHOME if set, otherwise create isolated GPG home
 # Avoid polluting user's keyrings during tests
 if [ -z "$GNUPGHOME" ]; then
-    GNUPGHOME="$(mktemp -d)"
+    GNUPGHOME="$TEST_HOME/gnupg"
+    mkdir -p "$GNUPGHOME"
+    chmod 700 "$GNUPGHOME"
     export GNUPGHOME
-    # shellcheck disable=SC2064
-    trap "rm -rf $GNUPGHOME" EXIT
 fi
+
+# shellcheck disable=SC2064
+trap "rm -rf $TEST_HOME" EXIT
 
 echo "==> Generating test keys in $GNUPGHOME"
 
@@ -46,11 +55,11 @@ echo "==> Key 1: $KEY1"
 echo "==> Key 2: $KEY2"
 
 echo "==> Initializing vaults"
-rm -f ~/.config/dotsecenv/config ~/.local/share/dotsecenv/vault .dotsecenv/vault
-mkdir -p ~/.local/share/dotsecenv .dotsecenv
+# Create test vault directories (XDG paths are already isolated via TEST_HOME)
+mkdir -p "$XDG_DATA_HOME/dotsecenv" .dotsecenv
 "$BIN" init config
 "$BIN" init vault -v .dotsecenv/vault
-"$BIN" init vault -v ~/.local/share/dotsecenv/vault
+"$BIN" init vault -v "$XDG_DATA_HOME/dotsecenv/vault"
 
 echo "==> Running e2e tests"
 "$BIN" login "$KEY1"
