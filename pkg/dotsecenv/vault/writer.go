@@ -144,30 +144,12 @@ func (w *Writer) loadExisting() error {
 		return w.createNewVault()
 	}
 
-	// Validate header marker
-	if err := ValidateHeaderMarker(markerLine); err != nil {
-		return fmt.Errorf("invalid vault file: %w", err)
-	}
-
-	// Detect version from JSON header
-	version, err := detectVersionFromJSON([]byte(headerLine))
+	header, version, err := parseVaultHeader(markerLine, headerLine)
 	if err != nil {
-		return fmt.Errorf("failed to detect vault version: %w", err)
-	}
-	w.version = version
-
-	// Validate version
-	if version < MinSupportedVersion {
-		return fmt.Errorf("vault format v%d is no longer supported (minimum: v%d)",
-			version, MinSupportedVersion)
-	}
-
-	// Parse header using version-appropriate unmarshaler
-	header, err := UnmarshalHeaderVersioned([]byte(headerLine), version)
-	if err != nil {
-		return fmt.Errorf("failed to parse vault header: %w", err)
+		return err
 	}
 	w.header = header
+	w.version = version
 
 	return nil
 }

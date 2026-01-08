@@ -3,6 +3,7 @@ package vault
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
@@ -179,15 +180,26 @@ func MarshalHeader(h *Header) ([]byte, error) {
 }
 
 // HeaderMarker is the constant marker line that precedes the vault header JSON.
+// New vaults always use this format.
 const HeaderMarker = "# === VAULT HEADER ==="
 
+// headerMarkerPrefix is the common prefix for all valid header markers.
+// Used for backward compatibility with old versioned markers.
+const headerMarkerPrefix = "# === VAULT HEADER"
+
 // ValidateHeaderMarker checks if a header marker line is valid.
+// Accepts both the new versionless format and old versioned formats for backward compatibility.
 // Returns nil if the marker is valid, or an error if invalid.
 func ValidateHeaderMarker(markerLine string) error {
-	if markerLine != HeaderMarker {
-		return fmt.Errorf("invalid vault header marker: %q (expected %q)", markerLine, HeaderMarker)
+	// Accept new format
+	if markerLine == HeaderMarker {
+		return nil
 	}
-	return nil
+	// Accept old versioned format (e.g., "# === VAULT HEADER v1 ===")
+	if strings.HasPrefix(markerLine, headerMarkerPrefix) && strings.HasSuffix(markerLine, " ===") {
+		return nil
+	}
+	return fmt.Errorf("invalid vault header marker: %q", markerLine)
 }
 
 // HeaderMarkerForVersion returns the header marker (version-independent).
@@ -259,6 +271,31 @@ func UnmarshalHeader(data []byte) (*Header, error) {
 	}
 
 	return UnmarshalHeaderVersioned(data, version)
+}
+
+// parseVaultHeader validates the marker line, detects version from the header JSON,
+// and parses the header. Returns the parsed header and version number.
+func parseVaultHeader(markerLine, headerLine string) (*Header, int, error) {
+	if err := ValidateHeaderMarker(markerLine); err != nil {
+		return nil, 0, fmt.Errorf("invalid vault file: %w", err)
+	}
+
+	version, err := detectVersionFromJSON([]byte(headerLine))
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to detect vault version: %w", err)
+	}
+
+	if version < MinSupportedVersion {
+		return nil, 0, fmt.Errorf("vault format v%d is no longer supported (minimum: v%d)",
+			version, MinSupportedVersion)
+	}
+
+	header, err := UnmarshalHeaderVersioned([]byte(headerLine), version)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to parse vault header: %w", err)
+	}
+
+	return header, version, nil
 }
 
 // ParseIdentityData extracts IdentityData from an Entry
