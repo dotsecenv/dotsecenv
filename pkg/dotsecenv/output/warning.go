@@ -59,7 +59,7 @@ func (w *Warning) ToError() *Error {
 
 	return &Error{
 		Code:    errorCode,
-		Message: "strict mode: " + w.Message,
+		Message: "strict mode error: " + w.Message,
 		Details: w.Details,
 	}
 }

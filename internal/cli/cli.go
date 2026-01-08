@@ -135,7 +135,7 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 		// In strict mode, ignoring config vaults is an error
 		if shouldWarnOrError {
 			if effectiveStrict {
-				return nil, NewError("strict mode: ignoring vaults in configuration and using specified vault arguments is not allowed", ExitGeneralError)
+				return nil, NewError("strict mode error: ignoring vaults in configuration and using specified vault arguments is not allowed", ExitGeneralError)
 			}
 			if !silent {
 				_, _ = fmt.Fprintf(stderr, "warning: ignoring vaults in configuration and using specified vault arguments\n")

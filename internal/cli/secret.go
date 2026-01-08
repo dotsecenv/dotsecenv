@@ -243,7 +243,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 			targetDesc = fmt.Sprintf("vault %d", fromIndex)
 		}
 		if c.Strict {
-			return NewError(fmt.Sprintf("strict mode: --last and -v cannot be used together; omit -v to search all vaults or remove --last to use %s", targetDesc), ExitGeneralError)
+			return NewError(fmt.Sprintf("strict mode error: --last and -v cannot be used together; omit -v to search all vaults or remove --last to use %s", targetDesc), ExitGeneralError)
 		}
 		_, _ = fmt.Fprintf(c.output.Stderr(), "warning: --last is ignored when -v is specified; returning latest value from %s. Omit -v to search all vaults.\n", targetDesc)
 		last = false
@@ -344,7 +344,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 			encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
 			if decodeErr != nil {
 				if c.Strict {
-					return NewError(fmt.Sprintf("strict mode: failed to decode value from %s: %v", val.AddedAt, decodeErr), ExitGeneralError)
+					return NewError(fmt.Sprintf("strict mode error: failed to decode value from %s: %v", val.AddedAt, decodeErr), ExitGeneralError)
 				}
 				c.Warnf("failed to decode value from %s: %v", val.AddedAt, decodeErr)
 				continue
@@ -353,7 +353,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 			plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 			if decErr != nil {
 				if c.Strict {
-					return NewError(fmt.Sprintf("strict mode: failed to decrypt value from %s: %v", val.AddedAt, decErr), ExitGPGError)
+					return NewError(fmt.Sprintf("strict mode error: failed to decrypt value from %s: %v", val.AddedAt, decErr), ExitGPGError)
 				}
 				c.Warnf("failed to decrypt value from %s: %v", val.AddedAt, decErr)
 				continue
@@ -493,7 +493,7 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 			encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
 			if decodeErr != nil {
 				if c.Strict {
-					return NewError(fmt.Sprintf("strict mode: failed to decode value from %s: %v", val.AddedAt, decodeErr), ExitGeneralError)
+					return NewError(fmt.Sprintf("strict mode error: failed to decode value from %s: %v", val.AddedAt, decodeErr), ExitGeneralError)
 				}
 				c.Warnf("failed to decode value from %s: %v", val.AddedAt, decodeErr)
 				continue
@@ -502,7 +502,7 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 			plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 			if decErr != nil {
 				if c.Strict {
-					return NewError(fmt.Sprintf("strict mode: failed to decrypt value from %s: %v", val.AddedAt, decErr), ExitGPGError)
+					return NewError(fmt.Sprintf("strict mode error: failed to decrypt value from %s: %v", val.AddedAt, decErr), ExitGPGError)
 				}
 				c.Warnf("failed to decrypt value from %s: %v", val.AddedAt, decErr)
 				continue

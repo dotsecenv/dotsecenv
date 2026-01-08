@@ -161,7 +161,7 @@ func (c *CLI) secretRevokeInVault(secretKey, targetFingerprint string, vaultInde
 	targetIdentity := c.vaultResolver.GetIdentityByFingerprint(targetFingerprint)
 	if targetIdentity == nil {
 		if c.Strict {
-			return NewError(fmt.Sprintf("strict mode: identity not found in vault: %s", targetFingerprint), ExitVaultError)
+			return NewError(fmt.Sprintf("strict error mode: identity not found in vault: %s", targetFingerprint), ExitVaultError)
 		}
 		if !silent {
 			_, _ = fmt.Fprintf(c.output.Stderr(), "warning: identity not found in vault: %s (proceeding with revocation)\n", targetFingerprint)

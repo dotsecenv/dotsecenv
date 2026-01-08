@@ -306,7 +306,7 @@ func (c *CLI) ensureIdentityInVault(fingerprint string, index int) *Error {
 	}
 
 	if c.Strict {
-		return NewError(fmt.Sprintf("identity %s not found in vault %d and will not be added in strict mode\n  run: `dotsecenv vault identity add %s`", fingerprint, index+1, fingerprint), ExitAccessDenied)
+		return NewError(fmt.Sprintf("strict mode error: identity %s not found in vault %d and will not be added\n  run: `dotsecenv vault identity add %s`", fingerprint, index+1, fingerprint), ExitAccessDenied)
 	}
 
 	_, _ = fmt.Fprintf(c.output.Stderr(), "Auto-adding identity %s to vault %d...\n", fingerprint, index+1)

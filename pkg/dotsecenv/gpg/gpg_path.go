@@ -26,7 +26,7 @@ var (
 func ValidateAndSetGPGProgram(path string, strict bool, stderr io.Writer) error {
 	// In strict mode, gpg.program must be explicitly specified
 	if strict && path == "" {
-		return errors.New("strict mode: gpg.program must be explicitly configured in config file")
+		return errors.New("strict mode error: gpg.program must be explicitly configured in config file")
 	}
 
 	if path != "" {
