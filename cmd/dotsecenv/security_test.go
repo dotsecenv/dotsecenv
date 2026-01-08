@@ -34,10 +34,10 @@ func getLatestSecretValue(t *testing.T, vaultPath string, secretKey string) stri
 	}
 
 	// Parse header (line 2, 0-indexed line 1)
-	// Note: identities are now stored as [[fingerprint, line], ...] array format
+	// Note: v2 format stores identities as {fingerprint: line, ...} dict
 	var header struct {
-		Version    int              `json:"version"`
-		Identities [][2]interface{} `json:"identities"` // [[fingerprint, line], ...]
+		Version    int            `json:"version"`
+		Identities map[string]int `json:"identities"` // {fingerprint: line, ...}
 		Secrets    map[string]struct {
 			Definition int   `json:"secret"` // renamed from "definition" to "secret"
 			Values     []int `json:"values"`

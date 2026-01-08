@@ -9,14 +9,17 @@ import (
 )
 
 const (
-	HeaderMarker = "# === VAULT HEADER v1 ==="
-	DataMarker   = "# === VAULT DATA ==="
+	// DataMarker separates the header from data entries
+	DataMarker = "# === VAULT DATA ==="
+	// HeaderMarker is kept for backward compatibility, use HeaderMarkerForVersion instead
+	HeaderMarker = HeaderMarkerV1
 )
 
 // Reader provides efficient access to vault data using the header index
 type Reader struct {
 	path        string
 	header      *Header
+	version     int     // detected format version
 	lineOffsets []int64 // byte offsets for each line (0-indexed)
 }
 
@@ -36,6 +39,7 @@ func (r *Reader) loadHeader() error {
 		if os.IsNotExist(err) {
 			// Empty vault
 			r.header = NewHeader()
+			r.version = LatestFormatVersion
 			r.lineOffsets = nil
 			return nil
 		}
@@ -50,6 +54,7 @@ func (r *Reader) loadHeader() error {
 	}
 	if info.Size() == 0 {
 		r.header = NewHeader()
+		r.version = LatestFormatVersion
 		r.lineOffsets = nil
 		return nil
 	}
@@ -59,16 +64,17 @@ func (r *Reader) loadHeader() error {
 	scanner := bufio.NewScanner(file)
 	var offset int64
 	lineNum := 0
-	headerFound := false
+	var markerLine string
 	var headerLine string
 
 	for scanner.Scan() {
 		line := scanner.Text()
 		r.lineOffsets = append(r.lineOffsets, offset)
 
-		if lineNum == 0 && line == HeaderMarker {
-			headerFound = true
-		} else if lineNum == 1 && headerFound {
+		switch lineNum {
+		case 0:
+			markerLine = line
+		case 1:
 			headerLine = line
 		}
 
@@ -81,17 +87,36 @@ func (r *Reader) loadHeader() error {
 		return fmt.Errorf("failed to scan vault: %w", err)
 	}
 
-	if !headerFound || headerLine == "" {
+	if markerLine == "" || headerLine == "" {
 		return fmt.Errorf("vault file missing valid header")
 	}
 
-	header, err := UnmarshalHeader([]byte(headerLine))
+	// Detect version from marker line (heuristic)
+	version, err := detectVersionFromMarker(markerLine)
+	if err != nil {
+		return fmt.Errorf("failed to detect vault version: %w", err)
+	}
+	r.version = version
+
+	// Validate version
+	if version < MinSupportedVersion {
+		return fmt.Errorf("vault format v%d is no longer supported (minimum: v%d)",
+			version, MinSupportedVersion)
+	}
+
+	// Parse header using version-appropriate unmarshaler
+	header, err := UnmarshalHeaderVersioned([]byte(headerLine), version)
 	if err != nil {
 		return fmt.Errorf("failed to parse vault header: %w", err)
 	}
 	r.header = header
 
 	return nil
+}
+
+// Version returns the detected vault format version
+func (r *Reader) Version() int {
+	return r.version
 }
 
 // Header returns the vault header (read-only copy)

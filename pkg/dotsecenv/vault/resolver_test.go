@@ -50,7 +50,7 @@ func TestOpenVaults_ValidVault(t *testing.T) {
 	vaultPath := filepath.Join(tmpDir, "test.vault")
 
 	// Create the vault file
-	vm := NewManager(vaultPath)
+	vm := NewManager(vaultPath, false)
 	if err := vm.OpenAndLock(); err != nil {
 		t.Fatalf("failed to create test vault: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestOpenVaults_MultipleVaults_OneMissing(t *testing.T) {
 	tmpDir := t.TempDir()
 	vaultPath := filepath.Join(tmpDir, "existing.vault")
 
-	vm := NewManager(vaultPath)
+	vm := NewManager(vaultPath, false)
 	if err := vm.OpenAndLock(); err != nil {
 		t.Fatalf("failed to create test vault: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestOpenVaults_MultipleVaults_AllValid(t *testing.T) {
 	vaultPath2 := filepath.Join(tmpDir, "vault2.vault")
 
 	// Create first vault
-	vm1 := NewManager(vaultPath1)
+	vm1 := NewManager(vaultPath1, false)
 	if err := vm1.OpenAndLock(); err != nil {
 		t.Fatalf("failed to create first test vault: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestOpenVaults_MultipleVaults_AllValid(t *testing.T) {
 	}
 
 	// Create second vault
-	vm2 := NewManager(vaultPath2)
+	vm2 := NewManager(vaultPath2, false)
 	if err := vm2.OpenAndLock(); err != nil {
 		t.Fatalf("failed to create second test vault: %v", err)
 	}

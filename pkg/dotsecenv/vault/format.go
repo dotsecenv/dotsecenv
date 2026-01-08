@@ -3,14 +3,22 @@ package vault
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
 )
 
-// FormatVersion is the current vault format version
-const FormatVersion = 1
+// Format version constants
+const (
+	// LatestFormatVersion is the current vault format version used for new vaults
+	LatestFormatVersion = 2
+	// MinSupportedVersion is the minimum vault format version that can be read
+	MinSupportedVersion = 1
+	// FormatVersion is kept for backward compatibility, use LatestFormatVersion instead
+	FormatVersion = LatestFormatVersion
+)
 
 // Entry types for JSONL records
 const (
@@ -154,83 +162,121 @@ func UnmarshalEntry(data []byte) (*Entry, error) {
 	return &e, nil
 }
 
-// MarshalHeader creates the JSON representation of the header
-func MarshalHeader(h *Header) ([]byte, error) {
-	// Create ordered representation for deterministic JSON output
-	// Identities sorted by line number (order added), secrets sorted by key
-	type orderedHeader struct {
-		Version    int                    `json:"version"`
-		Identities [][2]interface{}       `json:"identities"` // [[fingerprint, line], ...]
-		Secrets    map[string]SecretIndex `json:"secrets"`
+// MarshalHeaderVersioned creates the JSON representation of the header in the specified version format.
+func MarshalHeaderVersioned(h *Header, version int) ([]byte, error) {
+	switch version {
+	case 1:
+		return MarshalHeaderV1(h)
+	case 2:
+		return MarshalHeaderV2(h)
+	default:
+		return nil, fmt.Errorf("unsupported vault format version: %d", version)
 	}
-
-	// Sort identities by line number (ascending = order added)
-	type idEntry struct {
-		fp   string
-		line int
-	}
-	idEntries := make([]idEntry, 0, len(h.Identities))
-	for fp, line := range h.Identities {
-		idEntries = append(idEntries, idEntry{fp, line})
-	}
-	sort.Slice(idEntries, func(i, j int) bool {
-		return idEntries[i].line < idEntries[j].line
-	})
-
-	identities := make([][2]interface{}, len(idEntries))
-	for i, e := range idEntries {
-		identities[i] = [2]interface{}{e.fp, e.line}
-	}
-
-	ordered := orderedHeader{
-		Version:    h.Version,
-		Identities: identities,
-		Secrets:    h.Secrets,
-	}
-
-	return json.Marshal(ordered)
 }
 
-// UnmarshalHeader parses JSON into a Header
+// MarshalHeader creates the JSON representation of the header using the latest format.
+// This is kept for backward compatibility with existing code.
+func MarshalHeader(h *Header) ([]byte, error) {
+	return MarshalHeaderVersioned(h, LatestFormatVersion)
+}
+
+// ValidateHeaderMarker checks if a header marker line is valid and returns the version.
+// Returns the version number and nil error if valid, or 0 and an error if invalid.
+// Valid markers are: "# === VAULT HEADER v1 ===", "# === VAULT HEADER v2 ===", etc.
+func ValidateHeaderMarker(markerLine string) (int, error) {
+	return detectVersionFromMarker(markerLine)
+}
+
+// detectVersionFromMarker extracts version from the header marker line.
+// Input:  "# === VAULT HEADER v1 ===" -> 1
+// Input:  "# === VAULT HEADER v2 ===" -> 2
+func detectVersionFromMarker(markerLine string) (int, error) {
+	const prefix = "# === VAULT HEADER v"
+	const suffix = " ==="
+
+	if !strings.HasPrefix(markerLine, prefix) {
+		return 0, fmt.Errorf("invalid vault header marker: %q", markerLine)
+	}
+
+	rest := strings.TrimPrefix(markerLine, prefix)
+	versionStr := strings.TrimSuffix(rest, suffix)
+
+	version, err := strconv.Atoi(versionStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid version in header marker: %q", versionStr)
+	}
+
+	return version, nil
+}
+
+// HeaderMarkerForVersion returns the appropriate header marker for a version.
+func HeaderMarkerForVersion(version int) string {
+	return fmt.Sprintf("# === VAULT HEADER v%d ===", version)
+}
+
+// detectVersionFromJSON extracts the version from header JSON without full parsing.
+// Uses a quick prefix check for efficiency.
+func detectVersionFromJSON(data []byte) (int, error) {
+	// Quick check for version at start of JSON
+	// Format: {"version":N,...}
+	const prefix = `{"version":`
+	str := string(data)
+	if len(str) < len(prefix)+1 {
+		return 0, fmt.Errorf("header JSON too short")
+	}
+
+	if str[:len(prefix)] != prefix {
+		return 0, fmt.Errorf("cannot detect version from header JSON")
+	}
+
+	// Extract digits after "version":
+	rest := str[len(prefix):]
+	var versionStr string
+	for _, c := range rest {
+		if c >= '0' && c <= '9' {
+			versionStr += string(c)
+		} else {
+			break
+		}
+	}
+
+	if versionStr == "" {
+		return 0, fmt.Errorf("no version number found in header JSON")
+	}
+
+	var version int
+	if _, err := fmt.Sscanf(versionStr, "%d", &version); err != nil {
+		return 0, fmt.Errorf("invalid version number: %s", versionStr)
+	}
+
+	return version, nil
+}
+
+// UnmarshalHeaderVersioned parses header JSON using the specified version's parser.
+func UnmarshalHeaderVersioned(data []byte, version int) (*Header, error) {
+	switch version {
+	case 1:
+		return UnmarshalHeaderV1(data)
+	case 2:
+		return UnmarshalHeaderV2(data)
+	default:
+		return nil, fmt.Errorf("unsupported vault format version: %d", version)
+	}
+}
+
+// UnmarshalHeader parses JSON into a Header, auto-detecting the version.
 func UnmarshalHeader(data []byte) (*Header, error) {
-	// Parse the ordered format with identities as [[fingerprint, line], ...]
-	type orderedHeader struct {
-		Version    int                    `json:"version"`
-		Identities [][2]interface{}       `json:"identities"` // [[fingerprint, line], ...]
-		Secrets    map[string]SecretIndex `json:"secrets"`
+	version, err := detectVersionFromJSON(data)
+	if err != nil {
+		// Fallback: try v1 format (for backward compatibility)
+		return UnmarshalHeaderV1(data)
 	}
 
-	var oh orderedHeader
-	if err := json.Unmarshal(data, &oh); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal header: %w", err)
+	if version < MinSupportedVersion {
+		return nil, fmt.Errorf("vault format v%d is no longer supported (minimum: v%d)", version, MinSupportedVersion)
 	}
 
-	h := &Header{
-		Version:    oh.Version,
-		Identities: make(map[string]int, len(oh.Identities)),
-		Secrets:    oh.Secrets,
-	}
-
-	// Convert [[fingerprint, line], ...] back to map
-	for _, pair := range oh.Identities {
-		if len(pair) != 2 {
-			return nil, fmt.Errorf("invalid identity entry: expected [fingerprint, line]")
-		}
-		fp, ok := pair[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("invalid identity fingerprint: expected string")
-		}
-		lineFloat, ok := pair[1].(float64) // JSON numbers unmarshal as float64
-		if !ok {
-			return nil, fmt.Errorf("invalid identity line number: expected number")
-		}
-		h.Identities[fp] = int(lineFloat)
-	}
-
-	if h.Secrets == nil {
-		h.Secrets = make(map[string]SecretIndex)
-	}
-	return h, nil
+	return UnmarshalHeaderVersioned(data, version)
 }
 
 // ParseIdentityData extracts IdentityData from an Entry
