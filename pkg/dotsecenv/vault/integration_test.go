@@ -15,7 +15,7 @@ func TestManagerBasicWorkflow(t *testing.T) {
 	tmpDir := t.TempDir()
 	vaultPath := filepath.Join(tmpDir, "vault")
 
-	m := NewManager(vaultPath)
+	m := NewManager(vaultPath, false)
 	if err := m.OpenAndLock(); err != nil {
 		t.Fatalf("OpenAndLock failed: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestManagerPersistence(t *testing.T) {
 	vaultPath := filepath.Join(tmpDir, "vault")
 
 	// First manager: add data
-	m1 := NewManager(vaultPath)
+	m1 := NewManager(vaultPath, false)
 	if err := m1.OpenAndLock(); err != nil {
 		t.Fatalf("OpenAndLock failed: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestManagerPersistence(t *testing.T) {
 	}
 
 	// Second manager: verify data persisted
-	m2 := NewManager(vaultPath)
+	m2 := NewManager(vaultPath, false)
 	if err := m2.OpenAndLock(); err != nil {
 		t.Fatalf("OpenAndLock failed: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestManagerAddSecretValues(t *testing.T) {
 	tmpDir := t.TempDir()
 	vaultPath := filepath.Join(tmpDir, "vault")
 
-	m := NewManager(vaultPath)
+	m := NewManager(vaultPath, false)
 	if err := m.OpenAndLock(); err != nil {
 		t.Fatalf("OpenAndLock failed: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestManagerGetAccessibleSecretValue(t *testing.T) {
 	tmpDir := t.TempDir()
 	vaultPath := filepath.Join(tmpDir, "vault")
 
-	m := NewManager(vaultPath)
+	m := NewManager(vaultPath, false)
 	if err := m.OpenAndLock(); err != nil {
 		t.Fatalf("OpenAndLock failed: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestManagerListMethods(t *testing.T) {
 	tmpDir := t.TempDir()
 	vaultPath := filepath.Join(tmpDir, "vault")
 
-	m := NewManager(vaultPath)
+	m := NewManager(vaultPath, false)
 	if err := m.OpenAndLock(); err != nil {
 		t.Fatalf("OpenAndLock failed: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestManagerFragmentationStats(t *testing.T) {
 	tmpDir := t.TempDir()
 	vaultPath := filepath.Join(tmpDir, "vault")
 
-	m := NewManager(vaultPath)
+	m := NewManager(vaultPath, false)
 	if err := m.OpenAndLock(); err != nil {
 		t.Fatalf("OpenAndLock failed: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestManagerDefragment(t *testing.T) {
 	tmpDir := t.TempDir()
 	vaultPath := filepath.Join(tmpDir, "vault")
 
-	m := NewManager(vaultPath)
+	m := NewManager(vaultPath, false)
 	if err := m.OpenAndLock(); err != nil {
 		t.Fatalf("OpenAndLock failed: %v", err)
 	}

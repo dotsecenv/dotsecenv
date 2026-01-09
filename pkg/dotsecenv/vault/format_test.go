@@ -25,7 +25,7 @@ func TestNewHeader(t *testing.T) {
 
 func TestHeaderMarshalUnmarshal(t *testing.T) {
 	h := &Header{
-		Version: 1,
+		Version: LatestFormatVersion,
 		Identities: map[string]int{
 			"FP1": 5,
 			"FP2": 6,

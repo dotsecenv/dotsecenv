@@ -8,15 +8,11 @@ import (
 	"strings"
 )
 
-const (
-	HeaderMarker = "# === VAULT HEADER v1 ==="
-	DataMarker   = "# === VAULT DATA ==="
-)
-
 // Reader provides efficient access to vault data using the header index
 type Reader struct {
 	path        string
 	header      *Header
+	version     int     // detected format version
 	lineOffsets []int64 // byte offsets for each line (0-indexed)
 }
 
@@ -24,7 +20,7 @@ type Reader struct {
 func NewReader(path string) (*Reader, error) {
 	r := &Reader{path: path}
 	if err := r.loadHeader(); err != nil {
-		return nil, err
+		return nil, WrapVaultError(path, err)
 	}
 	return r, nil
 }
@@ -36,6 +32,7 @@ func (r *Reader) loadHeader() error {
 		if os.IsNotExist(err) {
 			// Empty vault
 			r.header = NewHeader()
+			r.version = LatestFormatVersion
 			r.lineOffsets = nil
 			return nil
 		}
@@ -50,6 +47,7 @@ func (r *Reader) loadHeader() error {
 	}
 	if info.Size() == 0 {
 		r.header = NewHeader()
+		r.version = LatestFormatVersion
 		r.lineOffsets = nil
 		return nil
 	}
@@ -59,17 +57,21 @@ func (r *Reader) loadHeader() error {
 	scanner := bufio.NewScanner(file)
 	var offset int64
 	lineNum := 0
-	headerFound := false
+	var markerLine string
 	var headerLine string
+	var dataMarkerLine string
 
 	for scanner.Scan() {
 		line := scanner.Text()
 		r.lineOffsets = append(r.lineOffsets, offset)
 
-		if lineNum == 0 && line == HeaderMarker {
-			headerFound = true
-		} else if lineNum == 1 && headerFound {
+		switch lineNum {
+		case 0:
+			markerLine = line
+		case 1:
 			headerLine = line
+		case 2:
+			dataMarkerLine = line
 		}
 
 		// Account for newline character
@@ -81,17 +83,31 @@ func (r *Reader) loadHeader() error {
 		return fmt.Errorf("failed to scan vault: %w", err)
 	}
 
-	if !headerFound || headerLine == "" {
+	if markerLine == "" || headerLine == "" {
 		return fmt.Errorf("vault file missing valid header")
 	}
 
-	header, err := UnmarshalHeader([]byte(headerLine))
+	header, version, err := parseVaultHeader(markerLine, headerLine)
 	if err != nil {
-		return fmt.Errorf("failed to parse vault header: %w", err)
+		return err
 	}
+
+	// Validate data marker if present (vaults with data have at least 3 lines)
+	if dataMarkerLine != "" {
+		if err := ValidateDataMarker(dataMarkerLine); err != nil {
+			return fmt.Errorf("invalid vault file: %w", err)
+		}
+	}
+
 	r.header = header
+	r.version = version
 
 	return nil
+}
+
+// Version returns the detected vault format version
+func (r *Reader) Version() int {
+	return r.version
 }
 
 // Header returns the vault header (read-only copy)

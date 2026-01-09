@@ -1,16 +1,33 @@
 package vault
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
 )
 
-// FormatVersion is the current vault format version
-const FormatVersion = 1
+// WrapVaultError adds vault path context to an error for better debugging.
+func WrapVaultError(path string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("vault %q: %w", path, err)
+}
+
+// Format version constants
+const (
+	// LatestFormatVersion is the current vault format version used for new vaults
+	LatestFormatVersion = 2
+	// MinSupportedVersion is the minimum vault format version that can be read
+	MinSupportedVersion = 1
+	// FormatVersion is kept for backward compatibility, use LatestFormatVersion instead
+	FormatVersion = LatestFormatVersion
+)
 
 // Entry types for JSONL records
 const (
@@ -154,83 +171,214 @@ func UnmarshalEntry(data []byte) (*Entry, error) {
 	return &e, nil
 }
 
-// MarshalHeader creates the JSON representation of the header
-func MarshalHeader(h *Header) ([]byte, error) {
-	// Create ordered representation for deterministic JSON output
-	// Identities sorted by line number (order added), secrets sorted by key
-	type orderedHeader struct {
-		Version    int                    `json:"version"`
-		Identities [][2]interface{}       `json:"identities"` // [[fingerprint, line], ...]
-		Secrets    map[string]SecretIndex `json:"secrets"`
+// MarshalHeaderVersioned creates the JSON representation of the header in the specified version format.
+func MarshalHeaderVersioned(h *Header, version int) ([]byte, error) {
+	switch version {
+	case 1:
+		return MarshalHeaderV1(h)
+	case 2:
+		return MarshalHeaderV2(h)
+	default:
+		return nil, fmt.Errorf("unsupported vault format version: %d", version)
 	}
-
-	// Sort identities by line number (ascending = order added)
-	type idEntry struct {
-		fp   string
-		line int
-	}
-	idEntries := make([]idEntry, 0, len(h.Identities))
-	for fp, line := range h.Identities {
-		idEntries = append(idEntries, idEntry{fp, line})
-	}
-	sort.Slice(idEntries, func(i, j int) bool {
-		return idEntries[i].line < idEntries[j].line
-	})
-
-	identities := make([][2]interface{}, len(idEntries))
-	for i, e := range idEntries {
-		identities[i] = [2]interface{}{e.fp, e.line}
-	}
-
-	ordered := orderedHeader{
-		Version:    h.Version,
-		Identities: identities,
-		Secrets:    h.Secrets,
-	}
-
-	return json.Marshal(ordered)
 }
 
-// UnmarshalHeader parses JSON into a Header
+// MarshalHeader creates the JSON representation of the header using the latest format.
+// This is kept for backward compatibility with existing code.
+func MarshalHeader(h *Header) ([]byte, error) {
+	return MarshalHeaderVersioned(h, LatestFormatVersion)
+}
+
+// Vault section markers
+const (
+	// HeaderMarker is the constant marker line that precedes the vault header JSON.
+	HeaderMarker = "# === VAULT HEADER ==="
+	// DataMarker separates the header from data entries.
+	DataMarker = "# === VAULT DATA ==="
+)
+
+// MarkerType identifies the type of vault marker line
+type MarkerType int
+
+const (
+	// MarkerUnknown indicates the line is not a recognized marker
+	MarkerUnknown MarkerType = iota
+	// MarkerHeader indicates a current-format header marker
+	MarkerHeader
+	// MarkerHeaderLegacy indicates an old versioned header marker (e.g., "# === VAULT HEADER v1 ===")
+	MarkerHeaderLegacy
+	// MarkerData indicates a data section marker
+	MarkerData
+)
+
+// DetectMarkerType identifies what type of marker a line is
+func DetectMarkerType(line string) MarkerType {
+	switch {
+	case line == HeaderMarker:
+		return MarkerHeader
+	case line == DataMarker:
+		return MarkerData
+	case strings.HasPrefix(line, legacyMarkerPrefix) && strings.HasSuffix(line, legacyMarkerSuffix):
+		middle := line[len(legacyMarkerPrefix) : len(line)-len(legacyMarkerSuffix)]
+		if len(middle) > 0 && isNumeric(middle) {
+			return MarkerHeaderLegacy
+		}
+	}
+	return MarkerUnknown
+}
+
+// legacyMarkerPrefix is the prefix for old versioned header markers.
+const legacyMarkerPrefix = "# === VAULT HEADER v"
+
+// legacyMarkerSuffix is the suffix for old versioned header markers.
+const legacyMarkerSuffix = " ==="
+
+// ValidateHeaderMarker checks if a header marker line is valid.
+// Accepts both the new versionless format and old versioned formats for backward compatibility.
+// Returns nil if the marker is valid, or an error if invalid.
+func ValidateHeaderMarker(markerLine string) error {
+	markerType := DetectMarkerType(markerLine)
+	if markerType == MarkerHeader || markerType == MarkerHeaderLegacy {
+		return nil
+	}
+	return fmt.Errorf("invalid vault header marker: %q", markerLine)
+}
+
+// ValidateDataMarker checks if a data marker line is valid.
+// Returns nil if the marker is valid, or an error if invalid.
+func ValidateDataMarker(markerLine string) error {
+	if DetectMarkerType(markerLine) == MarkerData {
+		return nil
+	}
+	return fmt.Errorf("invalid vault data marker: %q", markerLine)
+}
+
+// isNumeric checks if a string contains only digits.
+func isNumeric(s string) bool {
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// HeaderMarkerForVersion returns the header marker (version-independent).
+// Deprecated: The version parameter is ignored. Use HeaderMarker constant directly.
+func HeaderMarkerForVersion(_ int) string {
+	return HeaderMarker
+}
+
+// detectVersionFromJSON extracts the version from header JSON without full parsing.
+// Uses a heuristic approach:
+// 1. Fast path: assume version field is first ({"version":N,...)
+// 2. Fallback: search for "version": anywhere in the JSON
+// 3. Fails if version value is a string (no string-to-int conversion)
+func detectVersionFromJSON(data []byte) (int, error) {
+	str := string(data)
+	if len(str) < 12 { // minimum: {"version":1}
+		return 0, fmt.Errorf("header JSON too short")
+	}
+
+	// Fast path: version field is first
+	const fastPrefix = `{"version":`
+	var rest string
+	if strings.HasPrefix(str, fastPrefix) {
+		rest = str[len(fastPrefix):]
+	} else {
+		// Fallback: search for "version": anywhere in the JSON
+		const versionKey = `"version":`
+		idx := strings.Index(str, versionKey)
+		if idx == -1 {
+			return 0, fmt.Errorf("version field not found in header JSON")
+		}
+		rest = str[idx+len(versionKey):]
+	}
+
+	// Skip whitespace after colon
+	rest = strings.TrimLeft(rest, " \t")
+
+	if len(rest) == 0 {
+		return 0, fmt.Errorf("version field has no value")
+	}
+
+	// Check if value is a string (starts with quote) - we don't parse string versions
+	if rest[0] == '"' {
+		return 0, fmt.Errorf("version must be an integer, not a string")
+	}
+
+	// Extract digits
+	var versionStr string
+	for _, c := range rest {
+		if c >= '0' && c <= '9' {
+			versionStr += string(c)
+		} else {
+			break
+		}
+	}
+
+	if versionStr == "" {
+		return 0, fmt.Errorf("no version number found in header JSON")
+	}
+
+	var version int
+	if _, err := fmt.Sscanf(versionStr, "%d", &version); err != nil {
+		return 0, fmt.Errorf("invalid version number: %s", versionStr)
+	}
+
+	return version, nil
+}
+
+// UnmarshalHeaderVersioned parses header JSON using the specified version's parser.
+func UnmarshalHeaderVersioned(data []byte, version int) (*Header, error) {
+	switch version {
+	case 1:
+		return UnmarshalHeaderV1(data)
+	case 2:
+		return UnmarshalHeaderV2(data)
+	default:
+		return nil, fmt.Errorf("unsupported vault format version: %d", version)
+	}
+}
+
+// UnmarshalHeader parses JSON into a Header, auto-detecting the version.
 func UnmarshalHeader(data []byte) (*Header, error) {
-	// Parse the ordered format with identities as [[fingerprint, line], ...]
-	type orderedHeader struct {
-		Version    int                    `json:"version"`
-		Identities [][2]interface{}       `json:"identities"` // [[fingerprint, line], ...]
-		Secrets    map[string]SecretIndex `json:"secrets"`
+	version, err := detectVersionFromJSON(data)
+	if err != nil {
+		// Fallback: try v1 format (for backward compatibility)
+		return UnmarshalHeaderV1(data)
 	}
 
-	var oh orderedHeader
-	if err := json.Unmarshal(data, &oh); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal header: %w", err)
+	if version < MinSupportedVersion {
+		return nil, fmt.Errorf("vault format v%d is no longer supported (minimum: v%d)", version, MinSupportedVersion)
 	}
 
-	h := &Header{
-		Version:    oh.Version,
-		Identities: make(map[string]int, len(oh.Identities)),
-		Secrets:    oh.Secrets,
+	return UnmarshalHeaderVersioned(data, version)
+}
+
+// parseVaultHeader validates the marker line, detects version from the header JSON,
+// and parses the header. Returns the parsed header and version number.
+func parseVaultHeader(markerLine, headerLine string) (*Header, int, error) {
+	if err := ValidateHeaderMarker(markerLine); err != nil {
+		return nil, 0, fmt.Errorf("invalid vault file: %w", err)
 	}
 
-	// Convert [[fingerprint, line], ...] back to map
-	for _, pair := range oh.Identities {
-		if len(pair) != 2 {
-			return nil, fmt.Errorf("invalid identity entry: expected [fingerprint, line]")
-		}
-		fp, ok := pair[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("invalid identity fingerprint: expected string")
-		}
-		lineFloat, ok := pair[1].(float64) // JSON numbers unmarshal as float64
-		if !ok {
-			return nil, fmt.Errorf("invalid identity line number: expected number")
-		}
-		h.Identities[fp] = int(lineFloat)
+	version, err := detectVersionFromJSON([]byte(headerLine))
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to detect vault version: %w", err)
 	}
 
-	if h.Secrets == nil {
-		h.Secrets = make(map[string]SecretIndex)
+	if version < MinSupportedVersion {
+		return nil, 0, fmt.Errorf("vault format v%d is no longer supported (minimum: v%d)",
+			version, MinSupportedVersion)
 	}
-	return h, nil
+
+	header, err := UnmarshalHeaderVersioned([]byte(headerLine), version)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to parse vault header: %w", err)
+	}
+
+	return header, version, nil
 }
 
 // ParseIdentityData extracts IdentityData from an Entry
@@ -312,5 +460,95 @@ func CreateValueEntry(secretKey string, sv SecretValue) (*Entry, error) {
 		Type:      EntryTypeValue,
 		SecretKey: secretKey,
 		Data:      jsonData,
+	}, nil
+}
+
+// VaultInfo contains lightweight metadata about a vault file.
+// It can be obtained without fully parsing all vault entries.
+type VaultInfo struct {
+	Path          string     // Path to the vault file
+	Version       int        // Vault format version
+	MarkerFormat  MarkerType // Header marker format (current vs legacy)
+	IdentityCount int        // Number of identities in the vault
+	SecretCount   int        // Number of secrets in the vault
+}
+
+// InspectVault returns lightweight metadata about a vault without fully loading it.
+// This is useful for quick vault inspection or validation.
+func InspectVault(path string) (*VaultInfo, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &VaultInfo{
+				Path:          path,
+				Version:       LatestFormatVersion,
+				MarkerFormat:  MarkerUnknown,
+				IdentityCount: 0,
+				SecretCount:   0,
+			}, nil
+		}
+		return nil, WrapVaultError(path, fmt.Errorf("failed to open: %w", err))
+	}
+	defer func() { _ = file.Close() }()
+
+	// Check if file is empty
+	info, err := file.Stat()
+	if err != nil {
+		return nil, WrapVaultError(path, fmt.Errorf("failed to stat: %w", err))
+	}
+	if info.Size() == 0 {
+		return &VaultInfo{
+			Path:          path,
+			Version:       LatestFormatVersion,
+			MarkerFormat:  MarkerUnknown,
+			IdentityCount: 0,
+			SecretCount:   0,
+		}, nil
+	}
+
+	scanner := bufio.NewScanner(file)
+	lineNum := 0
+	var markerLine, headerLine string
+
+	for scanner.Scan() && lineNum < 2 {
+		line := scanner.Text()
+		switch lineNum {
+		case 0:
+			markerLine = line
+		case 1:
+			headerLine = line
+		}
+		lineNum++
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, WrapVaultError(path, fmt.Errorf("failed to scan: %w", err))
+	}
+
+	if markerLine == "" || headerLine == "" {
+		return nil, WrapVaultError(path, fmt.Errorf("missing valid header"))
+	}
+
+	markerType := DetectMarkerType(markerLine)
+	if markerType != MarkerHeader && markerType != MarkerHeaderLegacy {
+		return nil, WrapVaultError(path, fmt.Errorf("invalid header marker: %q", markerLine))
+	}
+
+	version, err := detectVersionFromJSON([]byte(headerLine))
+	if err != nil {
+		return nil, WrapVaultError(path, fmt.Errorf("failed to detect version: %w", err))
+	}
+
+	header, err := UnmarshalHeaderVersioned([]byte(headerLine), version)
+	if err != nil {
+		return nil, WrapVaultError(path, fmt.Errorf("failed to parse header: %w", err))
+	}
+
+	return &VaultInfo{
+		Path:          path,
+		Version:       version,
+		MarkerFormat:  markerType,
+		IdentityCount: len(header.Identities),
+		SecretCount:   len(header.Secrets),
 	}, nil
 }

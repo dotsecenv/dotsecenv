@@ -116,8 +116,8 @@ func InitVaultFile(vaultPath string, stdout, stderr io.Writer) *Error {
 		return NewError(fmt.Sprintf("vault file already exists: %s", vaultPath), ExitVaultError)
 	}
 
-	// Create empty vault structure
-	vm := vault.NewManager(vaultPath)
+	// Create empty vault structure (strictMode=false since we're creating new)
+	vm := vault.NewManager(vaultPath, false)
 
 	// Create directory if needed
 	if err := os.MkdirAll(filepath.Dir(vaultPath), 0o700); err != nil {

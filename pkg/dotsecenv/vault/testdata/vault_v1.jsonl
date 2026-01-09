@@ -1,0 +1,7 @@
+# === VAULT HEADER ===
+{"version":1,"identities":[["ABC123DEF456",4],["XYZ789GHI012",5]],"secrets":{"TEST_SECRET":{"secret":6,"values":[7]}}}
+# === VAULT DATA ===
+{"type":"identity","data":{"added_at":"2024-01-01T00:00:00Z","algorithm":"RSA","algorithm_bits":4096,"fingerprint":"ABC123DEF456","hash":"idhash1","public_key":"pk1","signed_by":"ABC123DEF456","signature":"sig1","uid":"test1@example.com"}}
+{"type":"identity","data":{"added_at":"2024-01-01T00:00:01Z","algorithm":"RSA","algorithm_bits":4096,"fingerprint":"XYZ789GHI012","hash":"idhash2","public_key":"pk2","signed_by":"ABC123DEF456","signature":"sig2","uid":"test2@example.com"}}
+{"type":"secret","data":{"added_at":"2024-01-01T00:00:02Z","hash":"sechash1","key":"TEST_SECRET","signature":"secsig1","signed_by":"ABC123DEF456"}}
+{"type":"value","secret":"TEST_SECRET","data":{"added_at":"2024-01-01T00:00:03Z","available_to":["ABC123DEF456","XYZ789GHI012"],"hash":"valhash1","signature":"valsig1","signed_by":"ABC123DEF456","value":"ZW5jcnlwdGVkX3ZhbHVl"}}

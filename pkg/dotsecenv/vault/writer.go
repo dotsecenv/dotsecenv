@@ -15,6 +15,7 @@ import (
 type Writer struct {
 	path     string
 	header   *Header
+	version  int      // current vault format version
 	lines    []string // cached lines for header rewriting
 	readOnly bool     // if true, don't try to create/modify files
 }
@@ -38,25 +39,25 @@ func newWriter(path string, readOnly bool) (*Writer, error) {
 	// Check if file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if readOnly {
-			return nil, fmt.Errorf("vault file does not exist: %s", path)
+			return nil, WrapVaultError(path, fmt.Errorf("file does not exist"))
 		}
 		// Create new vault
 		if err := w.createNewVault(); err != nil {
-			return nil, err
+			return nil, WrapVaultError(path, err)
 		}
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to stat vault file: %w", err)
+		return nil, WrapVaultError(path, fmt.Errorf("failed to stat: %w", err))
 	} else {
 		// Load existing vault
 		if err := w.loadExisting(); err != nil {
-			return nil, err
+			return nil, WrapVaultError(path, err)
 		}
 	}
 
 	return w, nil
 }
 
-// createNewVault initializes a new vault file
+// createNewVault initializes a new vault file with the latest format version
 func (w *Writer) createNewVault() error {
 	// Ensure directory exists
 	dir := filepath.Dir(w.path)
@@ -65,6 +66,7 @@ func (w *Writer) createNewVault() error {
 	}
 
 	w.header = NewHeader()
+	w.version = LatestFormatVersion
 	w.lines = []string{
 		HeaderMarker,
 		"", // placeholder for header JSON
@@ -91,6 +93,7 @@ func (w *Writer) loadExisting() error {
 		if w.readOnly {
 			// In read-only mode, treat empty file as empty vault (no write needed)
 			w.header = NewHeader()
+			w.version = LatestFormatVersion
 			w.lines = []string{
 				HeaderMarker,
 				"", // will be populated if we ever need to read
@@ -105,14 +108,21 @@ func (w *Writer) loadExisting() error {
 	scanner := bufio.NewScanner(file)
 	w.lines = make([]string, 0, 100)
 	lineNum := 0
+	var markerLine string
 	var headerLine string
+	var dataMarkerLine string
 
 	for scanner.Scan() {
 		line := scanner.Text()
 		w.lines = append(w.lines, line)
 
-		if lineNum == 1 {
+		switch lineNum {
+		case 0:
+			markerLine = line
+		case 1:
 			headerLine = line
+		case 2:
+			dataMarkerLine = line
 		}
 		lineNum++
 	}
@@ -125,6 +135,7 @@ func (w *Writer) loadExisting() error {
 		if w.readOnly {
 			// In read-only mode, treat malformed file as empty vault
 			w.header = NewHeader()
+			w.version = LatestFormatVersion
 			w.lines = []string{
 				HeaderMarker,
 				"",
@@ -136,19 +147,26 @@ func (w *Writer) loadExisting() error {
 		return w.createNewVault()
 	}
 
-	header, err := UnmarshalHeader([]byte(headerLine))
+	header, version, err := parseVaultHeader(markerLine, headerLine)
 	if err != nil {
-		return fmt.Errorf("failed to parse vault header: %w", err)
+		return err
 	}
+
+	// Validate data marker
+	if err := ValidateDataMarker(dataMarkerLine); err != nil {
+		return fmt.Errorf("invalid vault file: %w", err)
+	}
+
 	w.header = header
+	w.version = version
 
 	return nil
 }
 
 // flush writes all lines to the vault file atomically
 func (w *Writer) flush() error {
-	// Update header line
-	headerJSON, err := MarshalHeader(w.header)
+	// Update header line using current version's format
+	headerJSON, err := MarshalHeaderVersioned(w.header, w.version)
 	if err != nil {
 		return fmt.Errorf("failed to marshal header: %w", err)
 	}
@@ -353,6 +371,11 @@ func (w *Writer) AddSecretWithValues(s Secret) error {
 	return w.flush()
 }
 
+// Version returns the current vault format version
+func (w *Writer) Version() int {
+	return w.version
+}
+
 // Header returns a copy of the current header
 func (w *Writer) Header() Header {
 	if w.header == nil {
@@ -392,10 +415,17 @@ func (w *Writer) Path() string {
 }
 
 // RewriteFromVault completely rewrites the vault file from a Vault struct
-// This is used for defragmentation and initial conversion
+// using the latest format version. This is used for defragmentation.
 func (w *Writer) RewriteFromVault(v Vault) error {
-	// Start fresh
+	return w.RewriteFromVaultWithVersion(v, LatestFormatVersion)
+}
+
+// RewriteFromVaultWithVersion completely rewrites the vault file from a Vault struct
+// using the specified format version. This is used for upgrades and defragmentation.
+func (w *Writer) RewriteFromVaultWithVersion(v Vault, version int) error {
+	// Start fresh with specified version
 	w.header = NewHeader()
+	w.version = version
 	w.lines = []string{
 		HeaderMarker,
 		"", // placeholder for header JSON

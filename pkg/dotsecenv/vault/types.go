@@ -49,7 +49,8 @@ type VaultEntry struct {
 
 // VaultConfig represents parsed vault configuration
 type VaultConfig struct {
-	Entries []VaultEntry
+	Entries    []VaultEntry
+	StrictMode bool // If true, don't auto-upgrade vaults
 }
 
 // NewVault creates an empty vault.
