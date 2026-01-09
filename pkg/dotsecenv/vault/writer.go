@@ -39,18 +39,18 @@ func newWriter(path string, readOnly bool) (*Writer, error) {
 	// Check if file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if readOnly {
-			return nil, fmt.Errorf("vault file does not exist: %s", path)
+			return nil, WrapVaultError(path, fmt.Errorf("file does not exist"))
 		}
 		// Create new vault
 		if err := w.createNewVault(); err != nil {
-			return nil, err
+			return nil, WrapVaultError(path, err)
 		}
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to stat vault file: %w", err)
+		return nil, WrapVaultError(path, fmt.Errorf("failed to stat: %w", err))
 	} else {
 		// Load existing vault
 		if err := w.loadExisting(); err != nil {
-			return nil, err
+			return nil, WrapVaultError(path, err)
 		}
 	}
 
@@ -110,6 +110,7 @@ func (w *Writer) loadExisting() error {
 	lineNum := 0
 	var markerLine string
 	var headerLine string
+	var dataMarkerLine string
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -120,6 +121,8 @@ func (w *Writer) loadExisting() error {
 			markerLine = line
 		case 1:
 			headerLine = line
+		case 2:
+			dataMarkerLine = line
 		}
 		lineNum++
 	}
@@ -148,6 +151,12 @@ func (w *Writer) loadExisting() error {
 	if err != nil {
 		return err
 	}
+
+	// Validate data marker
+	if err := ValidateDataMarker(dataMarkerLine); err != nil {
+		return fmt.Errorf("invalid vault file: %w", err)
+	}
+
 	w.header = header
 	w.version = version
 

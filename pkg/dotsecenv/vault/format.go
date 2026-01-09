@@ -1,13 +1,23 @@
 package vault
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
 )
+
+// WrapVaultError adds vault path context to an error for better debugging.
+func WrapVaultError(path string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("vault %q: %w", path, err)
+}
 
 // Format version constants
 const (
@@ -179,9 +189,43 @@ func MarshalHeader(h *Header) ([]byte, error) {
 	return MarshalHeaderVersioned(h, LatestFormatVersion)
 }
 
-// HeaderMarker is the constant marker line that precedes the vault header JSON.
-// New vaults always use this format.
-const HeaderMarker = "# === VAULT HEADER ==="
+// Vault section markers
+const (
+	// HeaderMarker is the constant marker line that precedes the vault header JSON.
+	HeaderMarker = "# === VAULT HEADER ==="
+	// DataMarker separates the header from data entries.
+	DataMarker = "# === VAULT DATA ==="
+)
+
+// MarkerType identifies the type of vault marker line
+type MarkerType int
+
+const (
+	// MarkerUnknown indicates the line is not a recognized marker
+	MarkerUnknown MarkerType = iota
+	// MarkerHeader indicates a current-format header marker
+	MarkerHeader
+	// MarkerHeaderLegacy indicates an old versioned header marker (e.g., "# === VAULT HEADER v1 ===")
+	MarkerHeaderLegacy
+	// MarkerData indicates a data section marker
+	MarkerData
+)
+
+// DetectMarkerType identifies what type of marker a line is
+func DetectMarkerType(line string) MarkerType {
+	switch {
+	case line == HeaderMarker:
+		return MarkerHeader
+	case line == DataMarker:
+		return MarkerData
+	case strings.HasPrefix(line, legacyMarkerPrefix) && strings.HasSuffix(line, legacyMarkerSuffix):
+		middle := line[len(legacyMarkerPrefix) : len(line)-len(legacyMarkerSuffix)]
+		if len(middle) > 0 && isNumeric(middle) {
+			return MarkerHeaderLegacy
+		}
+	}
+	return MarkerUnknown
+}
 
 // legacyMarkerPrefix is the prefix for old versioned header markers.
 const legacyMarkerPrefix = "# === VAULT HEADER v"
@@ -193,19 +237,20 @@ const legacyMarkerSuffix = " ==="
 // Accepts both the new versionless format and old versioned formats for backward compatibility.
 // Returns nil if the marker is valid, or an error if invalid.
 func ValidateHeaderMarker(markerLine string) error {
-	// Accept new format
-	if markerLine == HeaderMarker {
+	markerType := DetectMarkerType(markerLine)
+	if markerType == MarkerHeader || markerType == MarkerHeaderLegacy {
 		return nil
 	}
-	// Accept old versioned format (e.g., "# === VAULT HEADER v1 ===")
-	if strings.HasPrefix(markerLine, legacyMarkerPrefix) && strings.HasSuffix(markerLine, legacyMarkerSuffix) {
-		// Extract version part and verify it's numeric
-		middle := markerLine[len(legacyMarkerPrefix) : len(markerLine)-len(legacyMarkerSuffix)]
-		if len(middle) > 0 && isNumeric(middle) {
-			return nil
-		}
-	}
 	return fmt.Errorf("invalid vault header marker: %q", markerLine)
+}
+
+// ValidateDataMarker checks if a data marker line is valid.
+// Returns nil if the marker is valid, or an error if invalid.
+func ValidateDataMarker(markerLine string) error {
+	if DetectMarkerType(markerLine) == MarkerData {
+		return nil
+	}
+	return fmt.Errorf("invalid vault data marker: %q", markerLine)
 }
 
 // isNumeric checks if a string contains only digits.
@@ -415,5 +460,95 @@ func CreateValueEntry(secretKey string, sv SecretValue) (*Entry, error) {
 		Type:      EntryTypeValue,
 		SecretKey: secretKey,
 		Data:      jsonData,
+	}, nil
+}
+
+// VaultInfo contains lightweight metadata about a vault file.
+// It can be obtained without fully parsing all vault entries.
+type VaultInfo struct {
+	Path          string     // Path to the vault file
+	Version       int        // Vault format version
+	MarkerFormat  MarkerType // Header marker format (current vs legacy)
+	IdentityCount int        // Number of identities in the vault
+	SecretCount   int        // Number of secrets in the vault
+}
+
+// InspectVault returns lightweight metadata about a vault without fully loading it.
+// This is useful for quick vault inspection or validation.
+func InspectVault(path string) (*VaultInfo, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &VaultInfo{
+				Path:          path,
+				Version:       LatestFormatVersion,
+				MarkerFormat:  MarkerUnknown,
+				IdentityCount: 0,
+				SecretCount:   0,
+			}, nil
+		}
+		return nil, WrapVaultError(path, fmt.Errorf("failed to open: %w", err))
+	}
+	defer func() { _ = file.Close() }()
+
+	// Check if file is empty
+	info, err := file.Stat()
+	if err != nil {
+		return nil, WrapVaultError(path, fmt.Errorf("failed to stat: %w", err))
+	}
+	if info.Size() == 0 {
+		return &VaultInfo{
+			Path:          path,
+			Version:       LatestFormatVersion,
+			MarkerFormat:  MarkerUnknown,
+			IdentityCount: 0,
+			SecretCount:   0,
+		}, nil
+	}
+
+	scanner := bufio.NewScanner(file)
+	lineNum := 0
+	var markerLine, headerLine string
+
+	for scanner.Scan() && lineNum < 2 {
+		line := scanner.Text()
+		switch lineNum {
+		case 0:
+			markerLine = line
+		case 1:
+			headerLine = line
+		}
+		lineNum++
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, WrapVaultError(path, fmt.Errorf("failed to scan: %w", err))
+	}
+
+	if markerLine == "" || headerLine == "" {
+		return nil, WrapVaultError(path, fmt.Errorf("missing valid header"))
+	}
+
+	markerType := DetectMarkerType(markerLine)
+	if markerType != MarkerHeader && markerType != MarkerHeaderLegacy {
+		return nil, WrapVaultError(path, fmt.Errorf("invalid header marker: %q", markerLine))
+	}
+
+	version, err := detectVersionFromJSON([]byte(headerLine))
+	if err != nil {
+		return nil, WrapVaultError(path, fmt.Errorf("failed to detect version: %w", err))
+	}
+
+	header, err := UnmarshalHeaderVersioned([]byte(headerLine), version)
+	if err != nil {
+		return nil, WrapVaultError(path, fmt.Errorf("failed to parse header: %w", err))
+	}
+
+	return &VaultInfo{
+		Path:          path,
+		Version:       version,
+		MarkerFormat:  markerType,
+		IdentityCount: len(header.Identities),
+		SecretCount:   len(header.Secrets),
 	}, nil
 }

@@ -8,9 +8,6 @@ import (
 	"strings"
 )
 
-// DataMarker separates the header from data entries
-const DataMarker = "# === VAULT DATA ==="
-
 // Reader provides efficient access to vault data using the header index
 type Reader struct {
 	path        string
@@ -23,7 +20,7 @@ type Reader struct {
 func NewReader(path string) (*Reader, error) {
 	r := &Reader{path: path}
 	if err := r.loadHeader(); err != nil {
-		return nil, err
+		return nil, WrapVaultError(path, err)
 	}
 	return r, nil
 }
@@ -62,6 +59,7 @@ func (r *Reader) loadHeader() error {
 	lineNum := 0
 	var markerLine string
 	var headerLine string
+	var dataMarkerLine string
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -72,6 +70,8 @@ func (r *Reader) loadHeader() error {
 			markerLine = line
 		case 1:
 			headerLine = line
+		case 2:
+			dataMarkerLine = line
 		}
 
 		// Account for newline character
@@ -91,6 +91,14 @@ func (r *Reader) loadHeader() error {
 	if err != nil {
 		return err
 	}
+
+	// Validate data marker if present (vaults with data have at least 3 lines)
+	if dataMarkerLine != "" {
+		if err := ValidateDataMarker(dataMarkerLine); err != nil {
+			return fmt.Errorf("invalid vault file: %w", err)
+		}
+	}
+
 	r.header = header
 	r.version = version
 
