@@ -354,25 +354,26 @@ if test -f $XDG_DATA_HOME/dotsecenv/conf.d/dotsecenv.fish
 end'
     fi
 
-    # Session banner
+    # Session banner - simple format that handles long paths
     local banner
     banner=$(cat <<'EOF'
 
 # Session info
 echo ""
-echo "┌─────────────────────────────────────────────────────────────┐"
-printf "│ %-59s │\n" "Sandbox: SESSION_NAME"
-printf "│ %-59s │\n" "HOME: $HOME"
+echo "╭───────────────────────────────────────╮"
+echo "│  dotsecenv sandbox                    │"
+echo "╰───────────────────────────────────────╯"
+echo "  Session: SESSION_NAME"
+echo "  HOME:    $HOME"
 EOF
 )
     banner="${banner//SESSION_NAME/$session_name}"
 
     if [[ -n "$fp_ed25519" ]]; then
         banner+='
-printf "│ %-59s │\n" "Default GPG: $DEFAULT_GPG_KEY"'
+echo "  GPG:     $DEFAULT_GPG_KEY"'
     fi
     banner+='
-echo "└─────────────────────────────────────────────────────────────┘"
 echo ""'
 
     # Write .bashrc
@@ -422,20 +423,21 @@ $fish_plugin
 EOF
     fi
 
-    # Fish banner (different syntax)
+    # Fish banner
     cat >> "$xdg_config/fish/config.fish" <<EOF
 
 # Session info
 echo ""
-echo "┌─────────────────────────────────────────────────────────────┐"
-printf "│ %-59s │\n" "Sandbox: $session_name"
-printf "│ %-59s │\n" "HOME: \$HOME"
+echo "╭───────────────────────────────────────╮"
+echo "│  dotsecenv sandbox                    │"
+echo "╰───────────────────────────────────────╯"
+echo "  Session: $session_name"
+echo "  HOME:    \$HOME"
 EOF
     if [[ -n "$fp_ed25519" ]]; then
-        echo 'printf "│ %-59s │\n" "Default GPG: $DEFAULT_GPG_KEY"' >> "$xdg_config/fish/config.fish"
+        echo 'echo "  GPG:     $DEFAULT_GPG_KEY"' >> "$xdg_config/fish/config.fish"
     fi
     cat >> "$xdg_config/fish/config.fish" <<EOF
-echo "└─────────────────────────────────────────────────────────────┘"
 echo ""
 EOF
 
