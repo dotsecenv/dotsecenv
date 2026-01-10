@@ -9,6 +9,8 @@ help:
 	@echo "  make test           - Run tests"
 	@echo "  make test-race      - Run tests with race condition detection"
 	@echo "  make e2e            - Run end-to-end tests using the compiled binary"
+	@echo "  make sandbox        - Create an interactive sandbox environment"
+	@echo "  make demo           - Run demo recording in sandbox (requires asciinema)"
 	@echo "  make completions    - Generate shell completions"
 	@echo "  make docs           - Generate markdown documentation"
 	@echo "  make man            - Generate man pages"
@@ -59,23 +61,68 @@ test-race:
 	@echo "Running tests with race condition detection..."
 	go test -race -v -p 1 ./...
 
+# E2E tests in isolated environment
 .PHONY: e2e
 e2e: build
+	@echo "Running e2e tests in isolated environment..."
 	@E2E_HOME=$$(mktemp -d) && \
-	mkdir -p "$$E2E_HOME/.gnupg" "$$E2E_HOME/.config" "$$E2E_HOME/.local/share" && \
+	mkdir -p "$$E2E_HOME/.gnupg" "$$E2E_HOME/.config" "$$E2E_HOME/.local/share" "$$E2E_HOME/.local/state" "$$E2E_HOME/.cache" "$$E2E_HOME/bin" && \
 	chmod 700 "$$E2E_HOME/.gnupg" && \
-	cp bin/dotsecenv "$$E2E_HOME/" && \
+	cp bin/dotsecenv "$$E2E_HOME/bin/" && \
 	cp scripts/e2e.sh "$$E2E_HOME/" && \
-	echo "Running e2e tests in isolated environment: $$E2E_HOME" && \
+	echo "E2E environment: $$E2E_HOME" && \
+	cd "$$E2E_HOME" && \
 	HOME="$$E2E_HOME" \
-	PATH="$$E2E_HOME:$$PATH" \
+	PATH="$$E2E_HOME/bin:$$PATH" \
 	GNUPGHOME="$$E2E_HOME/.gnupg" \
 	XDG_CONFIG_HOME="$$E2E_HOME/.config" \
 	XDG_DATA_HOME="$$E2E_HOME/.local/share" \
-	cd "$$E2E_HOME" && \
-	./e2e.sh $(E2E_FLAGS) && \
+	XDG_STATE_HOME="$$E2E_HOME/.local/state" \
+	XDG_CACHE_HOME="$$E2E_HOME/.cache" \
+	bash ./e2e.sh $(E2E_FLAGS) && \
 	rm -rf "$$E2E_HOME" && \
-	echo "Cleaned up $$E2E_HOME"
+	echo "E2E tests passed, cleaned up $$E2E_HOME"
+
+# Interactive sandbox for manual testing
+.PHONY: sandbox
+sandbox: build
+	@echo "Creating interactive sandbox..."
+	@scripts/sandbox.sh --binary bin/dotsecenv
+
+# Demo recording environment (for asciinema)
+.PHONY: demo
+demo: build
+	@echo "Setting up demo environment..."
+	@DEMO_HOME=$$(mktemp -d) && \
+	mkdir -p "$$DEMO_HOME/.gnupg" "$$DEMO_HOME/.config" "$$DEMO_HOME/.local/share" "$$DEMO_HOME/.local/state" "$$DEMO_HOME/.cache" "$$DEMO_HOME/bin" "$$DEMO_HOME/demos" && \
+	chmod 700 "$$DEMO_HOME/.gnupg" && \
+	cp bin/dotsecenv "$$DEMO_HOME/bin/" && \
+	cp demos/demo.sh "$$DEMO_HOME/demos/" && \
+	echo "Downloading demo-magic..." && \
+	curl -fsSL https://raw.githubusercontent.com/paxtonhare/demo-magic/master/demo-magic.sh -o "$$DEMO_HOME/demos/_demo-magic.sh" && \
+	if [ -d ../plugin ]; then \
+		mkdir -p "$$DEMO_HOME/.local/share/dotsecenv"; \
+		cp ../plugin/_dotsecenv_core.sh "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
+		cp ../plugin/dotsecenv.plugin.bash "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
+		cp ../plugin/dotsecenv.plugin.zsh "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
+	fi && \
+	echo "Generating GPG key for demo..." && \
+	GNUPGHOME="$$DEMO_HOME/.gnupg" gpg --batch --gen-key <<< $$'Key-Type: EDDSA\nKey-Curve: ed25519\nName-Real: Demo User\nName-Email: demo@dotsecenv\n%no-protection\n%commit' && \
+	echo "" && \
+	echo "Demo environment ready at: $$DEMO_HOME" && \
+	echo "To record: asciinema rec -c 'HOME=$$DEMO_HOME bash $$DEMO_HOME/demos/demo.sh'" && \
+	echo "" && \
+	echo "Entering demo shell (type 'exit' when done)..." && \
+	HOME="$$DEMO_HOME" \
+	PATH="$$DEMO_HOME/bin:$$PATH" \
+	GNUPGHOME="$$DEMO_HOME/.gnupg" \
+	XDG_CONFIG_HOME="$$DEMO_HOME/.config" \
+	XDG_DATA_HOME="$$DEMO_HOME/.local/share" \
+	XDG_STATE_HOME="$$DEMO_HOME/.local/state" \
+	XDG_CACHE_HOME="$$DEMO_HOME/.cache" \
+	bash -i && \
+	echo "Cleaning up $$DEMO_HOME" && \
+	rm -rf "$$DEMO_HOME"
 
 .PHONY: update
 update:
