@@ -529,25 +529,43 @@ enter_sandbox() {
     local shell="$3"
     local persistent="$4"
 
+    # Save original directory
+    local original_dir
+    original_dir=$(pwd)
+
     # Cleanup trap for ephemeral sessions
     if [[ "$persistent" != "true" ]]; then
         # shellcheck disable=SC2064
-        trap "log 'Cleaning up ephemeral sandbox: $sandbox_home'; rm -rf '$sandbox_home'" EXIT
+        trap "cd '$original_dir' 2>/dev/null; log 'Cleaning up ephemeral sandbox: $sandbox_home'; rm -rf '$sandbox_home'" EXIT
+    else
+        # shellcheck disable=SC2064
+        trap "cd '$original_dir' 2>/dev/null" EXIT
     fi
 
     log "Entering sandbox with $shell"
     log "  HOME=$sandbox_home"
     echo ""
 
-    # Launch shell with complete isolation
-    HOME="$sandbox_home" \
-    GNUPGHOME="$sandbox_home/.gnupg" \
-    XDG_CONFIG_HOME="$sandbox_home/.config" \
-    XDG_DATA_HOME="$sandbox_home/.local/share" \
-    XDG_STATE_HOME="$sandbox_home/.local/state" \
-    XDG_CACHE_HOME="$sandbox_home/.cache" \
-    SANDBOX_SESSION="$session_name" \
-    "$shell" -i
+    # Change to sandbox home
+    cd "$sandbox_home" || exit 1
+
+    # Launch shell with clean environment (only essential variables)
+    # Isolate: HOME, XDG_*, GNUPGHOME (sandbox-specific paths)
+    # Preserve: PATH (for system utilities like gpg, git), TERM, LANG, USER
+    env -i \
+        HOME="$sandbox_home" \
+        PATH="$sandbox_home/bin:${PATH}" \
+        GNUPGHOME="$sandbox_home/.gnupg" \
+        XDG_CONFIG_HOME="$sandbox_home/.config" \
+        XDG_DATA_HOME="$sandbox_home/.local/share" \
+        XDG_STATE_HOME="$sandbox_home/.local/state" \
+        XDG_CACHE_HOME="$sandbox_home/.cache" \
+        SANDBOX_SESSION="$session_name" \
+        TERM="${TERM:-xterm-256color}" \
+        LANG="${LANG:-en_US.UTF-8}" \
+        USER="${USER:-$(whoami)}" \
+        SHELL="$(command -v "$shell")" \
+        "$shell" -i
 
     log "Exited sandbox"
 }

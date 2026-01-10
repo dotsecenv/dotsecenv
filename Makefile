@@ -71,6 +71,7 @@ e2e: build
 	cp bin/dotsecenv "$$E2E_HOME/bin/" && \
 	cp scripts/e2e.sh "$$E2E_HOME/" && \
 	echo "E2E environment: $$E2E_HOME" && \
+	cd "$$E2E_HOME" && \
 	HOME="$$E2E_HOME" \
 	PATH="$$E2E_HOME/bin:$$PATH" \
 	GNUPGHOME="$$E2E_HOME/.gnupg" \
@@ -78,7 +79,7 @@ e2e: build
 	XDG_DATA_HOME="$$E2E_HOME/.local/share" \
 	XDG_STATE_HOME="$$E2E_HOME/.local/state" \
 	XDG_CACHE_HOME="$$E2E_HOME/.cache" \
-	bash "$$E2E_HOME/e2e.sh" $(E2E_FLAGS) && \
+	bash ./e2e.sh $(E2E_FLAGS) && \
 	rm -rf "$$E2E_HOME" && \
 	echo "E2E tests passed, cleaned up $$E2E_HOME"
 
