@@ -12,8 +12,9 @@ import (
 
 // resolveWritableVaultIndex resolves which vault to write to based on vaultPath and fromIndex.
 // If neither is specified, it performs interactive selection from available vaults.
+// The prompt parameter customizes the interactive selection prompt (empty uses default).
 // Returns the 0-based vault index or an error.
-func (c *CLI) resolveWritableVaultIndex(vaultPath string, fromIndex int) (int, *Error) {
+func (c *CLI) resolveWritableVaultIndex(vaultPath string, fromIndex int, prompt ...string) (int, *Error) {
 	if vaultPath != "" {
 		expandedPath := vault.ExpandPath(vaultPath)
 
@@ -72,7 +73,13 @@ func (c *CLI) resolveWritableVaultIndex(vaultPath string, fromIndex int) (int, *
 		displayPaths[i] = v.Path
 	}
 
-	selectedIndex, selectErr := HandleInteractiveSelection(displayPaths, "Multiple vaults configured. Select target vault:", c.output.Stderr())
+	// Use custom prompt if provided, otherwise default
+	selectionPrompt := "Multiple vaults configured. Select target vault:"
+	if len(prompt) > 0 && prompt[0] != "" {
+		selectionPrompt = prompt[0]
+	}
+
+	selectedIndex, selectErr := HandleInteractiveSelection(displayPaths, selectionPrompt, c.output.Stderr())
 	if selectErr != nil {
 		return -1, selectErr
 	}
@@ -213,39 +220,14 @@ type DefragStatsJSON struct {
 // VaultDefrag shows fragmentation stats or performs defragmentation on a single vault
 func (c *CLI) VaultDefrag(dryRun bool, jsonOutput bool, skipConfirm bool, vaultPath string, fromIndex int) *Error {
 	config := c.vaultResolver.GetConfig()
-	vaultPaths := c.vaultResolver.GetVaultPaths()
 
-	// Determine target vault index
-	targetIndex := -1
-
-	if vaultPath != "" {
-		expandedPath := vault.ExpandPath(vaultPath)
-		for i, p := range vaultPaths {
-			if vault.ExpandPath(p) == expandedPath {
-				targetIndex = i
-				break
-			}
-		}
-		if targetIndex == -1 {
-			return NewError(fmt.Sprintf("vault path '%s' not found in config", expandedPath), ExitVaultError)
-		}
-	} else if fromIndex != 0 {
-		if fromIndex <= 0 || fromIndex > len(config.Entries) {
-			return NewError(fmt.Sprintf("-v index must be between 1 and %d", len(config.Entries)), ExitGeneralError)
-		}
-		targetIndex = fromIndex - 1
-	} else if len(vaultPaths) == 0 {
-		return NewError("no vaults configured", ExitVaultError)
-	} else if len(vaultPaths) == 1 {
-		targetIndex = 0
-	} else {
-		// Multiple vaults: interactive selection
-		idx, selectErr := HandleInteractiveSelection(vaultPaths, "Select vault to defragment:", c.output.Stderr())
-		if selectErr != nil {
-			return selectErr
-		}
-		targetIndex = idx
+	// Use common vault selection logic
+	targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex, "Select vault to defragment:")
+	if resolveErr != nil {
+		return resolveErr
 	}
+
+	_ = config // Used later for entry lookup
 
 	// Get the vault manager
 	entry := config.Entries[targetIndex]
@@ -341,38 +323,11 @@ func (c *CLI) outputDefragJSONSingle(vaultPath string, stats *vault.Fragmentatio
 // VaultUpgrade upgrades a vault to the latest format version
 func (c *CLI) VaultUpgrade(vaultPath string, fromIndex int) *Error {
 	config := c.vaultResolver.GetConfig()
-	vaultPaths := c.vaultResolver.GetVaultPaths()
 
-	// Determine target vault index (same logic as VaultDefrag)
-	targetIndex := -1
-
-	if vaultPath != "" {
-		expandedPath := vault.ExpandPath(vaultPath)
-		for i, p := range vaultPaths {
-			if vault.ExpandPath(p) == expandedPath {
-				targetIndex = i
-				break
-			}
-		}
-		if targetIndex == -1 {
-			return NewError(fmt.Sprintf("vault path '%s' not found in config", expandedPath), ExitVaultError)
-		}
-	} else if fromIndex != 0 {
-		if fromIndex <= 0 || fromIndex > len(config.Entries) {
-			return NewError(fmt.Sprintf("-v index must be between 1 and %d", len(config.Entries)), ExitGeneralError)
-		}
-		targetIndex = fromIndex - 1
-	} else if len(vaultPaths) == 0 {
-		return NewError("no vaults configured", ExitVaultError)
-	} else if len(vaultPaths) == 1 {
-		targetIndex = 0
-	} else {
-		// Multiple vaults: interactive selection
-		idx, selectErr := HandleInteractiveSelection(vaultPaths, "Select vault to upgrade:", c.output.Stderr())
-		if selectErr != nil {
-			return NewError(selectErr.Error(), ExitGeneralError)
-		}
-		targetIndex = idx
+	// Use common vault selection logic
+	targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex, "Select vault to upgrade:")
+	if resolveErr != nil {
+		return resolveErr
 	}
 
 	entry := config.Entries[targetIndex]
