@@ -172,9 +172,17 @@ func (w *Writer) flush() error {
 	}
 	w.lines[1] = string(headerJSON)
 
+	// Capture original file's permissions and ownership before writing
+	var originalMode os.FileMode = 0o600 // default for new files
+	var originalUID, originalGID = -1, -1
+	if info, err := os.Stat(w.path); err == nil {
+		originalMode = info.Mode().Perm()
+		originalUID, originalGID = getFileOwner(info)
+	}
+
 	// Write to temp file first for atomicity
 	tmpPath := w.path + ".tmp"
-	tmpFile, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	tmpFile, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, originalMode)
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -214,6 +222,12 @@ func (w *Writer) flush() error {
 	if err := os.Rename(tmpPath, w.path); err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to rename temp file: %w", err)
+	}
+
+	// Restore original ownership if we captured it and are running as root.
+	// Non-fatal: the file was written successfully, just potentially with different ownership.
+	if originalUID >= 0 && originalGID >= 0 && os.Getuid() == 0 {
+		_ = os.Chown(w.path, originalUID, originalGID)
 	}
 
 	return nil
