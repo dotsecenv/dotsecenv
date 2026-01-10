@@ -107,6 +107,8 @@ approved_algorithms:
     min_bits: 2048
 vault:
   - "%s"
+gpg:
+  program: PATH
 `, vaultPath)
 	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatal(err)
@@ -209,6 +211,8 @@ approved_algorithms:
     min_bits: 2048
 vault:
   - "%s"
+gpg:
+  program: PATH
 `, vaultPath)
 	_ = os.WriteFile(configPath, []byte(configContent), 0600)
 

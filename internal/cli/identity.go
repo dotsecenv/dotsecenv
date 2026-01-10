@@ -92,8 +92,8 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 	// Get full config for correct display positions
 	fullVaultCfg, _ := vault.ParseVaultConfig(c.config.Vault)
 
-	// In strict mode, pre-flight check: fail if any vault has a parsing error (not just missing)
-	if c.Strict {
+	// If fail_on_integrity_error is set, pre-flight check: fail if any vault has a parsing error (not just missing)
+	if c.config.ShouldFailOnIntegrityError() {
 		// First pass: collect failed vault display positions and their errors
 		type vaultError struct {
 			displayPos int
@@ -139,7 +139,7 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 			}
 
 			// Print header and iterate through all vaults in order
-			_, _ = fmt.Fprintf(c.output.Stdout(), "Strict mode: vault errors detected, no changes made\n")
+			_, _ = fmt.Fprintf(c.output.Stdout(), "fail_on_integrity_error: vault errors detected, no changes made\n")
 			for idx, entry := range loadedConfig.Entries {
 				displayPos := idx + 1
 				expandedPath := vault.ExpandPath(entry.Path)
@@ -166,7 +166,7 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 					_, _ = fmt.Fprintf(c.output.Stdout(), "  Vault %d (%s): would add identity (skipped due to errors in %s %s)\n", displayPos, entry.Path, vaultWord, failedVaultsList)
 				}
 			}
-			return NewError("strict mode error: one or more vaults failed to load", ExitVaultError)
+			return NewError("fail_on_integrity_error: one or more vaults failed to load", ExitVaultError)
 		}
 	}
 
@@ -262,18 +262,9 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 		addedCount++
 	}
 
-	// In strict mode, error only if identity was NOT added to any vault
-	if c.Strict && addedCount == 0 {
-		if skippedAlreadyPresent > 0 {
-			return NewError("strict mode error: identity already exists in all viable vaults", ExitGeneralError)
-		}
-		if failureCount > 0 {
-			return NewError("strict mode error: failed to add identity to any vault", ExitVaultError)
-		}
-	}
-
-	// In non-strict mode, error only if all targets had actual failures (not "already present")
-	if !c.Strict && addedCount == 0 && failureCount > 0 && skippedAlreadyPresent == 0 {
+	// Error only if all targets had actual failures (not "already present")
+	// Identity already exists is not an error - it's just a warning (printed earlier)
+	if addedCount == 0 && failureCount > 0 && skippedAlreadyPresent == 0 {
 		return NewError("failed to add identity to any vault", ExitVaultError)
 	}
 
@@ -407,16 +398,14 @@ func (c *CLI) IdentityList(jsonOutput bool) *Error {
 }
 
 // ensureIdentityInVault ensures the identity exists in the specified vault index
+// If the identity doesn't exist, it will be auto-added with a warning
 func (c *CLI) ensureIdentityInVault(fingerprint string, index int) *Error {
 	if c.vaultResolver.IdentityExistsInVault(fingerprint, index) {
 		return nil
 	}
 
-	if c.Strict {
-		return NewError(fmt.Sprintf("strict mode error: identity %s not found in vault %d and will not be added\n  run: `dotsecenv vault identity add %s`", fingerprint, index+1, fingerprint), ExitAccessDenied)
-	}
-
-	_, _ = fmt.Fprintf(c.output.Stderr(), "Auto-adding identity %s to vault %d...\n", fingerprint, index+1)
+	// Always auto-add with warning (simplified behavior - no strict mode check)
+	_, _ = fmt.Fprintf(c.output.Stderr(), "warning: auto-adding identity %s to vault %d...\n", fingerprint, index+1)
 
 	publicKeyInfo, pubKeyErr := c.gpgClient.GetPublicKeyInfo(fingerprint)
 	if pubKeyErr != nil {

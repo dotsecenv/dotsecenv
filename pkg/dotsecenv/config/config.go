@@ -19,16 +19,33 @@ type ApprovedAlgorithm struct {
 
 // GPGConfig holds GPG-related configuration
 type GPGConfig struct {
-	Program string `yaml:"program,omitempty"` // Path to GPG executable
+	Program string `yaml:"program,omitempty"` // Path to GPG executable: "PATH" or absolute path
+}
+
+// BehaviorConfig holds granular behavior settings.
+// All fields are *bool to distinguish between "not set" (nil) and "explicitly false".
+// When nil, the legacy Strict field is used as fallback.
+type BehaviorConfig struct {
+	// RequireExplicitVaultUpgrade when true prevents automatic vault format upgrades.
+	// Users must run `dotsecenv vault upgrade` explicitly.
+	RequireExplicitVaultUpgrade *bool `yaml:"require_explicit_vault_upgrade,omitempty"`
+
+	// FailOnIntegrityError when true causes any config/vault read error to fail the operation.
+	// When false, warnings are printed and healthy files are used.
+	FailOnIntegrityError *bool `yaml:"fail_on_integrity_error,omitempty"`
+
+	// RequireConfigVaults when true ignores CLI -v flags and uses only config vaults.
+	RequireConfigVaults *bool `yaml:"require_config_vaults,omitempty"`
 }
 
 // Config represents the dotsecenv configuration
 type Config struct {
 	ApprovedAlgorithms []ApprovedAlgorithm `yaml:"approved_algorithms"`
 	Fingerprint        string              `yaml:"fingerprint,omitempty"`
-	Vault              []string            `yaml:"vault"`         // List of vault paths
-	Strict             bool                `yaml:"strict"`        // Strict mode: certain warnings become errors
-	GPG                GPGConfig           `yaml:"gpg,omitempty"` // GPG configuration
+	Vault              []string            `yaml:"vault"`              // List of vault paths
+	Strict             bool                `yaml:"strict"`             // DEPRECATED: use behavior section
+	Behavior           BehaviorConfig      `yaml:"behavior,omitempty"` // Granular behavior settings
+	GPG                GPGConfig           `yaml:"gpg,omitempty"`      // GPG configuration
 }
 
 // UnmarshalYAML provides custom YAML unmarshaling with better error messages for vault configuration
@@ -64,6 +81,33 @@ func (c *Config) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
+// ShouldRequireExplicitVaultUpgrade returns true if automatic vault upgrades should be prevented.
+// Checks behavior setting first, falls back to legacy Strict field.
+func (c *Config) ShouldRequireExplicitVaultUpgrade() bool {
+	if c.Behavior.RequireExplicitVaultUpgrade != nil {
+		return *c.Behavior.RequireExplicitVaultUpgrade
+	}
+	return c.Strict
+}
+
+// ShouldFailOnIntegrityError returns true if config/vault errors should fail the operation.
+// Checks behavior setting first, falls back to legacy Strict field.
+func (c *Config) ShouldFailOnIntegrityError() bool {
+	if c.Behavior.FailOnIntegrityError != nil {
+		return *c.Behavior.FailOnIntegrityError
+	}
+	return c.Strict
+}
+
+// ShouldRequireConfigVaults returns true if CLI -v flags should be ignored.
+// Checks behavior setting first, falls back to legacy Strict field.
+func (c *Config) ShouldRequireConfigVaults() bool {
+	if c.Behavior.RequireConfigVaults != nil {
+		return *c.Behavior.RequireConfigVaults
+	}
+	return c.Strict
+}
+
 // DefaultConfig returns a new Config with FIPS 186-5 compliant algorithm defaults.
 // Algorithm minimums are set per the Digital Signature Standard:
 //   - RSA: 2048 bits minimum (FIPS 186-5)
@@ -95,8 +139,8 @@ func DefaultConfig() Config {
 		},
 		Fingerprint: "",
 		Strict:      false,
-		Vault:       []string{},             // No default vaults from library; caller must populate
-		GPG:         GPGConfig{Program: ""}, // Empty by default; will be inferred from PATH
+		Vault:       []string{},                 // No default vaults from library; caller must populate
+		GPG:         GPGConfig{Program: "PATH"}, // Default to PATH inference
 	}
 }
 

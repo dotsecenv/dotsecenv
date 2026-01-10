@@ -219,7 +219,7 @@ func (c *CLI) SecretForget(secretKeyArg, vaultPath string, fromIndex int) *Error
 }
 
 // SecretGet retrieves a secret from the vault.
-// If c.Strict is true (from config), only returns a value if the user has access to the LATEST value of the secret.
+// If the user cannot access the latest value, falls back to older accessible values with a warning.
 func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, vaultPath string, fromIndex int) *Error {
 	// Validate secret key format
 	if _, err := vault.NormalizeSecretKey(secretKey); err != nil {
@@ -231,7 +231,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		return err
 	}
 
-	// Handle --last + -v combination warning/error
+	// Handle --last + -v combination - always error (conflicting flags)
 	if last && (vaultPath != "" || fromIndex != 0) {
 		vaultPaths := c.vaultResolver.GetVaultPaths()
 		var targetDesc string
@@ -242,11 +242,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		} else {
 			targetDesc = fmt.Sprintf("vault %d", fromIndex)
 		}
-		if c.Strict {
-			return NewError(fmt.Sprintf("strict mode error: --last and -v cannot be used together; omit -v to search all vaults or remove --last to use %s", targetDesc), ExitGeneralError)
-		}
-		_, _ = fmt.Fprintf(c.output.Stderr(), "warning: --last is ignored when -v is specified; returning latest value from %s. Omit -v to search all vaults.\n", targetDesc)
-		last = false
+		return NewError(fmt.Sprintf("--last and -v cannot be used together; omit -v to search all vaults or remove --last to use %s", targetDesc), ExitGeneralError)
 	}
 
 	targetIndex := -1
@@ -343,18 +339,14 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 
 			encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
 			if decodeErr != nil {
-				if c.Strict {
-					return NewError(fmt.Sprintf("strict mode error: failed to decode value from %s: %v", val.AddedAt, decodeErr), ExitGeneralError)
-				}
+				// Always warn and try other values
 				c.Warnf("failed to decode value from %s: %v", val.AddedAt, decodeErr)
 				continue
 			}
 
 			plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 			if decErr != nil {
-				if c.Strict {
-					return NewError(fmt.Sprintf("strict mode error: failed to decrypt value from %s: %v", val.AddedAt, decErr), ExitGPGError)
-				}
+				// Always warn and try other values
 				c.Warnf("failed to decrypt value from %s: %v", val.AddedAt, decErr)
 				continue
 			}
@@ -378,19 +370,17 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		}
 
 		// Use GetAccessibleSecretFromAnyVault to find a value THIS user can access
-		// If c.Strict is true, only the latest value is considered; otherwise fallback to older values
+		// Always allow fallback to older values if latest is not accessible
 		var errGet error
-		secret, errGet = c.vaultResolver.GetAccessibleSecretFromAnyVault(secretKey, fp, c.Strict)
+		secret, errGet = c.vaultResolver.GetAccessibleSecretFromAnyVault(secretKey, fp, false)
 		if errGet != nil {
 			return NewError(fmt.Sprintf("access denied: secret '%s' not found or not accessible", secretKey), ExitAccessDenied)
 		}
 
-		// Check if we are returning an older value (only relevant in non-strict mode)
-		if !c.Strict {
-			latestSecret, _ := c.vaultResolver.GetSecretFromAnyVault(secretKey, nil)
-			if latestSecret != nil && !latestSecret.AddedAt.Equal(secret.AddedAt) {
-				_, _ = fmt.Fprintf(c.output.Stderr(), "warning: returning older value for '%s' (access to latest value is revoked)\n", secretKey)
-			}
+		// Check if we are returning an older value and warn the user
+		latestSecret, _ := c.vaultResolver.GetSecretFromAnyVault(secretKey, nil)
+		if latestSecret != nil && !latestSecret.AddedAt.Equal(secret.AddedAt) {
+			_, _ = fmt.Fprintf(c.output.Stderr(), "warning: returning older value for '%s' (access to latest value is revoked)\n", secretKey)
 		}
 
 		// Find the vault path for this secret
@@ -448,7 +438,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 }
 
 // vaultGetFromIndex retrieves a secret from a specific vault index.
-// If c.Strict is true (from config), only returns a value if the user has access to the LATEST value.
+// If the user cannot access the latest value, falls back to older accessible values with a warning.
 func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool, fp string) *Error {
 	secretObj := c.vaultResolver.GetSecretByKeyFromVault(index, key)
 	if secretObj == nil {
@@ -492,18 +482,14 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 
 			encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
 			if decodeErr != nil {
-				if c.Strict {
-					return NewError(fmt.Sprintf("strict mode error: failed to decode value from %s: %v", val.AddedAt, decodeErr), ExitGeneralError)
-				}
+				// Always warn and try other values
 				c.Warnf("failed to decode value from %s: %v", val.AddedAt, decodeErr)
 				continue
 			}
 
 			plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 			if decErr != nil {
-				if c.Strict {
-					return NewError(fmt.Sprintf("strict mode error: failed to decrypt value from %s: %v", val.AddedAt, decErr), ExitGPGError)
-				}
+				// Always warn and try other values
 				c.Warnf("failed to decrypt value from %s: %v", val.AddedAt, decErr)
 				continue
 			}
@@ -527,17 +513,16 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 			return NewError(fmt.Sprintf("Vault %d (%s): not found", index+1, path), ExitVaultError)
 		}
 
-		val := manager.GetAccessibleSecretValue(fp, key, c.Strict)
+		// Always allow fallback to older values if latest is not accessible
+		val := manager.GetAccessibleSecretValue(fp, key, false)
 		if val == nil {
 			return NewError(fmt.Sprintf("access denied: you do not have access to secret '%s'", key), ExitAccessDenied)
 		}
 
-		// Check if we are returning an older value (only relevant in non-strict mode)
-		if !c.Strict {
-			latestVal := secretObj.Values[len(secretObj.Values)-1]
-			if !val.AddedAt.Equal(latestVal.AddedAt) {
-				_, _ = fmt.Fprintf(c.output.Stderr(), "warning: returning older value for '%s' (access to latest value is revoked)\n", key)
-			}
+		// Check if we are returning an older value and warn the user
+		latestVal := secretObj.Values[len(secretObj.Values)-1]
+		if !val.AddedAt.Equal(latestVal.AddedAt) {
+			_, _ = fmt.Fprintf(c.output.Stderr(), "warning: returning older value for '%s' (access to latest value is revoked)\n", key)
 		}
 
 		encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)

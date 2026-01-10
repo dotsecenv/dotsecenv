@@ -77,17 +77,17 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
 	}
 
+	// Deprecation warning for strict: true
+	if cfg.Strict && !silent {
+		_, _ = fmt.Fprintf(stderr, "warning: 'strict: true' is deprecated and will be removed in a future version\n")
+		_, _ = fmt.Fprintf(stderr, "         Migrate to granular behavior settings: https://dotsecenv.com/docs/concepts/behavior-settings\n")
+	}
+
 	// Compute effective strict mode early (CLI flag or config setting)
 	effectiveStrict := strict || cfg.Strict
 
-	// Determine stderr for warnings (respect silent mode)
-	gpgWarnWriter := stderr
-	if silent {
-		gpgWarnWriter = nil
-	}
-
 	// Validate and set GPG program path from config
-	if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program, effectiveStrict, gpgWarnWriter); err != nil {
+	if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program); err != nil {
 		return nil, NewError(fmt.Sprintf("failed: %v", err), ExitGPGError)
 	}
 
@@ -132,10 +132,10 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 			}
 		}
 
-		// In strict mode, ignoring config vaults is an error
+		// If require_config_vaults is set, ignoring config vaults is an error
 		if shouldWarnOrError {
-			if effectiveStrict {
-				return nil, NewError("strict mode error: ignoring vaults in configuration and using specified vault arguments is not allowed", ExitGeneralError)
+			if cfg.ShouldRequireConfigVaults() {
+				return nil, NewError("require_config_vaults: ignoring vaults in configuration and using specified vault arguments is not allowed", ExitGeneralError)
 			}
 			if !silent {
 				_, _ = fmt.Fprintf(stderr, "warning: ignoring vaults in configuration and using specified vault arguments\n")
@@ -158,6 +158,9 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 		if len(vaultCfg.Entries) == 0 {
 			return nil, NewError("no vaults configured - specify vault paths in config or use -v flag", ExitVaultError)
 		}
+
+		// Set vault upgrade behavior from config
+		vaultCfg.RequireExplicitVaultUpgrade = cfg.ShouldRequireExplicitVaultUpgrade()
 
 		vaultResolver = vault.NewVaultResolver(vaultCfg)
 		// Suppress startup warnings; commands like 'identity add' or 'validate' will report status

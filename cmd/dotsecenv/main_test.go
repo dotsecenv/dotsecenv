@@ -74,6 +74,8 @@ approved_algorithms:
     min_bits: 2048
 vault:
   - %s
+gpg:
+  program: PATH
 `, vaultPath)), 0600)
 	if err != nil {
 		t.Fatalf("failed to write config: %v", err)
@@ -140,6 +142,8 @@ approved_algorithms:
     min_bits: 2048
 vault:
   - %s
+gpg:
+  program: PATH
 `, vaultAPath)), 0600)
 	if err != nil {
 		t.Fatal(err)
@@ -186,6 +190,8 @@ approved_algorithms:
     min_bits: 2048
 vault:
   - %s
+gpg:
+  program: PATH
 `, vaultPath)), 0600)
 	if err != nil {
 		t.Fatal(err)
@@ -216,6 +222,8 @@ approved_algorithms:
     min_bits: 2048
 vault:
   - default_vault
+gpg:
+  program: PATH
 `), 0600)
 	if err != nil {
 		t.Fatal(err)

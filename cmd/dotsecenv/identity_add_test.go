@@ -98,6 +98,8 @@ approved_algorithms:
 vault:
   - "%s"
   - "%s"
+gpg:
+  program: PATH
 `, vaultAPath, vaultBPath)
 	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
 		t.Fatal(err)
@@ -165,6 +167,8 @@ approved_algorithms:
 vault:
   - "%s"
   - "%s"
+gpg:
+  program: PATH
 `, vaultAPath, vaultBPath)
 	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
 		t.Fatal(err)
@@ -231,6 +235,8 @@ approved_algorithms:
     min_bits: 2048
 vault:
   - "%s"
+gpg:
+  program: PATH
 `, vaultPath)
 	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
 		t.Fatal(err)
@@ -269,6 +275,8 @@ approved_algorithms:
   - algo: RSA
     min_bits: 2048
 vault: []
+gpg:
+  program: PATH
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -355,9 +363,9 @@ gpg:
 		t.Fatalf("expected error in strict mode with corrupt vault, but succeeded\nSTDOUT: %s\nSTDERR: %s", stdout, stderr)
 	}
 
-	// Should show the strict mode error message
-	if !strings.Contains(stdout, "Strict mode: vault errors detected") {
-		t.Errorf("expected 'Strict mode: vault errors detected' in output, got:\nSTDOUT: %s\nSTDERR: %s", stdout, stderr)
+	// Should show the fail_on_integrity_error message
+	if !strings.Contains(stdout, "fail_on_integrity_error: vault errors detected") {
+		t.Errorf("expected 'fail_on_integrity_error: vault errors detected' in output, got:\nSTDOUT: %s\nSTDERR: %s", stdout, stderr)
 	}
 
 	// Should show which vault has the error
@@ -400,6 +408,8 @@ vault:
   - "%s"
   - "%s"
 strict: false
+gpg:
+  program: PATH
 `, validVaultPath, corruptVaultPath)
 	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
 		t.Fatal(err)
@@ -470,6 +480,8 @@ approved_algorithms:
 vault:
   - "%s"
   - "%s"
+gpg:
+  program: PATH
 `, validVaultPath, missingVaultPath)
 	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
 		t.Fatal(err)

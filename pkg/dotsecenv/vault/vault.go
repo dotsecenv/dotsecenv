@@ -9,22 +9,22 @@ import (
 
 // Manager handles vault file operations with locking
 type Manager struct {
-	path       string
-	file       *os.File
-	locked     bool
-	readOnly   bool
-	strictMode bool // if true, don't auto-upgrade vaults
-	writer     *Writer
-	vault      Vault // cached vault for fast access
+	path                        string
+	file                        *os.File
+	locked                      bool
+	readOnly                    bool
+	requireExplicitVaultUpgrade bool // if true, don't auto-upgrade vaults
+	writer                      *Writer
+	vault                       Vault // cached vault for fast access
 }
 
 // NewManager creates a new vault manager for the specified path.
-// strictMode controls whether vaults are auto-upgraded (false) or only warned about (true).
-func NewManager(path string, strictMode bool) *Manager {
+// requireExplicitUpgrade controls whether vaults are auto-upgraded (false) or only warned about (true).
+func NewManager(path string, requireExplicitUpgrade bool) *Manager {
 	return &Manager{
-		path:       path,
-		strictMode: strictMode,
-		locked:     false,
+		path:                        path,
+		requireExplicitVaultUpgrade: requireExplicitUpgrade,
+		locked:                      false,
 	}
 }
 
@@ -90,7 +90,7 @@ func (m *Manager) OpenAndLock() error {
 
 	// Check and upgrade vault if needed (only for read-write mode)
 	if !m.readOnly {
-		upgraded, err := CheckAndUpgradeVault(writer, m.path, m.strictMode)
+		upgraded, err := CheckAndUpgradeVault(writer, m.path, m.requireExplicitVaultUpgrade)
 		if err != nil {
 			_ = m.Unlock()
 			return fmt.Errorf("failed to check/upgrade vault: %w", err)

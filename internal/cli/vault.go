@@ -337,3 +337,88 @@ func (c *CLI) outputDefragJSONSingle(vaultPath string, stats *vault.Fragmentatio
 	}
 	return nil
 }
+
+// VaultUpgrade upgrades a vault to the latest format version
+func (c *CLI) VaultUpgrade(vaultPath string, fromIndex int) *Error {
+	config := c.vaultResolver.GetConfig()
+	vaultPaths := c.vaultResolver.GetVaultPaths()
+
+	// Determine target vault index (same logic as VaultDefrag)
+	targetIndex := -1
+
+	if vaultPath != "" {
+		expandedPath := vault.ExpandPath(vaultPath)
+		for i, p := range vaultPaths {
+			if vault.ExpandPath(p) == expandedPath {
+				targetIndex = i
+				break
+			}
+		}
+		if targetIndex == -1 {
+			return NewError(fmt.Sprintf("vault path '%s' not found in config", expandedPath), ExitVaultError)
+		}
+	} else if fromIndex != 0 {
+		if fromIndex <= 0 || fromIndex > len(config.Entries) {
+			return NewError(fmt.Sprintf("-v index must be between 1 and %d", len(config.Entries)), ExitGeneralError)
+		}
+		targetIndex = fromIndex - 1
+	} else if len(vaultPaths) == 0 {
+		return NewError("no vaults configured", ExitVaultError)
+	} else if len(vaultPaths) == 1 {
+		targetIndex = 0
+	} else {
+		// Multiple vaults: interactive selection
+		idx, selectErr := HandleInteractiveSelection(vaultPaths, "Select vault to upgrade:", c.output.Stderr())
+		if selectErr != nil {
+			return NewError(selectErr.Error(), ExitGeneralError)
+		}
+		targetIndex = idx
+	}
+
+	entry := config.Entries[targetIndex]
+
+	// Check current version
+	currentVersion, err := vault.DetectVaultVersion(entry.Path)
+	if err != nil {
+		return NewError(fmt.Sprintf("failed to detect vault version: %v", err), ExitVaultError)
+	}
+
+	if currentVersion == 0 {
+		_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): no upgrade needed (vault is empty or will be created with latest format)\n",
+			targetIndex+1, entry.Path)
+		return nil
+	}
+
+	if currentVersion >= vault.LatestFormatVersion {
+		_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): already at latest format version (v%d)\n",
+			targetIndex+1, entry.Path, currentVersion)
+		return nil
+	}
+
+	if currentVersion < vault.MinSupportedVersion {
+		return NewError(fmt.Sprintf("vault format v%d is no longer supported (minimum: v%d)",
+			currentVersion, vault.MinSupportedVersion), ExitVaultError)
+	}
+
+	// Perform the upgrade
+	writer, err := vault.NewWriter(entry.Path)
+	if err != nil {
+		return NewError(fmt.Sprintf("failed to open vault for upgrade: %v", err), ExitVaultError)
+	}
+
+	// Read entire vault
+	vaultData, err := writer.ReadVault()
+	if err != nil {
+		return NewError(fmt.Sprintf("failed to read vault for upgrade: %v", err), ExitVaultError)
+	}
+
+	// Rewrite vault using latest version format
+	if err := writer.RewriteFromVaultWithVersion(vaultData, vault.LatestFormatVersion); err != nil {
+		return NewError(fmt.Sprintf("failed to upgrade vault: %v", err), ExitVaultError)
+	}
+
+	_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): upgraded from v%d to v%d\n",
+		targetIndex+1, entry.Path, currentVersion, vault.LatestFormatVersion)
+
+	return nil
+}

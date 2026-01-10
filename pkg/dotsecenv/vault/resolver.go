@@ -63,7 +63,7 @@ func (vr *VaultResolver) OpenVaults(stderr io.Writer) error {
 			continue
 		}
 
-		manager := NewManager(entry.Path, vr.config.StrictMode)
+		manager := NewManager(entry.Path, vr.config.RequireExplicitVaultUpgrade)
 
 		// Try to open the vault
 		if err := manager.OpenAndLock(); err != nil {
@@ -119,7 +119,7 @@ func (vr *VaultResolver) OpenVaultsFromPaths(paths []string, stderr io.Writer) e
 			return fmt.Errorf("vault file not found: %s", entry.Path)
 		}
 
-		manager := NewManager(entry.Path, vr.config.StrictMode)
+		manager := NewManager(entry.Path, vr.config.RequireExplicitVaultUpgrade)
 		if err := manager.OpenAndLock(); err != nil {
 			return fmt.Errorf("failed to open vault %s: %v", entry.Path, err)
 		}

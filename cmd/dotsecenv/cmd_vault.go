@@ -82,6 +82,34 @@ var vaultDefragDryRun bool
 var vaultDefragJSON bool
 var vaultDefragYes bool
 
+var vaultUpgradeCmd = &cobra.Command{
+	Use:   "upgrade",
+	Short: "Upgrade vault to latest format version",
+	Long: `Upgrade a vault file to the latest format version.
+
+This command explicitly upgrades the vault format, bypassing the
+require_explicit_vault_upgrade behavior setting.
+
+Prompts to select a vault if multiple are configured.
+Use -v to target a specific vault.`,
+	Args: cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cli, err := createCLI()
+		if err != nil {
+			os.Exit(int(clilib.PrintError(os.Stderr, err)))
+		}
+		defer func() { _ = cli.Close() }()
+
+		vaultPath, fromIndex, parseErr := parseVaultSpec(globalOpts.ConfigPath, globalOpts.VaultPaths)
+		if parseErr != nil {
+			os.Exit(int(clilib.PrintError(os.Stderr, clilib.NewError(parseErr.Error(), clilib.ExitGeneralError))))
+		}
+
+		exitErr := cli.VaultUpgrade(vaultPath, fromIndex)
+		exitWithError(exitErr)
+	},
+}
+
 var vaultDefragCmd = &cobra.Command{
 	Use:   "defrag",
 	Short: "Defragment vault files",
@@ -154,4 +182,5 @@ func init() {
 	vaultCmd.AddCommand(vaultListCmd)
 	vaultCmd.AddCommand(vaultIdentityCmd)
 	vaultCmd.AddCommand(vaultDefragCmd)
+	vaultCmd.AddCommand(vaultUpgradeCmd)
 }
