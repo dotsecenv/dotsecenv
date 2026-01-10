@@ -87,6 +87,31 @@ func (c *CLI) resolveWritableVaultIndex(vaultPath string, fromIndex int, prompt 
 	return availableVaults[selectedIndex].Index, nil
 }
 
+// checkVaultWritable verifies that a vault file and its directory are writable.
+// This should be called before operations that modify the vault file.
+func checkVaultWritable(vaultPath string) *Error {
+	expandedPath := vault.ExpandPath(vaultPath)
+
+	// Check file is writable
+	f, openErr := os.OpenFile(expandedPath, os.O_WRONLY, 0)
+	if openErr != nil {
+		return NewError(fmt.Sprintf("vault file is not writable: %s", expandedPath), ExitVaultError)
+	}
+	_ = f.Close()
+
+	// Check directory is writable (for temp file creation during atomic writes)
+	dir := filepath.Dir(expandedPath)
+	tmpPath := filepath.Join(dir, ".dotsecenv-write-test")
+	tmpFile, tmpErr := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o600)
+	if tmpErr != nil {
+		return NewError(fmt.Sprintf("vault directory is not writable: %s", dir), ExitVaultError)
+	}
+	_ = tmpFile.Close()
+	_ = os.Remove(tmpPath)
+
+	return nil
+}
+
 // VaultListSecretJSON represents a secret in the vault list JSON output
 type VaultListSecretJSON struct {
 	Key     string `json:"key"`
@@ -227,10 +252,15 @@ func (c *CLI) VaultDefrag(dryRun bool, jsonOutput bool, skipConfirm bool, vaultP
 		return resolveErr
 	}
 
-	_ = config // Used later for entry lookup
+	// Get the vault entry
+	entry := config.Entries[targetIndex]
+
+	// Verify writability before proceeding
+	if writeErr := checkVaultWritable(entry.Path); writeErr != nil {
+		return writeErr
+	}
 
 	// Get the vault manager
-	entry := config.Entries[targetIndex]
 	manager := c.vaultResolver.GetVaultManager(targetIndex)
 	if manager == nil {
 		loadErr := c.vaultResolver.GetLoadError(targetIndex)
@@ -331,6 +361,11 @@ func (c *CLI) VaultUpgrade(vaultPath string, fromIndex int) *Error {
 	}
 
 	entry := config.Entries[targetIndex]
+
+	// Verify writability before proceeding
+	if writeErr := checkVaultWritable(entry.Path); writeErr != nil {
+		return writeErr
+	}
 
 	// Check current version
 	currentVersion, err := vault.DetectVaultVersion(entry.Path)
