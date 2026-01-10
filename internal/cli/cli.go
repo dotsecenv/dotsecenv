@@ -132,10 +132,10 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 			}
 		}
 
-		// If require_config_vaults is set, ignoring config vaults is an error
+		// If restrict_to_configured_vaults is set, ignoring config vaults is an error
 		if shouldWarnOrError {
-			if cfg.ShouldRequireConfigVaults() {
-				return nil, NewError("require_config_vaults: ignoring vaults in configuration and using specified vault arguments is not allowed", ExitGeneralError)
+			if cfg.ShouldRestrictToConfiguredVaults() {
+				return nil, NewError("restrict_to_configured_vaults: ignoring vaults in configuration and using specified vault arguments is not allowed", ExitGeneralError)
 			}
 			if !silent {
 				_, _ = fmt.Fprintf(stderr, "warning: ignoring vaults in configuration and using specified vault arguments\n")

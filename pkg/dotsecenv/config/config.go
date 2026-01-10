@@ -30,12 +30,8 @@ type BehaviorConfig struct {
 	// Users must run `dotsecenv vault upgrade` explicitly.
 	RequireExplicitVaultUpgrade *bool `yaml:"require_explicit_vault_upgrade,omitempty"`
 
-	// FailOnIntegrityError when true causes any config/vault read error to fail the operation.
-	// When false, warnings are printed and healthy files are used.
-	FailOnIntegrityError *bool `yaml:"fail_on_integrity_error,omitempty"`
-
-	// RequireConfigVaults when true ignores CLI -v flags and uses only config vaults.
-	RequireConfigVaults *bool `yaml:"require_config_vaults,omitempty"`
+	// RestrictToConfiguredVaults when true ignores CLI -v flags and uses only config vaults.
+	RestrictToConfiguredVaults *bool `yaml:"restrict_to_configured_vaults,omitempty"`
 }
 
 // Config represents the dotsecenv configuration
@@ -90,20 +86,11 @@ func (c *Config) ShouldRequireExplicitVaultUpgrade() bool {
 	return c.Strict
 }
 
-// ShouldFailOnIntegrityError returns true if config/vault errors should fail the operation.
+// ShouldRestrictToConfiguredVaults returns true if CLI -v flags should be ignored.
 // Checks behavior setting first, falls back to legacy Strict field.
-func (c *Config) ShouldFailOnIntegrityError() bool {
-	if c.Behavior.FailOnIntegrityError != nil {
-		return *c.Behavior.FailOnIntegrityError
-	}
-	return c.Strict
-}
-
-// ShouldRequireConfigVaults returns true if CLI -v flags should be ignored.
-// Checks behavior setting first, falls back to legacy Strict field.
-func (c *Config) ShouldRequireConfigVaults() bool {
-	if c.Behavior.RequireConfigVaults != nil {
-		return *c.Behavior.RequireConfigVaults
+func (c *Config) ShouldRestrictToConfiguredVaults() bool {
+	if c.Behavior.RestrictToConfiguredVaults != nil {
+		return *c.Behavior.RestrictToConfiguredVaults
 	}
 	return c.Strict
 }

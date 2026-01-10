@@ -146,10 +146,8 @@ func saveConfigWithComments(path string, cfg config.Config) error {
 	sb.WriteString("behavior:\n")
 	sb.WriteString("  # Prevent automatic vault format upgrades; requires 'dotsecenv vault upgrade'\n")
 	sb.WriteString("  require_explicit_vault_upgrade: false\n")
-	sb.WriteString("  # Fail if any config or vault file has errors (recommended for CI/CD)\n")
-	sb.WriteString("  fail_on_integrity_error: false\n")
 	sb.WriteString("  # Ignore CLI -v flags; only use vaults from this config file\n")
-	sb.WriteString("  require_config_vaults: false\n")
+	sb.WriteString("  restrict_to_configured_vaults: false\n")
 
 	// GPG section
 	sb.WriteString("\ngpg:\n")

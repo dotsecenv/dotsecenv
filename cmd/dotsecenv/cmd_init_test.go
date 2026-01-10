@@ -21,8 +21,7 @@ type configForTest struct {
 	Strict      bool     `yaml:"strict"`
 	Behavior    struct {
 		RequireExplicitVaultUpgrade *bool `yaml:"require_explicit_vault_upgrade,omitempty"`
-		FailOnIntegrityError        *bool `yaml:"fail_on_integrity_error,omitempty"`
-		RequireConfigVaults         *bool `yaml:"require_config_vaults,omitempty"`
+		RestrictToConfiguredVaults  *bool `yaml:"restrict_to_configured_vaults,omitempty"`
 	} `yaml:"behavior,omitempty"`
 	GPG struct {
 		Program string `yaml:"program,omitempty"`
@@ -61,16 +60,10 @@ func TestInitConfig_HasBehaviorSection(t *testing.T) {
 		t.Errorf("expected require_explicit_vault_upgrade=false, got %v", *cfg.Behavior.RequireExplicitVaultUpgrade)
 	}
 
-	if cfg.Behavior.FailOnIntegrityError == nil {
-		t.Errorf("expected fail_on_integrity_error to be set")
-	} else if *cfg.Behavior.FailOnIntegrityError != false {
-		t.Errorf("expected fail_on_integrity_error=false, got %v", *cfg.Behavior.FailOnIntegrityError)
-	}
-
-	if cfg.Behavior.RequireConfigVaults == nil {
-		t.Errorf("expected require_config_vaults to be set")
-	} else if *cfg.Behavior.RequireConfigVaults != false {
-		t.Errorf("expected require_config_vaults=false, got %v", *cfg.Behavior.RequireConfigVaults)
+	if cfg.Behavior.RestrictToConfiguredVaults == nil {
+		t.Errorf("expected restrict_to_configured_vaults to be set")
+	} else if *cfg.Behavior.RestrictToConfiguredVaults != false {
+		t.Errorf("expected restrict_to_configured_vaults=false, got %v", *cfg.Behavior.RestrictToConfiguredVaults)
 	}
 }
 
@@ -114,7 +107,6 @@ func TestInitConfig_BehaviorCommentsExist(t *testing.T) {
 	expectedComments := []string{
 		"# Behavior settings control how dotsecenv handles edge cases",
 		"# Prevent automatic vault format upgrades",
-		"# Fail if any config or vault file has errors",
 		"# Ignore CLI -v flags",
 	}
 
