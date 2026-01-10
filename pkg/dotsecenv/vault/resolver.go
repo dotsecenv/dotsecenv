@@ -42,10 +42,15 @@ func (vr *VaultResolver) OpenVaults(stderr io.Writer) error {
 		// First check if the vault file exists and is not empty
 		fileInfo, err := os.Stat(entry.Path)
 		if err != nil {
-			errmsg := fmt.Sprintf("vault '%s': no such file or directory", entry.Path)
-			vr.loadErrors[i] = fmt.Errorf("no such file or directory: %w", os.ErrNotExist)
+			if os.IsNotExist(err) {
+				// Silent skip for missing files - expected in some workflows
+				vr.loadErrors[i] = fmt.Errorf("no such file or directory: %w", os.ErrNotExist)
+				continue
+			}
+			// Warn for other stat errors (permission denied, etc.)
+			errmsg := fmt.Sprintf("vault '%s': %v", entry.Path, err)
+			vr.loadErrors[i] = err
 			errors = append(errors, errmsg)
-
 			if stderr != nil {
 				_, _ = fmt.Fprintf(stderr, "warning: %s\n", errmsg)
 			}

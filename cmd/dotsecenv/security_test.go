@@ -142,15 +142,11 @@ gpg:
 	t.Logf("Revoke STDERR: %s", stderrRevoke)
 	t.Logf("Revoke STDOUT: %s", stdoutRevoke)
 
-	// 4. Verify User A gets the older value via fallback (with warning)
+	// 4. Verify User A gets the older value via fallback (silently)
 	// Since A was revoked from latest, but had access to previous, it should return previous.
-	_, stderr, err := runCmdWithEnv(envA, "-c", configPath, "secret", "get", "SEC1")
+	_, _, err = runCmdWithEnv(envA, "-c", configPath, "secret", "get", "SEC1")
 	if err != nil {
-		t.Errorf("CLI failed to get secret (fallback expected): %v\nSTDERR: %s", err, stderr)
-	} else {
-		if !strings.Contains(stderr, "warning: returning older value") {
-			t.Errorf("Expected warning about returning older value, got: %s", stderr)
-		}
+		t.Errorf("CLI failed to get secret (fallback expected): %v", err)
 	}
 
 	// 5. Verify recipients using gpg --list-packets

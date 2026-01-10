@@ -377,12 +377,6 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 			return NewError(fmt.Sprintf("access denied: secret '%s' not found or not accessible", secretKey), ExitAccessDenied)
 		}
 
-		// Check if we are returning an older value and warn the user
-		latestSecret, _ := c.vaultResolver.GetSecretFromAnyVault(secretKey, nil)
-		if latestSecret != nil && !latestSecret.AddedAt.Equal(secret.AddedAt) {
-			_, _ = fmt.Fprintf(c.output.Stderr(), "warning: returning older value for '%s' (access to latest value is revoked)\n", secretKey)
-		}
-
 		// Find the vault path for this secret
 		idx := c.vaultResolver.FindSecretVaultIndex(secretKey)
 		if idx >= 0 {
@@ -517,12 +511,6 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 		val := manager.GetAccessibleSecretValue(fp, key, false)
 		if val == nil {
 			return NewError(fmt.Sprintf("access denied: you do not have access to secret '%s'", key), ExitAccessDenied)
-		}
-
-		// Check if we are returning an older value and warn the user
-		latestVal := secretObj.Values[len(secretObj.Values)-1]
-		if !val.AddedAt.Equal(latestVal.AddedAt) {
-			_, _ = fmt.Fprintf(c.output.Stderr(), "warning: returning older value for '%s' (access to latest value is revoked)\n", key)
 		}
 
 		encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)

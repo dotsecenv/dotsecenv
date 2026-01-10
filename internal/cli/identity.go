@@ -137,14 +137,17 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 		// Check if vault is accessible
 		if manager == nil {
 			loadErr := c.vaultResolver.GetLoadError(idx)
-			// Only print non-existing vaults with --all; always print other errors (e.g., parse failures)
 			isNotExist := loadErr != nil && errors.Is(loadErr, os.ErrNotExist)
-			if showAllVaults || !isNotExist {
-				errMsg := "unknown error"
-				if loadErr != nil {
-					errMsg = loadErr.Error()
+			if showAllVaults {
+				if isNotExist {
+					_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped (not present)\n", displayPos, vaultPath)
+				} else {
+					errMsg := "unknown error"
+					if loadErr != nil {
+						errMsg = loadErr.Error()
+					}
+					_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped (err: %s)\n", displayPos, vaultPath, errMsg)
 				}
-				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, %s\n", displayPos, vaultPath, errMsg)
 			}
 			continue
 		}
@@ -327,7 +330,10 @@ func (c *CLI) ensureIdentityInVault(fingerprint string, index int) *Error {
 	}
 
 	// Always auto-add with warning (simplified behavior - no strict mode check)
-	_, _ = fmt.Fprintf(c.output.Stderr(), "warning: auto-adding identity %s to vault %d...\n", fingerprint, index+1)
+	vaultPath := c.vaultResolver.GetConfig().Entries[index].Path
+	_, _ = fmt.Fprintf(c.output.Stderr(), "warning: identity %s did not previously exist in vault\n", fingerprint)
+	_, _ = fmt.Fprintf(c.output.Stderr(), "warning: adding identity to vault %d (%s)\n", index+1, vaultPath)
+	_, _ = fmt.Fprintf(c.output.Stderr(), "warning: you can inspect the vault with 'dotsecenv vault identity list -v %s'\n", vaultPath)
 
 	publicKeyInfo, pubKeyErr := c.gpgClient.GetPublicKeyInfo(fingerprint)
 	if pubKeyErr != nil {

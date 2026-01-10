@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -191,10 +192,13 @@ func (c *CLI) VaultList(jsonOutput bool) *Error {
 
 		if manager == nil {
 			loadErr := c.vaultResolver.GetLoadError(i)
-			if loadErr != nil {
-				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): %v\n", displayPos, entry.Path, loadErr)
+			isNotExist := loadErr != nil && errors.Is(loadErr, os.ErrNotExist)
+			if isNotExist {
+				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped (not present)\n", displayPos, entry.Path)
+			} else if loadErr != nil {
+				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped (err: %v)\n", displayPos, entry.Path, loadErr)
 			} else {
-				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): not loaded\n", displayPos, entry.Path)
+				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped (not loaded)\n", displayPos, entry.Path)
 			}
 		} else {
 			vaultData := manager.Get()

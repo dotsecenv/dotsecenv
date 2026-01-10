@@ -160,7 +160,7 @@ func (c *CLI) secretRevokeInVault(secretKey, targetFingerprint string, vaultInde
 	// Warn if the fingerprint is not defined in the vault (always proceed with revocation)
 	targetIdentity := c.vaultResolver.GetIdentityByFingerprint(targetFingerprint)
 	if targetIdentity == nil && !silent {
-		_, _ = fmt.Fprintf(c.output.Stderr(), "warning: identity not found in vault: %s (proceeding with revocation)\n", targetFingerprint)
+		_, _ = fmt.Fprintf(c.output.Stderr(), "warning: expected identity %s to exist in vault, but was not found\n", targetFingerprint)
 	}
 
 	// Cannot revoke from self if you're the only one with access

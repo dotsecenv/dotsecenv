@@ -33,14 +33,11 @@ func TestOpenVaults_MissingConfiguredVault(t *testing.T) {
 	if !strings.Contains(errMsg, "no vault files could be opened") {
 		t.Errorf("expected error to mention 'no vault files could be opened', got: %v", errMsg)
 	}
-	if !strings.Contains(errMsg, "nonexistent") || !strings.Contains(errMsg, "vault") {
-		t.Errorf("expected error to mention the vault path, got: %v", errMsg)
-	}
 
-	// Stderr should contain an error about the missing vault (not a warning, since it's required)
+	// Stderr should be empty (missing files are silently skipped)
 	stderrOutput := stderr.String()
-	if !strings.Contains(stderrOutput, "warning") || !strings.Contains(stderrOutput, "vault") {
-		t.Errorf("expected warning in stderr about missing vault, got: %s", stderrOutput)
+	if stderrOutput != "" {
+		t.Errorf("expected no stderr output for missing vault file, got: %s", stderrOutput)
 	}
 }
 
@@ -144,10 +141,10 @@ func TestOpenVaults_MultipleVaults_OneMissing(t *testing.T) {
 		t.Errorf("expected vault 1 (missing) to be nil")
 	}
 
-	// Stderr should contain a warning about the missing optional vault
+	// Stderr should be empty (missing files are silently skipped)
 	stderrOutput := stderr.String()
-	if !strings.Contains(stderrOutput, "warning") || !strings.Contains(stderrOutput, "/nonexistent/vault") {
-		t.Errorf("expected warning about missing optional vault, got: %s", stderrOutput)
+	if stderrOutput != "" {
+		t.Errorf("expected no stderr output for missing vault file, got: %s", stderrOutput)
 	}
 }
 
@@ -181,10 +178,10 @@ func TestOpenVaults_AllMissing(t *testing.T) {
 		t.Errorf("expected error about required vault files, got: %v", errMsg)
 	}
 
-	// Stderr should contain error messages about the missing required vaults
+	// Stderr should be empty (missing files are silently skipped)
 	stderrOutput := stderr.String()
-	if !strings.Contains(stderrOutput, "warning") || !strings.Contains(stderrOutput, "vault") {
-		t.Errorf("expected warning messages in stderr about missing vaults, got: %s", stderrOutput)
+	if stderrOutput != "" {
+		t.Errorf("expected no stderr output for missing vault files, got: %s", stderrOutput)
 	}
 }
 

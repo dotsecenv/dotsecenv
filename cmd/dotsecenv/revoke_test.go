@@ -272,20 +272,16 @@ gpg:
 		t.Fatalf("secret revoke (self) failed: %v", err)
 	}
 
-	// 4. Verify User A gets a warning but can still access older value after self-revocation
-	// After self-revocation, User A can still decrypt their original value but gets a warning
-	// (Fallback to older values is always allowed with warning - no strict mode check)
-	stdout, stderr, err := runCmdWithEnv(envA, "-c", configPathNonStrict, "secret", "get", "SEC1")
+	// 4. Verify User A can still access older value after self-revocation
+	// After self-revocation, User A can still decrypt their original value
+	// (Fallback to older values is always allowed silently)
+	stdout, _, err = runCmdWithEnv(envA, "-c", configPathNonStrict, "secret", "get", "SEC1")
 	if err != nil {
 		t.Errorf("expected secret get (A) to succeed with older value after self-revocation, got error: %v", err)
 	}
 	// Should get the original value
 	if strings.TrimSpace(stdout) != "secret_value_1" {
 		t.Errorf("expected original secret value, got: %s", stdout)
-	}
-	// Should have a warning about returning older value
-	if !strings.Contains(stderr, "warning") || !strings.Contains(stderr, "older value") {
-		t.Errorf("expected warning about older value, got stderr: %s", stderr)
 	}
 
 	// 5. Verify User B CAN still access (with either config)
