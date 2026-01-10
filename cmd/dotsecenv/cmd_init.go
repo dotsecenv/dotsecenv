@@ -42,7 +42,6 @@ var initCmd = &cobra.Command{
 var initConfigOpts struct {
 	GPGProgram       string
 	NoGPGProgram     bool
-	Strict           bool
 	LoginFingerprint string
 }
 
@@ -63,7 +62,7 @@ Use -c to specify a custom path.`,
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		targetConfig := clilib.ResolveConfigPath(globalOpts.ConfigPath, globalOpts.Silent, os.Stderr)
-		err := clilib.InitConfig(targetConfig, globalOpts.VaultPaths, initConfigOpts.GPGProgram, initConfigOpts.NoGPGProgram, initConfigOpts.Strict, initConfigOpts.LoginFingerprint, os.Stdout, os.Stderr)
+		err := clilib.InitConfig(targetConfig, globalOpts.VaultPaths, initConfigOpts.GPGProgram, initConfigOpts.NoGPGProgram, initConfigOpts.LoginFingerprint, os.Stdout, os.Stderr)
 		if err != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, err)))
 		}
@@ -116,7 +115,6 @@ func init() {
 	// Use custom pathValue to reject flag-like values during parsing (before Cobra's subcommand resolution)
 	initConfigCmd.Flags().Var(&pathValue{value: &initConfigOpts.GPGProgram}, "gpg-program", "Set gpg.program to this path (without validation)")
 	initConfigCmd.Flags().BoolVar(&initConfigOpts.NoGPGProgram, "no-gpg-program", false, "Skip GPG detection (leave gpg.program empty)")
-	initConfigCmd.Flags().BoolVar(&initConfigOpts.Strict, "strict", false, "Initialize config with strict mode enabled")
 	initConfigCmd.Flags().StringVar(&initConfigOpts.LoginFingerprint, "login", "", "Initialize config with specified fingerprint")
 
 	initCmd.AddCommand(initConfigCmd)

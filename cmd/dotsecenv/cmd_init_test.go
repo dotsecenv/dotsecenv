@@ -19,7 +19,12 @@ type configForTest struct {
 	Fingerprint string   `yaml:"fingerprint,omitempty"`
 	Vault       []string `yaml:"vault"`
 	Strict      bool     `yaml:"strict"`
-	GPG         struct {
+	Behavior    struct {
+		RequireExplicitVaultUpgrade *bool `yaml:"require_explicit_vault_upgrade,omitempty"`
+		FailOnIntegrityError        *bool `yaml:"fail_on_integrity_error,omitempty"`
+		RequireConfigVaults         *bool `yaml:"require_config_vaults,omitempty"`
+	} `yaml:"behavior,omitempty"`
+	GPG struct {
 		Program string `yaml:"program,omitempty"`
 	} `yaml:"gpg,omitempty"`
 }
@@ -37,20 +42,35 @@ func loadConfigForTest(t *testing.T, path string) configForTest {
 	return cfg
 }
 
-func TestInitConfig_StrictFlag(t *testing.T) {
+func TestInitConfig_HasBehaviorSection(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
-	// Run init config with --strict flag
-	_, stderr, err := runCmd("init", "config", "-c", configPath, "--strict", "--no-gpg-program")
+	// Run init config
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
 	if err != nil {
-		t.Fatalf("init config --strict failed: %v\nSTDERR: %s", err, stderr)
+		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
 	}
 
-	// Verify the config file was created with strict: true
+	// Verify behavior settings are present and defaulted to false
 	cfg := loadConfigForTest(t, configPath)
-	if !cfg.Strict {
-		t.Errorf("expected strict=true, got strict=%v", cfg.Strict)
+
+	if cfg.Behavior.RequireExplicitVaultUpgrade == nil {
+		t.Errorf("expected require_explicit_vault_upgrade to be set")
+	} else if *cfg.Behavior.RequireExplicitVaultUpgrade != false {
+		t.Errorf("expected require_explicit_vault_upgrade=false, got %v", *cfg.Behavior.RequireExplicitVaultUpgrade)
+	}
+
+	if cfg.Behavior.FailOnIntegrityError == nil {
+		t.Errorf("expected fail_on_integrity_error to be set")
+	} else if *cfg.Behavior.FailOnIntegrityError != false {
+		t.Errorf("expected fail_on_integrity_error=false, got %v", *cfg.Behavior.FailOnIntegrityError)
+	}
+
+	if cfg.Behavior.RequireConfigVaults == nil {
+		t.Errorf("expected require_config_vaults to be set")
+	} else if *cfg.Behavior.RequireConfigVaults != false {
+		t.Errorf("expected require_config_vaults=false, got %v", *cfg.Behavior.RequireConfigVaults)
 	}
 }
 
@@ -73,42 +93,58 @@ func TestInitConfig_LoginFlag(t *testing.T) {
 	}
 }
 
-func TestInitConfig_StrictAndLoginFlags(t *testing.T) {
+func TestInitConfig_BehaviorCommentsExist(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
-	testFingerprint := "XYZ987654321"
-
-	// Run init config with both --strict and --login flags
-	_, stderr, err := runCmd("init", "config", "-c", configPath, "--strict", "--login", testFingerprint, "--no-gpg-program")
-	if err != nil {
-		t.Fatalf("init config --strict --login failed: %v\nSTDERR: %s", err, stderr)
-	}
-
-	// Verify both settings
-	cfg := loadConfigForTest(t, configPath)
-	if !cfg.Strict {
-		t.Errorf("expected strict=true, got strict=%v", cfg.Strict)
-	}
-	if cfg.Fingerprint != testFingerprint {
-		t.Errorf("expected fingerprint=%q, got fingerprint=%q", testFingerprint, cfg.Fingerprint)
-	}
-}
-
-func TestInitConfig_DefaultStrictIsFalse(t *testing.T) {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
-
-	// Run init config without --strict flag
+	// Run init config
 	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
 	if err != nil {
 		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
 	}
 
-	// Verify strict defaults to false
-	cfg := loadConfigForTest(t, configPath)
-	if cfg.Strict {
-		t.Errorf("expected strict=false by default, got strict=%v", cfg.Strict)
+	// Read raw config file to check for comments
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to read config file: %v", err)
+	}
+	content := string(data)
+
+	// Verify comments are present
+	expectedComments := []string{
+		"# Behavior settings control how dotsecenv handles edge cases",
+		"# Prevent automatic vault format upgrades",
+		"# Fail if any config or vault file has errors",
+		"# Ignore CLI -v flags",
+	}
+
+	for _, comment := range expectedComments {
+		if !strings.Contains(content, comment) {
+			t.Errorf("expected config to contain comment %q", comment)
+		}
+	}
+}
+
+func TestInitConfig_NoStrictFieldInOutput(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Run init config
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	if err != nil {
+		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Read raw config and verify strict field is not present
+	// (we use behavior section now instead)
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to read config file: %v", err)
+	}
+	content := string(data)
+
+	if strings.Contains(content, "strict:") {
+		t.Errorf("expected config to NOT contain 'strict:' field, but it does")
 	}
 }
 
@@ -254,7 +290,6 @@ func TestInitConfig_AllFlagsCombined(t *testing.T) {
 	_, stderr, err := runCmd("init", "config",
 		"-c", configPath,
 		"-v", vaultPath,
-		"--strict",
 		"--login", testFingerprint,
 		"--gpg-program", customGPGPath,
 	)
@@ -265,9 +300,6 @@ func TestInitConfig_AllFlagsCombined(t *testing.T) {
 	// Verify all settings
 	cfg := loadConfigForTest(t, configPath)
 
-	if !cfg.Strict {
-		t.Errorf("expected strict=true")
-	}
 	if cfg.Fingerprint != testFingerprint {
 		t.Errorf("expected fingerprint=%q, got %q", testFingerprint, cfg.Fingerprint)
 	}
@@ -276,6 +308,11 @@ func TestInitConfig_AllFlagsCombined(t *testing.T) {
 	}
 	if len(cfg.Vault) != 1 || cfg.Vault[0] != vaultPath {
 		t.Errorf("expected vault=[%q], got %v", vaultPath, cfg.Vault)
+	}
+
+	// Verify behavior section exists with defaults
+	if cfg.Behavior.RequireExplicitVaultUpgrade == nil || *cfg.Behavior.RequireExplicitVaultUpgrade != false {
+		t.Errorf("expected require_explicit_vault_upgrade=false")
 	}
 }
 
