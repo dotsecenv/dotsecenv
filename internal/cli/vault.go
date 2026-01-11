@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,8 +13,9 @@ import (
 
 // resolveWritableVaultIndex resolves which vault to write to based on vaultPath and fromIndex.
 // If neither is specified, it performs interactive selection from available vaults.
+// The prompt parameter customizes the interactive selection prompt (empty uses default).
 // Returns the 0-based vault index or an error.
-func (c *CLI) resolveWritableVaultIndex(vaultPath string, fromIndex int) (int, *Error) {
+func (c *CLI) resolveWritableVaultIndex(vaultPath string, fromIndex int, prompt ...string) (int, *Error) {
 	if vaultPath != "" {
 		expandedPath := vault.ExpandPath(vaultPath)
 
@@ -72,12 +74,43 @@ func (c *CLI) resolveWritableVaultIndex(vaultPath string, fromIndex int) (int, *
 		displayPaths[i] = v.Path
 	}
 
-	selectedIndex, selectErr := HandleInteractiveSelection(displayPaths, "Multiple vaults configured. Select target vault:", c.output.Stderr())
+	// Use custom prompt if provided, otherwise default
+	selectionPrompt := "Multiple vaults configured. Select target vault:"
+	if len(prompt) > 0 && prompt[0] != "" {
+		selectionPrompt = prompt[0]
+	}
+
+	selectedIndex, selectErr := HandleInteractiveSelection(displayPaths, selectionPrompt, c.output.Stderr())
 	if selectErr != nil {
 		return -1, selectErr
 	}
 	// Map back to the original configuration index
 	return availableVaults[selectedIndex].Index, nil
+}
+
+// checkVaultWritable verifies that a vault file and its directory are writable.
+// This should be called before operations that modify the vault file.
+func checkVaultWritable(vaultPath string) *Error {
+	expandedPath := vault.ExpandPath(vaultPath)
+
+	// Check file is writable
+	f, openErr := os.OpenFile(expandedPath, os.O_WRONLY, 0)
+	if openErr != nil {
+		return NewError(fmt.Sprintf("vault file is not writable: %s", expandedPath), ExitVaultError)
+	}
+	_ = f.Close()
+
+	// Check directory is writable (for temp file creation during atomic writes)
+	dir := filepath.Dir(expandedPath)
+	tmpPath := filepath.Join(dir, ".dotsecenv-write-test")
+	tmpFile, tmpErr := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o600)
+	if tmpErr != nil {
+		return NewError(fmt.Sprintf("vault directory is not writable: %s", dir), ExitVaultError)
+	}
+	_ = tmpFile.Close()
+	_ = os.Remove(tmpPath)
+
+	return nil
 }
 
 // VaultListSecretJSON represents a secret in the vault list JSON output
@@ -159,10 +192,13 @@ func (c *CLI) VaultList(jsonOutput bool) *Error {
 
 		if manager == nil {
 			loadErr := c.vaultResolver.GetLoadError(i)
-			if loadErr != nil {
-				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): %v\n", displayPos, entry.Path, loadErr)
+			isNotExist := loadErr != nil && errors.Is(loadErr, os.ErrNotExist)
+			if isNotExist {
+				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped (not present)\n", displayPos, entry.Path)
+			} else if loadErr != nil {
+				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped (err: %v)\n", displayPos, entry.Path, loadErr)
 			} else {
-				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): not loaded\n", displayPos, entry.Path)
+				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped (not loaded)\n", displayPos, entry.Path)
 			}
 		} else {
 			vaultData := manager.Get()
@@ -213,42 +249,22 @@ type DefragStatsJSON struct {
 // VaultDefrag shows fragmentation stats or performs defragmentation on a single vault
 func (c *CLI) VaultDefrag(dryRun bool, jsonOutput bool, skipConfirm bool, vaultPath string, fromIndex int) *Error {
 	config := c.vaultResolver.GetConfig()
-	vaultPaths := c.vaultResolver.GetVaultPaths()
 
-	// Determine target vault index
-	targetIndex := -1
+	// Use common vault selection logic
+	targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex, "Select vault to defragment:")
+	if resolveErr != nil {
+		return resolveErr
+	}
 
-	if vaultPath != "" {
-		expandedPath := vault.ExpandPath(vaultPath)
-		for i, p := range vaultPaths {
-			if vault.ExpandPath(p) == expandedPath {
-				targetIndex = i
-				break
-			}
-		}
-		if targetIndex == -1 {
-			return NewError(fmt.Sprintf("vault path '%s' not found in config", expandedPath), ExitVaultError)
-		}
-	} else if fromIndex != 0 {
-		if fromIndex <= 0 || fromIndex > len(config.Entries) {
-			return NewError(fmt.Sprintf("-v index must be between 1 and %d", len(config.Entries)), ExitGeneralError)
-		}
-		targetIndex = fromIndex - 1
-	} else if len(vaultPaths) == 0 {
-		return NewError("no vaults configured", ExitVaultError)
-	} else if len(vaultPaths) == 1 {
-		targetIndex = 0
-	} else {
-		// Multiple vaults: interactive selection
-		idx, selectErr := HandleInteractiveSelection(vaultPaths, "Select vault to defragment:", c.output.Stderr())
-		if selectErr != nil {
-			return selectErr
-		}
-		targetIndex = idx
+	// Get the vault entry
+	entry := config.Entries[targetIndex]
+
+	// Verify writability before proceeding
+	if writeErr := checkVaultWritable(entry.Path); writeErr != nil {
+		return writeErr
 	}
 
 	// Get the vault manager
-	entry := config.Entries[targetIndex]
 	manager := c.vaultResolver.GetVaultManager(targetIndex)
 	if manager == nil {
 		loadErr := c.vaultResolver.GetLoadError(targetIndex)
@@ -335,5 +351,68 @@ func (c *CLI) outputDefragJSONSingle(vaultPath string, stats *vault.Fragmentatio
 	if err := encoder.Encode(result); err != nil {
 		return NewError(fmt.Sprintf("failed to encode json: %v", err), ExitGeneralError)
 	}
+	return nil
+}
+
+// VaultUpgrade upgrades a vault to the latest format version
+func (c *CLI) VaultUpgrade(vaultPath string, fromIndex int) *Error {
+	config := c.vaultResolver.GetConfig()
+
+	// Use common vault selection logic
+	targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex, "Select vault to upgrade:")
+	if resolveErr != nil {
+		return resolveErr
+	}
+
+	entry := config.Entries[targetIndex]
+
+	// Verify writability before proceeding
+	if writeErr := checkVaultWritable(entry.Path); writeErr != nil {
+		return writeErr
+	}
+
+	// Check current version
+	currentVersion, err := vault.DetectVaultVersion(entry.Path)
+	if err != nil {
+		return NewError(fmt.Sprintf("failed to detect vault version: %v", err), ExitVaultError)
+	}
+
+	if currentVersion == 0 {
+		_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): no upgrade needed (vault is empty or will be created with latest format)\n",
+			targetIndex+1, entry.Path)
+		return nil
+	}
+
+	if currentVersion >= vault.LatestFormatVersion {
+		_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): already at latest format version (v%d)\n",
+			targetIndex+1, entry.Path, currentVersion)
+		return nil
+	}
+
+	if currentVersion < vault.MinSupportedVersion {
+		return NewError(fmt.Sprintf("vault format v%d is no longer supported (minimum: v%d)",
+			currentVersion, vault.MinSupportedVersion), ExitVaultError)
+	}
+
+	// Perform the upgrade
+	writer, err := vault.NewWriter(entry.Path)
+	if err != nil {
+		return NewError(fmt.Sprintf("failed to open vault for upgrade: %v", err), ExitVaultError)
+	}
+
+	// Read entire vault
+	vaultData, err := writer.ReadVault()
+	if err != nil {
+		return NewError(fmt.Sprintf("failed to read vault for upgrade: %v", err), ExitVaultError)
+	}
+
+	// Rewrite vault using latest version format
+	if err := writer.RewriteFromVaultWithVersion(vaultData, vault.LatestFormatVersion); err != nil {
+		return NewError(fmt.Sprintf("failed to upgrade vault: %v", err), ExitVaultError)
+	}
+
+	_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): upgraded from v%d to v%d\n",
+		targetIndex+1, entry.Path, currentVersion, vault.LatestFormatVersion)
+
 	return nil
 }

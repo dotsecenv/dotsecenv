@@ -43,17 +43,6 @@ jobs:
           init-config: ''
       - run: dotsecenv version
 
-  test-init-config-strict:
-    name: Test init-config --strict
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: dotsecenv/dotsecenv@v0
-        with:
-          version: ${{ github.event.client_payload.version || 'latest' }}
-          init-config: '--strict'
-      - run: dotsecenv version
-
   test-init-config-login:
     name: Test init-config --login
     if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')

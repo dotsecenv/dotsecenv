@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/dotsecenv/dotsecenv/internal/xdg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/config"
@@ -15,9 +16,8 @@ import (
 // InitConfig initializes a configuration file with FIPS-compliant defaults.
 // gpgProgram: if non-empty, use this value for gpg.program (without validation)
 // noGPGProgram: if true, skip GPG detection entirely and leave gpg.program empty
-// strict: if true, initialize config with strict mode enabled
 // loginFingerprint: if non-empty, set fingerprint to this value
-func InitConfig(configPath string, initialVaults []string, gpgProgram string, noGPGProgram bool, strict bool, loginFingerprint string, stdout, stderr io.Writer) *Error {
+func InitConfig(configPath string, initialVaults []string, gpgProgram string, noGPGProgram bool, loginFingerprint string, stdout, stderr io.Writer) *Error {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
 		return NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
@@ -35,11 +35,6 @@ func InitConfig(configPath string, initialVaults []string, gpgProgram string, no
 
 	// Use FIPS-compliant default configuration
 	cfg := config.DefaultConfig()
-
-	// Apply strict mode if requested
-	if strict {
-		cfg.Strict = true
-	}
 
 	// Apply fingerprint if provided via --login
 	if loginFingerprint != "" {
@@ -100,12 +95,72 @@ func InitConfig(configPath string, initialVaults []string, gpgProgram string, no
 		}
 	}
 
-	// Save config
-	if err := config.Save(configPath, cfg); err != nil {
+	// Save config with comments for behavior section
+	if err := saveConfigWithComments(configPath, cfg); err != nil {
 		return NewError(fmt.Sprintf("failed to save config: %v", err), ExitConfigError)
 	}
 
 	_, _ = fmt.Fprintf(stderr, "Initialized config file: %s\n", configPath)
+	return nil
+}
+
+// saveConfigWithComments writes a config file with helpful comments for init.
+// This produces a more user-friendly config file than yaml.Marshal alone.
+func saveConfigWithComments(path string, cfg config.Config) error {
+	// Create parent directory if needed
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	var sb strings.Builder
+
+	// Approved algorithms section
+	sb.WriteString("approved_algorithms:\n")
+	for _, alg := range cfg.ApprovedAlgorithms {
+		sb.WriteString(fmt.Sprintf("  - algo: %s\n", alg.Algo))
+		if len(alg.Curves) > 0 {
+			sb.WriteString("    curves:\n")
+			for _, curve := range alg.Curves {
+				sb.WriteString(fmt.Sprintf("      - %s\n", curve))
+			}
+		}
+		sb.WriteString(fmt.Sprintf("    min_bits: %d\n", alg.MinBits))
+	}
+
+	// Fingerprint (only if set)
+	if cfg.Fingerprint != "" {
+		sb.WriteString(fmt.Sprintf("fingerprint: %s\n", cfg.Fingerprint))
+	}
+
+	// Vault paths
+	sb.WriteString("vault:\n")
+	for _, v := range cfg.Vault {
+		sb.WriteString(fmt.Sprintf("  - %s\n", v))
+	}
+
+	// Behavior section with comments
+	sb.WriteString("\n# Behavior settings control how dotsecenv handles edge cases.\n")
+	sb.WriteString("# All settings default to false (permissive). Set to true for stricter behavior.\n")
+	sb.WriteString("# See: https://dotsecenv.com/docs/concepts/behavior-settings\n")
+	sb.WriteString("behavior:\n")
+	sb.WriteString("  # Prevent automatic vault format upgrades; requires 'dotsecenv vault upgrade'\n")
+	sb.WriteString("  require_explicit_vault_upgrade: false\n")
+	sb.WriteString("  # Ignore CLI -v flags; only use vaults from this config file\n")
+	sb.WriteString("  restrict_to_configured_vaults: false\n")
+
+	// GPG section
+	sb.WriteString("\ngpg:\n")
+	if cfg.GPG.Program != "" {
+		sb.WriteString(fmt.Sprintf("  program: %s\n", cfg.GPG.Program))
+	} else {
+		sb.WriteString("  program: \"\"\n")
+	}
+
+	if err := os.WriteFile(path, []byte(sb.String()), 0o600); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+
 	return nil
 }
 
