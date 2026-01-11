@@ -116,10 +116,8 @@ gpg:
 
 	envA := []string{"GNUPGHOME=" + gpgHome, "DOTSECENV_FINGERPRINT=" + fpA}
 
-	// Init
+	// Init vault (identities are auto-added by secret put and secret share)
 	_, _, _ = runCmdWithEnv(envA, "init", "vault", "-v", vaultPath)
-	_, _, _ = runCmdWithEnv(envA, "-c", configPath, "vault", "identity", "add", "-v", "1", fpA)
-	_, _, _ = runCmdWithEnv(envA, "-c", configPath, "vault", "identity", "add", "-v", "1", fpB)
 
 	// 1. User A puts secret
 	cmd := exec.Command(binaryPath, "-c", configPath, "secret", "put", "SEC1")
@@ -215,10 +213,8 @@ gpg:
 	envA := []string{"GNUPGHOME=" + gpgHome, "DOTSECENV_FINGERPRINT=" + fpA}
 	envB := []string{"GNUPGHOME=" + gpgHome, "DOTSECENV_FINGERPRINT=" + fpB}
 
+	// Init vault (identities are auto-added by secret put and secret share)
 	_, _, _ = runCmdWithEnv(envA, "init", "vault", "-v", vaultPath)
-	_, _, _ = runCmdWithEnv(envA, "-c", configPath, "vault", "identity", "add", "-v", "1", fpA)
-	_, _, _ = runCmdWithEnv(envA, "-c", configPath, "vault", "identity", "add", "-v", "1", fpB)
-	_, _, _ = runCmdWithEnv(envA, "-c", configPath, "vault", "identity", "add", "-v", "1", fpC)
 
 	// 1. A creates secret (v1)
 	cmd := exec.Command(binaryPath, "-c", configPath, "secret", "put", "SEC1")

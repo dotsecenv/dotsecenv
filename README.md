@@ -280,10 +280,6 @@ dotsecenv init vault -v /path/to/vault
 # Login with your GPG fingerprint
 dotsecenv login <FINGERPRINT>
 
-# Add an identity to the vault
-dotsecenv vault identity add <FINGERPRINT>
-dotsecenv vault identity add <FINGERPRINT> --all  # Add to all vaults
-
 # Store a secret (reads value from stdin)
 echo "secret-value" | dotsecenv secret put MY_SECRET
 
@@ -293,19 +289,19 @@ dotsecenv secret get MY_SECRET --all   # All values across all vaults
 dotsecenv secret get MY_SECRET --last  # Most recent value across all vaults
 dotsecenv secret get MY_SECRET --json  # Output as JSON
 
-# Share a secret with another identity
+# Share a secret with another identity (auto-adds identity if needed)
 dotsecenv secret share MY_SECRET <TARGET_FINGERPRINT>
 
 # Revoke access to a secret
 dotsecenv secret revoke MY_SECRET <TARGET_FINGERPRINT>
 
-# List vaults and secrets
-dotsecenv vault list
-dotsecenv vault list --json
+# Describe vaults with identities and secrets
+dotsecenv vault describe
+dotsecenv vault describe --json
 
-# List identities in vaults
-dotsecenv vault identity list
-dotsecenv vault identity list --json
+# Run health checks on vaults and environment
+dotsecenv vault doctor
+dotsecenv vault doctor --json
 
 # Validate vault and config
 dotsecenv validate
@@ -333,9 +329,8 @@ dotsecenv validate --fix  # Attempt to fix issues
 | `secret get SECRET [--all\|--last\|--json]`     | Retrieve a secret value                      |
 | `secret share SECRET FINGERPRINT [--all]`       | Share a secret with another identity         |
 | `secret revoke SECRET FINGERPRINT [--all]`      | Revoke access to a secret                    |
-| `vault list [--json]`                           | List configured vaults and their secrets     |
-| `vault identity add FINGERPRINT [--all]`        | Add an identity to vault(s)                  |
-| `vault identity list [--json]`                  | List identities in configured vaults         |
+| `vault describe [--json]`                       | Describe vaults with identities and secrets  |
+| `vault doctor [--json]`                         | Run health checks and fix issues             |
 | `validate [--fix]`                              | Validate vault and config integrity          |
 | `version`                                       | Show version information                     |
 | `completion`                                    | Generate shell completion scripts            |
@@ -528,7 +523,7 @@ When running with SUID privileges, the following restrictions apply:
 - `-c` and `-v` flags are blocked
 - `DOTSECENV_CONFIG` and `DOTSECENV_FINGERPRINT` environment variables are ignored
 - Config defaults to `/etc/dotsecenv/config`
-- Write operations are blocked: `login`, `init config`, `init vault`, `secret put`, `secret share`, `secret revoke`, `vault identity add`
+- Write operations are blocked: `login`, `init config`, `init vault`, `secret put`, `secret share`, `secret revoke`
 
 This prevents privilege escalation attacks when the binary is installed with elevated permissions.
 

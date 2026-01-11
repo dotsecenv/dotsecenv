@@ -1,12 +1,12 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/dotsecenv/dotsecenv/internal/xdg"
 
@@ -62,13 +62,6 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 	return newCLI(vaultPaths, configPath, silent, strict, stdin, stdout, stderr, nil)
 }
 
-// NewCLIForUpgrade creates a CLI instance that prevents auto-upgrade of vaults.
-// Used by the "vault upgrade" command to ensure vaults aren't upgraded before the explicit upgrade runs.
-func NewCLIForUpgrade(vaultPaths []string, configPath string, silent bool, strict bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
-	forceNoAutoUpgrade := true
-	return newCLI(vaultPaths, configPath, silent, strict, stdin, stdout, stderr, &forceNoAutoUpgrade)
-}
-
 // newCLI creates a CLI instance. If requireExplicitUpgradeOverride is non-nil, it overrides the config setting.
 func newCLI(vaultPaths []string, configPath string, silent bool, strict bool, stdin io.Reader, stdout, stderr io.Writer, requireExplicitUpgradeOverride *bool) (*CLI, error) {
 	xdgPaths, err := xdg.NewPaths()
@@ -86,6 +79,9 @@ func newCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 	// Load config (fail if missing or invalid)
 	cfg, err := config.Load(configPath)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, NewError(fmt.Sprintf("config file not found: %s\nRun 'dotsecenv init config' to create one", configPath), ExitConfigError)
+		}
 		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
 	}
 
@@ -262,43 +258,4 @@ func (c *CLI) checkFingerprintRequired(operation string) (string, *Error) {
 		return "", NewError(msg, ExitFingerprintRequired)
 	}
 	return fp, nil
-}
-
-// createSignedIdentity creates a new signed identity structure
-func (c *CLI) createSignedIdentity(info *gpg.KeyInfo, targetFP, signingFP string) (*vault.Identity, *Error) {
-	// Validate algorithm policy
-	if !c.config.IsAlgorithmAllowed(info.Algorithm, info.AlgorithmBits) {
-		return nil, NewError(fmt.Sprintf("algorithm not allowed: %s (%d bits)\n%s", info.Algorithm, info.AlgorithmBits, c.config.GetAllowedAlgorithmsString()), ExitAlgorithmNotAllowed)
-	}
-
-	// Validate encryption capability
-	if !info.CanEncrypt {
-		return nil, NewError(fmt.Sprintf("key %s is not capable of encryption (signing-only key).\nPlease ensure your key has an encryption subkey.", targetFP), ExitGPGError)
-	}
-
-	now := time.Now().UTC()
-	algo, curve := c.gpgClient.ExtractAlgorithmAndCurve(info.Algorithm)
-
-	newIdentity := &vault.Identity{
-		AddedAt:       now,
-		Fingerprint:   targetFP,
-		UID:           info.UID,
-		Algorithm:     algo,
-		AlgorithmBits: info.AlgorithmBits,
-		Curve:         curve,
-		CreatedAt:     c.gpgClient.GetKeyCreationTime(targetFP),
-		ExpiresAt:     info.ExpiresAt,
-		PublicKey:     info.PublicKeyBase64,
-		SignedBy:      signingFP,
-	}
-
-	newIdentity.Hash = ComputeIdentityHash(newIdentity)
-
-	signature, signErr := c.gpgClient.SignDataWithAgent(signingFP, []byte(newIdentity.Hash))
-	if signErr != nil {
-		return nil, NewError(fmt.Sprintf("failed to sign identity: %v", signErr), ExitGPGError)
-	}
-	newIdentity.Signature = signature
-
-	return newIdentity, nil
 }

@@ -54,10 +54,8 @@ mkdir -p "$XDG_DATA_HOME/dotsecenv" .dotsecenv
 "$BIN" init vault -v "$XDG_DATA_HOME/dotsecenv/vault"
 
 echo "==> Running e2e tests"
-"$BIN" login "$KEY1"
-"$BIN" vault identity add "$KEY1" --all
+# Identities are auto-added by secret put and secret share
 "$BIN" login "$KEY2"
-"$BIN" vault identity add "$KEY2" --all
 
 echo abc | "$BIN" secret put SEC1 -v 1
 "$BIN" secret get SEC1

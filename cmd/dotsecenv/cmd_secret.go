@@ -267,7 +267,7 @@ Secret key formats:
   Non-namespaced: KEY_NAME             (e.g., DATABASE_URL)
 
 This adds a deletion marker to the secret. The secret will no longer be
-returned by 'secret get' and will be shown as deleted in 'vault list'.
+returned by 'secret get' and will be shown as deleted in 'vault describe'.
 
 Use -v to specify which vault to delete the secret from (either a path
 or 1-based index).`,

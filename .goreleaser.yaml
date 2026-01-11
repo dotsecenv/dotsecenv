@@ -87,11 +87,8 @@ homebrew_casks:
       - man/man1/dotsecenv-secret-share.1
       - man/man1/dotsecenv-validate.1
       - man/man1/dotsecenv-vault.1
-      - man/man1/dotsecenv-vault-defrag.1
-      - man/man1/dotsecenv-vault-identity.1
-      - man/man1/dotsecenv-vault-identity-add.1
-      - man/man1/dotsecenv-vault-identity-list.1
-      - man/man1/dotsecenv-vault-list.1
+      - man/man1/dotsecenv-vault-describe.1
+      - man/man1/dotsecenv-vault-doctor.1
       - man/man1/dotsecenv-version.1
     completions:
       bash: completions/dotsecenv.bash
