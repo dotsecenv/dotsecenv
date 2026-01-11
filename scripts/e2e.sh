@@ -15,7 +15,7 @@ set -e
 
 BIN="dotsecenv"
 
-echo "==> Generating test keys using dotsecenv identity create"
+echo "==> Generating test keys in $GNUPGHOME"
 
 # Generate two test keys (passwordless for CI)
 # Using RSA4096 which is supported by dotsecenv
