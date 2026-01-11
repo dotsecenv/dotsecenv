@@ -15,29 +15,13 @@ set -e
 
 BIN="dotsecenv"
 
-echo "==> Generating test keys in $GNUPGHOME"
+echo "==> Generating test keys using dotsecenv identity create"
 
-# Generate two test keys
-# Preferences exclude S2 (3DES) to avoid "invalid item 'S2'" warning on GPG 2.4+
-gpg --batch --gen-key <<EOF
-Key-Type: RSA
-Key-Length: 3072
-Preferences: AES256 SHA512 Uncompressed
-Name-Real: Test User One
-Name-Email: test1@dotsecenv.com
-%no-protection
-%commit
-EOF
-
-gpg --batch --gen-key <<EOF
-Key-Type: RSA
-Key-Length: 3072
-Preferences: AES256 SHA512 Uncompressed
-Name-Real: Test User Two
-Name-Email: test2@dotsecenv.com
-%no-protection
-%commit
-EOF
+# Generate two test keys (passwordless for CI)
+# Using RSA4096 which is supported by dotsecenv
+# Keys expire in 2y by default (fine for ephemeral test keys)
+"$BIN" identity create --name "Test User One" --email "test1@dotsecenv.com" --algo RSA4096 --no-passphrase
+"$BIN" identity create --name "Test User Two" --email "test2@dotsecenv.com" --algo RSA4096 --no-passphrase
 
 # Capture fingerprints
 KEY1=$(gpg --list-keys --with-colons test1@dotsecenv.com | awk -F: '/^fpr:/{print $10; exit}')

@@ -13,6 +13,7 @@ var identityCreateOpts struct {
 	Name         string
 	Email        string
 	TemplateOnly bool
+	NoPassphrase bool
 }
 
 var identityCmd = &cobra.Command{
@@ -48,6 +49,7 @@ setting. See https://dotsecenv.com/concepts/compliance/ for details.`,
 			Name:         identityCreateOpts.Name,
 			Email:        identityCreateOpts.Email,
 			TemplateOnly: identityCreateOpts.TemplateOnly,
+			NoPassphrase: identityCreateOpts.NoPassphrase,
 		}
 
 		// Try to create CLI (may fail if no config exists)
@@ -79,6 +81,8 @@ This allows you to:
 - Execute key generation directly with GPG for maximum security
 - Generate the key on an air-gapped machine
 - Reduce attack surface by avoiding secret material handling in dotsecenv`)
+	identityCreateCmd.Flags().BoolVar(&identityCreateOpts.NoPassphrase, "no-passphrase", false,
+		"Create key without passphrase protection (for CI/automation only)")
 
 	identityCmd.AddCommand(identityCreateCmd)
 }

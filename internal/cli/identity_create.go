@@ -18,6 +18,7 @@ type IdentityCreateOptions struct {
 	Name         string // User's full name
 	Email        string // User's email address
 	TemplateOnly bool   // If true, only output the template without generating
+	NoPassphrase bool   // If true, create key without passphrase (for CI/automation)
 }
 
 // IdentityCreate generates a new GPG key or outputs the generation template.
@@ -33,6 +34,16 @@ func (c *CLI) IdentityCreate(opts IdentityCreateOptions) *Error {
 	if !c.config.IsAlgorithmAllowed(algoStr, bits) {
 		return NewError(fmt.Sprintf("algorithm '%s' is not allowed by your configuration\n\n%s\n\nTo use %s, add it to your config's approved_algorithms.\nSee https://dotsecenv.com/concepts/compliance/ for more details.",
 			opts.Algorithm, c.config.GetAllowedAlgorithmsString(), opts.Algorithm), ExitAlgorithmNotAllowed)
+	}
+
+	// Validate --no-passphrase requires --name and --email
+	if opts.NoPassphrase && (opts.Name == "" || opts.Email == "") {
+		return NewError("--no-passphrase requires --name and --email flags", ExitGeneralError)
+	}
+
+	// Print algorithm before prompting for interactive input
+	if opts.Name == "" || opts.Email == "" {
+		_, _ = fmt.Fprintf(c.output.Stdout(), "Generating %s key...\n", opts.Algorithm)
 	}
 
 	// Prompt for name if not provided
@@ -61,29 +72,40 @@ func (c *CLI) IdentityCreate(opts IdentityCreateOptions) *Error {
 		}
 	}
 
+	// Build template options
+	templateOpts := &gpg.KeyTemplateOptions{
+		NoPassphrase: opts.NoPassphrase,
+	}
+
 	// Generate the template
-	template, templateErr := gpg.GenerateKeyTemplate(algo, name, email)
+	template, templateErr := gpg.GenerateKeyTemplate(algo, name, email, templateOpts)
 	if templateErr != nil {
 		return NewError(fmt.Sprintf("failed to generate template: %v", templateErr), ExitGeneralError)
 	}
 
-	// If template-only mode, print template and instructions
+	// If template-only mode, print shell-friendly wrapper
 	if opts.TemplateOnly {
+		_, _ = fmt.Fprintf(c.output.Stdout(), "#!/bin/bash\n")
+		_, _ = fmt.Fprintf(c.output.Stdout(), "# GPG Key Generation Template\n")
+		_, _ = fmt.Fprintf(c.output.Stdout(), "# Algorithm: %s\n", opts.Algorithm)
+		_, _ = fmt.Fprintf(c.output.Stdout(), "#\n")
+		_, _ = fmt.Fprintf(c.output.Stdout(), "# Run: bash <this-file> OR pipe to bash\n\n")
+		_, _ = fmt.Fprintf(c.output.Stdout(), "TEMPLATE_FILE=$(mktemp)\n")
+		_, _ = fmt.Fprintf(c.output.Stdout(), "cat > \"$TEMPLATE_FILE\" << 'DOTSECENV_TEMPLATE'\n")
 		_, _ = fmt.Fprintf(c.output.Stdout(), "%s", template)
-		_, _ = fmt.Fprintf(c.output.Stderr(), "\n# Save the above template to a file (e.g., key-params.txt) and run:\n")
-		_, _ = fmt.Fprintf(c.output.Stderr(), "#   gpg --batch --generate-key key-params.txt\n")
-		_, _ = fmt.Fprintf(c.output.Stderr(), "#\n")
-		_, _ = fmt.Fprintf(c.output.Stderr(), "# This allows you to:\n")
-		_, _ = fmt.Fprintf(c.output.Stderr(), "#   - Review and customize the template before generation\n")
-		_, _ = fmt.Fprintf(c.output.Stderr(), "#   - Execute key generation directly with GPG for maximum security\n")
-		_, _ = fmt.Fprintf(c.output.Stderr(), "#   - Generate the key on an air-gapped machine\n")
-		_, _ = fmt.Fprintf(c.output.Stderr(), "#   - Reduce attack surface by avoiding secret material handling in dotsecenv\n")
+		_, _ = fmt.Fprintf(c.output.Stdout(), "DOTSECENV_TEMPLATE\n\n")
+		_, _ = fmt.Fprintf(c.output.Stdout(), "echo \"Template: $TEMPLATE_FILE\"\n")
+		_, _ = fmt.Fprintf(c.output.Stdout(), "gpg --batch --generate-key \"$TEMPLATE_FILE\"\n")
 		return nil
 	}
 
 	// Generate the key using GPG
 	_, _ = fmt.Fprintf(c.output.Stdout(), "Generating %s key for %s <%s>...\n", opts.Algorithm, name, email)
-	_, _ = fmt.Fprintf(c.output.Stdout(), "GPG will prompt for a passphrase to protect your key.\n\n")
+	if opts.NoPassphrase {
+		_, _ = fmt.Fprintf(c.output.Stderr(), "WARNING: Creating key without passphrase. Only use for CI/automation.\n\n")
+	} else {
+		_, _ = fmt.Fprintf(c.output.Stdout(), "GPG will prompt for a passphrase to protect your key.\n\n")
+	}
 
 	fingerprint, genErr := c.generateGPGKey(template)
 	if genErr != nil {
@@ -214,6 +236,11 @@ func (c *CLI) exportPublicKey(fingerprint string) (string, error) {
 // IdentityCreateStandalone runs identity create without requiring full CLI initialization.
 // This is used when no config exists yet.
 func IdentityCreateStandalone(opts IdentityCreateOptions, stdout, stderr, stdin *os.File) *Error {
+	// Ensure GPG program is configured (use PATH lookup for standalone mode)
+	if err := gpg.ValidateAndSetGPGProgram("PATH"); err != nil {
+		return NewError(fmt.Sprintf("GPG not found: %v", err), ExitGPGError)
+	}
+
 	// Use default config for algorithm validation
 	cfg := config.DefaultConfig()
 
@@ -228,6 +255,16 @@ func IdentityCreateStandalone(opts IdentityCreateOptions, stdout, stderr, stdin 
 	if !cfg.IsAlgorithmAllowed(algoStr, bits) {
 		return NewError(fmt.Sprintf("algorithm '%s' is not allowed by default configuration\n\n%s\n\nTo use %s, first create a config with it enabled.\nSee https://dotsecenv.com/concepts/compliance/ for more details.",
 			opts.Algorithm, cfg.GetAllowedAlgorithmsString(), opts.Algorithm), ExitAlgorithmNotAllowed)
+	}
+
+	// Validate --no-passphrase requires --name and --email
+	if opts.NoPassphrase && (opts.Name == "" || opts.Email == "") {
+		return NewError("--no-passphrase requires --name and --email flags", ExitGeneralError)
+	}
+
+	// Print algorithm before prompting for interactive input
+	if opts.Name == "" || opts.Email == "" {
+		_, _ = fmt.Fprintf(stdout, "Generating %s key...\n", opts.Algorithm)
 	}
 
 	// Prompt for name if not provided
@@ -260,29 +297,40 @@ func IdentityCreateStandalone(opts IdentityCreateOptions, stdout, stderr, stdin 
 		}
 	}
 
+	// Build template options
+	templateOpts := &gpg.KeyTemplateOptions{
+		NoPassphrase: opts.NoPassphrase,
+	}
+
 	// Generate the template
-	template, templateErr := gpg.GenerateKeyTemplate(algo, name, email)
+	template, templateErr := gpg.GenerateKeyTemplate(algo, name, email, templateOpts)
 	if templateErr != nil {
 		return NewError(fmt.Sprintf("failed to generate template: %v", templateErr), ExitGeneralError)
 	}
 
-	// If template-only mode, print template and instructions
+	// If template-only mode, print shell-friendly wrapper
 	if opts.TemplateOnly {
+		_, _ = fmt.Fprintf(stdout, "#!/bin/bash\n")
+		_, _ = fmt.Fprintf(stdout, "# GPG Key Generation Template\n")
+		_, _ = fmt.Fprintf(stdout, "# Algorithm: %s\n", opts.Algorithm)
+		_, _ = fmt.Fprintf(stdout, "#\n")
+		_, _ = fmt.Fprintf(stdout, "# Run: bash <this-file> OR pipe to bash\n\n")
+		_, _ = fmt.Fprintf(stdout, "TEMPLATE_FILE=$(mktemp)\n")
+		_, _ = fmt.Fprintf(stdout, "cat > \"$TEMPLATE_FILE\" << 'DOTSECENV_TEMPLATE'\n")
 		_, _ = fmt.Fprintf(stdout, "%s", template)
-		_, _ = fmt.Fprintf(stderr, "\n# Save the above template to a file (e.g., key-params.txt) and run:\n")
-		_, _ = fmt.Fprintf(stderr, "#   gpg --batch --generate-key key-params.txt\n")
-		_, _ = fmt.Fprintf(stderr, "#\n")
-		_, _ = fmt.Fprintf(stderr, "# This allows you to:\n")
-		_, _ = fmt.Fprintf(stderr, "#   - Review and customize the template before generation\n")
-		_, _ = fmt.Fprintf(stderr, "#   - Execute key generation directly with GPG for maximum security\n")
-		_, _ = fmt.Fprintf(stderr, "#   - Generate the key on an air-gapped machine\n")
-		_, _ = fmt.Fprintf(stderr, "#   - Reduce attack surface by avoiding secret material handling in dotsecenv\n")
+		_, _ = fmt.Fprintf(stdout, "DOTSECENV_TEMPLATE\n\n")
+		_, _ = fmt.Fprintf(stdout, "echo \"Template: $TEMPLATE_FILE\"\n")
+		_, _ = fmt.Fprintf(stdout, "gpg --batch --generate-key \"$TEMPLATE_FILE\"\n")
 		return nil
 	}
 
 	// Generate the key using GPG
 	_, _ = fmt.Fprintf(stdout, "Generating %s key for %s <%s>...\n", opts.Algorithm, name, email)
-	_, _ = fmt.Fprintf(stdout, "GPG will prompt for a passphrase to protect your key.\n\n")
+	if opts.NoPassphrase {
+		_, _ = fmt.Fprintf(stderr, "WARNING: Creating key without passphrase. Only use for CI/automation.\n\n")
+	} else {
+		_, _ = fmt.Fprintf(stdout, "GPG will prompt for a passphrase to protect your key.\n\n")
+	}
 
 	fingerprint, genErr := generateGPGKeyStandalone(template)
 	if genErr != nil {

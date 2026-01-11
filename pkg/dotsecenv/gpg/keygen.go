@@ -20,6 +20,10 @@ type AlgorithmInfo struct {
 	KeyType   string // GPG Key-Type value
 	KeyCurve  string // GPG Key-Curve value (for ECC/EdDSA)
 	KeyLength int    // GPG Key-Length value (for RSA)
+	// Subkey for encryption
+	SubkeyType   string // GPG Subkey-Type value
+	SubkeyCurve  string // GPG Subkey-Curve value (for ECC)
+	SubkeyLength int    // GPG Subkey-Length value (for RSA)
 	// For algorithm validation
 	AlgoFamily string // "ECC", "EdDSA", or "RSA"
 	Curve      string // Curve name for validation (e.g., "P-384", "Ed25519")
@@ -29,36 +33,49 @@ type AlgorithmInfo struct {
 // SupportedAlgorithms maps algorithm flag values to their GPG parameters.
 var SupportedAlgorithms = map[KeyAlgorithm]AlgorithmInfo{
 	AlgoED25519: {
-		KeyType:    "eddsa",
-		KeyCurve:   "ed25519",
-		AlgoFamily: "EdDSA",
-		Curve:      "Ed25519",
-		Bits:       255,
+		KeyType:     "eddsa",
+		KeyCurve:    "ed25519",
+		SubkeyType:  "ecdh",
+		SubkeyCurve: "cv25519",
+		AlgoFamily:  "EdDSA",
+		Curve:       "Ed25519",
+		Bits:        255,
 	},
 	AlgoRSA4096: {
-		KeyType:    "RSA",
-		KeyLength:  4096,
-		AlgoFamily: "RSA",
-		Bits:       4096,
+		KeyType:      "RSA",
+		KeyLength:    4096,
+		SubkeyType:   "RSA",
+		SubkeyLength: 4096,
+		AlgoFamily:   "RSA",
+		Bits:         4096,
 	},
 	AlgoP384: {
-		KeyType:    "ecdsa",
-		KeyCurve:   "nistp384",
-		AlgoFamily: "ECC",
-		Curve:      "P-384",
-		Bits:       384,
+		KeyType:     "ecdsa",
+		KeyCurve:    "nistp384",
+		SubkeyType:  "ecdh",
+		SubkeyCurve: "nistp384",
+		AlgoFamily:  "ECC",
+		Curve:       "P-384",
+		Bits:        384,
 	},
 	AlgoP521: {
-		KeyType:    "ecdsa",
-		KeyCurve:   "nistp521",
-		AlgoFamily: "ECC",
-		Curve:      "P-521",
-		Bits:       521,
+		KeyType:     "ecdsa",
+		KeyCurve:    "nistp521",
+		SubkeyType:  "ecdh",
+		SubkeyCurve: "nistp521",
+		AlgoFamily:  "ECC",
+		Curve:       "P-521",
+		Bits:        521,
 	},
 }
 
 // DefaultAlgorithm is the default algorithm for key generation (P384 for FIPS compliance).
 const DefaultAlgorithm = AlgoP384
+
+// KeyTemplateOptions holds options for GPG key template generation.
+type KeyTemplateOptions struct {
+	NoPassphrase bool // Add %no-protection for CI/automation (no passphrase prompt)
+}
 
 // ParseAlgorithm parses an algorithm string into a KeyAlgorithm.
 // Returns an error if the algorithm is not recognized.
@@ -99,7 +116,8 @@ func GetAlgorithmForValidation(algo KeyAlgorithm) (string, int) {
 }
 
 // GenerateKeyTemplate generates a GPG batch file template for key generation.
-func GenerateKeyTemplate(algo KeyAlgorithm, name, email string) (string, error) {
+// Pass nil for opts to use defaults (with passphrase prompt, 2y expiration).
+func GenerateKeyTemplate(algo KeyAlgorithm, name, email string, opts *KeyTemplateOptions) (string, error) {
 	info, ok := SupportedAlgorithms[algo]
 	if !ok {
 		return "", fmt.Errorf("unsupported algorithm: %s", algo)
@@ -125,12 +143,30 @@ func GenerateKeyTemplate(algo KeyAlgorithm, name, email string) (string, error) 
 	// Key usage - signing only for primary key
 	sb.WriteString("Key-Usage: sign\n")
 
+	// Encryption subkey
+	sb.WriteString(fmt.Sprintf("Subkey-Type: %s\n", info.SubkeyType))
+	if info.SubkeyCurve != "" {
+		sb.WriteString(fmt.Sprintf("Subkey-Curve: %s\n", info.SubkeyCurve))
+	}
+	if info.SubkeyLength > 0 {
+		sb.WriteString(fmt.Sprintf("Subkey-Length: %d\n", info.SubkeyLength))
+	}
+	sb.WriteString("Subkey-Usage: encrypt\n")
+
+	// Cipher/hash preferences (exclude weak algorithms like 3DES)
+	sb.WriteString("Preferences: AES256 SHA512 Uncompressed\n")
+
 	// User identity
 	sb.WriteString(fmt.Sprintf("Name-Real: %s\n", name))
 	sb.WriteString(fmt.Sprintf("Name-Email: %s\n", email))
 
-	// No expiration
-	sb.WriteString("Expire-Date: 0\n")
+	// Expiration (2 years by default)
+	sb.WriteString("Expire-Date: 2y\n")
+
+	// No passphrase protection (for CI/automation)
+	if opts != nil && opts.NoPassphrase {
+		sb.WriteString("%no-protection\n")
+	}
 
 	// Commit the key generation
 	sb.WriteString("%commit\n")
