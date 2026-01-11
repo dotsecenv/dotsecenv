@@ -8,7 +8,7 @@ const pages = Object.fromEntries(
   entries.map(({ id, data }) => [id, { data }])
 );
 
-export const { getStaticPaths, GET } = OGImageRoute({
+export const { getStaticPaths, GET } = await OGImageRoute({
   param: 'slug',
   pages,
   getImageOptions: (_path, page: (typeof pages)[string]) => ({
