@@ -38,10 +38,10 @@ type BehaviorConfig struct {
 // Login represents authenticated login state with cryptographic proof.
 // The signature proves the user controls the secret key at login time.
 type Login struct {
-	Fingerprint string    `yaml:"fingerprint"`           // GPG key fingerprint
-	AddedAt     time.Time `yaml:"added_at"`              // When the login was performed
-	Hash        string    `yaml:"hash"`                  // SHA-256 of canonical string (login:{added_at}:{fingerprint})
-	Signature   string    `yaml:"signature"`             // Hex-encoded detached GPG signature of the hash
+	Fingerprint string    `yaml:"fingerprint"` // GPG key fingerprint
+	AddedAt     time.Time `yaml:"added_at"`    // When the login was performed
+	Hash        string    `yaml:"hash"`        // SHA-256 of canonical string (login:{added_at}:{fingerprint})
+	Signature   string    `yaml:"signature"`   // Hex-encoded detached GPG signature of the hash
 }
 
 // Config represents the dotsecenv configuration
