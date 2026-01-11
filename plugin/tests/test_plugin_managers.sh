@@ -28,12 +28,21 @@ TESTS_FAILED=0
 # Options
 VERBOSE=0
 TARGET_MANAGER="all"
+REMOTE_MODE=0
+REPO_URL="https://github.com/dotsecenv/plugin.git"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
     --manager=*)
         TARGET_MANAGER="${1#*=}"
+        ;;
+    --remote)
+        REMOTE_MODE=1
+        ;;
+    --repo-url=*)
+        REPO_URL="${1#*=}"
+        REMOTE_MODE=1
         ;;
     --verbose | -v)
         VERBOSE=1
@@ -45,6 +54,9 @@ while [[ $# -gt 0 ]]; do
         echo ""
         echo "Options:"
         echo "  --manager=NAME   Test specific manager (ohmyzsh, zinit, antidote, ohmybash, fisher, ohmyfish, all)"
+        echo "  --remote         Test installation from remote GitHub repository (default: local)"
+        echo "  --repo-url=URL   Override repository URL (implies --remote)"
+        echo "                   Default: https://github.com/dotsecenv/plugin.git"
         echo "  --verbose, -v    Show verbose output"
         echo "  -h, --help       Show this help"
         exit 0
@@ -81,9 +93,9 @@ check_docker() {
     fi
 }
 
-# Build test image with common dependencies
+# Build test image with common dependencies (local mode - copies plugin files)
 build_base_image() {
-    log "Building base test image..."
+    log "Building base test image (local mode)..."
 
     docker build -t dotsecenv-plugin-test-base -f - "$PROJECT_ROOT" <<'DOCKERFILE'
 FROM ubuntu:22.04
@@ -136,9 +148,60 @@ WORKDIR /home/testuser
 DOCKERFILE
 }
 
+# Build test image for remote mode (no local plugin files - will clone from GitHub)
+build_base_image_remote() {
+    log "Building base test image (remote mode)..."
+
+    docker build -t dotsecenv-plugin-test-base-remote -f - . <<'DOCKERFILE'
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TERM=xterm-256color
+
+# Install common dependencies
+RUN apt-get update && apt-get install -y \
+    bash \
+    zsh \
+    git \
+    curl \
+    ca-certificates \
+    locales \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up locale
+RUN locale-gen en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
+# Create test user
+RUN useradd -m -s /bin/bash testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Create mock dotsecenv CLI
+RUN mkdir -p /usr/local/bin && \
+    cat > /usr/local/bin/dotsecenv <<'EOF'
+#!/bin/bash
+if [[ "$1" == "secret" && "$2" == "get" ]]; then
+    case "$3" in
+        "TEST_SECRET") echo "secret-value-12345" ;;
+        "DB_PASSWORD") echo "super-secret-password" ;;
+        *) echo "Secret not found: $3" >&2; exit 1 ;;
+    esac
+else
+    echo "dotsecenv mock: $*"
+fi
+EOF
+RUN chmod +x /usr/local/bin/dotsecenv
+
+USER testuser
+WORKDIR /home/testuser
+DOCKERFILE
+}
+
 # Build fish image (separate because fish needs special install)
 build_fish_image() {
-    log "Building fish test image..."
+    log "Building fish test image (local mode)..."
 
     docker build -t dotsecenv-plugin-test-fish -f - "$PROJECT_ROOT" <<'DOCKERFILE'
 FROM ubuntu:22.04
@@ -190,15 +253,76 @@ WORKDIR /home/testuser
 DOCKERFILE
 }
 
+# Build fish image for remote mode
+build_fish_image_remote() {
+    log "Building fish test image (remote mode)..."
+
+    docker build -t dotsecenv-plugin-test-fish-remote -f - . <<'DOCKERFILE'
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TERM=xterm-256color
+
+# Install dependencies including fish
+RUN apt-get update && apt-get install -y \
+    fish \
+    git \
+    curl \
+    ca-certificates \
+    locales \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up locale
+RUN locale-gen en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
+# Create test user
+RUN useradd -m -s /usr/bin/fish testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Create mock dotsecenv CLI
+RUN mkdir -p /usr/local/bin && \
+    cat > /usr/local/bin/dotsecenv <<'EOF'
+#!/bin/bash
+if [[ "$1" == "secret" && "$2" == "get" ]]; then
+    case "$3" in
+        "TEST_SECRET") echo "secret-value-12345" ;;
+        "DB_PASSWORD") echo "super-secret-password" ;;
+        *) echo "Secret not found: $3" >&2; exit 1 ;;
+    esac
+else
+    echo "dotsecenv mock: $*"
+fi
+EOF
+RUN chmod +x /usr/local/bin/dotsecenv
+
+USER testuser
+WORKDIR /home/testuser
+DOCKERFILE
+}
+
 # ============================================================================
 # Test: Oh My Zsh
 # ============================================================================
 test_ohmyzsh() {
-    log "Testing Oh My Zsh plugin installation..."
+    local mode_suffix=""
+    local plugin_source="/opt/dotsecenv-plugin"
+
+    if [[ $REMOTE_MODE -eq 1 ]]; then
+        mode_suffix=" (remote: $REPO_URL)"
+        plugin_source="$REPO_URL"
+    fi
+
+    log "Testing Oh My Zsh plugin installation${mode_suffix}..."
     ((TESTS_RUN++)) || true
 
+    local image_name="dotsecenv-plugin-test-base"
+    [[ $REMOTE_MODE -eq 1 ]] && image_name="dotsecenv-plugin-test-base-remote"
+
     local output
-    output=$(docker run --rm dotsecenv-plugin-test-base bash -c '
+    output=$(docker run --rm -e PLUGIN_SOURCE="$plugin_source" "$image_name" bash -c '
         set -e
 
         # Install Oh My Zsh (unattended)
@@ -207,7 +331,7 @@ test_ohmyzsh() {
         sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
         # Clone plugin to custom plugins directory
-        git clone /opt/dotsecenv-plugin ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/dotsecenv
+        git clone "$PLUGIN_SOURCE" ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/dotsecenv
 
         # Configure .zshrc to use the plugin
         sed -i "s/plugins=(git)/plugins=(git dotsecenv)/" ~/.zshrc
@@ -236,10 +360,10 @@ test_ohmyzsh() {
     ' 2>&1)
 
     if echo "$output" | grep -q "SUCCESS: Oh My Zsh plugin works"; then
-        pass "Oh My Zsh plugin installation and functionality"
+        pass "Oh My Zsh plugin installation and functionality${mode_suffix}"
         debug "$output"
     else
-        fail "Oh My Zsh plugin test failed"
+        fail "Oh My Zsh plugin test failed${mode_suffix}"
         echo "$output"
     fi
 }
@@ -248,20 +372,32 @@ test_ohmyzsh() {
 # Test: Zinit
 # ============================================================================
 test_zinit() {
-    log "Testing Zinit plugin installation..."
+    local mode_suffix=""
+    local plugin_source="/opt/dotsecenv-plugin"
+
+    if [[ $REMOTE_MODE -eq 1 ]]; then
+        mode_suffix=" (remote: $REPO_URL)"
+        # Zinit uses GitHub shorthand: user/repo
+        plugin_source="dotsecenv/plugin"
+    fi
+
+    log "Testing Zinit plugin installation${mode_suffix}..."
     ((TESTS_RUN++)) || true
 
+    local image_name="dotsecenv-plugin-test-base"
+    [[ $REMOTE_MODE -eq 1 ]] && image_name="dotsecenv-plugin-test-base-remote"
+
     local output
-    output=$(docker run --rm dotsecenv-plugin-test-base bash -c '
+    output=$(docker run --rm -e PLUGIN_SOURCE="$plugin_source" "$image_name" bash -c '
         set -e
 
         # Install Zinit
         bash -c "$(curl --fail --show-error --silent --location https://raw.githubusercontent.com/zdharma-continuum/zinit/HEAD/scripts/install.sh)" -- --no-modify-rc
 
-        # Create .zshrc with zinit loading our plugin from local path
+        # Create .zshrc with zinit loading our plugin
         cat > ~/.zshrc <<EOF
 source ~/.local/share/zinit/zinit.git/zinit.zsh
-zinit light /opt/dotsecenv-plugin
+zinit light $PLUGIN_SOURCE
 EOF
 
         # Create test directory with .secenv
@@ -288,10 +424,10 @@ EOF
     ' 2>&1)
 
     if echo "$output" | grep -q "SUCCESS: Zinit plugin works"; then
-        pass "Zinit plugin installation and functionality"
+        pass "Zinit plugin installation and functionality${mode_suffix}"
         debug "$output"
     else
-        fail "Zinit plugin test failed"
+        fail "Zinit plugin test failed${mode_suffix}"
         echo "$output"
     fi
 }
@@ -300,18 +436,30 @@ EOF
 # Test: Antidote
 # ============================================================================
 test_antidote() {
-    log "Testing Antidote plugin installation..."
+    local mode_suffix=""
+    local plugin_source="/opt/dotsecenv-plugin"
+
+    if [[ $REMOTE_MODE -eq 1 ]]; then
+        mode_suffix=" (remote: $REPO_URL)"
+        # Antidote uses GitHub shorthand: owner/repo
+        plugin_source="dotsecenv/plugin"
+    fi
+
+    log "Testing Antidote plugin installation${mode_suffix}..."
     ((TESTS_RUN++)) || true
 
+    local image_name="dotsecenv-plugin-test-base"
+    [[ $REMOTE_MODE -eq 1 ]] && image_name="dotsecenv-plugin-test-base-remote"
+
     local output
-    output=$(docker run --rm dotsecenv-plugin-test-base bash -c '
+    output=$(docker run --rm -e PLUGIN_SOURCE="$plugin_source" "$image_name" bash -c '
         set -e
 
         # Install Antidote
         git clone --depth=1 https://github.com/mattmc3/antidote.git ~/.antidote
 
         # Create plugins file
-        echo "/opt/dotsecenv-plugin" > ~/.zsh_plugins.txt
+        echo "$PLUGIN_SOURCE" > ~/.zsh_plugins.txt
 
         # Create .zshrc
         cat > ~/.zshrc <<EOF
@@ -343,10 +491,10 @@ EOF
     ' 2>&1)
 
     if echo "$output" | grep -q "SUCCESS: Antidote plugin works"; then
-        pass "Antidote plugin installation and functionality"
+        pass "Antidote plugin installation and functionality${mode_suffix}"
         debug "$output"
     else
-        fail "Antidote plugin test failed"
+        fail "Antidote plugin test failed${mode_suffix}"
         echo "$output"
     fi
 }
@@ -355,20 +503,35 @@ EOF
 # Test: Oh My Bash
 # ============================================================================
 test_ohmybash() {
-    log "Testing Oh My Bash plugin installation..."
+    local mode_suffix=""
+    local plugin_source="/opt/dotsecenv-plugin"
+
+    if [[ $REMOTE_MODE -eq 1 ]]; then
+        mode_suffix=" (remote: $REPO_URL)"
+        plugin_source="$REPO_URL"
+    fi
+
+    log "Testing Oh My Bash plugin installation${mode_suffix}..."
     ((TESTS_RUN++)) || true
 
+    local image_name="dotsecenv-plugin-test-base"
+    [[ $REMOTE_MODE -eq 1 ]] && image_name="dotsecenv-plugin-test-base-remote"
+
     local output
-    output=$(docker run --rm dotsecenv-plugin-test-base bash -c '
+    output=$(docker run --rm -e PLUGIN_SOURCE="$plugin_source" -e REMOTE_MODE="$REMOTE_MODE" "$image_name" bash -c '
         set -e
 
         # Install Oh My Bash (unattended)
         export OSH_UNATTENDED=1
         bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)"
 
-        # Clone plugin to custom plugins directory
+        # Install plugin to custom plugins directory
         mkdir -p ~/.oh-my-bash/custom/plugins
-        cp -r /opt/dotsecenv-plugin ~/.oh-my-bash/custom/plugins/dotsecenv
+        if [[ "$REMOTE_MODE" -eq 1 ]]; then
+            git clone "$PLUGIN_SOURCE" ~/.oh-my-bash/custom/plugins/dotsecenv
+        else
+            cp -r "$PLUGIN_SOURCE" ~/.oh-my-bash/custom/plugins/dotsecenv
+        fi
 
         # Configure .bashrc to use the plugin
         # Oh My Bash uses OSH_PLUGINS array
@@ -403,10 +566,10 @@ EOF
     ' 2>&1)
 
     if echo "$output" | grep -q "SUCCESS: Oh My Bash plugin works"; then
-        pass "Oh My Bash plugin installation and functionality"
+        pass "Oh My Bash plugin installation and functionality${mode_suffix}"
         debug "$output"
     else
-        fail "Oh My Bash plugin test failed"
+        fail "Oh My Bash plugin test failed${mode_suffix}"
         echo "$output"
     fi
 }
@@ -415,17 +578,29 @@ EOF
 # Test: Fisher
 # ============================================================================
 test_fisher() {
-    log "Testing Fisher plugin installation..."
+    local mode_suffix=""
+    local plugin_source="/opt/dotsecenv-plugin"
+
+    if [[ $REMOTE_MODE -eq 1 ]]; then
+        mode_suffix=" (remote: $REPO_URL)"
+        # Fisher uses GitHub shorthand: owner/repo
+        plugin_source="dotsecenv/plugin"
+    fi
+
+    log "Testing Fisher plugin installation${mode_suffix}..."
     ((TESTS_RUN++)) || true
 
+    local image_name="dotsecenv-plugin-test-fish"
+    [[ $REMOTE_MODE -eq 1 ]] && image_name="dotsecenv-plugin-test-fish-remote"
+
     local output
-    output=$(docker run --rm dotsecenv-plugin-test-fish fish -c '
+    output=$(docker run --rm -e PLUGIN_SOURCE="$plugin_source" "$image_name" fish -c '
         # Install Fisher
         curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source
         fisher install jorgebucaran/fisher
 
-        # Install plugin from local path
-        fisher install /opt/dotsecenv-plugin
+        # Install plugin
+        fisher install $PLUGIN_SOURCE
 
         # Verify plugin was installed
         if not functions -q _dotsecenv_on_cd
@@ -455,10 +630,10 @@ test_fisher() {
     ' 2>&1)
 
     if echo "$output" | grep -q "SUCCESS: Fisher plugin works"; then
-        pass "Fisher plugin installation and functionality"
+        pass "Fisher plugin installation and functionality${mode_suffix}"
         debug "$output"
     else
-        fail "Fisher plugin test failed"
+        fail "Fisher plugin test failed${mode_suffix}"
         echo "$output"
     fi
 }
@@ -467,20 +642,35 @@ test_fisher() {
 # Test: Oh My Fish
 # ============================================================================
 test_ohmyfish() {
-    log "Testing Oh My Fish plugin installation..."
+    local mode_suffix=""
+    local plugin_source="/opt/dotsecenv-plugin"
+
+    if [[ $REMOTE_MODE -eq 1 ]]; then
+        mode_suffix=" (remote: $REPO_URL)"
+        plugin_source="$REPO_URL"
+    fi
+
+    log "Testing Oh My Fish plugin installation${mode_suffix}..."
     ((TESTS_RUN++)) || true
 
+    local image_name="dotsecenv-plugin-test-fish"
+    [[ $REMOTE_MODE -eq 1 ]] && image_name="dotsecenv-plugin-test-fish-remote"
+
     local output
-    output=$(docker run --rm dotsecenv-plugin-test-fish fish -c '
+    output=$(docker run --rm -e PLUGIN_SOURCE="$plugin_source" -e REMOTE_MODE="$REMOTE_MODE" "$image_name" fish -c '
         # Install Oh My Fish
         curl https://raw.githubusercontent.com/oh-my-fish/oh-my-fish/master/bin/install | fish --init-command "set -g NONINTERACTIVE 1"
 
-        # Link plugin to OMF packages (simulating omf install)
+        # Install plugin to OMF packages
         mkdir -p ~/.local/share/omf/pkg
-        ln -s /opt/dotsecenv-plugin ~/.local/share/omf/pkg/dotsecenv
+        if test "$REMOTE_MODE" = "1"
+            git clone $PLUGIN_SOURCE ~/.local/share/omf/pkg/dotsecenv
+        else
+            ln -s $PLUGIN_SOURCE ~/.local/share/omf/pkg/dotsecenv
+        end
 
         # Source the plugin
-        source /opt/dotsecenv-plugin/conf.d/dotsecenv.fish
+        source ~/.local/share/omf/pkg/dotsecenv/conf.d/dotsecenv.fish
 
         # Verify plugin was loaded
         if not functions -q _dotsecenv_on_cd
@@ -510,10 +700,10 @@ test_ohmyfish() {
     ' 2>&1)
 
     if echo "$output" | grep -q "SUCCESS: Oh My Fish plugin works"; then
-        pass "Oh My Fish plugin installation and functionality"
+        pass "Oh My Fish plugin installation and functionality${mode_suffix}"
         debug "$output"
     else
-        fail "Oh My Fish plugin test failed"
+        fail "Oh My Fish plugin test failed${mode_suffix}"
         echo "$output"
     fi
 }
@@ -528,11 +718,25 @@ main() {
     echo "=================================================="
     echo ""
 
+    if [[ $REMOTE_MODE -eq 1 ]]; then
+        echo -e "${YELLOW}Mode: REMOTE${NC}"
+        echo "Repository: $REPO_URL"
+    else
+        echo -e "${YELLOW}Mode: LOCAL${NC}"
+        echo "Source: $PROJECT_ROOT"
+    fi
+    echo ""
+
     check_docker
 
-    # Build base images
-    build_base_image
-    build_fish_image
+    # Build base images based on mode
+    if [[ $REMOTE_MODE -eq 1 ]]; then
+        build_base_image_remote
+        build_fish_image_remote
+    else
+        build_base_image
+        build_fish_image
+    fi
     echo ""
 
     # Run tests based on target
@@ -581,6 +785,11 @@ main() {
     echo "Test Results"
     echo "=================================================="
     echo ""
+    if [[ $REMOTE_MODE -eq 1 ]]; then
+        echo "Mode:         REMOTE ($REPO_URL)"
+    else
+        echo "Mode:         LOCAL"
+    fi
     echo "Tests run:    $TESTS_RUN"
     echo -e "Tests passed: ${GREEN}$TESTS_PASSED${NC}"
     echo -e "Tests failed: ${RED}$TESTS_FAILED${NC}"

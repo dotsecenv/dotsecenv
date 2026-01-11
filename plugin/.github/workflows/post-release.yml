@@ -1,0 +1,15 @@
+name: Post-release e2e tests
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test-remote:
+    name: Remote e2e tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Test plugin managers (remote)
+        run: make test-managers-remote

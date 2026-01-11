@@ -1,16 +1,17 @@
 .PHONY: help
 help:
 	@echo "shell targets:"
-	@echo "  make test-plugins    - Run unit tests (bash/zsh/fish)"
-	@echo "  make test-bash       - Run bash unit tests"
-	@echo "  make test-zsh        - Run zsh unit tests"
-	@echo "  make test-fish       - Run fish unit tests"
-	@echo "  make test-managers   - Run plugin manager integration tests (Docker)"
-	@echo "  make fmt             - Format all shell scripts"
-	@echo "  make fmt-check       - Check formatting without modifying files"
-	@echo "  make lint            - Lint shell plugin scripts"
-	@echo "  make hooks           - Install git hooks using lefthook"
-	@echo "  make install-tools   - Install all dev tools"
+	@echo "  make test-plugins         - Run unit tests (bash/zsh/fish)"
+	@echo "  make test-bash            - Run bash unit tests"
+	@echo "  make test-zsh             - Run zsh unit tests"
+	@echo "  make test-fish            - Run fish unit tests"
+	@echo "  make test-managers        - Run plugin manager integration tests (Docker, local)"
+	@echo "  make test-managers-remote - Run plugin manager e2e tests from GitHub (Docker)"
+	@echo "  make fmt                  - Format all shell scripts"
+	@echo "  make fmt-check            - Check formatting without modifying files"
+	@echo "  make lint                 - Lint shell plugin scripts"
+	@echo "  make hooks                - Install git hooks using lefthook"
+	@echo "  make install-tools        - Install all dev tools"
 
 .PHONY: test-plugins
 test-plugins: test-bash test-zsh test-fish
@@ -33,8 +34,13 @@ test-fish:
 
 .PHONY: test-managers
 test-managers:
-	@echo "Running plugin manager integration tests..."
+	@echo "Running plugin manager integration tests (local)..."
 	@./tests/test_plugin_managers.sh
+
+.PHONY: test-managers-remote
+test-managers-remote:
+	@echo "Running plugin manager integration tests (remote)..."
+	@./tests/test_plugin_managers.sh --remote
 
 .PHONY: test-manager-ohmyzsh
 test-manager-ohmyzsh:
