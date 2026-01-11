@@ -108,8 +108,11 @@ func (vr *VaultResolver) OpenVaultsFromPaths(paths []string, stderr io.Writer) e
 		return fmt.Errorf("no vault paths specified")
 	}
 
-	// Update config
-	vr.config = VaultConfig{}
+	// Update config (preserve RequireExplicitVaultUpgrade setting)
+	requireExplicitUpgrade := vr.config.RequireExplicitVaultUpgrade
+	vr.config = VaultConfig{
+		RequireExplicitVaultUpgrade: requireExplicitUpgrade,
+	}
 	for _, path := range paths {
 		vr.config.Entries = append(vr.config.Entries, VaultEntry{Path: ExpandPath(path)})
 	}

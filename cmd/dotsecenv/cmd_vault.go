@@ -94,7 +94,7 @@ Prompts to select a vault if multiple are configured.
 Use -v to target a specific vault.`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		cli, err := createCLI()
+		cli, err := createCLIForUpgrade()
 		if err != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, err)))
 		}

@@ -128,6 +128,16 @@ func createCLI() (*clilib.CLI, error) {
 	return clilib.NewCLI(resolvedPaths, globalOpts.ConfigPath, globalOpts.Silent, false, os.Stdin, os.Stdout, os.Stderr)
 }
 
+// createCLIForUpgrade creates a CLI instance that prevents auto-upgrade of vaults
+func createCLIForUpgrade() (*clilib.CLI, error) {
+	resolvedPaths, err := resolveVaultPaths(globalOpts.ConfigPath, globalOpts.VaultPaths)
+	if err != nil {
+		return nil, err
+	}
+
+	return clilib.NewCLIForUpgrade(resolvedPaths, globalOpts.ConfigPath, globalOpts.Silent, false, os.Stdin, os.Stdout, os.Stderr)
+}
+
 // parseVaultSpec parses a vault specification (-v value) and returns the vault path and index
 // Returns: vaultPath (if path), fromIndex (if 1-based index), error
 func parseVaultSpec(configPath string, vaultPaths []string) (vaultPath string, fromIndex int, err error) {

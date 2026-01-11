@@ -59,6 +59,18 @@ func isSUID() bool {
 }
 
 func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
+	return newCLI(vaultPaths, configPath, silent, strict, stdin, stdout, stderr, nil)
+}
+
+// NewCLIForUpgrade creates a CLI instance that prevents auto-upgrade of vaults.
+// Used by the "vault upgrade" command to ensure vaults aren't upgraded before the explicit upgrade runs.
+func NewCLIForUpgrade(vaultPaths []string, configPath string, silent bool, strict bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
+	forceNoAutoUpgrade := true
+	return newCLI(vaultPaths, configPath, silent, strict, stdin, stdout, stderr, &forceNoAutoUpgrade)
+}
+
+// newCLI creates a CLI instance. If requireExplicitUpgradeOverride is non-nil, it overrides the config setting.
+func newCLI(vaultPaths []string, configPath string, silent bool, strict bool, stdin io.Reader, stdout, stderr io.Writer, requireExplicitUpgradeOverride *bool) (*CLI, error) {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
 		return nil, NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
@@ -142,8 +154,14 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 			}
 		}
 
-		// Initialize resolver with empty config and load paths
-		vaultResolver = vault.NewVaultResolver(vault.VaultConfig{})
+		// Initialize resolver with config that includes upgrade prevention setting
+		requireExplicit := cfg.ShouldRequireExplicitVaultUpgrade()
+		if requireExplicitUpgradeOverride != nil {
+			requireExplicit = *requireExplicitUpgradeOverride
+		}
+		vaultResolver = vault.NewVaultResolver(vault.VaultConfig{
+			RequireExplicitVaultUpgrade: requireExplicit,
+		})
 		if err := vaultResolver.OpenVaultsFromPaths(vaultPaths, warnWriter); err != nil {
 			return nil, NewError(fmt.Sprintf("failed to open vaults from -v paths: %v", err), ExitVaultError)
 		}
@@ -159,8 +177,12 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 			return nil, NewError("no vaults configured - specify vault paths in config or use -v flag", ExitVaultError)
 		}
 
-		// Set vault upgrade behavior from config
-		vaultCfg.RequireExplicitVaultUpgrade = cfg.ShouldRequireExplicitVaultUpgrade()
+		// Set vault upgrade behavior from config (or override if specified)
+		if requireExplicitUpgradeOverride != nil {
+			vaultCfg.RequireExplicitVaultUpgrade = *requireExplicitUpgradeOverride
+		} else {
+			vaultCfg.RequireExplicitVaultUpgrade = cfg.ShouldRequireExplicitVaultUpgrade()
+		}
 
 		vaultResolver = vault.NewVaultResolver(vaultCfg)
 		// Suppress startup warnings; commands like 'identity add' or 'validate' will report status
