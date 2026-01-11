@@ -13,7 +13,7 @@ importers:
         version: 0.37.2(astro@5.16.6(@types/node@25.0.3)(rollup@4.54.0)(typescript@5.9.3)(yaml@2.8.2))
       asciinema-player:
         specifier: ^3.13.5
-        version: 3.13.5
+        version: 3.14.0
       astro:
         specifier: ^5.1.1
         version: 5.16.6(@types/node@25.0.3)(rollup@4.54.0)(typescript@5.9.3)(yaml@2.8.2)
@@ -926,8 +926,8 @@ packages:
   array-iterate@2.0.1:
     resolution: {integrity: sha512-I1jXZMjAgCMmxT4qxXfPXa6SthSoE8h6gkSI9BGGNv8mP8G/v0blc+qFnZu6K42vTOiuME596QaLO0TP3Lk0xg==}
 
-  asciinema-player@3.13.5:
-    resolution: {integrity: sha512-mgpJc9g6I+k4Tz5qVUNd0H+GoYlhiUwvlay6vD6IXiuiWOWhBOjxbvqQ1bcI/HPTrOYxhTyxZuzHIXM36Tw60Q==}
+  asciinema-player@3.14.0:
+    resolution: {integrity: sha512-44m3CpNavn8i7DSr/AeeV+rJpHpcqc/OCildCs9FAu5gnXB6XNBdbhfg6mHMG4uU3R1rxFNA3ZRTt8FMhHC48Q==}
 
   astring@1.9.0:
     resolution: {integrity: sha512-LElXdjswlqjWrPpJFg1Fx4wpkOCxj1TDHlSV4PlaRxHGWko024xICaa97ZkMfs6DRKlCguiAI+rbXv5GWwXIkg==}
@@ -3608,7 +3608,7 @@ snapshots:
 
   array-iterate@2.0.1: {}
 
-  asciinema-player@3.13.5:
+  asciinema-player@3.14.0:
     dependencies:
       '@babel/runtime': 7.28.4
       solid-js: 1.9.10
