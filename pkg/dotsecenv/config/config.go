@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/crypto"
 	"gopkg.in/yaml.v3"
@@ -34,14 +35,24 @@ type BehaviorConfig struct {
 	RestrictToConfiguredVaults *bool `yaml:"restrict_to_configured_vaults,omitempty"`
 }
 
+// Login represents authenticated login state with cryptographic proof.
+// The signature proves the user controls the secret key at login time.
+type Login struct {
+	Fingerprint string    `yaml:"fingerprint"`           // GPG key fingerprint
+	AddedAt     time.Time `yaml:"added_at"`              // When the login was performed
+	Hash        string    `yaml:"hash"`                  // SHA-256 of canonical string (login:{added_at}:{fingerprint})
+	Signature   string    `yaml:"signature"`             // Hex-encoded detached GPG signature of the hash
+}
+
 // Config represents the dotsecenv configuration
 type Config struct {
 	ApprovedAlgorithms []ApprovedAlgorithm `yaml:"approved_algorithms"`
-	Fingerprint        string              `yaml:"fingerprint,omitempty"`
-	Vault              []string            `yaml:"vault"`              // List of vault paths
-	Strict             bool                `yaml:"strict"`             // DEPRECATED: use behavior section
-	Behavior           BehaviorConfig      `yaml:"behavior,omitempty"` // Granular behavior settings
-	GPG                GPGConfig           `yaml:"gpg,omitempty"`      // GPG configuration
+	Login              *Login              `yaml:"login,omitempty"`       // Authenticated login with cryptographic proof
+	Fingerprint        string              `yaml:"fingerprint,omitempty"` // DEPRECATED: use login section instead
+	Vault              []string            `yaml:"vault"`                 // List of vault paths
+	Strict             bool                `yaml:"strict"`                // DEPRECATED: use behavior section
+	Behavior           BehaviorConfig      `yaml:"behavior,omitempty"`    // Granular behavior settings
+	GPG                GPGConfig           `yaml:"gpg,omitempty"`         // GPG configuration
 }
 
 // UnmarshalYAML provides custom YAML unmarshaling with better error messages for vault configuration
@@ -93,6 +104,21 @@ func (c *Config) ShouldRestrictToConfiguredVaults() bool {
 		return *c.Behavior.RestrictToConfiguredVaults
 	}
 	return c.Strict
+}
+
+// GetFingerprint returns the active fingerprint, preferring login.fingerprint over the deprecated field.
+// This method provides backward compatibility during the migration from the old fingerprint field.
+func (c *Config) GetFingerprint() string {
+	if c.Login != nil && c.Login.Fingerprint != "" {
+		return c.Login.Fingerprint
+	}
+	return c.Fingerprint // fallback to deprecated field
+}
+
+// HasDeprecatedFingerprint returns true if the config uses the deprecated fingerprint field
+// without a login section. Used to emit deprecation warnings.
+func (c *Config) HasDeprecatedFingerprint() bool {
+	return c.Fingerprint != "" && (c.Login == nil || c.Login.Fingerprint == "")
 }
 
 // DefaultConfig returns a new Config with FIPS 186-5 compliant algorithm defaults.

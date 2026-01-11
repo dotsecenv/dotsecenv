@@ -9,20 +9,21 @@ import (
 )
 
 var loginCmd = &cobra.Command{
-	Use:   "login FINGERPRINT",
+	Use:   "login [FINGERPRINT]",
 	Short: "Initialize user identity",
-	Long: `Initialize user identity with the given GPG fingerprint.
+	Long: `Initialize user identity with a GPG fingerprint.
+
+If no fingerprint is provided, you will be prompted to select from
+available secret keys in your GPG keyring.
 
 The fingerprint should be the full 40-character GPG key fingerprint
-of the user who will be accessing secrets.`,
+of the user who will be accessing secrets.
+
+This command creates a cryptographically signed login proof that is
+stored in your configuration file, ensuring only users with access
+to the secret key can configure dotsecenv to use it.`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// If no fingerprint provided, show help
-		if len(args) == 0 {
-			_ = cmd.Help()
-			return
-		}
-
 		// Warn if -v or -c are specified (they have no effect on login)
 		if len(globalOpts.VaultPaths) > 0 || globalOpts.ConfigPath != "" {
 			_, _ = fmt.Fprintf(os.Stderr, "warning: -v and -c flags have no effect on 'login' command\n")
@@ -36,7 +37,13 @@ of the user who will be accessing secrets.`,
 		}
 		defer func() { _ = cli.Close() }()
 
-		exitErr := cli.Login(args[0])
+		// If no fingerprint provided, pass empty string to trigger interactive selection
+		fingerprint := ""
+		if len(args) > 0 {
+			fingerprint = args[0]
+		}
+
+		exitErr := cli.Login(fingerprint)
 		exitWithError(exitErr)
 	},
 }
