@@ -3,7 +3,6 @@ package gpg
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os/exec"
 	"path/filepath"
 	"sync"
@@ -17,47 +16,40 @@ var (
 )
 
 // ValidateAndSetGPGProgram validates and sets the GPG program path.
-// It returns an error if validation fails, and writes warnings to stderr.
+// It returns an error if validation fails.
 //
 // Validation rules:
-//   - If path is specified: must be an absolute path to an existing, executable program
-//   - If path is empty: infers "gpg" from PATH and prints a warning to stderr
-//   - In strict mode: fails if path is not explicitly specified
-func ValidateAndSetGPGProgram(path string, strict bool, stderr io.Writer) error {
-	// In strict mode, gpg.program must be explicitly specified
-	if strict && path == "" {
-		return errors.New("strict mode error: gpg.program must be explicitly configured in config file")
+//   - "PATH": explicitly infer gpg from system PATH (silent, no warning)
+//   - Absolute path: must point to an existing, executable program
+//   - Empty/missing: returns an error (must be explicitly configured)
+func ValidateAndSetGPGProgram(program string) error {
+	// Empty/missing program is an error - must be explicitly configured
+	if program == "" {
+		return errors.New("gpg.program must be configured (set to 'PATH' or an absolute path)")
 	}
 
-	if path != "" {
-		// Validate that the path is absolute
-		if !filepath.IsAbs(path) {
-			return fmt.Errorf("gpg.program must be an absolute path, got: %s", path)
+	// "PATH" means explicitly infer from system PATH (silent, no warning)
+	if program == "PATH" {
+		gpgPath, err := exec.LookPath("gpg")
+		if err != nil {
+			return errors.New("gpg.program set to PATH but gpg not found in system PATH")
 		}
-
-		// Validate that the file exists and is executable
-		if !isExecutableFile(path) {
-			return fmt.Errorf("gpg.program is not an executable file: %s", path)
-		}
-
-		// Path is valid, set it
-		setGPGProgramInternal(path)
+		setGPGProgramInternal(gpgPath)
 		return nil
 	}
 
-	// Path not specified, infer from PATH
-	gpgPath, err := exec.LookPath("gpg")
-	if err != nil {
-		return errors.New("gpg.program not configured and gpg not found in PATH")
+	// Must be an absolute path
+	if !filepath.IsAbs(program) {
+		return fmt.Errorf("gpg.program must be 'PATH' or an absolute path, got: %s", program)
 	}
 
-	// Warn about inferring from PATH
-	if stderr != nil {
-		_, _ = fmt.Fprintf(stderr, "warning: gpg.program not configured, using gpg from PATH: %s\n", gpgPath)
+	// Validate that the file exists and is executable
+	if !isExecutableFile(program) {
+		return fmt.Errorf("gpg.program is not an executable file: %s", program)
 	}
 
-	// Set the resolved path
-	setGPGProgramInternal(gpgPath)
+	// Path is valid, set it
+	setGPGProgramInternal(program)
 	return nil
 }
 

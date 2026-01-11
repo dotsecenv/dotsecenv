@@ -42,10 +42,15 @@ func (vr *VaultResolver) OpenVaults(stderr io.Writer) error {
 		// First check if the vault file exists and is not empty
 		fileInfo, err := os.Stat(entry.Path)
 		if err != nil {
-			errmsg := fmt.Sprintf("vault '%s': no such file or directory", entry.Path)
-			vr.loadErrors[i] = fmt.Errorf("no such file or directory: %w", os.ErrNotExist)
+			if os.IsNotExist(err) {
+				// Silent skip for missing files - expected in some workflows
+				vr.loadErrors[i] = fmt.Errorf("no such file or directory: %w", os.ErrNotExist)
+				continue
+			}
+			// Warn for other stat errors (permission denied, etc.)
+			errmsg := fmt.Sprintf("vault '%s': %v", entry.Path, err)
+			vr.loadErrors[i] = err
 			errors = append(errors, errmsg)
-
 			if stderr != nil {
 				_, _ = fmt.Fprintf(stderr, "warning: %s\n", errmsg)
 			}
@@ -63,7 +68,7 @@ func (vr *VaultResolver) OpenVaults(stderr io.Writer) error {
 			continue
 		}
 
-		manager := NewManager(entry.Path, vr.config.StrictMode)
+		manager := NewManager(entry.Path, vr.config.RequireExplicitVaultUpgrade)
 
 		// Try to open the vault
 		if err := manager.OpenAndLock(); err != nil {
@@ -103,8 +108,11 @@ func (vr *VaultResolver) OpenVaultsFromPaths(paths []string, stderr io.Writer) e
 		return fmt.Errorf("no vault paths specified")
 	}
 
-	// Update config
-	vr.config = VaultConfig{}
+	// Update config (preserve RequireExplicitVaultUpgrade setting)
+	requireExplicitUpgrade := vr.config.RequireExplicitVaultUpgrade
+	vr.config = VaultConfig{
+		RequireExplicitVaultUpgrade: requireExplicitUpgrade,
+	}
 	for _, path := range paths {
 		vr.config.Entries = append(vr.config.Entries, VaultEntry{Path: ExpandPath(path)})
 	}
@@ -119,7 +127,7 @@ func (vr *VaultResolver) OpenVaultsFromPaths(paths []string, stderr io.Writer) e
 			return fmt.Errorf("vault file not found: %s", entry.Path)
 		}
 
-		manager := NewManager(entry.Path, vr.config.StrictMode)
+		manager := NewManager(entry.Path, vr.config.RequireExplicitVaultUpgrade)
 		if err := manager.OpenAndLock(); err != nil {
 			return fmt.Errorf("failed to open vault %s: %v", entry.Path, err)
 		}

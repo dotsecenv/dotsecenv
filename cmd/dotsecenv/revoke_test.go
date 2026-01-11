@@ -212,6 +212,8 @@ approved_algorithms:
 vault:
   - "%s"
 strict: false
+gpg:
+  program: PATH
 `, vaultPath)
 
 	if err := os.WriteFile(configPathStrict, []byte(configContentStrict), 0600); err != nil {
@@ -270,31 +272,16 @@ strict: false
 		t.Fatalf("secret revoke (self) failed: %v", err)
 	}
 
-	// 4a. Verify User A CANNOT access with strict config
-	// With strict: true, access is denied if user doesn't have access to the LATEST value
-	stdout, stderr, err := runCmdWithEnv(envA, "-c", configPathStrict, "secret", "get", "SEC1")
-	if err == nil {
-		t.Errorf("expected secret get (A) with strict config to fail after self-revocation, got success: %s", stdout)
-	} else {
-		// Expect access denied error
-		if !strings.Contains(stderr, "access denied") {
-			t.Errorf("expected access denied error with strict config, got: %s", stderr)
-		}
-	}
-
-	// 4b. Verify User A gets a warning but can still access older value with non-strict config
-	// After self-revocation, User A can still decrypt their original value but gets a warning
-	stdout, stderr, err = runCmdWithEnv(envA, "-c", configPathNonStrict, "secret", "get", "SEC1")
+	// 4. Verify User A can still access older value after self-revocation
+	// After self-revocation, User A can still decrypt their original value
+	// (Fallback to older values is always allowed silently)
+	stdout, _, err = runCmdWithEnv(envA, "-c", configPathNonStrict, "secret", "get", "SEC1")
 	if err != nil {
-		t.Errorf("expected secret get (A) to succeed with older value (non-strict), got error: %v", err)
+		t.Errorf("expected secret get (A) to succeed with older value after self-revocation, got error: %v", err)
 	}
 	// Should get the original value
 	if strings.TrimSpace(stdout) != "secret_value_1" {
 		t.Errorf("expected original secret value, got: %s", stdout)
-	}
-	// Should have a warning about returning older value
-	if !strings.Contains(stderr, "warning") || !strings.Contains(stderr, "older value") {
-		t.Errorf("expected warning about older value, got stderr: %s", stderr)
 	}
 
 	// 5. Verify User B CAN still access (with either config)

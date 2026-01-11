@@ -81,16 +81,16 @@ func printUpgradeNotice(path string, fromVersion, toVersion int) {
 		path, fromVersion, toVersion)
 }
 
-// printStrictModeHint outputs hint about enabling auto-upgrade.
-func printStrictModeHint() {
-	fmt.Fprintf(os.Stderr, "dotsecenv: set strict: false in config to enable automatic upgrades\n")
+// printExplicitUpgradeHint outputs hint about running vault upgrade command.
+func printExplicitUpgradeHint() {
+	fmt.Fprintf(os.Stderr, "dotsecenv: run 'dotsecenv vault upgrade' to upgrade the vault format\n")
 }
 
-// CheckAndUpgradeVault checks if a vault needs upgrading and handles it based on strictMode.
+// CheckAndUpgradeVault checks if a vault needs upgrading and handles it based on requireExplicitUpgrade.
 // Returns true if the vault was upgraded (caller may need to reload).
-// In strict mode: warns but doesn't modify the vault.
-// In non-strict mode: upgrades the vault in-place.
-func CheckAndUpgradeVault(w *Writer, path string, strictMode bool) (bool, error) {
+// If requireExplicitUpgrade is true: warns but doesn't modify the vault.
+// If requireExplicitUpgrade is false: upgrades the vault in-place.
+func CheckAndUpgradeVault(w *Writer, path string, requireExplicitUpgrade bool) (bool, error) {
 	currentVersion := w.Version()
 
 	if currentVersion >= LatestFormatVersion {
@@ -110,13 +110,13 @@ func CheckAndUpgradeVault(w *Writer, path string, strictMode bool) (bool, error)
 	// Always warn to stderr
 	printUpgradeWarning(path, currentVersion, LatestFormatVersion)
 
-	if strictMode {
-		// Strict mode: warn only, don't modify
-		printStrictModeHint()
+	if requireExplicitUpgrade {
+		// Explicit upgrade required: warn only, don't modify
+		printExplicitUpgradeHint()
 		return false, nil
 	}
 
-	// Non-strict mode: perform upgrade
+	// Auto-upgrade: perform upgrade
 	if err := upgradeVault(w, currentVersion, LatestFormatVersion); err != nil {
 		return false, fmt.Errorf("failed to upgrade vault: %w", err)
 	}

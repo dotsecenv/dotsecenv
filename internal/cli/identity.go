@@ -92,84 +92,6 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 	// Get full config for correct display positions
 	fullVaultCfg, _ := vault.ParseVaultConfig(c.config.Vault)
 
-	// In strict mode, pre-flight check: fail if any vault has a parsing error (not just missing)
-	if c.Strict {
-		// First pass: collect failed vault display positions and their errors
-		type vaultError struct {
-			displayPos int
-			path       string
-			errMsg     string
-		}
-		var failedVaults []vaultError
-		var failedDisplayPositions []string
-
-		for idx, entry := range loadedConfig.Entries {
-			manager := c.vaultResolver.GetVaultManager(idx)
-			if manager == nil {
-				loadErr := c.vaultResolver.GetLoadError(idx)
-				isNotExist := loadErr != nil && errors.Is(loadErr, os.ErrNotExist)
-				if !isNotExist {
-					displayPos := idx + 1
-					expandedPath := vault.ExpandPath(entry.Path)
-					for i, fullEntry := range fullVaultCfg.Entries {
-						if vault.ExpandPath(fullEntry.Path) == expandedPath {
-							displayPos = i + 1
-							break
-						}
-					}
-					errMsg := "unknown error"
-					if loadErr != nil {
-						errMsg = loadErr.Error()
-					}
-					failedVaults = append(failedVaults, vaultError{displayPos, entry.Path, errMsg})
-					failedDisplayPositions = append(failedDisplayPositions, fmt.Sprintf("%d", displayPos))
-				}
-			}
-		}
-
-		if len(failedVaults) > 0 {
-			// Build the list of failing vault numbers for the skip message
-			failedVaultsList := failedDisplayPositions[0]
-			for i := 1; i < len(failedDisplayPositions); i++ {
-				failedVaultsList += ", " + failedDisplayPositions[i]
-			}
-			vaultWord := "vault"
-			if len(failedDisplayPositions) > 1 {
-				vaultWord = "vaults"
-			}
-
-			// Print header and iterate through all vaults in order
-			_, _ = fmt.Fprintf(c.output.Stdout(), "Strict mode: vault errors detected, no changes made\n")
-			for idx, entry := range loadedConfig.Entries {
-				displayPos := idx + 1
-				expandedPath := vault.ExpandPath(entry.Path)
-				for i, fullEntry := range fullVaultCfg.Entries {
-					if vault.ExpandPath(fullEntry.Path) == expandedPath {
-						displayPos = i + 1
-						break
-					}
-				}
-
-				manager := c.vaultResolver.GetVaultManager(idx)
-				if manager == nil {
-					loadErr := c.vaultResolver.GetLoadError(idx)
-					isNotExist := loadErr != nil && errors.Is(loadErr, os.ErrNotExist)
-					if !isNotExist {
-						errMsg := "unknown error"
-						if loadErr != nil {
-							errMsg = loadErr.Error()
-						}
-						_, _ = fmt.Fprintf(c.output.Stdout(), "  Vault %d (%s): error, %s\n", displayPos, entry.Path, errMsg)
-					}
-					// Skip non-existent vaults silently
-				} else if targetSet[idx] {
-					_, _ = fmt.Fprintf(c.output.Stdout(), "  Vault %d (%s): would add identity (skipped due to errors in %s %s)\n", displayPos, entry.Path, vaultWord, failedVaultsList)
-				}
-			}
-			return NewError("strict mode error: one or more vaults failed to load", ExitVaultError)
-		}
-	}
-
 	signingFP := c.getFingerprintFromEnv()
 	if signingFP == "" {
 		return NewError("no fingerprint configured for signing; run 'dotsecenv init FINGERPRINT' first", ExitFingerprintRequired)
@@ -215,14 +137,17 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 		// Check if vault is accessible
 		if manager == nil {
 			loadErr := c.vaultResolver.GetLoadError(idx)
-			// Only print non-existing vaults with --all; always print other errors (e.g., parse failures)
 			isNotExist := loadErr != nil && errors.Is(loadErr, os.ErrNotExist)
-			if showAllVaults || !isNotExist {
-				errMsg := "unknown error"
-				if loadErr != nil {
-					errMsg = loadErr.Error()
+			if showAllVaults {
+				if isNotExist {
+					_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped (not present)\n", displayPos, vaultPath)
+				} else {
+					errMsg := "unknown error"
+					if loadErr != nil {
+						errMsg = loadErr.Error()
+					}
+					_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped (err: %s)\n", displayPos, vaultPath, errMsg)
 				}
-				_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, %s\n", displayPos, vaultPath, errMsg)
 			}
 			continue
 		}
@@ -262,18 +187,9 @@ func (c *CLI) IdentityAdd(fingerprint string, all bool, vaultPath string, fromIn
 		addedCount++
 	}
 
-	// In strict mode, error only if identity was NOT added to any vault
-	if c.Strict && addedCount == 0 {
-		if skippedAlreadyPresent > 0 {
-			return NewError("strict mode error: identity already exists in all viable vaults", ExitGeneralError)
-		}
-		if failureCount > 0 {
-			return NewError("strict mode error: failed to add identity to any vault", ExitVaultError)
-		}
-	}
-
-	// In non-strict mode, error only if all targets had actual failures (not "already present")
-	if !c.Strict && addedCount == 0 && failureCount > 0 && skippedAlreadyPresent == 0 {
+	// Error only if all targets had actual failures (not "already present")
+	// Identity already exists is not an error - it's just a warning (printed earlier)
+	if addedCount == 0 && failureCount > 0 && skippedAlreadyPresent == 0 {
 		return NewError("failed to add identity to any vault", ExitVaultError)
 	}
 
@@ -407,16 +323,17 @@ func (c *CLI) IdentityList(jsonOutput bool) *Error {
 }
 
 // ensureIdentityInVault ensures the identity exists in the specified vault index
+// If the identity doesn't exist, it will be auto-added with a warning
 func (c *CLI) ensureIdentityInVault(fingerprint string, index int) *Error {
 	if c.vaultResolver.IdentityExistsInVault(fingerprint, index) {
 		return nil
 	}
 
-	if c.Strict {
-		return NewError(fmt.Sprintf("strict mode error: identity %s not found in vault %d and will not be added\n  run: `dotsecenv vault identity add %s`", fingerprint, index+1, fingerprint), ExitAccessDenied)
-	}
-
-	_, _ = fmt.Fprintf(c.output.Stderr(), "Auto-adding identity %s to vault %d...\n", fingerprint, index+1)
+	// Always auto-add with warning (simplified behavior - no strict mode check)
+	vaultPath := c.vaultResolver.GetConfig().Entries[index].Path
+	_, _ = fmt.Fprintf(c.output.Stderr(), "warning: identity %s did not previously exist in vault\n", fingerprint)
+	_, _ = fmt.Fprintf(c.output.Stderr(), "warning: adding identity to vault %d (%s)\n", index+1, vaultPath)
+	_, _ = fmt.Fprintf(c.output.Stderr(), "warning: you can inspect the vault with 'dotsecenv vault identity list -v %s'\n", vaultPath)
 
 	publicKeyInfo, pubKeyErr := c.gpgClient.GetPublicKeyInfo(fingerprint)
 	if pubKeyErr != nil {

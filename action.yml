@@ -21,7 +21,7 @@ inputs:
     required: false
     default: 'true'
   init-config:
-    description: 'Arguments for "dotsecenv init config". Set to empty string to run with defaults, or provide flags (e.g., "--strict --login FINGERPRINT"). Leave as "skip" to not run.'
+    description: 'Arguments for "dotsecenv init config". Set to empty string to run with defaults, or provide flags (e.g., "--login FINGERPRINT"). Leave as "skip" to not run.'
     required: false
     default: 'skip'
 

@@ -90,7 +90,7 @@ jobs:
         with:
           version: ${{ github.sha }}
           build-from-source: true
-          init-config: '--strict --no-gpg-program'
+          init-config: '--no-gpg-program'
       - run: dotsecenv version
 
   release-test:

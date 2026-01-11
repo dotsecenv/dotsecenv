@@ -59,6 +59,18 @@ func isSUID() bool {
 }
 
 func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
+	return newCLI(vaultPaths, configPath, silent, strict, stdin, stdout, stderr, nil)
+}
+
+// NewCLIForUpgrade creates a CLI instance that prevents auto-upgrade of vaults.
+// Used by the "vault upgrade" command to ensure vaults aren't upgraded before the explicit upgrade runs.
+func NewCLIForUpgrade(vaultPaths []string, configPath string, silent bool, strict bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
+	forceNoAutoUpgrade := true
+	return newCLI(vaultPaths, configPath, silent, strict, stdin, stdout, stderr, &forceNoAutoUpgrade)
+}
+
+// newCLI creates a CLI instance. If requireExplicitUpgradeOverride is non-nil, it overrides the config setting.
+func newCLI(vaultPaths []string, configPath string, silent bool, strict bool, stdin io.Reader, stdout, stderr io.Writer, requireExplicitUpgradeOverride *bool) (*CLI, error) {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
 		return nil, NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
@@ -77,17 +89,17 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
 	}
 
+	// Deprecation warning for strict: true
+	if cfg.Strict && !silent {
+		_, _ = fmt.Fprintf(stderr, "warning: 'strict: true' is deprecated and will be removed in a future version\n")
+		_, _ = fmt.Fprintf(stderr, "         Migrate to granular behavior settings: https://dotsecenv.com/docs/concepts/behavior-settings\n")
+	}
+
 	// Compute effective strict mode early (CLI flag or config setting)
 	effectiveStrict := strict || cfg.Strict
 
-	// Determine stderr for warnings (respect silent mode)
-	gpgWarnWriter := stderr
-	if silent {
-		gpgWarnWriter = nil
-	}
-
 	// Validate and set GPG program path from config
-	if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program, effectiveStrict, gpgWarnWriter); err != nil {
+	if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program); err != nil {
 		return nil, NewError(fmt.Sprintf("failed: %v", err), ExitGPGError)
 	}
 
@@ -132,18 +144,24 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 			}
 		}
 
-		// In strict mode, ignoring config vaults is an error
+		// If restrict_to_configured_vaults is set, ignoring config vaults is an error
 		if shouldWarnOrError {
-			if effectiveStrict {
-				return nil, NewError("strict mode error: ignoring vaults in configuration and using specified vault arguments is not allowed", ExitGeneralError)
+			if cfg.ShouldRestrictToConfiguredVaults() {
+				return nil, NewError("restrict_to_configured_vaults: ignoring vaults in configuration and using specified vault arguments is not allowed", ExitGeneralError)
 			}
 			if !silent {
 				_, _ = fmt.Fprintf(stderr, "warning: ignoring vaults in configuration and using specified vault arguments\n")
 			}
 		}
 
-		// Initialize resolver with empty config and load paths
-		vaultResolver = vault.NewVaultResolver(vault.VaultConfig{})
+		// Initialize resolver with config that includes upgrade prevention setting
+		requireExplicit := cfg.ShouldRequireExplicitVaultUpgrade()
+		if requireExplicitUpgradeOverride != nil {
+			requireExplicit = *requireExplicitUpgradeOverride
+		}
+		vaultResolver = vault.NewVaultResolver(vault.VaultConfig{
+			RequireExplicitVaultUpgrade: requireExplicit,
+		})
 		if err := vaultResolver.OpenVaultsFromPaths(vaultPaths, warnWriter); err != nil {
 			return nil, NewError(fmt.Sprintf("failed to open vaults from -v paths: %v", err), ExitVaultError)
 		}
@@ -157,6 +175,13 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 		// Check if we have any vaults configured
 		if len(vaultCfg.Entries) == 0 {
 			return nil, NewError("no vaults configured - specify vault paths in config or use -v flag", ExitVaultError)
+		}
+
+		// Set vault upgrade behavior from config (or override if specified)
+		if requireExplicitUpgradeOverride != nil {
+			vaultCfg.RequireExplicitVaultUpgrade = *requireExplicitUpgradeOverride
+		} else {
+			vaultCfg.RequireExplicitVaultUpgrade = cfg.ShouldRequireExplicitVaultUpgrade()
 		}
 
 		vaultResolver = vault.NewVaultResolver(vaultCfg)
