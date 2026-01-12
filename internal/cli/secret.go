@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"golang.org/x/term"
@@ -435,7 +436,9 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 			}
 		} else {
 			if len(decryptedValues) > 0 {
-				_, _ = fmt.Fprintf(c.output.Stdout(), "%s\n", decryptedValues[0])
+				// Trim trailing newline to avoid double newline (echo adds one, we add one)
+				value := strings.TrimSuffix(decryptedValues[0], "\n")
+				_, _ = fmt.Fprintf(c.output.Stdout(), "%s\n", value)
 			}
 		}
 	}
@@ -565,7 +568,9 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 				_, _ = fmt.Fprintf(c.output.Stdout(), "%s (%s): %s\n", item.AddedAt.Format(time.RFC3339), item.Vault, item.Value)
 			}
 		} else {
-			_, _ = fmt.Fprintf(c.output.Stdout(), "%s\n", decryptedValues[0])
+			// Trim trailing newline to avoid double newline (echo adds one, we add one)
+			value := strings.TrimSuffix(decryptedValues[0], "\n")
+			_, _ = fmt.Fprintf(c.output.Stdout(), "%s\n", value)
 		}
 	}
 
