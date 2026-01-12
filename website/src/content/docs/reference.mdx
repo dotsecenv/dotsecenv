@@ -589,6 +589,25 @@ Validate the vault and configuration files.
 dotsecenv validate [flags]
 ```
 
+<Aside type="danger" title="Breaking Change in v0.4">
+v0.4 changed the hash computation format to improve security. Secrets created with v0.3.x will fail validation with "hash mismatch" errors.
+
+**To fix existing vaults:**
+
+1. Each user must re-sign their own secret values (one user cannot edit another's values):
+
+   ```bash
+   # For each secret you created
+   dotsecenv secret get SECRET_KEY | dotsecenv secret put SECRET_KEY
+   ```
+
+2. After re-signing, edit the vault file manually to remove old values that no longer validate. Look for entries where the `hash` field fails verification and delete those value blocks.
+
+3. Commit the updated vault file.
+
+This is a one-time migration. New secrets created with v0.4+ will validate correctly.
+</Aside>
+
 Checks for:
 
 - Config file syntax and validity

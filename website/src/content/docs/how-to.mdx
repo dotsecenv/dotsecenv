@@ -249,6 +249,43 @@ dotsecenv secret revoke "*" THEIR_FINGERPRINT --all
 
 Check for issues with your config and vault files.
 
+<Aside type="danger" title="Breaking Change in v0.4">
+v0.4 changed the hash computation format to improve security (prevents value transplantation attacks). Secrets created with v0.3.x will fail validation with "hash mismatch" errors.
+
+**To migrate your vault:**
+
+<Steps>
+
+1. **Re-sign your secret values**
+
+   Each user must re-sign their own values—you cannot edit another user's secret values:
+
+   ```bash
+   # List all secrets
+   dotsecenv vault describe
+
+   # For each secret you created, re-sign it
+   dotsecenv secret get DATABASE_PASSWORD | dotsecenv secret put DATABASE_PASSWORD
+   dotsecenv secret get API_KEY | dotsecenv secret put API_KEY
+   # ... repeat for each secret
+   ```
+
+2. **Remove old values from the vault file**
+
+   Edit the vault file manually and delete the old value entries that no longer validate. Each secret may have multiple values—keep only the newly signed ones.
+
+3. **Commit the updated vault**
+
+   ```bash
+   git add vault
+   git commit -m "Migrate vault to v0.4 hash format"
+   ```
+
+</Steps>
+
+This is a one-time migration. New secrets created with v0.4+ will validate correctly.
+</Aside>
+
 ### Basic validation
 
 ```bash
