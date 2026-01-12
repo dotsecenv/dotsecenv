@@ -94,12 +94,6 @@ homebrew_casks:
       bash: completions/dotsecenv.bash
       zsh: completions/dotsecenv.zsh
       fish: completions/dotsecenv.fish
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/dotsecenv"]
-          end
     repository:
       owner: dotsecenv
       name: homebrew-tap
