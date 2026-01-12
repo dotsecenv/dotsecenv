@@ -30,11 +30,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y rpm
 
-      - name: Install Zig (for CGO cross-compilation)
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.13.0
-
       - name: Setup GPG key
         id: setup_gpg
         env:
@@ -86,8 +81,140 @@ jobs:
         with:
           subject-path: "dist/*"
 
-  trigger-repo-update:
+  notarize-macos:
     needs: goreleaser
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          trust_level: 5
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+          ARCHIVE="dotsecenv_${VERSION#v}_Darwin_${{ matrix.arch }}.tar.gz"
+
+          # Download archive and extract to separate directory
+          gh release download "$VERSION" --pattern "$ARCHIVE" --dir .
+          mkdir -p archive-contents
+          tar -xzf "$ARCHIVE" -C archive-contents
+
+      - name: Sign and notarize
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: bash scripts/notarize-macos.sh ./archive-contents/dotsecenv
+
+      - name: Re-package and re-sign archive
+        run: |
+          VERSION="${{ github.ref_name }}"
+          ARCHIVE="dotsecenv_${VERSION#v}_Darwin_${{ matrix.arch }}.tar.gz"
+
+          # Re-create archive from extracted directory (preserves original structure)
+          tar -czf "$ARCHIVE" -C archive-contents .
+
+          # Re-sign the archive with GPG (binary .sig format to match GoReleaser)
+          rm -f "${ARCHIVE}.sig"
+          gpg --batch --yes --detach-sign \
+            --default-key "${{ steps.import_gpg.outputs.keyid }}" \
+            "$ARCHIVE"
+
+      - name: Upload updated assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+          ARCHIVE="dotsecenv_${VERSION#v}_Darwin_${{ matrix.arch }}.tar.gz"
+
+          # Delete old assets and upload new ones
+          gh release delete-asset "$VERSION" "$ARCHIVE" --yes || true
+          gh release delete-asset "$VERSION" "${ARCHIVE}.sig" --yes || true
+
+          gh release upload "$VERSION" "$ARCHIVE" --clobber
+          gh release upload "$VERSION" "${ARCHIVE}.sig" --clobber
+
+      - name: Cleanup secrets
+        if: always()
+        run: |
+          # Clean up any Apple signing secrets that may remain
+          rm -f "${{ runner.temp }}/certificate.p12" 2>/dev/null || true
+          rm -f "${{ runner.temp }}/notarize.zip" 2>/dev/null || true
+          rm -rf "$HOME/.private_keys" 2>/dev/null || true
+
+          # Delete signing keychain if it exists
+          if security list-keychains | grep -q "signing.keychain-db"; then
+            security delete-keychain "${{ runner.temp }}/signing.keychain-db" 2>/dev/null || true
+          fi
+
+  update-checksums:
+    needs: notarize-macos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          trust_level: 5
+
+      - name: Download and regenerate checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+
+          # Download current checksums and all darwin archives
+          gh release download "$VERSION" --pattern "checksums.txt" --dir .
+          gh release download "$VERSION" --pattern "dotsecenv_*_Darwin_*.tar.gz" --dir .
+
+          # Regenerate checksums for darwin archives
+          for archive in dotsecenv_*_Darwin_*.tar.gz; do
+            # Remove old line, add new checksum
+            grep -v "$archive" checksums.txt > checksums.txt.tmp || true
+            sha256sum "$archive" >> checksums.txt.tmp
+            mv checksums.txt.tmp checksums.txt
+          done
+
+          # Sort checksums file for consistency
+          sort checksums.txt -o checksums.txt
+
+      - name: Re-sign and upload checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+
+          # Re-sign checksums (binary .sig format to match GoReleaser)
+          rm -f checksums.txt.sig
+          gpg --batch --yes --detach-sign \
+            --default-key "${{ steps.import_gpg.outputs.keyid }}" \
+            checksums.txt
+
+          # Upload updated checksums
+          gh release delete-asset "$VERSION" "checksums.txt" --yes || true
+          gh release delete-asset "$VERSION" "checksums.txt.sig" --yes || true
+          gh release upload "$VERSION" checksums.txt --clobber
+          gh release upload "$VERSION" checksums.txt.sig --clobber
+
+  trigger-repo-update:
+    needs: [goreleaser, update-checksums]
     runs-on: ubuntu-latest
     steps:
       - name: Generate App Token
