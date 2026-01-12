@@ -37,6 +37,7 @@ func init() {
 	// Add subcommands
 	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(identityCmd)
 	rootCmd.AddCommand(secretCmd)
 	rootCmd.AddCommand(vaultCmd)
 	rootCmd.AddCommand(validateCmd)

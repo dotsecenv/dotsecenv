@@ -16,7 +16,7 @@ import (
 // InitConfig initializes a configuration file with FIPS-compliant defaults.
 // gpgProgram: if non-empty, use this value for gpg.program (without validation)
 // noGPGProgram: if true, skip GPG detection entirely and leave gpg.program empty
-// loginFingerprint: if non-empty, set fingerprint to this value
+// loginFingerprint: if non-empty, creates a signed login proof for this fingerprint
 func InitConfig(configPath string, initialVaults []string, gpgProgram string, noGPGProgram bool, loginFingerprint string, stdout, stderr io.Writer) *Error {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
@@ -36,9 +36,25 @@ func InitConfig(configPath string, initialVaults []string, gpgProgram string, no
 	// Use FIPS-compliant default configuration
 	cfg := config.DefaultConfig()
 
-	// Apply fingerprint if provided via --login
+	// Apply signed login if fingerprint is provided via --login
 	if loginFingerprint != "" {
-		cfg.Fingerprint = loginFingerprint
+		// Create a GPG client to generate the signed login proof
+		gpgClient := &gpg.GPGClient{}
+
+		// Validate the key exists first
+		publicKeyInfo, pubKeyErr := gpgClient.GetPublicKeyInfo(loginFingerprint)
+		if pubKeyErr != nil {
+			return NewError(fmt.Sprintf("failed to get public key for fingerprint '%s': %v\nMake sure your GPG key is available in gpg-agent", loginFingerprint, pubKeyErr), ExitGPGError)
+		}
+
+		_, _ = fmt.Fprintf(stderr, "Creating signed login for: %s (%s)\n", publicKeyInfo.UID, loginFingerprint)
+
+		// Create signed login proof
+		login, loginErr := CreateSignedLogin(gpgClient, loginFingerprint)
+		if loginErr != nil {
+			return NewError(fmt.Sprintf("failed to create signed login: %v", loginErr), ExitGPGError)
+		}
+		cfg.Login = login
 	}
 
 	// Inject default vault paths (CLI specific behavior)
@@ -128,8 +144,15 @@ func saveConfigWithComments(path string, cfg config.Config) error {
 		sb.WriteString(fmt.Sprintf("    min_bits: %d\n", alg.MinBits))
 	}
 
-	// Fingerprint (only if set)
-	if cfg.Fingerprint != "" {
+	// Login section (only if set) - preferred over deprecated fingerprint
+	if cfg.Login != nil && cfg.Login.Fingerprint != "" {
+		sb.WriteString("login:\n")
+		sb.WriteString(fmt.Sprintf("  fingerprint: %s\n", cfg.Login.Fingerprint))
+		sb.WriteString(fmt.Sprintf("  added_at: %s\n", cfg.Login.AddedAt.Format("2006-01-02T15:04:05Z07:00")))
+		sb.WriteString(fmt.Sprintf("  hash: %s\n", cfg.Login.Hash))
+		sb.WriteString(fmt.Sprintf("  signature: %s\n", cfg.Login.Signature))
+	} else if cfg.Fingerprint != "" {
+		// Deprecated fingerprint field (for backward compatibility)
 		sb.WriteString(fmt.Sprintf("fingerprint: %s\n", cfg.Fingerprint))
 	}
 
@@ -144,7 +167,7 @@ func saveConfigWithComments(path string, cfg config.Config) error {
 	sb.WriteString("# All settings default to false (permissive). Set to true for stricter behavior.\n")
 	sb.WriteString("# See: https://dotsecenv.com/docs/concepts/behavior-settings\n")
 	sb.WriteString("behavior:\n")
-	sb.WriteString("  # Prevent automatic vault format upgrades; requires 'dotsecenv vault upgrade'\n")
+	sb.WriteString("  # Prevent automatic vault format upgrades; requires 'dotsecenv vault doctor'\n")
 	sb.WriteString("  require_explicit_vault_upgrade: false\n")
 	sb.WriteString("  # Ignore CLI -v flags; only use vaults from this config file\n")
 	sb.WriteString("  restrict_to_configured_vaults: false\n")

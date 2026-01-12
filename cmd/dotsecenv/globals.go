@@ -28,16 +28,15 @@ func isSUID() bool {
 
 // suidDisallowedCommands lists commands that are completely blocked in SUID mode
 var suidDisallowedCommands = map[string]bool{
-	"login":              true,
-	"init config":        true,
-	"init vault":         true,
-	"secret put":         true,
-	"secret share":       true,
-	"secret revoke":      true,
-	"vault identity add": true,
+	"login":         true,
+	"init config":   true,
+	"init vault":    true,
+	"secret put":    true,
+	"secret share":  true,
+	"secret revoke": true,
 }
 
-// getCommandPath returns the full command path (e.g., "secret put", "vault identity add")
+// getCommandPath returns the full command path (e.g., "secret put", "vault describe")
 func getCommandPath(cmd *cobra.Command) string {
 	var parts []string
 	for c := cmd; c != nil && c.Name() != "dotsecenv"; c = c.Parent() {
@@ -126,16 +125,6 @@ func createCLI() (*clilib.CLI, error) {
 	}
 
 	return clilib.NewCLI(resolvedPaths, globalOpts.ConfigPath, globalOpts.Silent, false, os.Stdin, os.Stdout, os.Stderr)
-}
-
-// createCLIForUpgrade creates a CLI instance that prevents auto-upgrade of vaults
-func createCLIForUpgrade() (*clilib.CLI, error) {
-	resolvedPaths, err := resolveVaultPaths(globalOpts.ConfigPath, globalOpts.VaultPaths)
-	if err != nil {
-		return nil, err
-	}
-
-	return clilib.NewCLIForUpgrade(resolvedPaths, globalOpts.ConfigPath, globalOpts.Silent, false, os.Stdin, os.Stdout, os.Stderr)
 }
 
 // parseVaultSpec parses a vault specification (-v value) and returns the vault path and index

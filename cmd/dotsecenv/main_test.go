@@ -57,6 +57,16 @@ func runCmd(args ...string) (string, string, error) {
 	return stdout.String(), stderr.String(), err
 }
 
+func runCmdWithEnv(env []string, args ...string) (string, string, error) {
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(filteredEnv(), env...)
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stdout.String(), stderr.String(), err
+}
+
 func TestGlobalOptions_ConfigPath(t *testing.T) {
 	tmpDir := t.TempDir()
 

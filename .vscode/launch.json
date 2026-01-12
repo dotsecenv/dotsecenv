@@ -96,7 +96,7 @@
             "showLog": true
         },
         {
-            "name": "Debug: vault list",
+            "name": "Debug: vault describe",
             "type": "go",
             "request": "launch",
             "mode": "debug",
@@ -104,12 +104,12 @@
             "env": {},
             "args": [
                 "vault",
-                "list"
+                "describe"
             ],
             "showLog": true
         },
         {
-            "name": "Debug: vault identity list",
+            "name": "Debug: vault doctor",
             "type": "go",
             "request": "launch",
             "mode": "debug",
@@ -117,23 +117,7 @@
             "env": {},
             "args": [
                 "vault",
-                "identity",
-                "list"
-            ],
-            "showLog": true
-        },
-        {
-            "name": "Debug: vault identity add <fingerprint>",
-            "type": "go",
-            "request": "launch",
-            "mode": "debug",
-            "program": "${workspaceFolder}",
-            "env": {},
-            "args": [
-                "vault",
-                "identity",
-                "add",
-                "REPLACE_WITH_FINGERPRINT"
+                "doctor"
             ],
             "showLog": true
         },

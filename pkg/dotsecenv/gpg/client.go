@@ -39,7 +39,6 @@ type KeyInfo struct {
 }
 
 // Client defines the interface for GPG operations.
-// Client defines the interface for GPG operations.
 type Client interface {
 	GetPublicKeyInfo(fingerprint string) (*KeyInfo, error)
 	EncryptToRecipients(plaintext []byte, recipients []string, signingKey *crypto.Key) (string, error)
@@ -52,6 +51,8 @@ type Client interface {
 	SignSecretValue(value *vault.SecretValue, signerFingerprint string, algorithmBits int) (hash string, signature string, err error)
 	DecryptSecret(encryptedBase64 string, fingerprint string) ([]byte, error)
 	DecryptSecretValue(value *vault.SecretValue, fingerprint string) ([]byte, error)
+	IsAgentAvailable() bool
+	ListSecretKeys() ([]SecretKeyInfo, error)
 }
 
 // GPGClient provides GPG operations.
@@ -699,4 +700,68 @@ func GetKeyUID(key *crypto.Key) (string, error) {
 	}
 
 	return "", fmt.Errorf("key has no user IDs")
+}
+
+// IsAgentAvailable checks if gpg-agent is available by running gpg-connect-agent.
+// Returns true if the agent responds successfully.
+func (c *GPGClient) IsAgentAvailable() bool {
+	cmd := exec.Command("gpg-connect-agent", "/bye")
+	cmd.Stderr = nil
+	err := cmd.Run()
+	return err == nil
+}
+
+// SecretKeyInfo holds basic information about a secret key for listing purposes.
+type SecretKeyInfo struct {
+	Fingerprint string
+	UID         string
+}
+
+// ListSecretKeys lists all secret keys available in the GPG keyring.
+// Returns a list of SecretKeyInfo structs with fingerprint and UID.
+func (c *GPGClient) ListSecretKeys() ([]SecretKeyInfo, error) {
+	cmd := exec.Command(GetGPGProgram(), "--with-colons", "--list-secret-keys")
+	cmd.Stderr = nil
+
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list secret keys: %w", err)
+	}
+
+	var keys []SecretKeyInfo
+	var currentFingerprint string
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		parts := strings.Split(line, ":")
+		if len(parts) < 2 {
+			continue
+		}
+
+		recordType := parts[0]
+
+		switch recordType {
+		case "sec":
+			// Secret key record - reset fingerprint for next fpr line
+			currentFingerprint = ""
+		case "fpr":
+			// Fingerprint record
+			if len(parts) >= 10 && parts[9] != "" {
+				currentFingerprint = parts[9]
+			}
+		case "uid":
+			// User ID record
+			if currentFingerprint != "" && len(parts) >= 10 && parts[9] != "" {
+				// Only add if we have both fingerprint and UID
+				keys = append(keys, SecretKeyInfo{
+					Fingerprint: currentFingerprint,
+					UID:         parts[9],
+				})
+				// Reset after capturing first UID for this key
+				currentFingerprint = ""
+			}
+		}
+	}
+
+	return keys, nil
 }

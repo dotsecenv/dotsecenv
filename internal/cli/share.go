@@ -143,6 +143,11 @@ func (c *CLI) secretShareInVault(secretKey, targetFingerprint string, vaultIndex
 		return nil
 	}
 
+	// Ensure target identity exists in the vault (auto-add if necessary)
+	if ensureErr := c.ensureIdentityInVault(targetFingerprint, vaultIndex); ensureErr != nil {
+		return ensureErr
+	}
+
 	targetIdentity := c.vaultResolver.GetIdentityByFingerprint(targetFingerprint)
 	if targetIdentity == nil {
 		return NewError(fmt.Sprintf("identity not found: %s", targetFingerprint), ExitVaultError)

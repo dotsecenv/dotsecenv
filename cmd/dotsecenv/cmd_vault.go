@@ -10,16 +10,16 @@ import (
 var vaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Manage vaults",
-	Long:  `Commands for managing vaults: list, identity.`,
+	Long:  `Commands for managing vaults: describe, doctor.`,
 }
 
-// vault list flags
-var vaultListJSON bool
+// vault describe flags
+var vaultDescribeJSON bool
 
-var vaultListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List configured vaults and their secrets",
-	Long: `List all configured vaults and the secrets they contain.
+var vaultDescribeCmd = &cobra.Command{
+	Use:   "describe",
+	Short: "Describe configured vaults with identities and secrets",
+	Long: `Describe all configured vaults showing their identities and secrets.
 
 Options:
   --json  Output as JSON`,
@@ -31,119 +31,29 @@ Options:
 		}
 		defer func() { _ = cli.Close() }()
 
-		exitErr := cli.VaultList(vaultListJSON)
+		exitErr := cli.VaultDescribe(vaultDescribeJSON)
 		exitWithError(exitErr)
 	},
 }
 
-// vault identity command
-var vaultIdentityCmd = &cobra.Command{
-	Use:   "identity",
-	Short: "Manage vault identities",
-	Long:  `Commands for managing vault identities: add, list.`,
-}
+// vault doctor flags
+var vaultDoctorJSON bool
 
-// vault identity add flags
-var vaultIdentityAddAll bool
+var vaultDoctorCmd = &cobra.Command{
+	Use:   "doctor",
+	Short: "Run health checks on vaults and environment",
+	Long: `Run health checks on vaults and the GPG environment.
 
-var vaultIdentityAddCmd = &cobra.Command{
-	Use:   "add FINGERPRINT",
-	Short: "Add an identity to vault(s)",
-	Long: `Add an identity to one or more vaults.
+Checks performed:
+  - GPG agent availability
+  - Vault format version (upgrades outdated vaults)
+  - Vault fragmentation (defragments if needed)
 
-Options:
-  --all  Add identity to all configured vaults
-  -v     Target vault (path or 1-based index)`,
-	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		fingerprint := args[0]
+In CI environments (CI=true, GITHUB_ACTIONS, GITLAB_CI, etc.),
+interactive prompts are automatically skipped to avoid blocking
+pipelines.
 
-		cli, err := createCLI()
-		if err != nil {
-			os.Exit(int(clilib.PrintError(os.Stderr, err)))
-		}
-		defer func() { _ = cli.Close() }()
-
-		vaultPath, fromIndex, parseErr := parseVaultSpec(globalOpts.ConfigPath, globalOpts.VaultPaths)
-		if parseErr != nil {
-			os.Exit(int(clilib.PrintError(os.Stderr, clilib.NewError(parseErr.Error(), clilib.ExitGeneralError))))
-		}
-
-		exitErr := cli.IdentityAdd(fingerprint, vaultIdentityAddAll, vaultPath, fromIndex)
-		exitWithError(exitErr)
-	},
-}
-
-// vault identity list flags
-var vaultIdentityListJSON bool
-
-// vault defrag flags
-var vaultDefragDryRun bool
-var vaultDefragJSON bool
-var vaultDefragYes bool
-
-var vaultUpgradeCmd = &cobra.Command{
-	Use:   "upgrade",
-	Short: "Upgrade vault to latest format version",
-	Long: `Upgrade a vault file to the latest format version.
-
-This command explicitly upgrades the vault format, bypassing the
-require_explicit_vault_upgrade behavior setting.
-
-Prompts to select a vault if multiple are configured.
-Use -v to target a specific vault.`,
-	Args: cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		cli, err := createCLIForUpgrade()
-		if err != nil {
-			os.Exit(int(clilib.PrintError(os.Stderr, err)))
-		}
-		defer func() { _ = cli.Close() }()
-
-		vaultPath, fromIndex, parseErr := parseVaultSpec(globalOpts.ConfigPath, globalOpts.VaultPaths)
-		if parseErr != nil {
-			os.Exit(int(clilib.PrintError(os.Stderr, clilib.NewError(parseErr.Error(), clilib.ExitGeneralError))))
-		}
-
-		exitErr := cli.VaultUpgrade(vaultPath, fromIndex)
-		exitWithError(exitErr)
-	},
-}
-
-var vaultDefragCmd = &cobra.Command{
-	Use:   "defrag",
-	Short: "Defragment vault files",
-	Long: `Analyze vault fragmentation and optionally defragment.
-
-Prompts to select a vault if multiple are configured.
-Use --dry-run to only show stats without making changes.
-
-Options:
-  --dry-run  Show fragmentation stats without defragmenting
-  --json     Output as JSON
-  --yes      Skip confirmation prompt`,
-	Args: cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		cli, err := createCLI()
-		if err != nil {
-			os.Exit(int(clilib.PrintError(os.Stderr, err)))
-		}
-		defer func() { _ = cli.Close() }()
-
-		vaultPath, fromIndex, parseErr := parseVaultSpec(globalOpts.ConfigPath, globalOpts.VaultPaths)
-		if parseErr != nil {
-			os.Exit(int(clilib.PrintError(os.Stderr, clilib.NewError(parseErr.Error(), clilib.ExitGeneralError))))
-		}
-
-		exitErr := cli.VaultDefrag(vaultDefragDryRun, vaultDefragJSON, vaultDefragYes, vaultPath, fromIndex)
-		exitWithError(exitErr)
-	},
-}
-
-var vaultIdentityListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List identities in configured vaults",
-	Long: `List all identities in the configured vaults.
+Use -v to target a specific vault for checks.
 
 Options:
   --json  Output as JSON`,
@@ -155,32 +65,24 @@ Options:
 		}
 		defer func() { _ = cli.Close() }()
 
-		exitErr := cli.IdentityList(vaultIdentityListJSON)
+		vaultPath, fromIndex, parseErr := parseVaultSpec(globalOpts.ConfigPath, globalOpts.VaultPaths)
+		if parseErr != nil {
+			os.Exit(int(clilib.PrintError(os.Stderr, clilib.NewError(parseErr.Error(), clilib.ExitGeneralError))))
+		}
+
+		exitErr := cli.VaultDoctor(vaultDoctorJSON, vaultPath, fromIndex)
 		exitWithError(exitErr)
 	},
 }
 
 func init() {
-	// vault list flags
-	vaultListCmd.Flags().BoolVar(&vaultListJSON, "json", false, "Output as JSON")
+	// vault describe flags
+	vaultDescribeCmd.Flags().BoolVar(&vaultDescribeJSON, "json", false, "Output as JSON")
 
-	// vault identity add flags
-	vaultIdentityAddCmd.Flags().BoolVar(&vaultIdentityAddAll, "all", false, "Add identity to all configured vaults")
-
-	// vault identity list flags
-	vaultIdentityListCmd.Flags().BoolVar(&vaultIdentityListJSON, "json", false, "Output as JSON")
-
-	// vault defrag flags
-	vaultDefragCmd.Flags().BoolVar(&vaultDefragDryRun, "dry-run", false, "Show fragmentation stats without defragmenting")
-	vaultDefragCmd.Flags().BoolVar(&vaultDefragJSON, "json", false, "Output as JSON")
-	vaultDefragCmd.Flags().BoolVarP(&vaultDefragYes, "yes", "y", false, "Skip confirmation prompt")
+	// vault doctor flags
+	vaultDoctorCmd.Flags().BoolVar(&vaultDoctorJSON, "json", false, "Output as JSON")
 
 	// Build command tree
-	vaultIdentityCmd.AddCommand(vaultIdentityAddCmd)
-	vaultIdentityCmd.AddCommand(vaultIdentityListCmd)
-
-	vaultCmd.AddCommand(vaultListCmd)
-	vaultCmd.AddCommand(vaultIdentityCmd)
-	vaultCmd.AddCommand(vaultDefragCmd)
-	vaultCmd.AddCommand(vaultUpgradeCmd)
+	vaultCmd.AddCommand(vaultDescribeCmd)
+	vaultCmd.AddCommand(vaultDoctorCmd)
 }

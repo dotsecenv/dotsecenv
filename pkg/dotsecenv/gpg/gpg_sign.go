@@ -3,6 +3,7 @@ package gpg
 import (
 	"encoding/hex"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -23,8 +24,37 @@ func (c *GPGClient) SignDataWithAgent(fingerprint string, data []byte) (string, 
 		return "", fmt.Errorf("data cannot be empty")
 	}
 
-	// Use gpg to create a detached signature via gpg-agent (without armor)
-	cmd := exec.Command(GetGPGProgram(), "--detach-sign", "-u", fingerprint)
+	// Check if we have a TTY available for pinentry
+	hasTTY := false
+	ttyPath := os.Getenv("GPG_TTY")
+	if ttyPath == "" {
+		ttyCmd := exec.Command("tty")
+		if ttyOut, err := ttyCmd.Output(); err == nil {
+			tty := strings.TrimSpace(string(ttyOut))
+			if tty != "" && tty != "not a tty" {
+				ttyPath = tty
+				hasTTY = true
+			}
+		}
+	} else {
+		hasTTY = true
+	}
+
+	// Build GPG command
+	// Use --pinentry-mode error when no TTY is available to fail fast instead of hanging
+	var cmd *exec.Cmd
+	if hasTTY {
+		cmd = exec.Command(GetGPGProgram(), "--detach-sign", "-u", fingerprint)
+		// Set GPG_TTY for pinentry
+		cmd.Env = os.Environ()
+		if os.Getenv("GPG_TTY") == "" {
+			cmd.Env = append(cmd.Env, "GPG_TTY="+ttyPath)
+		}
+	} else {
+		// No TTY: use --pinentry-mode error to fail fast if passphrase needed
+		cmd = exec.Command(GetGPGProgram(), "--detach-sign", "-u", fingerprint, "--pinentry-mode", "error")
+		cmd.Env = os.Environ()
+	}
 	cmd.Stdin = strings.NewReader(string(data))
 
 	// Capture stderr to include in error messages for better debugging
@@ -34,10 +64,18 @@ func (c *GPGClient) SignDataWithAgent(fingerprint string, data []byte) (string, 
 	output, err := cmd.Output()
 	if err != nil {
 		stderrMsg := stderr.String()
+		// Check for pinentry-related errors and provide helpful message
+		if strings.Contains(stderrMsg, "No pinentry") || strings.Contains(stderrMsg, "pinentry") {
+			return "", fmt.Errorf("GPG passphrase required but no TTY available for pinentry.\n"+
+				"Options:\n"+
+				"  1. Run in a terminal with GPG_TTY set: export GPG_TTY=$(tty)\n"+
+				"  2. Pre-cache passphrase: gpg --sign --local-user %s </dev/null\n"+
+				"  3. Use a key without passphrase for automation", fingerprint)
+		}
 		if stderrMsg != "" {
 			return "", fmt.Errorf("failed to sign data with gpg-agent: %w\nGPG error: %s", err, stderrMsg)
 		}
-		return "", fmt.Errorf("failed to sign data with gpg-agent: %w", err)
+		return "", fmt.Errorf("failed to sign data with gpg-agent: %w\nMake sure your GPG key is available in gpg-agent", err)
 	}
 
 	if len(output) == 0 {
