@@ -46,7 +46,7 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int) *Error {
 
 	identity := c.vaultResolver.GetIdentityByFingerprint(fp)
 	if identity == nil {
-		return NewError(fmt.Sprintf("identity not found in vault\n  run: `dotsecenv vault identity add %s`", fp), ExitAccessDenied)
+		return NewError(fmt.Sprintf("identity not found in vault: %s", fp), ExitAccessDenied)
 	}
 
 	// Check if secret exists and if we have access to the latest value
@@ -172,7 +172,7 @@ func (c *CLI) SecretForget(secretKeyArg, vaultPath string, fromIndex int) *Error
 
 	identity := c.vaultResolver.GetIdentityByFingerprint(fp)
 	if identity == nil {
-		return NewError(fmt.Sprintf("identity not found in vault\n  run: `dotsecenv vault identity add %s`", fp), ExitAccessDenied)
+		return NewError(fmt.Sprintf("identity not found in vault: %s", fp), ExitAccessDenied)
 	}
 
 	now := time.Now().UTC()

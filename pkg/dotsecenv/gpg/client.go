@@ -39,7 +39,6 @@ type KeyInfo struct {
 }
 
 // Client defines the interface for GPG operations.
-// Client defines the interface for GPG operations.
 type Client interface {
 	GetPublicKeyInfo(fingerprint string) (*KeyInfo, error)
 	EncryptToRecipients(plaintext []byte, recipients []string, signingKey *crypto.Key) (string, error)
@@ -52,6 +51,7 @@ type Client interface {
 	SignSecretValue(value *vault.SecretValue, signerFingerprint string, algorithmBits int) (hash string, signature string, err error)
 	DecryptSecret(encryptedBase64 string, fingerprint string) ([]byte, error)
 	DecryptSecretValue(value *vault.SecretValue, fingerprint string) ([]byte, error)
+	IsAgentAvailable() bool
 }
 
 // GPGClient provides GPG operations.
@@ -699,4 +699,13 @@ func GetKeyUID(key *crypto.Key) (string, error) {
 	}
 
 	return "", fmt.Errorf("key has no user IDs")
+}
+
+// IsAgentAvailable checks if gpg-agent is available by running gpg-connect-agent.
+// Returns true if the agent responds successfully.
+func (c *GPGClient) IsAgentAvailable() bool {
+	cmd := exec.Command("gpg-connect-agent", "/bye")
+	cmd.Stderr = nil
+	err := cmd.Run()
+	return err == nil
 }

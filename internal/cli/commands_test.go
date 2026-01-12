@@ -340,6 +340,10 @@ func (m *MockGPGClient) DecryptSecretValue(value *vault.SecretValue, fingerprint
 	return []byte("decrypted_secret_value"), nil
 }
 
+func (m *MockGPGClient) IsAgentAvailable() bool {
+	return true
+}
+
 // TestSecretPut_WithVaultPath tests the -v flag functionality
 func TestSecretPut_WithVaultPath(t *testing.T) {
 	t.Setenv("DOTSECENV_FINGERPRINT", "") // Clear env to use mock config fingerprint
