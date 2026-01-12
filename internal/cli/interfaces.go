@@ -29,4 +29,6 @@ type VaultResolver interface {
 	OpenVaultsFromPaths(paths []string, stderr io.Writer) error
 	OpenVaults(stderr io.Writer) error
 	VaultCount() int
+	ListAllSecretKeys() []vault.SecretKeyInfo
+	ListSecretKeysFromVault(index int) []vault.SecretKeyInfo
 }

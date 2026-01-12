@@ -260,3 +260,165 @@ gpg:
 		t.Errorf("expected to find config path in output")
 	}
 }
+
+// TestSecretGet_ListMode tests "dotsecenv secret get" without arguments (list mode)
+func TestSecretGet_ListMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	vaultPath := filepath.Join(tmpDir, "vault")
+
+	err := os.WriteFile(configPath, []byte(fmt.Sprintf(`
+approved_algorithms:
+  - algo: RSA
+    min_bits: 2048
+vault:
+  - %s
+gpg:
+  program: PATH
+`, vaultPath)), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Initialize vault
+	_, stderr, err := runCmd("init", "vault", "-v", vaultPath)
+	if err != nil {
+		t.Fatalf("failed to init vault: %v, stderr: %s", err, stderr)
+	}
+
+	// Test: secret get (no args) - should list secrets (empty)
+	stdout, stderr, err := runCmd("-c", configPath, "secret", "get")
+	if err != nil {
+		t.Fatalf("command failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Should say "No secrets found" for empty vault
+	if !strings.Contains(stdout, "No secrets found") {
+		t.Errorf("expected 'No secrets found' for empty vault, got: %s", stdout)
+	}
+}
+
+// TestSecretGet_ListModeJSON tests "dotsecenv secret get --json" without arguments
+func TestSecretGet_ListModeJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	vaultPath := filepath.Join(tmpDir, "vault")
+
+	err := os.WriteFile(configPath, []byte(fmt.Sprintf(`
+approved_algorithms:
+  - algo: RSA
+    min_bits: 2048
+vault:
+  - %s
+gpg:
+  program: PATH
+`, vaultPath)), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Initialize vault
+	_, stderr, err := runCmd("init", "vault", "-v", vaultPath)
+	if err != nil {
+		t.Fatalf("failed to init vault: %v, stderr: %s", err, stderr)
+	}
+
+	// Test: secret get --json (no args) - should return empty JSON array
+	stdout, stderr, err := runCmd("-c", configPath, "secret", "get", "--json")
+	if err != nil {
+		t.Fatalf("command failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Should be empty JSON array for empty vault
+	trimmed := strings.TrimSpace(stdout)
+	if trimmed != "[]" && trimmed != "null" {
+		t.Errorf("expected empty JSON array for empty vault, got: %s", stdout)
+	}
+}
+
+// TestSecretGet_ListModeWithVault tests "dotsecenv secret get -v N" without secret key
+func TestSecretGet_ListModeWithVault(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	vault1Path := filepath.Join(tmpDir, "vault1")
+	vault2Path := filepath.Join(tmpDir, "vault2")
+
+	err := os.WriteFile(configPath, []byte(fmt.Sprintf(`
+approved_algorithms:
+  - algo: RSA
+    min_bits: 2048
+vault:
+  - %s
+  - %s
+gpg:
+  program: PATH
+`, vault1Path, vault2Path)), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Initialize both vaults
+	_, stderr, err := runCmd("init", "vault", "-v", vault1Path)
+	if err != nil {
+		t.Fatalf("failed to init vault1: %v, stderr: %s", err, stderr)
+	}
+	_, stderr, err = runCmd("init", "vault", "-v", vault2Path)
+	if err != nil {
+		t.Fatalf("failed to init vault2: %v, stderr: %s", err, stderr)
+	}
+
+	// Test: secret get -v 1 (no args) - should list secrets from vault 1
+	stdout, stderr, err := runCmd("-c", configPath, "secret", "get", "-v", "1")
+	if err != nil {
+		t.Fatalf("command failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Should say "No secrets found" for empty vault
+	if !strings.Contains(stdout, "No secrets found") {
+		t.Errorf("expected 'No secrets found' for empty vault, got: %s", stdout)
+	}
+}
+
+// TestSecretGet_ListModeErrorFlags tests that --all and --last require a secret key
+func TestSecretGet_ListModeErrorFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	vaultPath := filepath.Join(tmpDir, "vault")
+
+	err := os.WriteFile(configPath, []byte(fmt.Sprintf(`
+approved_algorithms:
+  - algo: RSA
+    min_bits: 2048
+vault:
+  - %s
+gpg:
+  program: PATH
+`, vaultPath)), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Initialize vault
+	_, stderr, err := runCmd("init", "vault", "-v", vaultPath)
+	if err != nil {
+		t.Fatalf("failed to init vault: %v, stderr: %s", err, stderr)
+	}
+
+	// Test: secret get --all (no args) - should error
+	_, stderr, err = runCmd("-c", configPath, "secret", "get", "--all")
+	if err == nil {
+		t.Error("expected error for 'secret get --all' without secret key")
+	}
+	if !strings.Contains(stderr, "--all flag requires a secret key") {
+		t.Errorf("expected '--all flag requires a secret key' error, got: %s", stderr)
+	}
+
+	// Test: secret get --last (no args) - should error
+	_, stderr, err = runCmd("-c", configPath, "secret", "get", "--last")
+	if err == nil {
+		t.Error("expected error for 'secret get --last' without secret key")
+	}
+	if !strings.Contains(stderr, "--last flag requires a secret key") {
+		t.Errorf("expected '--last flag requires a secret key' error, got: %s", stderr)
+	}
+}

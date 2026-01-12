@@ -282,6 +282,74 @@ func (m *MockVaultResolver) VaultCount() int {
 	return count
 }
 
+func (m *MockVaultResolver) ListAllSecretKeys() []vault.SecretKeyInfo {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var result []vault.SecretKeyInfo
+	seen := make(map[string]bool)
+
+	count := m.VaultCount()
+	for i := 0; i < count; i++ {
+		secrets, ok := m.Secrets[i]
+		if !ok {
+			continue
+		}
+
+		vaultPath := ""
+		if i < len(m.VaultEntries) {
+			vaultPath = m.VaultEntries[i].Path
+		} else if i < len(m.VaultPaths) {
+			vaultPath = m.VaultPaths[i]
+		}
+
+		for key, secret := range secrets {
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+
+			result = append(result, vault.SecretKeyInfo{
+				Key:      key,
+				Vault:    vaultPath,
+				VaultIdx: i + 1,
+				Deleted:  secret.IsDeleted(),
+			})
+		}
+	}
+
+	return result
+}
+
+func (m *MockVaultResolver) ListSecretKeysFromVault(index int) []vault.SecretKeyInfo {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	secrets, ok := m.Secrets[index]
+	if !ok {
+		return nil
+	}
+
+	vaultPath := ""
+	if index < len(m.VaultEntries) {
+		vaultPath = m.VaultEntries[index].Path
+	} else if index < len(m.VaultPaths) {
+		vaultPath = m.VaultPaths[index]
+	}
+
+	var result []vault.SecretKeyInfo
+	for key, secret := range secrets {
+		result = append(result, vault.SecretKeyInfo{
+			Key:      key,
+			Vault:    vaultPath,
+			VaultIdx: index + 1,
+			Deleted:  secret.IsDeleted(),
+		})
+	}
+
+	return result
+}
+
 // MockGPGClient is a mock implementation of GPGClient interface
 type MockGPGClient struct {
 	PublicKeyInfo map[string]gpg.KeyInfo
@@ -1025,5 +1093,254 @@ func TestSecretForget_NoAccess(t *testing.T) {
 
 	if !strings.Contains(forgetErr.Message, "access denied") {
 		t.Errorf("Expected 'access denied' error, got: %s", forgetErr.Message)
+	}
+}
+
+// TestSecretList_AllVaults tests listing all secrets from all vaults
+func TestSecretList_AllVaults(t *testing.T) {
+	mockVaultResolver := NewMockVaultResolver()
+
+	// Set up vaults with secrets
+	mockVaultResolver.VaultPaths = []string{"/vault1.yaml", "/vault2.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{
+		{Path: "/vault1.yaml"},
+		{Path: "/vault2.yaml"},
+	}
+
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"SECRET_A": {Key: "SECRET_A", Values: []vault.SecretValue{{Value: "a"}}},
+		"SECRET_B": {Key: "SECRET_B", Values: []vault.SecretValue{{Value: "b"}}},
+	}
+	mockVaultResolver.Secrets[1] = map[string]vault.Secret{
+		"SECRET_C": {Key: "SECRET_C", Values: []vault.SecretValue{{Value: "c"}}},
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		vaultResolver: mockVaultResolver,
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	// List all secrets
+	err := cli.SecretList(false, "", 0)
+	if err != nil {
+		t.Fatalf("SecretList failed: %v", err)
+	}
+
+	out := stdoutBuf.String()
+	// Should contain all 3 secrets sorted
+	if !strings.Contains(out, "SECRET_A") {
+		t.Errorf("Expected output to contain 'SECRET_A', got: %s", out)
+	}
+	if !strings.Contains(out, "SECRET_B") {
+		t.Errorf("Expected output to contain 'SECRET_B', got: %s", out)
+	}
+	if !strings.Contains(out, "SECRET_C") {
+		t.Errorf("Expected output to contain 'SECRET_C', got: %s", out)
+	}
+}
+
+// TestSecretList_SpecificVault tests listing secrets from a specific vault
+func TestSecretList_SpecificVault(t *testing.T) {
+	mockVaultResolver := NewMockVaultResolver()
+
+	// Set up vaults with secrets
+	mockVaultResolver.VaultPaths = []string{"/vault1.yaml", "/vault2.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{
+		{Path: "/vault1.yaml"},
+		{Path: "/vault2.yaml"},
+	}
+
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"SECRET_A": {Key: "SECRET_A", Values: []vault.SecretValue{{Value: "a"}}},
+		"SECRET_B": {Key: "SECRET_B", Values: []vault.SecretValue{{Value: "b"}}},
+	}
+	mockVaultResolver.Secrets[1] = map[string]vault.Secret{
+		"SECRET_C": {Key: "SECRET_C", Values: []vault.SecretValue{{Value: "c"}}},
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		vaultResolver: mockVaultResolver,
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	// List secrets from vault 2 only (index 2 = second vault)
+	err := cli.SecretList(false, "", 2)
+	if err != nil {
+		t.Fatalf("SecretList failed: %v", err)
+	}
+
+	out := stdoutBuf.String()
+	// Should contain only SECRET_C
+	if strings.Contains(out, "SECRET_A") {
+		t.Errorf("Expected output NOT to contain 'SECRET_A', got: %s", out)
+	}
+	if strings.Contains(out, "SECRET_B") {
+		t.Errorf("Expected output NOT to contain 'SECRET_B', got: %s", out)
+	}
+	if !strings.Contains(out, "SECRET_C") {
+		t.Errorf("Expected output to contain 'SECRET_C', got: %s", out)
+	}
+}
+
+// TestSecretList_JSONOutput tests JSON output for secret list
+func TestSecretList_JSONOutput(t *testing.T) {
+	mockVaultResolver := NewMockVaultResolver()
+
+	// Set up vaults with secrets
+	mockVaultResolver.VaultPaths = []string{"/vault1.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{
+		{Path: "/vault1.yaml"},
+	}
+
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"SECRET_A": {Key: "SECRET_A", Values: []vault.SecretValue{{Value: "a"}}},
+		"SECRET_B": {Key: "SECRET_B", Values: []vault.SecretValue{{Value: "b", Deleted: true}}},
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		vaultResolver: mockVaultResolver,
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	// List secrets as JSON
+	err := cli.SecretList(true, "", 0)
+	if err != nil {
+		t.Fatalf("SecretList failed: %v", err)
+	}
+
+	out := stdoutBuf.String()
+	// Should be valid JSON
+	if !strings.HasPrefix(strings.TrimSpace(out), "[") {
+		t.Errorf("Expected JSON array output, got: %s", out)
+	}
+	if !strings.Contains(out, `"key"`) {
+		t.Errorf("Expected JSON to contain 'key' field, got: %s", out)
+	}
+	if !strings.Contains(out, `"vault"`) {
+		t.Errorf("Expected JSON to contain 'vault' field, got: %s", out)
+	}
+}
+
+// TestSecretList_WithDeletedSecrets tests that deleted secrets are shown with (deleted) marker
+func TestSecretList_WithDeletedSecrets(t *testing.T) {
+	mockVaultResolver := NewMockVaultResolver()
+
+	// Set up vault with a deleted secret
+	mockVaultResolver.VaultPaths = []string{"/vault1.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{
+		{Path: "/vault1.yaml"},
+	}
+
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"ACTIVE_SECRET": {Key: "ACTIVE_SECRET", Values: []vault.SecretValue{{Value: "a"}}},
+		"DELETED_SECRET": {Key: "DELETED_SECRET", Values: []vault.SecretValue{
+			{Value: "old", AvailableTo: []string{"fp1"}},
+			{Value: "", AvailableTo: []string{}, Deleted: true},
+		}},
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		vaultResolver: mockVaultResolver,
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	// List all secrets
+	err := cli.SecretList(false, "", 0)
+	if err != nil {
+		t.Fatalf("SecretList failed: %v", err)
+	}
+
+	out := stdoutBuf.String()
+	// Active secret should be shown
+	if !strings.Contains(out, "ACTIVE_SECRET") {
+		t.Errorf("Expected output to contain 'ACTIVE_SECRET', got: %s", out)
+	}
+	// Deleted secret should have (deleted) marker
+	if !strings.Contains(out, "DELETED_SECRET (deleted)") {
+		t.Errorf("Expected output to contain 'DELETED_SECRET (deleted)', got: %s", out)
+	}
+}
+
+// TestSecretList_Empty tests listing when no secrets exist
+func TestSecretList_Empty(t *testing.T) {
+	mockVaultResolver := NewMockVaultResolver()
+
+	// Set up empty vault
+	mockVaultResolver.VaultPaths = []string{"/vault1.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{
+		{Path: "/vault1.yaml"},
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		vaultResolver: mockVaultResolver,
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	// List all secrets
+	err := cli.SecretList(false, "", 0)
+	if err != nil {
+		t.Fatalf("SecretList failed: %v", err)
+	}
+
+	out := stdoutBuf.String()
+	if !strings.Contains(out, "No secrets found") {
+		t.Errorf("Expected 'No secrets found', got: %s", out)
+	}
+}
+
+// TestSecretList_VaultPath tests listing secrets from a specific vault path
+func TestSecretList_VaultPath(t *testing.T) {
+	mockVaultResolver := NewMockVaultResolver()
+
+	// Set up vaults with secrets
+	mockVaultResolver.VaultPaths = []string{"/vault1.yaml", "/vault2.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{
+		{Path: "/vault1.yaml"},
+		{Path: "/vault2.yaml"},
+	}
+
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"SECRET_A": {Key: "SECRET_A", Values: []vault.SecretValue{{Value: "a"}}},
+	}
+	mockVaultResolver.Secrets[1] = map[string]vault.Secret{
+		"SECRET_B": {Key: "SECRET_B", Values: []vault.SecretValue{{Value: "b"}}},
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		vaultResolver: mockVaultResolver,
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	// List secrets from vault1.yaml only
+	err := cli.SecretList(false, "/vault1.yaml", 0)
+	if err != nil {
+		t.Fatalf("SecretList failed: %v", err)
+	}
+
+	out := stdoutBuf.String()
+	// Should contain only SECRET_A
+	if !strings.Contains(out, "SECRET_A") {
+		t.Errorf("Expected output to contain 'SECRET_A', got: %s", out)
+	}
+	if strings.Contains(out, "SECRET_B") {
+		t.Errorf("Expected output NOT to contain 'SECRET_B', got: %s", out)
 	}
 }

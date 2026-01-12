@@ -667,3 +667,89 @@ func (c *CLI) readSecretFromStdin() (string, error) {
 	}
 	return "", fmt.Errorf("no input provided")
 }
+
+// SecretListJSON is the JSON output structure for secret list
+type SecretListJSON struct {
+	Key     string `json:"key"`
+	Vault   string `json:"vault,omitempty"`
+	Deleted bool   `json:"deleted,omitempty"`
+}
+
+// SecretList lists all secret keys from vaults.
+// If vaultPath is specified or fromIndex > 0, lists secrets only from that vault.
+// Otherwise, lists secrets from all vaults.
+func (c *CLI) SecretList(jsonOutput bool, vaultPath string, fromIndex int) *Error {
+	targetIndex := -1
+
+	// Resolve which vault(s) to list from
+	if vaultPath != "" {
+		expandedPath := vault.ExpandPath(vaultPath)
+		loadedPaths := c.vaultResolver.GetVaultPaths()
+		found := false
+		for i, p := range loadedPaths {
+			if vault.ExpandPath(p) == expandedPath {
+				targetIndex = i
+				found = true
+				break
+			}
+		}
+		if !found {
+			// Check if file exists for better error message
+			if _, err := os.Stat(expandedPath); err != nil {
+				return NewError(fmt.Sprintf("vault file does not exist: %s", expandedPath), ExitVaultError)
+			}
+			return NewError(fmt.Sprintf("vault path '%s' not found in resolver", expandedPath), ExitVaultError)
+		}
+	} else if fromIndex != 0 {
+		configEntries := c.vaultResolver.GetConfig().Entries
+		if fromIndex <= 0 || fromIndex > len(configEntries) {
+			return NewError(fmt.Sprintf("-v index must be a positive integer between 1 and %d", len(configEntries)), ExitGeneralError)
+		}
+		targetIndex = fromIndex - 1
+	}
+
+	// Get secret keys
+	var secrets []vault.SecretKeyInfo
+	if targetIndex >= 0 {
+		secrets = c.vaultResolver.ListSecretKeysFromVault(targetIndex)
+	} else {
+		secrets = c.vaultResolver.ListAllSecretKeys()
+	}
+
+	// Sort secrets by key
+	sort.Slice(secrets, func(i, j int) bool {
+		return secrets[i].Key < secrets[j].Key
+	})
+
+	// Output
+	if jsonOutput {
+		output := make([]SecretListJSON, 0, len(secrets))
+		for _, s := range secrets {
+			output = append(output, SecretListJSON{
+				Key:     s.Key,
+				Vault:   s.Vault,
+				Deleted: s.Deleted,
+			})
+		}
+
+		encoder := json.NewEncoder(c.output.Stdout())
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(output); err != nil {
+			return NewError(fmt.Sprintf("failed to encode json: %v", err), ExitGeneralError)
+		}
+	} else {
+		if len(secrets) == 0 {
+			_, _ = fmt.Fprintf(c.output.Stdout(), "No secrets found\n")
+		} else {
+			for _, s := range secrets {
+				if s.Deleted {
+					_, _ = fmt.Fprintf(c.output.Stdout(), "%s (deleted)\n", s.Key)
+				} else {
+					_, _ = fmt.Fprintf(c.output.Stdout(), "%s\n", s.Key)
+				}
+			}
+		}
+	}
+
+	return nil
+}
