@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 
 	clilib "github.com/dotsecenv/dotsecenv/internal/cli"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var secretCmd = &cobra.Command{
@@ -51,6 +53,23 @@ to store the secret in (either a path or 1-based index).`,
 			os.Exit(int(clilib.ExitGeneralError))
 		}
 
+		// Read stdin BEFORE creating CLI (which acquires vault locks) to prevent
+		// deadlock when piping: `dotsecenv secret get KEY | dotsecenv secret put KEY`
+		// If stdin is piped (not TTY), read it now before vault lock acquisition.
+		var preReadValue string
+		if !term.IsTerminal(int(os.Stdin.Fd())) {
+			scanner := bufio.NewScanner(os.Stdin)
+			if scanner.Scan() {
+				preReadValue = scanner.Text()
+			} else if err := scanner.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "error: failed to read secret from stdin: %v\n", err)
+				os.Exit(int(clilib.ExitGeneralError))
+			} else {
+				fmt.Fprintf(os.Stderr, "error: no input provided on stdin\n")
+				os.Exit(int(clilib.ExitGeneralError))
+			}
+		}
+
 		// Clear VaultPaths for createCLI if we're using an index
 		if fromIndex > 0 {
 			globalOpts.VaultPaths = []string{}
@@ -62,7 +81,7 @@ to store the secret in (either a path or 1-based index).`,
 		}
 		defer func() { _ = cli.Close() }()
 
-		exitErr := cli.SecretPut(secretKey, vaultPath, fromIndex)
+		exitErr := cli.SecretPut(secretKey, vaultPath, fromIndex, preReadValue)
 		exitWithError(exitErr)
 	},
 }

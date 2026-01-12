@@ -23,8 +23,10 @@ type SecretValueJSON struct {
 	Vault   string    `json:"vault,omitempty"`
 }
 
-// SecretPut stores a secret in the vault
-func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int) *Error {
+// SecretPut stores a secret in the vault.
+// If preReadValue is non-empty, it's used as the secret value (for piped input read before vault lock).
+// If preReadValue is empty, the secret is read from stdin (interactive TTY mode).
+func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadValue string) *Error {
 	secretKey, normErr := vault.NormalizeSecretKey(secretKeyArg)
 	if normErr != nil {
 		return NewError(vault.FormatSecretKeyError(normErr), ExitValidationError)
@@ -62,17 +64,25 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int) *Error {
 		}
 	}
 
-	isTTY := false
-	if f, ok := c.stdin.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
+	var secretValue string
+	if preReadValue != "" {
+		// Use pre-read value (from piped stdin read before vault lock acquisition)
+		secretValue = preReadValue
+	} else {
+		// Read from stdin (TTY interactive mode)
+		isTTY := false
+		if f, ok := c.stdin.(*os.File); ok {
+			isTTY = term.IsTerminal(int(f.Fd()))
+		}
 
-	if isTTY {
-		_, _ = fmt.Fprintf(c.output.Stderr(), "Enter secret value (input will be redacted): ")
-	}
-	secretValue, readErr := c.readSecretFromStdin()
-	if readErr != nil {
-		return NewError(fmt.Sprintf("failed to read secret: %v", readErr), ExitGeneralError)
+		if isTTY {
+			_, _ = fmt.Fprintf(c.output.Stderr(), "Enter secret value (input will be redacted): ")
+		}
+		var readErr error
+		secretValue, readErr = c.readSecretFromStdin()
+		if readErr != nil {
+			return NewError(fmt.Sprintf("failed to read secret: %v", readErr), ExitGeneralError)
+		}
 	}
 
 	encryptedArmored, encErr := c.gpgClient.EncryptToRecipients(
