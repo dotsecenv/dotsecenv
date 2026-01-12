@@ -91,6 +91,12 @@ func newCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 		_, _ = fmt.Fprintf(stderr, "         Migrate to granular behavior settings: https://dotsecenv.com/docs/concepts/behavior-settings\n")
 	}
 
+	// Deprecation warning for fingerprint field (use login section instead)
+	if cfg.HasDeprecatedFingerprint() && !silent {
+		_, _ = fmt.Fprintf(stderr, "warning: 'fingerprint:' field is deprecated and will be removed in a future version\n")
+		_, _ = fmt.Fprintf(stderr, "         Run 'dotsecenv login %s' to migrate to signed login\n", cfg.Fingerprint)
+	}
+
 	// Compute effective strict mode early (CLI flag or config setting)
 	effectiveStrict := strict || cfg.Strict
 
@@ -240,6 +246,7 @@ func (c *CLI) Close() error {
 
 // getFingerprintFromEnv gets the current fingerprint to use.
 // In SUID mode, DOTSECENV_FINGERPRINT is ignored for security.
+// Prefers Login.Fingerprint over the deprecated Fingerprint field.
 func (c *CLI) getFingerprintFromEnv() string {
 	if !isSUID() {
 		envFP := os.Getenv("DOTSECENV_FINGERPRINT")
@@ -247,7 +254,7 @@ func (c *CLI) getFingerprintFromEnv() string {
 			return envFP
 		}
 	}
-	return c.config.Fingerprint
+	return c.config.GetFingerprint()
 }
 
 // checkFingerprintRequired ensures a fingerprint is configured

@@ -344,6 +344,12 @@ func (m *MockGPGClient) IsAgentAvailable() bool {
 	return true
 }
 
+func (m *MockGPGClient) ListSecretKeys() ([]gpg.SecretKeyInfo, error) {
+	return []gpg.SecretKeyInfo{
+		{Fingerprint: "TESTFINGERPRINT", UID: "Test User <test@example.com>"},
+	}, nil
+}
+
 // TestSecretPut_WithVaultPath tests the -v flag functionality
 func TestSecretPut_WithVaultPath(t *testing.T) {
 	t.Setenv("DOTSECENV_FINGERPRINT", "") // Clear env to use mock config fingerprint

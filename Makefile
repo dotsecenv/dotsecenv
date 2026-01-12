@@ -5,6 +5,7 @@ help:
 	@echo "  make clean          - Clean build artifacts"
 	@echo "  make update         - Update go dependencies"
 	@echo "  make build          - Build with FIPS 140-3 crypto (no CGO)"
+	@echo "  make fmt            - Format Go code"
 	@echo "  make lint           - Run linting (vet + fmt check)"
 	@echo "  make test           - Run tests"
 	@echo "  make test-race      - Run tests with race condition detection"
@@ -37,6 +38,12 @@ build:
 	@echo "Building dotsecenv with FIPS 140-3 crypto..."
 	CGO_ENABLED=0 GOFIPS140=v1.0.0 go build -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
 	@echo "Binary built at: bin/dotsecenv"
+
+.PHONY: fmt
+fmt:
+	@echo "Formatting Go code..."
+	@gofmt -s -w .
+	@$(GOLANGCI_LINT) run --fix ./...
 
 .PHONY: lint
 lint: install-lint
