@@ -223,8 +223,71 @@ jobs:
         with:
           subject-path: "dotsecenv_*_Darwin_*.tar.gz"
 
+  update-homebrew-tap:
+    needs: update-checksums
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate App Token
+        uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            homebrew-tap
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v6
+        with:
+          repository: dotsecenv/homebrew-tap
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Download updated checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+          gh release download "$VERSION" --repo dotsecenv/dotsecenv --pattern "checksums.txt" --dir .
+
+      - name: Update cask with correct checksums
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION_NUM="${VERSION#v}"
+
+          # Extract Darwin checksums from the updated checksums.txt
+          ARM64_SHA=$(grep "dotsecenv_${VERSION_NUM}_Darwin_arm64.tar.gz$" checksums.txt | cut -d' ' -f1)
+          X86_64_SHA=$(grep "dotsecenv_${VERSION_NUM}_Darwin_x86_64.tar.gz$" checksums.txt | cut -d' ' -f1)
+
+          echo "ARM64 SHA: $ARM64_SHA"
+          echo "X86_64 SHA: $X86_64_SHA"
+
+          # Update the cask file with correct checksums
+          CASK_FILE="Casks/dotsecenv.rb"
+
+          # Update version
+          sed -i "s/version \".*\"/version \"${VERSION_NUM}\"/" "$CASK_FILE"
+
+          # Update arm64 sha256 (on_arm block)
+          sed -i "/on_arm do/,/end/{s/sha256 \"[a-f0-9]*\"/sha256 \"${ARM64_SHA}\"/}" "$CASK_FILE"
+
+          # Update x86_64 sha256 (on_intel block for macOS)
+          sed -i "/on_macos do/,/on_linux do/{/on_intel do/,/end/{s/sha256 \"[a-f0-9]*\"/sha256 \"${X86_64_SHA}\"/}}" "$CASK_FILE"
+
+          echo "==> Updated cask file:"
+          cat "$CASK_FILE"
+
+      - name: Commit and push
+        run: |
+          VERSION="${{ github.ref_name }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/dotsecenv.rb
+          git commit -m "fix: update Darwin checksums for ${VERSION} (post-notarization)" || echo "No changes to commit"
+          git push
+
   trigger-repo-update:
-    needs: [goreleaser, update-checksums]
+    needs: [goreleaser, update-checksums, update-homebrew-tap]
     runs-on: ubuntu-latest
     steps:
       - name: Generate App Token
