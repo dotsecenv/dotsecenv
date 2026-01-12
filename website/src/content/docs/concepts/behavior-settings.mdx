@@ -1,0 +1,187 @@
+---
+title: Behavior Settings
+description: Configure granular behavior settings for dotsecenv operations
+---
+
+import { Aside, Badge, Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Overview
+
+dotsecenv provides granular behavior settings that control how the tool handles various edge cases and error conditions. These settings replace the previous all-or-nothing `strict: true` flag with fine-grained controls.
+
+<Aside type="caution" title="Deprecation Notice">
+  The `strict: true` configuration option is deprecated and will be removed in a future version. Please migrate to the granular behavior settings described below.
+</Aside>
+
+## Configuration
+
+Behavior settings are configured in your `~/.config/dotsecenv/config.yaml` file under the `behavior` section:
+
+```yaml
+behavior:
+  require_explicit_vault_upgrade: false
+  restrict_to_configured_vaults: false
+```
+
+## Available Settings
+
+### `require_explicit_vault_upgrade`
+
+Controls whether vault format upgrades happen automatically or require explicit user action.
+
+| Value | Behavior |
+|-------|----------|
+| `false` (default) | Vaults are automatically upgraded to the latest format with a notice |
+| `true` | Warns about outdated format but doesn't modify; requires `dotsecenv vault upgrade` |
+
+**Use case:** Set to `true` in shared environments where you want to coordinate vault upgrades across team members.
+
+```yaml
+behavior:
+  require_explicit_vault_upgrade: true
+```
+
+When enabled, you'll see:
+
+```shell
+dotsecenv: warning: vault "/path/to/vault" uses format v1, upgrade to v2 recommended
+dotsecenv: run 'dotsecenv vault upgrade' to upgrade the vault format
+```
+
+### `restrict_to_configured_vaults`
+
+Controls whether CLI `-v` flags can override vaults specified in the configuration file.
+
+| Value | Behavior |
+|-------|----------|
+| `false` (default) | CLI `-v` flags can specify different vaults than config |
+| `true` | CLI `-v` flags are ignored; only config vaults are used |
+
+**Use case:** Set to `true` to prevent accidental use of wrong vaults in production.
+
+```yaml
+behavior:
+  restrict_to_configured_vaults: true
+```
+
+## Simplified Behaviors
+
+Several behaviors that were previously controlled by `strict: true` now have sensible defaults that cannot be changed:
+
+| Behavior | Default | Rationale |
+|----------|---------|-----------|
+| Flag conflicts (`--last -v`) | Always error | Conflicting flags should fail early |
+| Secret fallback | Always allowed with warning | Supports multi-user private values |
+| Identity already exists | Always warn + skip | Fingerprints are unique |
+| Identity auto-add | Always warn + auto-add | Convenient default |
+| Revoke unknown identity | Always warn + proceed | Revoke should complete |
+| Decrypt errors | Always warn + try others | Best-effort recovery |
+
+### Secret Fallback Behavior
+
+When a user requests a secret but cannot access the latest value (e.g., their access was revoked), dotsecenv will:
+
+1. Attempt to decrypt older values that the user can still access
+2. Print a warning: `warning: returning older value for 'SECRET_NAME' (access to latest value is revoked)`
+3. Return the most recent accessible value
+
+This allows multi-user scenarios where each user maintains their own private values.
+
+## GPG Program Configuration
+
+The GPG program path is now configured explicitly:
+
+```yaml
+gpg:
+  program: PATH           # Infer from system PATH (recommended)
+  # OR
+  program: /usr/bin/gpg   # Absolute path to specific binary
+```
+
+<Aside type="note">
+  An empty or missing `gpg.program` value will cause an error. You must explicitly set it to `PATH` or provide an absolute path.
+</Aside>
+
+## Migration from `strict: true`
+
+If you currently use `strict: true`, here's how to migrate:
+
+<Tabs>
+  <TabItem label="Before">
+
+    ```yaml
+    # Old configuration
+    strict: true
+    ```
+
+  </TabItem>
+  <TabItem label="After">
+
+    ```yaml
+    # New configuration - choose which behaviors you need
+    behavior:
+      require_explicit_vault_upgrade: true
+      restrict_to_configured_vaults: true
+
+    gpg:
+      program: /usr/bin/gpg  # Or PATH
+    ```
+
+  </TabItem>
+</Tabs>
+
+The `strict: true` shorthand still works during the deprecation period and is equivalent to setting both behavior flags to `true`.
+
+### Hybrid Configuration
+
+You can use `strict: true` with individual overrides:
+
+```yaml
+strict: true
+behavior:
+  require_explicit_vault_upgrade: false  # Override: allow auto-upgrades
+```
+
+## Example Configurations
+
+### Development Environment
+
+```yaml
+approved_algorithms:
+  - algo: RSA
+    min_bits: 2048
+vault:
+  - ~/.local/share/dotsecenv/vault
+gpg:
+  program: PATH
+# behavior section omitted - all defaults (permissive)
+```
+
+### Production / CI Environment
+
+```yaml
+approved_algorithms:
+  - algo: ECC
+    curves: [P-384, P-521]
+    min_bits: 384
+vault:
+  - /secure/path/to/vault
+behavior:
+  restrict_to_configured_vaults: true
+gpg:
+  program: /usr/bin/gpg
+```
+
+### Shared Team Environment
+
+```yaml
+approved_algorithms:
+  - algo: RSA
+    min_bits: 4096
+vault:
+  - ~/projects/myapp/.dotsecenv/vault
+behavior:
+  require_explicit_vault_upgrade: true  # Coordinate upgrades
+gpg:
+  program: PATH
+```

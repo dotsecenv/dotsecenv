@@ -60,7 +60,7 @@ Install and use `dotsecenv` in GitHub Actions workflows to securely access secre
    ```
 
    <Aside type="tip">
-     Set `init-config` to an empty string `''` to run `dotsecenv init config` with defaults, or provide specific flags like `--strict` or `--no-gpg-program`.
+     Set `init-config` to an empty string `''` to run `dotsecenv init config` with defaults, or provide specific flags like `--no-gpg-program`.
    </Aside>
 
 4. **Use dotsecenv in subsequent steps**
@@ -192,7 +192,7 @@ The `init-config` input controls whether `dotsecenv init config` runs after inst
     ```yaml
     - uses: dotsecenv/dotsecenv@v0
       with:
-        init-config: '--strict'
+        init-config: '--login <GPG_KEY>'
     ```
   </TabItem>
 

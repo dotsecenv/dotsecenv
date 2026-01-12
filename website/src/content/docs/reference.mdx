@@ -70,7 +70,6 @@ The default configuration uses FIPS 186-5 compliant algorithm minimums: RSA 2048
 |------|-------------|
 | `--gpg-program PATH` | Set gpg.program to this path (without validation) |
 | `--no-gpg-program` | Skip GPG detection (leave gpg.program empty) |
-| `--strict` | Initialize config with strict mode enabled |
 | `--login FINGERPRINT` | Initialize config with specified fingerprint |
 
 **Examples:**
@@ -88,11 +87,8 @@ dotsecenv init config --no-gpg-program
 # Set GPG path explicitly
 dotsecenv init config --gpg-program /usr/local/bin/gpg
 
-# Initialize with strict mode and login in one step
-dotsecenv init config --strict --login E60A1740BAEF49284D22EA7D3C376348F0921C59
-
-# Initialize with strict mode only
-dotsecenv init config --strict
+# Initialize with login fingerprint
+dotsecenv init config --login E60A1740BAEF49284D22EA7D3C376348F0921C59
 ```
 
 ### init vault
@@ -455,6 +451,29 @@ dotsecenv vault identity list
 dotsecenv vault identity list --json
 ```
 
+### vault upgrade
+
+Upgrade vault file format to the latest version.
+
+```bash
+dotsecenv vault upgrade [flags]
+```
+
+When `behavior.require_explicit_vault_upgrade` is set to `true` in your config, automatic vault upgrades are disabled. Use this command to explicitly upgrade vault formats.
+
+**Examples:**
+
+```bash
+# Upgrade vault (prompts if multiple vaults configured)
+dotsecenv vault upgrade
+
+# Upgrade specific vault
+dotsecenv vault upgrade -v 1
+
+# Upgrade vault at path
+dotsecenv vault upgrade -v ./project/vault
+```
+
 ---
 
 ## validate
@@ -614,58 +633,67 @@ dotsecenv version [flags]
 Default location: `~/.config/dotsecenv/config` (or `$XDG_CONFIG_HOME/dotsecenv/config`)
 
 ```yaml
+# Approved algorithms (minimum strength)
+approved_algorithms:
+  - algo: ECC
+    curves: [P-384, P-521]
+    min_bits: 384
+  - algo: EdDSA
+    curves: [Ed25519, Ed448]
+    min_bits: 255
+  - algo: RSA
+    min_bits: 2048
+
 # Vault file path(s)
 vault:
   - ~/.config/dotsecenv/vault
 
-# Or with names:
-vault:
-  - name: personal
-    path: ~/.config/dotsecenv/vault
-  - name: work
-    path: ~/work/secrets/vault
-
 # Active user fingerprint
 fingerprint: E60A1740BAEF49284D22EA7D3C376348F0921C59
 
-# Approved algorithms (minimum strength)
-approved_algorithms:
-  - rsa:3072
-  - ecdsa:p384
-  - eddsa:ed25519
+# Behavior settings (all default to false)
+behavior:
+  require_explicit_vault_upgrade: false
+  restrict_to_configured_vaults: false
 
-# Strict mode: treat warnings as errors
-strict: false
-
-# GPG executable path (absolute path required if specified)
+# GPG executable path
 gpg:
   program: /usr/bin/gpg
 ```
+
+### Behavior Settings
+
+Granular settings that control how dotsecenv handles edge cases. See [Behavior Settings](/concepts/behavior-settings/) for full documentation.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `require_explicit_vault_upgrade` | `false` | Prevent automatic vault format upgrades; requires `vault upgrade` command |
+| `restrict_to_configured_vaults` | `false` | Ignore CLI `-v` flags; only use vaults from config file |
 
 ### GPG Program Configuration
 
 The `gpg.program` option specifies the path to the GPG executable:
 
-| Scenario | Behavior |
-|----------|----------|
-| `gpg.program` specified | Must be an absolute path to an existing, executable program |
-| `gpg.program` empty/omitted | Infers `gpg` from PATH, prints warning to stderr |
-| Strict mode + empty | **Error**: must be explicitly configured |
+| Value | Behavior |
+|-------|----------|
+| `PATH` | Infer GPG location from system PATH |
+| `/absolute/path` | Use the specified absolute path |
+| Empty/missing | **Error**: must be explicitly configured |
 
 **Examples:**
 
 ```yaml
-# Explicit path (recommended for strict mode)
+# Infer from system PATH (recommended default)
+gpg:
+  program: PATH
+
+# Explicit absolute path
 gpg:
   program: /usr/bin/gpg
 
 # Windows
 gpg:
   program: "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe"
-
-# Omit to infer from PATH (prints warning)
-gpg:
-  program: ""
 ```
 
 ---
@@ -675,4 +703,5 @@ gpg:
 - [Getting Started](/getting-started/) — Quick setup guide
 - [First Secret Tutorial](/tutorials/first-secret/) — Store your first secret
 - [Share a Secret](/tutorials/share-secret/) — Team sharing workflow
+- [Behavior Settings](/concepts/behavior-settings/) — Granular behavior configuration
 - [How-To Guides](/how-to/) — Common tasks
