@@ -229,6 +229,37 @@ gpg --keyserver keys.openpgp.org --recv-keys E60A1740BAEF49284D22EA7D3C376348F09
 curl https://keybase.io/dotsecenv/pgp_keys.asc | gpg --import
 ```
 
+### Verifying macOS Notarization
+
+All macOS binaries are code-signed with an Apple Developer ID certificate and notarized by Apple.
+This ensures Gatekeeper allows the binary to run without security warnings.
+
+**Verify code signature:**
+
+```bash
+codesign --verify --verbose /usr/local/bin/dotsecenv
+# Expected: valid on disk
+```
+
+**Verify notarization status:**
+
+```bash
+spctl --assess --verbose /usr/local/bin/dotsecenv
+# Expected: accepted
+# source=Notarized Developer ID
+```
+
+**View signature details:**
+
+```bash
+codesign -dv --verbose=4 /usr/local/bin/dotsecenv
+```
+
+<Aside type="tip" title="Homebrew Users">
+If you installed via Homebrew, the binary is located at `$(brew --prefix)/bin/dotsecenv`.
+Homebrew casks automatically handle quarantine removal, so Gatekeeper warnings are bypassed.
+</Aside>
+
 ### Uninstalling
 
 <Tabs>
