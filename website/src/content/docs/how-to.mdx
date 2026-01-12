@@ -194,19 +194,15 @@ Give another identity access to decrypt a secret.
    gpg --import teammate-public.asc
    ```
 
-2. **Add them to the vault**
+2. **Share the secret**
 
-   ```bash
-   dotsecenv vault identity add THEIR_FINGERPRINT
-   ```
-
-3. **Share the secret**
+   The `secret share` command automatically adds the identity to the vault if needed:
 
    ```bash
    dotsecenv secret share DATABASE_PASSWORD THEIR_FINGERPRINT
    ```
 
-4. **Commit and push**
+3. **Commit and push**
 
    ```bash
    git add vault
@@ -291,40 +287,37 @@ dotsecenv validate -v ./project/vault
 
 ## List All Secrets
 
-View secrets and their access.
+View identities and secrets in your vaults.
 
-### Simple list
+### Describe vaults
 
 ```bash
-dotsecenv vault list
+dotsecenv vault describe
 ```
 
 Output:
 
 ```text
-Vault: ~/.config/dotsecenv/vault
-
-Identities:
-  E60A1740... (alice@example.com)
-  ABC12345... (bob@example.com)
-
-Secrets:
-  DATABASE_PASSWORD
-    available_to: [E60A1740..., ABC12345...]
-  API_KEY
-    available_to: [E60A1740...]
+Vault 1 (~/.config/dotsecenv/vault):
+  Identities:
+    - Alice <alice@example.com> (E60A1740...)
+    - Bob <bob@example.com> (ABC12345...)
+  Secrets:
+    - DATABASE_PASSWORD
+    - API_KEY
+    - prod::API_KEY
 ```
 
 ### JSON output
 
 ```bash
-dotsecenv vault list --json
+dotsecenv vault describe --json
 ```
 
 ### Filter by namespace
 
 ```bash
-dotsecenv vault list | grep "prod::"
+dotsecenv vault describe | grep "prod::"
 ```
 
 ---
@@ -429,31 +422,51 @@ export API_KEY=$(dotsecenv secret get API_KEY)
 
 ---
 
-## Defragment the Vault
+## Run Vault Health Checks
 
-Remove old entries and optimize vault size.
+Run health checks on vaults and the GPG environment, and fix any issues.
 
-### Preview changes
+### Run doctor
 
 ```bash
-dotsecenv vault defrag --dry-run
+dotsecenv vault doctor
 ```
 
 Output:
 
 ```text
-Would remove 15 obsolete entries
-Would reduce vault from 2.4 KB to 1.1 KB
+Health checks:
+  [✓] gpg-agent is available
+  [✓] ~/.config/dotsecenv/vault: format v2 (latest)
+  [✓] ~/.config/dotsecenv/vault: 0.0% fragmentation
+
+Status: healthy
+
+All vaults are up to date.
 ```
 
-### Execute defrag
+### Doctor checks and fixes
+
+The `doctor` command performs these checks:
+
+- **GPG agent availability** — verifies gpg-agent is running
+- **Vault format version** — checks if vaults need upgrading
+- **Vault fragmentation** — checks if defragmentation is needed
+
+After displaying health check results, doctor offers to fix any issues found (upgrade outdated vaults, defragment fragmented vaults).
+
+### JSON output (for CI)
 
 ```bash
-dotsecenv vault defrag --yes
+dotsecenv vault doctor --json
 ```
 
+<Aside type="note">
+In CI environments (`CI=true`, `GITHUB_ACTIONS`, `GITLAB_CI`, etc.), interactive prompts are automatically skipped to avoid blocking pipelines.
+</Aside>
+
 <Aside type="caution">
-Defragmenting removes historical values. Make sure you don't need the history before running.
+Defragmenting removes historical values. Make sure you don't need the history before confirming.
 </Aside>
 
 ---
@@ -506,7 +519,7 @@ deploy:
 | Problem | Solution |
 |---------|----------|
 | "Not logged in" | `dotsecenv login FINGERPRINT` |
-| "Secret not found" | Check vault: `dotsecenv vault list` |
+| "Secret not found" | Check vault: `dotsecenv vault describe` |
 | "Cannot decrypt" | Verify you're in `available_to` |
 | "GPG error" | Check key: `gpg --list-secret-keys` |
 | "Config not found" | Run: `dotsecenv init config` |

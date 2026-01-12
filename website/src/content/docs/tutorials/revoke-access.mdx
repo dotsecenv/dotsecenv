@@ -23,7 +23,7 @@ Revoke someone's access to a secret. Understand what revocation does and doesn't
    See who has access to a secret:
 
    ```bash
-   dotsecenv vault list
+   dotsecenv vault describe
    ```
 
    Look for the `available_to` field:
@@ -50,7 +50,7 @@ Revoke someone's access to a secret. Understand what revocation does and doesn't
 3. **Verify revocation**
 
    ```bash
-   dotsecenv vault list
+   dotsecenv vault describe
    ```
 
    The identity should no longer appear in `available_to`:
@@ -97,7 +97,7 @@ After revocation + rotation:
 - Your vault shows only authorized identities for new values
 
 ```bash
-dotsecenv vault list
+dotsecenv vault describe
 # DATABASE_PASSWORD
 #   available_to: [YOUR_FINGERPRINT]
 #   values: 2 (latest accessible to you)
@@ -135,7 +135,7 @@ Remove an identity completely:
 
 ```bash
 # Revoke from all secrets
-for secret in $(dotsecenv vault list --json | jq -r '.secrets[].name'); do
+for secret in $(dotsecenv vault describe --json | jq -r '.secrets[].name'); do
   dotsecenv secret revoke "$secret" FINGERPRINT
 done
 ```
@@ -148,7 +148,7 @@ The vault preserves full history. View who had access to each version:
 dotsecenv secret get DATABASE_PASSWORD --all --json | jq '.values[] | {timestamp, available_to}'
 ```
 
-### Revoke all secrets from an identity
+### Revoke from all secrets
 
 If someone should no longer have any access:
 
@@ -158,7 +158,7 @@ dotsecenv secret revoke "*" FINGERPRINT --all
 ```
 
 <Aside type="note">
-The identity remains in the vault but cannot decrypt any current secret values. To fully remove an identity from the vault, use `vault defrag` after revoking all access.
+Revoking access doesn't delete their access to previously shared values. It only prevents them from decrypting future values. To fully clean up the vault, run `vault doctor` after revoking all access.
 </Aside>
 
 ---
@@ -170,7 +170,7 @@ When a team member leaves:
 - Revoke their access to all secrets
 - Rotate ALL secrets they had access to
 - Update all systems with new credentials
-- Defragment the vault to remove their identity
+- Run `vault doctor` to clean up (optional)
 - Document the change in your security log
 
 ```bash
@@ -185,10 +185,7 @@ echo "new-value" | dotsecenv secret put DATABASE_PASSWORD
 echo "new-value" | dotsecenv secret put API_KEY
 # ... repeat for all secrets
 
-# 3. Defragment to clean up (removes identity entries with no access)
-dotsecenv vault defrag --yes
-
-# 4. Commit
+# 3. Commit
 git add vault
 git commit -m "Offboard: revoke access for $FINGERPRINT"
 git push
@@ -206,12 +203,13 @@ This is why **rotating secrets is essential** after revocation.
 
 **Vault getting large?**
 
-Revoked entries and old values accumulate. Defragment periodically:
+Revoked entries and old values accumulate. Run doctor to check and optionally defragment:
 
 ```bash
-dotsecenv vault defrag --dry-run   # Preview
-dotsecenv vault defrag             # Execute
+dotsecenv vault doctor
 ```
+
+The doctor command checks vault health and offers to defragment if needed.
 
 <Aside type="caution">
 Defragmenting removes old entries. This breaks access to historical values but doesn't affect current values.

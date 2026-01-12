@@ -13,14 +13,26 @@ This guide gets you from zero to encrypted secrets in about 5 minutes. By the en
 
 ## Prerequisites
 
-You need a GPG key. Most developers already have one for signing git commits. If not:
+You need a GPG key. Most developers already have one for signing git commits. If not, you have two options:
 
-```bash
-# Generate a new GPG key
-gpg --full-generate-key
-# Select: (1) RSA and RSA, 4096 bits, key does not expire
-# Enter your name and email
-```
+<Tabs>
+  <TabItem label="Using dotsecenv (easier)">
+    ```bash
+    # Generate a new GPG key with dotsecenv
+    dotsecenv identity create
+    # Enter your name and email when prompted
+    ```
+    This uses FIPS-compliant defaults (P-384 curve, 2-year expiration). See [identity create](/reference/#identity-create) for algorithm options.
+  </TabItem>
+  <TabItem label="Using GPG directly">
+    ```bash
+    # Generate a new GPG key
+    gpg --full-generate-key
+    # Select: (1) RSA and RSA, 4096 bits, key does not expire
+    # Enter your name and email
+    ```
+  </TabItem>
+</Tabs>
 
 ## Quick Setup
 
@@ -83,24 +95,17 @@ gpg --full-generate-key
 
 4. **Login with your GPG key**
 
-   Find your GPG fingerprint:
-
    ```bash
-   gpg --list-secret-keys --keyid-format long
+   dotsecenv login
    ```
 
-   Look for the fingerprint (40-character hex string) and login:
+   This lists your available GPG keys and prompts you to select one. You can also specify a fingerprint directly:
 
    ```bash
    dotsecenv login YOUR_FINGERPRINT
    ```
 
-   Or, if you have a single key, use this one-liner to auto-detect it:
-
-   ```bash
-   dotsecenv login \
-      $(gpg --list-keys --with-colons | awk -F: '/^fpr/ {print $10; exit}')
-   ```
+   The login creates a cryptographically signed proof that you control the secret key.
 
 5. **Store your first secret**
 
@@ -152,7 +157,7 @@ When you `cd` into the directory, dotsecenv prompts you to load the secrets.
 Before moving on, verify:
 
 - `dotsecenv version` shows version info
-- `dotsecenv vault list` shows your vault with your identity
+- `dotsecenv vault describe` shows your vault with your identity
 - `dotsecenv secret get DATABASE_PASSWORD` returns your secret
 
 ## What's Next?

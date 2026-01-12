@@ -121,8 +121,8 @@ An identity represents a user who can access secrets. Each identity is:
 1. User generates GPG key pair
 2. Public key exported and shared
 3. Vault admin imports public key to keyring
-4. Vault admin adds identity: dotsecenv vault identity add FINGERPRINT
-5. Identity now exists in vault, can receive shared secrets
+4. Vault admin shares a secret: dotsecenv secret share SECRET_NAME FINGERPRINT
+5. Identity is auto-added to vault and can now receive shared secrets
 ```
 
 ---
@@ -256,17 +256,16 @@ The vault never modifies existing entries—only appends:
 
 ### Defragmentation
 
-Over time, the vault accumulates obsolete entries. Defrag compacts it:
+Over time, the vault accumulates obsolete entries. The `vault doctor` command checks vault health and can defragment it:
 
 ```bash
-dotsecenv vault defrag --dry-run  # Preview
-dotsecenv vault defrag             # Execute
+dotsecenv vault doctor
 ```
 
-This removes:
+After displaying health checks, doctor offers to defragment if needed. This removes:
 
 - Old value entries (keeps latest per recipient set)
-- Removed identities
+- Obsolete entries
 - Duplicate entries
 
 <Aside type="note">

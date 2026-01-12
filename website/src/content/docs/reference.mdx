@@ -40,6 +40,7 @@ A secure tool for managing environment secrets using GPG encryption. Secrets are
 |---------|-------------|
 | `init` | Initialize configuration or vault files |
 | `login` | Initialize user identity |
+| `identity` | Manage GPG identities |
 | `secret` | Manage secrets |
 | `vault` | Manage vaults |
 | `validate` | Validate vault and config |
@@ -122,23 +123,134 @@ dotsecenv init vault -v ~/project/secrets/vault
 
 ## login
 
-Initialize user identity with the given GPG fingerprint.
+Initialize your dotsecenv identity by selecting a GPG key. This creates a cryptographically
+signed proof that you control the secret key, stored in your configuration.
 
 ```bash
-dotsecenv login FINGERPRINT [flags]
+dotsecenv login [FINGERPRINT] [flags]
 ```
 
-The fingerprint should be the full 40-character GPG key fingerprint of the user who will be accessing secrets.
+**Arguments:**
+
+- `FINGERPRINT` (optional): GPG key fingerprint. If not provided, you'll be prompted to
+  select from available secret keys.
+
+**What happens:**
+
+1. Validates the GPG key exists and you have the secret key
+2. Creates a signed login proof (timestamp + fingerprint + signature)
+3. Stores the proof in your configuration file
+
+This signed proof ensures that only someone with access to the secret key can
+configure dotsecenv to use it.
 
 **Examples:**
 
 ```bash
-# Login with specific fingerprint
-dotsecenv login E60A1740BAEF49284D22EA7D3C376348F0921C59
+# Interactive key selection (recommended)
+dotsecenv login
 
-# Auto-detect fingerprint (bash)
-dotsecenv login $(gpg --list-secret-keys --keyid-format long | \
-  grep -oP '(?<=sec\s{3}rsa4096/)[A-F0-9]+' | head -1)
+# Specify fingerprint directly
+dotsecenv login E60A1740BAEF49284D22EA7D3C376348F0921C59
+```
+
+---
+
+## identity
+
+Manage GPG identities.
+
+```bash
+dotsecenv identity [command]
+```
+
+### identity create
+
+Generate a new GPG key for use with dotsecenv.
+
+```bash
+dotsecenv identity create [flags]
+```
+
+This command simplifies GPG key creation by providing sensible defaults
+while allowing customization for power users.
+
+While dotsecenv's philosophy aligns with Unix/POSIX tool composition, we felt that
+providing a simplified wrapper for GPG key generation is a net positive for users
+unfamiliar with GPG.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--name` | Your full name (prompts if not provided) |
+| `--email` | Your email address (prompts if not provided) |
+| `--algo` | Key algorithm: `ED25519`, `RSA4096`, `P384` (default), `P521` |
+| `--template` | Output GPG batch template instead of generating key |
+| `--no-passphrase` | Create key without passphrase protection (for CI/automation only) |
+
+**Key expiration:**
+
+Generated keys expire after **2 years** by default. This is a security best practice - keys should
+be rotated periodically. If you need a different expiration, use `--template` to get the GPG batch
+template and modify the `Expire-Date` field before generating.
+
+**Supported algorithms:**
+
+| Algorithm | Description |
+|-----------|-------------|
+| `P384` (default) | NIST P-384 ECDSA curve |
+| `P521` | NIST P-521 ECDSA curve |
+| `ED25519` | EdDSA with Ed25519 curve |
+| `RSA4096` | RSA 4096-bit key |
+
+**Algorithm validation:**
+
+The requested algorithm must be allowed by your configuration's `approved_algorithms`
+setting. If you request an algorithm that isn't enabled, you'll see an error:
+
+```text
+Error: algorithm 'ED25519' is not allowed by your configuration
+
+Your config only allows:
+  - ECC (minimum 384 bits, curves: P-384, P-521)
+  - RSA (minimum 2048 bits)
+
+To use ED25519, add it to your config's approved_algorithms.
+See https://dotsecenv.com/concepts/compliance/ for more details.
+```
+
+This ensures that generated keys comply with your organization's cryptographic policies.
+See the [Compliance](/concepts/compliance/) page for more information.
+
+**About the `--template` flag:**
+
+Instead of generating the key directly, output a GPG batch template file. This allows you to:
+
+- Review and customize the template before generation
+- Execute key generation directly with GPG for maximum security
+- Generate the key on an air-gapped machine
+- Reduce attack surface by avoiding secret material handling in dotsecenv
+
+**Examples:**
+
+```bash
+# Interactive key generation with defaults (P384)
+dotsecenv identity create
+
+# Specify name and email via flags
+dotsecenv identity create --name "John Doe" --email "john@example.com"
+
+# Use RSA 4096-bit key (if allowed by config)
+dotsecenv identity create --algo RSA4096
+
+# Output template for manual generation
+dotsecenv identity create --template --name "John Doe" --email "john@example.com"
+# Save this template to a file and run:
+#   gpg --batch --generate-key key-params.txt
+
+# CI/automation: create passwordless key (requires --name and --email)
+dotsecenv identity create --name "CI Bot" --email "ci@example.com" --no-passphrase
 ```
 
 ---
@@ -296,10 +408,10 @@ Mark a secret as deleted in the vault.
 dotsecenv secret forget SECRET [flags]
 ```
 
-This adds a deletion marker to the secret. The secret will no longer be returned by `secret get` and will be shown as deleted in `vault list`.
+This adds a deletion marker to the secret. The secret will no longer be returned by `secret get` and will be shown as deleted in `vault describe`.
 
 <Aside type="note">
-The deletion is a soft delete — the secret's history is preserved in the vault file. Use `vault defrag` to permanently remove deleted secrets.
+The deletion is a soft delete — the secret's history is preserved in the vault file. Use `vault doctor` (which offers defragmentation) to permanently remove deleted secrets.
 </Aside>
 
 **Examples:**
@@ -320,7 +432,7 @@ dotsecenv secret forget -v ./project/vault SECRET_NAME
 - `secret get SECRET` — Returns error: "secret has been deleted"
 - `secret get --all` — Skips values from vaults where the secret is deleted
 - `secret get --last` — Does not consider deleted secrets
-- `vault list` — Shows `(deleted)` next to the secret name
+- `vault describe` — Shows `(deleted)` next to the secret name
 
 ---
 
@@ -328,12 +440,12 @@ dotsecenv secret forget -v ./project/vault SECRET_NAME
 
 Manage vaults.
 
-### vault list
+### vault describe
 
-List all configured vaults and the secrets they contain.
+Describe all configured vaults showing their identities and secrets.
 
 ```bash
-dotsecenv vault list [flags]
+dotsecenv vault describe [flags]
 ```
 
 **Options:**
@@ -345,95 +457,48 @@ dotsecenv vault list [flags]
 **Examples:**
 
 ```bash
-# List all vaults and secrets
-dotsecenv vault list
+# Describe all vaults
+dotsecenv vault describe
 
 # Output as JSON
-dotsecenv vault list --json
+dotsecenv vault describe --json
 
-# List specific vault
-dotsecenv vault list -v 1
+# Describe specific vault
+dotsecenv vault describe -v 1
 ```
 
 **Sample output:**
 
 ```text
-Vault 1 (~/.config/dotsecenv/vault):
-  - DATABASE_PASSWORD
-  - OLD_SECRET (deleted)
-  - prod::API_KEY
+Vault 1 (~/.local/share/dotsecenv/vault):
+  Identities:
+    - Alice <alice@example.com> (ABC123...)
+    - Bob <bob@example.com> (DEF456...)
+  Secrets:
+    - DATABASE_PASSWORD
+    - OLD_SECRET (deleted)
+    - prod::API_KEY
 ```
 
-### vault defrag
+### vault doctor
 
-Analyze vault fragmentation and optionally defragment.
+Run health checks on vaults and the GPG environment, and fix issues.
 
 ```bash
-dotsecenv vault defrag [flags]
+dotsecenv vault doctor [flags]
 ```
 
-Prompts to select a vault if multiple are configured. Use `--dry-run` to only show stats without making changes.
+Performs the following checks:
 
-**Options:**
+- **GPG agent availability** - verifies gpg-agent is running
+- **Vault format version** - checks if vaults need upgrading to the latest format
+- **Vault fragmentation** - checks if vaults would benefit from defragmentation
 
-| Flag | Description |
-|------|-------------|
-| `--dry-run` | Show fragmentation stats without defragmenting |
-| `--json` | Output as JSON |
-| `-y, --yes` | Skip confirmation prompt |
+After displaying health check results, the command offers to fix any issues found (upgrade outdated vaults, defragment fragmented vaults).
 
-**Examples:**
-
-```bash
-# Preview defragmentation
-dotsecenv vault defrag --dry-run
-
-# Defragment with confirmation
-dotsecenv vault defrag
-
-# Defragment without confirmation
-dotsecenv vault defrag --yes
-
-# Output stats as JSON
-dotsecenv vault defrag --dry-run --json
-```
-
-### vault identity add
-
-Add an identity to one or more vaults.
-
-```bash
-dotsecenv vault identity add FINGERPRINT [flags]
-```
-
-The identity must have their GPG public key imported into your keyring first.
-
-**Options:**
-
-| Flag | Description |
-|------|-------------|
-| `--all` | Add identity to all configured vaults |
-
-**Examples:**
-
-```bash
-# Add identity to default vault
-dotsecenv vault identity add E60A1740BAEF49284D22EA7D3C376348F0921C59
-
-# Add to all vaults
-dotsecenv vault identity add FINGERPRINT --all
-
-# Add to specific vault
-dotsecenv vault identity add -v 2 FINGERPRINT
-```
-
-### vault identity list
-
-List all identities in the configured vaults.
-
-```bash
-dotsecenv vault identity list [flags]
-```
+:::note[CI Environment Detection]
+In CI environments (`CI=true`, `GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `CIRCLECI`, etc.), interactive prompts are automatically skipped to avoid blocking pipelines. Use `--json` for machine-readable output in CI.
+:::
 
 **Options:**
 
@@ -444,11 +509,51 @@ dotsecenv vault identity list [flags]
 **Examples:**
 
 ```bash
-# List identities
-dotsecenv vault identity list
+# Run health checks
+dotsecenv vault doctor
 
-# Output as JSON
-dotsecenv vault identity list --json
+# Output as JSON (useful for CI)
+dotsecenv vault doctor --json
+
+# Check specific vault
+dotsecenv vault doctor -v 1
+```
+
+**Sample output:**
+
+```text
+Health checks:
+  [✓] gpg-agent is available
+  [✓] ~/.local/share/dotsecenv/vault: format v2 (latest)
+  [!] /var/lib/dotsecenv/vault: format v1 (latest: v2)
+  [✓] ~/.local/share/dotsecenv/vault: 0.0% fragmentation
+
+Status: warning
+
+Upgrade vault /var/lib/dotsecenv/vault from v1 to v2? [y/N]:
+```
+
+### vault upgrade
+
+Upgrade vault file format to the latest version.
+
+```bash
+dotsecenv vault upgrade [flags]
+```
+
+When `behavior.require_explicit_vault_upgrade` is set to `true` in your config, automatic vault upgrades are disabled. Use this command to explicitly upgrade vault formats.
+
+**Examples:**
+
+```bash
+# Upgrade vault (prompts if multiple vaults configured)
+dotsecenv vault upgrade
+
+# Upgrade specific vault
+dotsecenv vault upgrade -v 1
+
+# Upgrade vault at path
+dotsecenv vault upgrade -v ./project/vault
 ```
 
 ### vault upgrade
