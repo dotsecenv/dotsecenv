@@ -67,7 +67,7 @@ jobs:
       - uses: dotsecenv/dotsecenv@v0
         with:
           version: ${{ github.event.client_payload.version || 'latest' }}
-          init-config: '--gpg-program /usr/bin/gpg --login ${{ steps.gpg.outputs.fingerprint }}'
+          init-config: '--login ${{ steps.gpg.outputs.fingerprint }}'
       - run: dotsecenv version
 
   test-init-config-gpg-program:
