@@ -48,7 +48,7 @@ type Client interface {
 	GetKeyCreationTime(fingerprint string) time.Time
 	SignIdentity(identity *identity.Identity, signerFingerprint string) (hash string, signature string, err error)
 	SignSecret(secret *vault.Secret, signerFingerprint string, algorithmBits int) (hash string, signature string, err error)
-	SignSecretValue(value *vault.SecretValue, signerFingerprint string, algorithmBits int) (hash string, signature string, err error)
+	SignSecretValue(value *vault.SecretValue, secretKey string, signerFingerprint string, algorithmBits int) (hash string, signature string, err error)
 	DecryptSecret(encryptedBase64 string, fingerprint string) ([]byte, error)
 	DecryptSecretValue(value *vault.SecretValue, fingerprint string) ([]byte, error)
 	IsAgentAvailable() bool

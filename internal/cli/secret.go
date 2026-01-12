@@ -8,7 +8,6 @@ import (
 	"os"
 	"slices"
 	"sort"
-	"strings"
 	"time"
 
 	"golang.org/x/term"
@@ -97,38 +96,42 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 	encryptedBase64 := base64.StdEncoding.EncodeToString([]byte(encryptedArmored))
 	now := time.Now().UTC()
 
-	secretMetadata := fmt.Sprintf("secret:%s:%s:%s", now.Format(time.RFC3339Nano), secretKey, fp)
-	secretHash := ComputeHash([]byte(secretMetadata), identity.AlgorithmBits)
+	// Build secret struct first (without hash/signature)
+	newSecret := vault.Secret{
+		AddedAt:  now,
+		Key:      secretKey,
+		SignedBy: fp,
+		Values:   []vault.SecretValue{},
+	}
+
+	// Compute hash using shared function
+	secretHash := vault.ComputeSecretHash(&newSecret, identity.AlgorithmBits)
 	secretSig, sigErr := c.gpgClient.SignDataWithAgent(fp, []byte(secretHash))
 	if sigErr != nil {
 		return NewError(fmt.Sprintf("failed to sign secret: %v", sigErr), ExitGeneralError)
 	}
+	newSecret.Hash = secretHash
+	newSecret.Signature = secretSig
 
-	availableTo := strings.Join([]string{fp}, ",")
-	valueMetadata := fmt.Sprintf("value:%s:%s:%s:%s:%s:%t", now.Format(time.RFC3339Nano), secretKey, availableTo, fp, encryptedBase64, false)
-	valueHash := ComputeHash([]byte(valueMetadata), identity.AlgorithmBits)
+	// Build secret value struct (without hash/signature)
+	newValue := vault.SecretValue{
+		AddedAt:     now,
+		AvailableTo: []string{fp},
+		SignedBy:    fp,
+		Value:       encryptedBase64,
+		Deleted:     false,
+	}
+
+	// Compute value hash using shared function
+	valueHash := vault.ComputeSecretValueHash(&newValue, secretKey, identity.AlgorithmBits)
 	valueSig, valueSigErr := c.gpgClient.SignDataWithAgent(fp, []byte(valueHash))
 	if valueSigErr != nil {
 		return NewError(fmt.Sprintf("failed to sign secret value: %v", valueSigErr), ExitGeneralError)
 	}
+	newValue.Hash = valueHash
+	newValue.Signature = valueSig
 
-	newSecret := vault.Secret{
-		AddedAt:   now,
-		Hash:      secretHash,
-		Key:       secretKey,
-		Signature: secretSig,
-		SignedBy:  fp,
-		Values: []vault.SecretValue{
-			{
-				AddedAt:     now,
-				AvailableTo: []string{fp},
-				Hash:        valueHash,
-				Signature:   valueSig,
-				SignedBy:    fp,
-				Value:       encryptedBase64,
-			},
-		},
-	}
+	newSecret.Values = []vault.SecretValue{newValue}
 
 	if err := c.vaultResolver.AddSecret(newSecret, targetIndex); err != nil {
 		return NewError(fmt.Sprintf("failed to add secret: %v", err), ExitVaultError)
@@ -187,24 +190,23 @@ func (c *CLI) SecretForget(secretKeyArg, vaultPath string, fromIndex int) *Error
 
 	now := time.Now().UTC()
 
-	// Create deletion marker value metadata
-	// Format: value:timestamp:key:available_to:signed_by:value:deleted
-	valueMetadata := fmt.Sprintf("value:%s:%s:%s:%s:%s:%t", now.Format(time.RFC3339Nano), secretKey, "", fp, "", true)
-	valueHash := ComputeHash([]byte(valueMetadata), identity.AlgorithmBits)
-	valueSig, valueSigErr := c.gpgClient.SignDataWithAgent(fp, []byte(valueHash))
-	if valueSigErr != nil {
-		return NewError(fmt.Sprintf("failed to sign deletion marker: %v", valueSigErr), ExitGeneralError)
-	}
-
+	// Create deletion marker value (without hash/signature first)
 	deletionValue := vault.SecretValue{
 		AddedAt:     now,
 		AvailableTo: []string{}, // Empty list - no one can access a deleted secret
 		Deleted:     true,
-		Hash:        valueHash,
-		Signature:   valueSig,
 		SignedBy:    fp,
 		Value:       "", // No encrypted value for deletion marker
 	}
+
+	// Compute hash using shared function
+	valueHash := vault.ComputeSecretValueHash(&deletionValue, secretKey, identity.AlgorithmBits)
+	valueSig, valueSigErr := c.gpgClient.SignDataWithAgent(fp, []byte(valueHash))
+	if valueSigErr != nil {
+		return NewError(fmt.Sprintf("failed to sign deletion marker: %v", valueSigErr), ExitGeneralError)
+	}
+	deletionValue.Hash = valueHash
+	deletionValue.Signature = valueSig
 
 	// Create a secret with just the deletion value to add
 	deletionSecret := vault.Secret{

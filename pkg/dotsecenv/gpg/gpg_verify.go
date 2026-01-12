@@ -73,8 +73,8 @@ func VerifySecretHash(secret *vault.Secret, algorithmBits int) (bool, error) {
 }
 
 // VerifySecretValueHash verifies that a secret value's hash matches its canonical data.
-func VerifySecretValueHash(value *vault.SecretValue, algorithmBits int) (bool, error) {
-	computedHash := vault.ComputeSecretValueHash(value, algorithmBits)
+func VerifySecretValueHash(value *vault.SecretValue, secretKey string, algorithmBits int) (bool, error) {
+	computedHash := vault.ComputeSecretValueHash(value, secretKey, algorithmBits)
 	if computedHash != value.Hash {
 		return false, fmt.Errorf("hash mismatch: computed %s, stored %s", computedHash, value.Hash)
 	}
@@ -126,9 +126,9 @@ func FullSecretVerification(secret *vault.Secret, signerPublicKeyBase64 string, 
 // FullSecretValueVerification performs complete verification of a secret value:
 // 1. Verifies the hash matches the canonical data
 // 2. Verifies the signature using the signer's public key
-func FullSecretValueVerification(value *vault.SecretValue, signerPublicKeyBase64 string, algorithmBits int) error {
+func FullSecretValueVerification(value *vault.SecretValue, secretKey string, signerPublicKeyBase64 string, algorithmBits int) error {
 	// Step 1: Verify hash
-	if valid, err := VerifySecretValueHash(value, algorithmBits); !valid {
+	if valid, err := VerifySecretValueHash(value, secretKey, algorithmBits); !valid {
 		return fmt.Errorf("secret value hash verification failed: %w", err)
 	}
 

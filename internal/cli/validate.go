@@ -42,6 +42,7 @@ func (c *CLI) Validate(fix bool) *Error {
 	_, _ = fmt.Fprintf(c.output.Stdout(), "Vault Configuration:\n")
 	vaultCount := 0
 	hasErrors := false
+	hasHashMismatch := false
 
 	for i, entry := range c.vaultResolver.GetConfig().Entries {
 		vaultCount++
@@ -114,6 +115,9 @@ func (c *CLI) Validate(fix bool) *Error {
 			for _, err := range dataErrors {
 				_, _ = fmt.Fprintf(c.output.Stdout(), "      - %s at %s\n", err.Message, err.Path)
 				hasErrors = true
+				if strings.Contains(err.Message, "hash mismatch") {
+					hasHashMismatch = true
+				}
 			}
 		} else {
 			_, _ = fmt.Fprintf(c.output.Stdout(), "    Vault Structure: ✓\n")
@@ -244,7 +248,10 @@ func (c *CLI) Validate(fix bool) *Error {
 	_, _ = fmt.Fprintf(c.output.Stdout(), "=== Validation Complete ===\n")
 	if hasErrors {
 		_, _ = fmt.Fprintf(c.output.Stdout(), "Status: ✗ Validation failed - see errors above\n")
-		return NewError("validation failed", ExitVaultError)
+		if hasHashMismatch {
+			_, _ = fmt.Fprintf(c.output.Stdout(), "\nIf you recently upgraded to v0.4, see: %s\n", hashMismatchMigrationURL)
+		}
+		return NewError("", ExitVaultError)
 	}
 	_, _ = fmt.Fprintf(c.output.Stdout(), "Status: ✓ All checks passed\n")
 

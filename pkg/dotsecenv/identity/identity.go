@@ -37,8 +37,8 @@ func ComputeIdentityHash(identity *Identity) string {
 		expiresAtStr = identity.ExpiresAt.Format(time.RFC3339Nano)
 	}
 
-	// Reconstruct the canonical data with all fields
-	canonicalData := fmt.Sprintf("%s:%s:%d:%s:%s:%s:%s:%s:%s:%s",
+	// Reconstruct the canonical data with all fields: identity:added_at:algorithm:algorithm_bits:curve:created_at:expires_at:fingerprint:public_key:signed_by:uid
+	canonicalData := fmt.Sprintf("identity:%s:%s:%d:%s:%s:%s:%s:%s:%s:%s",
 		identity.AddedAt.Format(time.RFC3339Nano),
 		identity.Algorithm,
 		identity.AlgorithmBits,

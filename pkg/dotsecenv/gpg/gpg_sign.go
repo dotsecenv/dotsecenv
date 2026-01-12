@@ -144,9 +144,9 @@ func (c *GPGClient) SignSecret(secret *vault.Secret, signerFingerprint string, a
 }
 
 // SignSecretValue signs a secret value's canonical data and returns the hash and signature.
-func (c *GPGClient) SignSecretValue(value *vault.SecretValue, signerFingerprint string, algorithmBits int) (hash string, signature string, err error) {
+func (c *GPGClient) SignSecretValue(value *vault.SecretValue, secretKey string, signerFingerprint string, algorithmBits int) (hash string, signature string, err error) {
 	// Compute the canonical hash
-	hash = vault.ComputeSecretValueHash(value, algorithmBits)
+	hash = vault.ComputeSecretValueHash(value, secretKey, algorithmBits)
 
 	// Sign the hash
 	signature, err = c.SignDataWithAgent(signerFingerprint, []byte(hash))
