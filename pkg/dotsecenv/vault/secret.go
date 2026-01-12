@@ -12,7 +12,8 @@ import (
 // ComputeSecretHash computes the canonical hash for a secret.
 // The canonical format includes: added_at:key:signed_by
 func ComputeSecretHash(secret *Secret, algorithmBits int) string {
-	canonicalData := fmt.Sprintf("%s:%s:%s",
+	// Canonical data format: secret:added_at:key:signed_by
+	canonicalData := fmt.Sprintf("secret:%s:%s:%s",
 		secret.AddedAt.Format(time.RFC3339Nano),
 		secret.Key,
 		secret.SignedBy)
@@ -23,14 +24,17 @@ func ComputeSecretHash(secret *Secret, algorithmBits int) string {
 // ComputeSecretValueHash computes the canonical hash for a secret value.
 // The canonical format includes: added_at:available_to:signed_by:value
 // The available_to list is joined with commas for deterministic representation.
-func ComputeSecretValueHash(value *SecretValue, algorithmBits int) string {
+func ComputeSecretValueHash(value *SecretValue, secretKey string, algorithmBits int) string {
 	// Join recipients with commas for deterministic representation
 	availableTo := strings.Join(value.AvailableTo, ",")
-	canonicalData := fmt.Sprintf("%s:%s:%s:%s",
+	// Canonical data format: value:added_at:secret_key:available_to:signed_by:value:deleted
+	canonicalData := fmt.Sprintf("value:%s:%s:%s:%s:%s:%t",
 		value.AddedAt.Format(time.RFC3339Nano),
+		secretKey,
 		availableTo,
 		value.SignedBy,
-		value.Value)
+		value.Value,
+		value.Deleted)
 
 	return identity.ComputeHash([]byte(canonicalData), algorithmBits)
 }
@@ -58,9 +62,9 @@ func VerifySecretSignature(secret *Secret, signingIdentity *Identity) (bool, err
 // 2. Verifies the signature of the hash using the signer's public key
 //
 // Returns true if both verifications pass, false otherwise.
-func VerifySecretValueSignature(value *SecretValue, signingIdentity *Identity) (bool, error) {
+func VerifySecretValueSignature(value *SecretValue, secretKey string, signingIdentity *Identity) (bool, error) {
 	// Step 1: Verify hash (tampering detection)
-	computedHash := ComputeSecretValueHash(value, signingIdentity.AlgorithmBits)
+	computedHash := ComputeSecretValueHash(value, secretKey, signingIdentity.AlgorithmBits)
 	if computedHash != value.Hash {
 		return false, fmt.Errorf("hash mismatch: computed %s, stored %s (data tampering detected)", computedHash, value.Hash)
 	}
@@ -108,7 +112,7 @@ func ValidateSecret(secret *Secret, signingIdentity *Identity) error {
 //   - Signature is cryptographically valid
 //
 // Returns nil if valid, or an error describing the validation failure.
-func ValidateSecretValue(value *SecretValue, signingIdentity *Identity) error {
+func ValidateSecretValue(value *SecretValue, secretKey string, signingIdentity *Identity) error {
 	if value.Signature == "" {
 		return fmt.Errorf("missing signature field")
 	}
@@ -123,7 +127,7 @@ func ValidateSecretValue(value *SecretValue, signingIdentity *Identity) error {
 	}
 
 	// Cryptographically verify the signature
-	valid, err := VerifySecretValueSignature(value, signingIdentity)
+	valid, err := VerifySecretValueSignature(value, secretKey, signingIdentity)
 	if err != nil {
 		return fmt.Errorf("failed to verify signature: %w", err)
 	}

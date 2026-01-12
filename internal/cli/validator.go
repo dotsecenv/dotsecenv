@@ -2,21 +2,22 @@ package cli
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 	"gopkg.in/yaml.v3"
 )
+
+// hashMismatchMigrationURL is the documentation URL for fixing hash mismatch errors after upgrading to v0.4
+const hashMismatchMigrationURL = "https://dotsecenv.com/how-to/#validate-configuration-and-vault"
 
 // ValidationError represents a validation error with context
 type ValidationError struct {
@@ -587,73 +588,37 @@ func isValidBase64(s string) bool {
 	return true
 }
 
-// ComputeHash computes a cryptographic hash of the data based on the algorithm bits
-// Uses SHA-512 for keys >= 256 bits (RSA 4096, ECC P-521), SHA-256 for smaller keys
-func ComputeHash(data []byte, algorithmBits int) string {
-	if algorithmBits >= 256 {
-		// Use SHA-512 for stronger keys
-		hash := sha512.Sum512(data)
-		return hex.EncodeToString(hash[:])
-	}
-	// Use SHA-256 for standard keys
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:])
-}
-
-// ComputeIdentityHash computes the canonical hash for an identity
-func ComputeIdentityHash(identity *vault.Identity) string {
-	expiresAtStr := ""
-	if identity.ExpiresAt != nil {
-		expiresAtStr = identity.ExpiresAt.Format(time.RFC3339Nano)
-	}
-
-	// Reconstruct the canonical data with all fields: type:added_at:algorithm:algorithm_bits:curve:created_at:expires_at:fingerprint:public_key:signed_by:uid
-	canonicalData := fmt.Sprintf("identity:%s:%s:%d:%s:%s:%s:%s:%s:%s:%s",
-		identity.AddedAt.Format(time.RFC3339Nano),
-		identity.Algorithm,
-		identity.AlgorithmBits,
-		identity.Curve,
-		identity.CreatedAt.Format(time.RFC3339Nano),
-		expiresAtStr,
-		identity.Fingerprint,
-		identity.PublicKey,
-		identity.SignedBy,
-		identity.UID)
-
-	return ComputeHash([]byte(canonicalData), identity.AlgorithmBits)
-}
+// NOTE: Hash computation functions are now in pkg/dotsecenv/identity and pkg/dotsecenv/vault
+// to ensure consistent hash formats across signing and validation.
 
 // verifyIdentitySignature verifies the cryptographic signature of an identity
-func verifyIdentitySignature(identity *vault.Identity, vaultData *vault.Vault) (bool, error) {
+func verifyIdentitySignature(vaultIdentity *vault.Identity, vaultData *vault.Vault) (bool, error) {
 	// Look up the signer's identity
-	signingIdentity := vaultData.GetIdentityByFingerprint(identity.SignedBy)
+	signingIdentity := vaultData.GetIdentityByFingerprint(vaultIdentity.SignedBy)
 	if signingIdentity == nil {
-		return false, fmt.Errorf("signing identity not found: %s", identity.SignedBy)
+		return false, fmt.Errorf("signing identity not found: %s", vaultIdentity.SignedBy)
 	}
 
-	// Step 1: Compute hash of canonical data and verify it matches stored hash
-	computedHash := ComputeIdentityHash(identity)
+	// vault.Identity is an alias for identity.Identity, so we can cast directly
+	id := (*identity.Identity)(vaultIdentity)
 
-	if computedHash != identity.Hash {
-		return false, fmt.Errorf("hash mismatch: computed %s, stored %s (data tampering detected)", computedHash, identity.Hash)
+	// Step 1: Compute hash of canonical data and verify it matches stored hash
+	computedHash := identity.ComputeIdentityHash(id)
+
+	if computedHash != vaultIdentity.Hash {
+		return false, fmt.Errorf("hash mismatch: computed %s, stored %s", computedHash, vaultIdentity.Hash)
 	}
 
 	// Step 2: Verify signature of the hash using the signer's public key
-	return verifySignatureWithPublicKey(signingIdentity.PublicKey, []byte(identity.Hash), identity.Signature)
+	return verifySignatureWithPublicKey(signingIdentity.PublicKey, []byte(vaultIdentity.Hash), vaultIdentity.Signature)
 }
 
 // verifySecretSignature verifies the cryptographic signature of a secret
 func verifySecretSignature(secret *vault.Secret, signingIdentity *vault.Identity) (bool, error) {
-	// Reconstruct the canonical data with all fields: type:added_at:key:signed_by
-	canonicalData := fmt.Sprintf("secret:%s:%s:%s",
-		secret.AddedAt.Format(time.RFC3339Nano),
-		secret.Key,
-		secret.SignedBy)
-
-	// Step 1: Verify hash (tampering detection)
-	computedHash := ComputeHash([]byte(canonicalData), signingIdentity.AlgorithmBits)
+	// Step 1: Verify hash (tampering detection) using shared hash computation
+	computedHash := vault.ComputeSecretHash(secret, signingIdentity.AlgorithmBits)
 	if computedHash != secret.Hash {
-		return false, fmt.Errorf("hash mismatch: computed %s, stored %s (data tampering detected)", computedHash, secret.Hash)
+		return false, fmt.Errorf("hash mismatch: computed %s, stored %s", computedHash, secret.Hash)
 	}
 
 	// Step 2: Verify signature of hash (identity verification)
@@ -662,21 +627,10 @@ func verifySecretSignature(secret *vault.Secret, signingIdentity *vault.Identity
 
 // verifySecretValueSignature verifies the cryptographic signature of a secret value
 func verifySecretValueSignature(value *vault.SecretValue, secretKey string, signingIdentity *vault.Identity) (bool, error) {
-	// Reconstruct the canonical data with all fields: type:added_at:secret_key:available_to:signed_by:value:deleted
-	// Join recipients with commas for deterministic representation (same as signing)
-	availableTo := strings.Join(value.AvailableTo, ",")
-	canonicalData := fmt.Sprintf("value:%s:%s:%s:%s:%s:%t",
-		value.AddedAt.Format(time.RFC3339Nano),
-		secretKey,
-		availableTo,
-		value.SignedBy,
-		value.Value,
-		value.Deleted)
-
-	// Step 1: Verify hash (tampering detection)
-	computedHash := ComputeHash([]byte(canonicalData), signingIdentity.AlgorithmBits)
+	// Step 1: Verify hash (tampering detection) using shared hash computation
+	computedHash := vault.ComputeSecretValueHash(value, secretKey, signingIdentity.AlgorithmBits)
 	if computedHash != value.Hash {
-		return false, fmt.Errorf("hash mismatch: computed %s, stored %s (data tampering detected)", computedHash, value.Hash)
+		return false, fmt.Errorf("hash mismatch: computed %s, stored %s", computedHash, value.Hash)
 	}
 
 	// Step 2: Verify signature of hash (identity verification)

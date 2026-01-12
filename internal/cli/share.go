@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
@@ -187,27 +186,29 @@ func (c *CLI) secretShareInVault(secretKey, targetFingerprint string, vaultIndex
 	encryptedBase64 := base64.StdEncoding.EncodeToString([]byte(encryptedArmoredNew))
 
 	now := time.Now().UTC()
-	availableTo := strings.Join(newRecipients, ",")
-	valueMetadata := fmt.Sprintf("value:%s:%s:%s:%s:%s:%t", now.Format(time.RFC3339Nano), secretKey, availableTo, fp, encryptedBase64, false)
 	algorithmBits := 256
 	signingIdentity := c.vaultResolver.GetIdentityByFingerprint(fp)
 	if signingIdentity != nil {
 		algorithmBits = signingIdentity.AlgorithmBits
 	}
-	valueHash := ComputeHash([]byte(valueMetadata), algorithmBits)
+
+	// Build secret value struct first (without hash/signature)
+	newSecretValue := vault.SecretValue{
+		AddedAt:     now,
+		AvailableTo: newRecipients,
+		SignedBy:    fp,
+		Value:       encryptedBase64,
+		Deleted:     false,
+	}
+
+	// Compute hash using shared function
+	valueHash := vault.ComputeSecretValueHash(&newSecretValue, secretKey, algorithmBits)
 	valueSig, sigErr := c.gpgClient.SignDataWithAgent(fp, []byte(valueHash))
 	if sigErr != nil {
 		return NewError(fmt.Sprintf("failed to sign secret value: %v", sigErr), ExitGeneralError)
 	}
-
-	newSecretValue := vault.SecretValue{
-		AddedAt:     now,
-		AvailableTo: newRecipients,
-		Hash:        valueHash,
-		Signature:   valueSig,
-		SignedBy:    fp,
-		Value:       encryptedBase64,
-	}
+	newSecretValue.Hash = valueHash
+	newSecretValue.Signature = valueSig
 
 	// Use AddSecret which handles adding values to existing secrets via the writer
 	newSecret := vault.Secret{

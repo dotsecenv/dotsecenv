@@ -328,7 +328,7 @@ func (m *MockGPGClient) SignSecret(secret *vault.Secret, signerFingerprint strin
 	return "mock_hash", "mock_signature", nil
 }
 
-func (m *MockGPGClient) SignSecretValue(value *vault.SecretValue, signerFingerprint string, algorithmBits int) (hash string, signature string, err error) {
+func (m *MockGPGClient) SignSecretValue(value *vault.SecretValue, secretKey string, signerFingerprint string, algorithmBits int) (hash string, signature string, err error) {
 	return "mock_hash", "mock_signature", nil
 }
 

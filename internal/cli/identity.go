@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
@@ -49,7 +50,7 @@ func (c *CLI) ensureIdentityInVault(fingerprint string, index int) *Error {
 		SignedBy:      fingerprint,
 	}
 
-	newIdentity.Hash = ComputeIdentityHash(&newIdentity)
+	newIdentity.Hash = identity.ComputeIdentityHash(&newIdentity)
 
 	signature, signErr := c.gpgClient.SignDataWithAgent(fingerprint, []byte(newIdentity.Hash))
 	if signErr != nil {
