@@ -183,15 +183,16 @@ jobs:
         run: |
           VERSION="${{ github.ref_name }}"
 
-          # Download current checksums and all darwin archives
+          # Download current checksums, darwin archives, and their signatures
           gh release download "$VERSION" --pattern "checksums.txt" --dir .
           gh release download "$VERSION" --pattern "dotsecenv_*_Darwin_*.tar.gz" --dir .
+          gh release download "$VERSION" --pattern "dotsecenv_*_Darwin_*.tar.gz.sig" --dir .
 
-          # Regenerate checksums for darwin archives
-          for archive in dotsecenv_*_Darwin_*.tar.gz; do
+          # Regenerate checksums for darwin archives and signatures
+          for file in dotsecenv_*_Darwin_*.tar.gz dotsecenv_*_Darwin_*.tar.gz.sig; do
             # Remove old line, add new checksum
-            grep -v "$archive" checksums.txt > checksums.txt.tmp || true
-            sha256sum "$archive" >> checksums.txt.tmp
+            grep -v "$file" checksums.txt > checksums.txt.tmp || true
+            sha256sum "$file" >> checksums.txt.tmp
             mv checksums.txt.tmp checksums.txt
           done
 
