@@ -216,6 +216,12 @@ jobs:
           gh release upload "$VERSION" checksums.txt --clobber
           gh release upload "$VERSION" checksums.txt.sig --clobber
 
+      - name: Attest Darwin Archives
+        if: ${{ !github.event.repository.private }}
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: "dotsecenv_*_Darwin_*.tar.gz"
+
   trigger-repo-update:
     needs: [goreleaser, update-checksums]
     runs-on: ubuntu-latest
