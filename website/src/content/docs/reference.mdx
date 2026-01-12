@@ -261,11 +261,16 @@ Manage secrets in the vault.
 
 ### secret get
 
-Retrieve a secret value from the vault.
+Retrieve a secret value from the vault, or list all secret keys.
 
 ```bash
-dotsecenv secret get SECRET [flags]
+dotsecenv secret get [SECRET] [flags]
 ```
+
+**Two modes of operation:**
+
+1. **List mode** (no arguments): Lists all secret keys from configured vaults
+2. **Get mode** (with SECRET argument): Retrieves the secret value
 
 **Secret key formats:**
 
@@ -276,14 +281,23 @@ dotsecenv secret get SECRET [flags]
 
 | Flag | Description |
 |------|-------------|
-| `--all` | Retrieve all values for the secret |
-| `--last` | Retrieve the most recent value across all vaults |
+| `--all` | Retrieve all values for the secret (requires SECRET) |
+| `--last` | Retrieve the most recent value across all vaults (requires SECRET) |
 | `--json` | Output as JSON |
 
 **Examples:**
 
 ```bash
-# Get a secret
+# List all secrets from all vaults
+dotsecenv secret get
+
+# List secrets from a specific vault
+dotsecenv secret get -v 2
+
+# List secrets as JSON
+dotsecenv secret get --json
+
+# Get a secret value
 dotsecenv secret get DATABASE_PASSWORD
 
 # Get namespaced secret
@@ -297,6 +311,34 @@ dotsecenv secret get DATABASE_PASSWORD --json
 
 # Get from specific vault
 dotsecenv secret get -v 2 DATABASE_PASSWORD
+```
+
+**List mode output:**
+
+```text
+DATABASE_PASSWORD
+prod::API_KEY
+OLD_SECRET (deleted)
+```
+
+**List mode JSON output (`--json`):**
+
+```json
+[
+  {
+    "key": "DATABASE_PASSWORD",
+    "vault": "~/.local/share/dotsecenv/vault"
+  },
+  {
+    "key": "prod::API_KEY",
+    "vault": "~/.local/share/dotsecenv/vault"
+  },
+  {
+    "key": "OLD_SECRET",
+    "vault": "~/.local/share/dotsecenv/vault",
+    "deleted": true
+  }
+]
 ```
 
 ### secret put
