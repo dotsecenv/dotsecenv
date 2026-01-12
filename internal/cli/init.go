@@ -36,9 +36,67 @@ func InitConfig(configPath string, initialVaults []string, gpgProgram string, no
 	// Use FIPS-compliant default configuration
 	cfg := config.DefaultConfig()
 
+	// Handle GPG program configuration FIRST (before login handling needs it)
+	var detectedGPGProgram string
+	switch {
+	case gpgProgram != "":
+		// Explicit path provided via --gpg-program (no validation)
+		detectedGPGProgram = gpgProgram
+		cfg.GPG.Program = gpgProgram
+		_, _ = fmt.Fprintf(stderr, "Using GPG program: %s\n", gpgProgram)
+
+	case noGPGProgram:
+		// Skip GPG detection entirely
+		detectedGPGProgram = ""
+		cfg.GPG.Program = ""
+		_, _ = fmt.Fprintf(stderr, "Skipping GPG program detection (gpg.program will be empty)\n")
+
+	default:
+		// Auto-detect GPG paths and let user choose if multiple are found
+		gpgPaths := gpg.DetectAllGPGPaths()
+
+		switch len(gpgPaths) {
+		case 0:
+			// Fail to generate the config
+			return NewError("GPG not found. Please install GPG and ensure it's in your PATH, then try again.\n  Use --no-gpg-program to skip GPG detection, or --gpg-program to specify a path.", ExitConfigError)
+		case 1:
+			// Single GPG found - always set it explicitly
+			detectedGPGProgram = gpgPaths[0]
+			cfg.GPG.Program = gpgPaths[0]
+			_, _ = fmt.Fprintf(stderr, "Using GPG: %s\n", gpgPaths[0])
+		default:
+			// Multiple GPG installations found, let user choose
+			_, _ = fmt.Fprintf(stderr, "Multiple GPG installations found:\n")
+
+			// Try interactive selection
+			idx, selectErr := HandleInteractiveSelection(gpgPaths, "Select GPG to use (Arrow Up/Down, Enter to select):", stderr)
+			if selectErr != nil {
+				// Interactive selection failed (no terminal, Windows, etc.)
+				// Fall back to first detected path
+				detectedGPGProgram = gpgPaths[0]
+				cfg.GPG.Program = gpgPaths[0]
+				_, _ = fmt.Fprintf(stderr, "Could not prompt for selection, using first detected: %s\n", gpgPaths[0])
+			} else {
+				detectedGPGProgram = gpgPaths[idx]
+				cfg.GPG.Program = gpgPaths[idx]
+				_, _ = fmt.Fprintf(stderr, "Selected GPG: %s\n", gpgPaths[idx])
+			}
+		}
+	}
+
 	// Apply signed login if fingerprint is provided via --login
+	// (now GPG program is already detected/configured)
 	if loginFingerprint != "" {
-		// Create a GPG client to generate the signed login proof
+		if detectedGPGProgram == "" {
+			return NewError("--login requires GPG but no GPG program is configured.\n  Use --gpg-program to specify a path, or ensure GPG is installed.", ExitGPGError)
+		}
+
+		// Validate and set the GPG program path for the GPG client to use
+		if err := gpg.ValidateAndSetGPGProgram(detectedGPGProgram); err != nil {
+			return NewError(fmt.Sprintf("failed to validate GPG program: %v", err), ExitGPGError)
+		}
+
+		// Create a GPG client (uses the validated program path)
 		gpgClient := &gpg.GPGClient{}
 
 		// Validate the key exists first
@@ -68,48 +126,6 @@ func InitConfig(configPath string, initialVaults []string, gpgProgram string, no
 		vaultPaths = append(vaultPaths, defaultVaults...)
 	}
 	cfg.Vault = vaultPaths
-
-	// Handle GPG program configuration
-	switch {
-	case gpgProgram != "":
-		// Explicit path provided via --gpg-program (no validation)
-		cfg.GPG.Program = gpgProgram
-		_, _ = fmt.Fprintf(stderr, "Using GPG program: %s\n", gpgProgram)
-
-	case noGPGProgram:
-		// Skip GPG detection entirely
-		cfg.GPG.Program = ""
-		_, _ = fmt.Fprintf(stderr, "Skipping GPG program detection (gpg.program will be empty)\n")
-
-	default:
-		// Auto-detect GPG paths and let user choose if multiple are found
-		gpgPaths := gpg.DetectAllGPGPaths()
-
-		switch len(gpgPaths) {
-		case 0:
-			// Fail to generate the config
-			return NewError("GPG not found. Please install GPG and ensure it's in your PATH, then try again.\n  Use --no-gpg-program to skip GPG detection, or --gpg-program to specify a path.", ExitConfigError)
-		case 1:
-			// Single GPG found - always set it explicitly
-			cfg.GPG.Program = gpgPaths[0]
-			_, _ = fmt.Fprintf(stderr, "Using GPG: %s\n", gpgPaths[0])
-		default:
-			// Multiple GPG installations found, let user choose
-			_, _ = fmt.Fprintf(stderr, "Multiple GPG installations found:\n")
-
-			// Try interactive selection
-			idx, selectErr := HandleInteractiveSelection(gpgPaths, "Select GPG to use (Arrow Up/Down, Enter to select):", stderr)
-			if selectErr != nil {
-				// Interactive selection failed (no terminal, Windows, etc.)
-				// Fall back to first detected path
-				cfg.GPG.Program = gpgPaths[0]
-				_, _ = fmt.Fprintf(stderr, "Could not prompt for selection, using first detected: %s\n", gpgPaths[0])
-			} else {
-				cfg.GPG.Program = gpgPaths[idx]
-				_, _ = fmt.Fprintf(stderr, "Selected GPG: %s\n", gpgPaths[idx])
-			}
-		}
-	}
 
 	// Save config with comments for behavior section
 	if err := saveConfigWithComments(configPath, cfg); err != nil {
