@@ -98,6 +98,7 @@ export default defineConfig({
             { label: 'Philosophy', slug: 'concepts/philosophy' },
             { label: 'Security Model', slug: 'concepts/threat-model' },
             { label: 'Architecture', slug: 'concepts/architecture' },
+            { label: 'Vault Format', slug: 'concepts/vault-format' },
             { label: 'Standards Compliance', slug: 'concepts/compliance' },
             { label: 'Comparison', slug: 'concepts/comparison' },
           ],

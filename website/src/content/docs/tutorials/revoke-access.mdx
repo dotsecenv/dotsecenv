@@ -148,20 +148,17 @@ The vault preserves full history. View who had access to each version:
 dotsecenv secret get DATABASE_PASSWORD --all --json | jq '.values[] | {timestamp, available_to}'
 ```
 
-### Remove identity from vault
+### Revoke all secrets from an identity
 
 If someone should no longer have any access:
 
 ```bash
-# Remove from vault identity list
-dotsecenv vault identity remove FINGERPRINT
-
-# Revoke from all existing secrets
+# Revoke from all existing secrets in all vaults
 dotsecenv secret revoke "*" FINGERPRINT --all
 ```
 
 <Aside type="note">
-Removing an identity doesn't delete their access to previously shared values. It only prevents sharing new secrets with them.
+The identity remains in the vault but cannot decrypt any current secret values. To fully remove an identity from the vault, use `vault defrag` after revoking all access.
 </Aside>
 
 ---
@@ -173,8 +170,7 @@ When a team member leaves:
 - Revoke their access to all secrets
 - Rotate ALL secrets they had access to
 - Update all systems with new credentials
-- Remove their identity from the vault
-- Consider defragmenting the vault (optional)
+- Defragment the vault to remove their identity
 - Document the change in your security log
 
 ```bash
@@ -184,13 +180,13 @@ FINGERPRINT="THEIR_FINGERPRINT"
 # 1. Revoke all access
 dotsecenv secret revoke "*" "$FINGERPRINT" --all
 
-# 2. Remove identity
-dotsecenv vault identity remove "$FINGERPRINT"
-
-# 3. Rotate secrets (do this for each secret)
+# 2. Rotate secrets (do this for each secret)
 echo "new-value" | dotsecenv secret put DATABASE_PASSWORD
 echo "new-value" | dotsecenv secret put API_KEY
 # ... repeat for all secrets
+
+# 3. Defragment to clean up (removes identity entries with no access)
+dotsecenv vault defrag --yes
 
 # 4. Commit
 git add vault

@@ -598,12 +598,14 @@ dotsecenv version [flags]
 |------|---------|
 | `0` | Success |
 | `1` | General error |
-| `2` | Invalid arguments |
-| `3` | Config/vault not found |
+| `2` | Configuration error |
+| `3` | Vault error |
 | `4` | GPG error |
-| `5` | Secret not found |
-| `6` | Permission denied |
-| `7` | Validation failed |
+| `5` | Authentication error (not logged in) |
+| `6` | Validation failed |
+| `7` | Fingerprint required |
+| `8` | Access denied |
+| `9` | Algorithm not allowed |
 
 ---
 

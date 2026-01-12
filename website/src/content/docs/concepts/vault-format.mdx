@@ -1,0 +1,167 @@
+---
+title: Vault Format
+description: Understanding dotsecenv vault file format and structure
+---
+
+import { Aside, Badge } from '@astrojs/starlight/components';
+
+## Overview
+
+dotsecenv vaults use a versioned JSONL format. The format includes a version field in the header JSON, allowing the format to evolve over time while maintaining backward compatibility.
+
+## Current Format (v1) <Badge text="Current" variant="success" />
+
+The vault file consists of:
+
+1. **Header marker line** - Identifies the file as a dotsecenv vault
+2. **Header JSON** - Index for efficient lookups (identities, secrets)
+3. **Data marker line** - Separates header from data
+4. **Data entries** - One JSON object per line (identities, secrets, values)
+
+### Structure
+
+```text
+# === VAULT HEADER v1 ===
+{"version":1,"identities":[["fingerprint1",4],["fingerprint2",5]],"secrets":{...}}
+# === VAULT DATA ===
+{"type":"identity","data":{...}}
+{"type":"secret","data":{...}}
+{"type":"value","secret":"KEY","data":{...}}
+```
+
+### Header Format
+
+Identities are stored as an ordered array of `[fingerprint, line]` pairs, sorted by line number (order added):
+
+```json
+{
+  "version": 1,
+  "identities": [
+    ["ABC123DEF456", 4],
+    ["XYZ789GHI012", 5]
+  ],
+  "secrets": {
+    "DATABASE_URL": {
+      "secret": 6,
+      "values": [7, 8]
+    }
+  }
+}
+```
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `version` | `int` | Format version (currently 1) |
+| `identities` | `array` | Array of `[fingerprint, line]` pairs, sorted by line number |
+| `secrets` | `object` | Map of secret name to definition line and value lines |
+
+### Why Arrays for Identities?
+
+The array format preserves insertion order, which provides:
+
+- **Deterministic output** - Same vault always serializes identically
+- **Git-friendly** - Consistent ordering means cleaner diffs
+- **Audit trail** - Order reflects when identities were added
+
+## Entry Types
+
+### Identity Entry
+
+```json
+{
+  "type": "identity",
+  "data": {
+    "added_at": "2025-01-01T00:00:00Z",
+    "algorithm": "RSA",
+    "algorithm_bits": 4096,
+    "fingerprint": "ABC123DEF456789012345678901234567890ABCD",
+    "hash": "sha256:...",
+    "public_key": "-----BEGIN PGP PUBLIC KEY BLOCK-----...",
+    "signed_by": "ABC123DEF456789012345678901234567890ABCD",
+    "signature": "...",
+    "uid": "alice@example.com"
+  }
+}
+```
+
+### Secret Definition
+
+```json
+{
+  "type": "secret",
+  "data": {
+    "added_at": "2025-01-01T00:00:00Z",
+    "hash": "sha256:...",
+    "key": "DATABASE_URL",
+    "signature": "...",
+    "signed_by": "ABC123DEF456789012345678901234567890ABCD"
+  }
+}
+```
+
+### Secret Value
+
+```json
+{
+  "type": "value",
+  "secret": "DATABASE_URL",
+  "data": {
+    "added_at": "2025-01-01T00:00:00Z",
+    "available_to": ["ABC123DEF456...", "XYZ789GHI012..."],
+    "hash": "sha256:...",
+    "signature": "...",
+    "signed_by": "ABC123DEF456789012345678901234567890ABCD",
+    "value": "base64-encoded-encrypted-blob"
+  }
+}
+```
+
+## Version Detection
+
+dotsecenv detects the format version from the `version` field in the header JSON:
+
+```json
+{"version":1,"identities":[...],"secrets":{...}}
+```
+
+This allows efficient version detection by parsing just the header line.
+
+## Line Numbers
+
+Line numbers in the header are 1-indexed (first line = 1):
+
+| Line | Content |
+|------|---------|
+| 1 | Header marker (`# === VAULT HEADER v1 ===`) |
+| 2 | Header JSON |
+| 3 | Data marker (`# === VAULT DATA ===`) |
+| 4+ | Data entries (identities, secrets, values) |
+
+The header indexes point to line numbers where each entry can be found, enabling O(1) lookups.
+
+## Future Versioning
+
+The format version allows dotsecenv to evolve while maintaining compatibility:
+
+- **Backward compatibility** - Read older vaults without data loss
+- **Forward evolution** - Add new features without breaking existing vaults
+- **Automatic migration** - Future versions may include automatic upgrades
+
+<Aside type="note">
+  Currently only v1 format exists. Future format changes will be announced in release notes with migration guidance.
+</Aside>
+
+## Validation
+
+dotsecenv validates vault structure on read:
+
+1. Header marker must match expected format
+2. Header JSON must parse successfully
+3. Data marker must be present
+4. Line numbers in header must point to valid entries
+
+Use the validate command to check vault integrity:
+
+```bash
+dotsecenv validate
+```

@@ -17,28 +17,34 @@ The vault is a JSONL (JSON Lines) file where each line is a self-contained JSON 
 ### File Format
 
 ```text
-Line 1: Header with metadata and indexes
-Line 2+: Identity entries, secret definitions, and secret values
+# === VAULT HEADER v1 ===
+Line 2: Header JSON with metadata and indexes
+# === VAULT DATA ===
+Line 4+: Identity entries, secret definitions, and secret values
 ```
 
 Example structure:
 
 ```json
-{"version":1,"identities":[["ABC123",2],["DEF456",3]],"secrets":{"DATABASE_URL":{"secret":4,"values":[5]}}}
-{"type":"identity","data":{"fingerprint":"ABC123","uid":"alice@example.com","algorithm":"rsa4096"}}
-{"type":"identity","data":{"fingerprint":"DEF456","uid":"bob@example.com","algorithm":"ed25519"}}
-{"type":"secret","data":{"name":"DATABASE_URL","created_by":"ABC123","created_at":"2025-01-01T00:00:00Z"}}
+{"version":1,"identities":[["ABC123",4],["DEF456",5]],"secrets":{"DATABASE_URL":{"secret":6,"values":[7]}}}
+{"type":"identity","data":{"fingerprint":"ABC123","uid":"alice@example.com","algorithm":"RSA","algorithm_bits":4096}}
+{"type":"identity","data":{"fingerprint":"DEF456","uid":"bob@example.com","algorithm":"EdDSA","curve":"Ed25519"}}
+{"type":"secret","data":{"key":"DATABASE_URL","signed_by":"ABC123","added_at":"2025-01-01T00:00:00Z"}}
 {"type":"value","secret":"DATABASE_URL","data":{"available_to":["ABC123","DEF456"],"value":"encrypted..."}}
 ```
 
-### Header (Line 1)
+<Aside type="tip">
+  See [Vault Format](/concepts/vault-format) for details on format versioning.
+</Aside>
+
+### Header (Line 2)
 
 The header provides fast lookup without scanning the entire file:
 
 | Field | Purpose |
 |-------|---------|
 | `version` | Format version (currently 1) |
-| `identities` | Map of fingerprint to line number |
+| `identities` | Array of `[fingerprint, line]` pairs (sorted by line number) |
 | `secrets` | Map of secret name to definition line and value lines |
 
 ### Entry Types
