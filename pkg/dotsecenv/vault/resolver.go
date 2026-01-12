@@ -469,3 +469,74 @@ func (vr *VaultResolver) FindSecretVaultIndex(key string) int {
 	}
 	return -1
 }
+
+// SecretKeyInfo contains information about a secret key and its location
+type SecretKeyInfo struct {
+	Key      string `json:"key"`
+	Vault    string `json:"vault"`
+	VaultIdx int    `json:"vault_idx"`
+	Deleted  bool   `json:"deleted,omitempty"`
+}
+
+// ListAllSecretKeys returns all secret keys from all valid vaults
+func (vr *VaultResolver) ListAllSecretKeys() []SecretKeyInfo {
+	vr.mu.RLock()
+	defer vr.mu.RUnlock()
+
+	var result []SecretKeyInfo
+	seen := make(map[string]bool)
+
+	for i, manager := range vr.vaults {
+		if manager == nil {
+			continue
+		}
+
+		vaultPath := vr.config.Entries[i].Path
+		for _, secret := range manager.vault.Secrets {
+			// Use the key as identifier to avoid duplicates
+			keyID := secret.Key
+			if seen[keyID] {
+				continue
+			}
+			seen[keyID] = true
+
+			result = append(result, SecretKeyInfo{
+				Key:      secret.Key,
+				Vault:    vaultPath,
+				VaultIdx: i + 1,
+				Deleted:  secret.IsDeleted(),
+			})
+		}
+	}
+
+	return result
+}
+
+// ListSecretKeysFromVault returns all secret keys from a specific vault
+func (vr *VaultResolver) ListSecretKeysFromVault(index int) []SecretKeyInfo {
+	vr.mu.RLock()
+	defer vr.mu.RUnlock()
+
+	if index < 0 || index >= len(vr.vaults) {
+		return nil
+	}
+
+	manager := vr.vaults[index]
+	if manager == nil {
+		return nil
+	}
+
+	vaultPath := vr.config.Entries[index].Path
+	var result []SecretKeyInfo
+
+	for _, secret := range manager.vault.Secrets {
+		result = append(result, SecretKeyInfo{
+			Key:      secret.Key,
+			Vault:    vaultPath,
+			VaultIdx: index + 1,
+			Deleted:  secret.IsDeleted(),
+		})
+	}
+
+	return result
+}

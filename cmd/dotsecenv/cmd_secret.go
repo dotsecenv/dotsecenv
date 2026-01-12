@@ -94,21 +94,32 @@ var (
 )
 
 var secretGetCmd = &cobra.Command{
-	Use:   "get SECRET",
-	Short: "Retrieve a secret value",
-	Long: `Retrieve a secret value from the vault.
+	Use:   "get [SECRET]",
+	Short: "Retrieve a secret value or list all secrets",
+	Long: `Retrieve a secret value from the vault, or list all secret keys if no secret is specified.
 
 Secret key formats:
   Namespaced:     namespace::KEY_NAME  (e.g., myapp::DATABASE_URL)
   Non-namespaced: KEY_NAME             (e.g., DATABASE_URL)
+
+When called without arguments:
+  Lists all secret keys from all configured vaults.
+  Use -v to list secrets from a specific vault only.
+
+When called with a SECRET argument:
+  Retrieves the secret value from the vault.
 
 Options:
   --all   Retrieve all values for the secret across all vaults
   --last  Retrieve the most recent value across all vaults
   --json  Output as JSON`,
 	Args: func(cmd *cobra.Command, args []string) error {
-		if err := cobra.ExactArgs(1)(cmd, args); err != nil {
-			return err
+		if len(args) == 0 {
+			// List mode - no arguments needed
+			return nil
+		}
+		if len(args) > 1 {
+			return fmt.Errorf("accepts at most 1 arg(s), received %d", len(args))
 		}
 		// Validate secret key format
 		if _, err := vault.NormalizeSecretKey(args[0]); err != nil {
@@ -117,8 +128,6 @@ Options:
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		secretKey := args[0]
-
 		vaultPath, fromIndex, err := parseVaultSpec(globalOpts.ConfigPath, globalOpts.VaultPaths)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -134,6 +143,25 @@ Options:
 		}
 		defer func() { _ = cli.Close() }()
 
+		// If no arguments provided, list secrets
+		if len(args) == 0 {
+			// --all and --last are not valid for list mode
+			if secretGetAll {
+				fmt.Fprintf(os.Stderr, "error: --all flag requires a secret key argument\n")
+				os.Exit(int(clilib.ExitGeneralError))
+			}
+			if secretGetLast {
+				fmt.Fprintf(os.Stderr, "error: --last flag requires a secret key argument\n")
+				os.Exit(int(clilib.ExitGeneralError))
+			}
+
+			exitErr := cli.SecretList(secretGetJSON, vaultPath, fromIndex)
+			exitWithError(exitErr)
+			return
+		}
+
+		// Get secret value
+		secretKey := args[0]
 		exitErr := cli.SecretGet(secretKey, secretGetAll, secretGetLast, secretGetJSON, vaultPath, fromIndex)
 		exitWithError(exitErr)
 	},
