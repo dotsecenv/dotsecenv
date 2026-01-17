@@ -258,10 +258,9 @@ _dotsecenv_load_file() {
             elif [[ "$phase" == "2" && ("$ptype" == "secret_same" || "$ptype" == "secret_named") ]]; then
                 # Phase 2: load secrets via dotsecenv CLI
                 local secret_name="$value"
-                local secret_value
 
                 # Check if this will override a .env variable
-                local env_var
+                local env_var=""
                 for env_var in "${_DOTSECENV_ENV_VARS[@]}"; do
                     if [[ "$env_var" == "$key" ]]; then
                         echo "dotsecenv: warning: $key from .secenv overrides value from .env" >&2
@@ -270,7 +269,8 @@ _dotsecenv_load_file() {
                 done
 
                 # Fetch secret from vault (capture stderr separately to preserve secret value)
-                local secret_result secret_stderr_file
+                # Note: Initialize to empty to prevent zsh from printing existing values on re-declaration
+                local secret_result="" secret_stderr_file=""
                 secret_stderr_file=$(mktemp)
                 if secret_result=$(dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
                     export "$key=$secret_result"
