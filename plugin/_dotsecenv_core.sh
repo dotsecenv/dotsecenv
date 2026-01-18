@@ -578,23 +578,29 @@ _dotsecenv_clipboard_copy() {
 
 # Aliases - defined as functions to work in both bash and zsh
 dse() {
-    dotsecenv "$@"
-}
-
-secret() {
-    dotsecenv secret get "$@"
-}
-
-# copysecret copies output to clipboard
-copysecret() {
-    local output
-    if output=$(dotsecenv secret get "$@"); then
-        if echo -n "$output" | _dotsecenv_clipboard_copy; then
-            echo "dotsecenv: secret copied to clipboard" >&2
+    case "${1:-}" in
+    reload)
+        _dotsecenv_chpwd_hook
+        ;;
+    get)
+        shift
+        dotsecenv secret get "$@"
+        ;;
+    cp)
+        shift
+        local output
+        if output=$(dotsecenv secret get "$@"); then
+            if echo -n "$output" | _dotsecenv_clipboard_copy; then
+                echo "dotsecenv: secret copied to clipboard" >&2
+            else
+                return 1
+            fi
         else
             return 1
         fi
-    else
-        return 1
-    fi
+        ;;
+    *)
+        dotsecenv "$@"
+        ;;
+    esac
 }

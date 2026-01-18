@@ -553,27 +553,31 @@ function _dotsecenv_clipboard_copy
     return 1
 end
 
-# Alias: dse
+# Alias: dse (with subcommands: reload, get, cp)
 function dse
-    dotsecenv $argv
-end
+    if test (count $argv) -eq 0
+        dotsecenv
+        return
+    end
 
-# Alias: secret
-function secret
-    dotsecenv secret get $argv
-end
-
-# copysecret: copies secret to clipboard
-function copysecret
-    set -l output
-    if set output (dotsecenv secret get $argv)
-        if echo -n "$output" | _dotsecenv_clipboard_copy
-            echo "dotsecenv: secret copied to clipboard" >&2
-        else
-            return 1
-        end
-    else
-        return 1
+    switch $argv[1]
+        case reload
+            _dotsecenv_on_cd "$PWD" "$PWD"
+        case get
+            dotsecenv secret get $argv[2..]
+        case cp
+            set -l output
+            if set output (dotsecenv secret get $argv[2..])
+                if echo -n "$output" | _dotsecenv_clipboard_copy
+                    echo "dotsecenv: secret copied to clipboard" >&2
+                else
+                    return 1
+                end
+            else
+                return 1
+            end
+        case '*'
+            dotsecenv $argv
     end
 end
 

@@ -294,8 +294,8 @@ function test_alias_dse
     end
 end
 
-function test_alias_secret
-    log "[fish] Testing 'secret' function..."
+function test_alias_dse_get
+    log "[fish] Testing 'dse get' subcommand..."
     set TESTS_RUN (math $TESTS_RUN + 1)
 
     set mock_path (create_mock_dotsecenv)
@@ -303,13 +303,13 @@ function test_alias_secret
     set result (fish -c "
         set -gx PATH '$mock_path' \$PATH
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
-        secret API_KEY
+        dse get API_KEY
     " 2>&1)
 
     if test "$result" = mock-api-key-12345
-        pass "[fish] 'secret' function works correctly"
+        pass "[fish] 'dse get' subcommand works correctly"
     else
-        fail "[fish] 'secret' function failed, got: $result"
+        fail "[fish] 'dse get' subcommand failed, got: $result"
     end
 end
 
@@ -600,7 +600,7 @@ function main
     test_security_check_world_writable
     test_two_phase_loading
     test_alias_dse
-    test_alias_secret
+    test_alias_dse_get
     test_comments_and_empty_lines
     test_quoted_values
 

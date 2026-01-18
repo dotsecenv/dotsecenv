@@ -497,9 +497,9 @@ test_alias_dse() {
     fi
 }
 
-test_alias_secret() {
+test_alias_dse_get() {
     local shell="$1"
-    log "[$shell] Testing 'secret' alias..."
+    log "[$shell] Testing 'dse get' subcommand..."
     ((TESTS_RUN++)) || true
 
     local mock_path
@@ -510,20 +510,20 @@ test_alias_secret() {
         result=$("$BASH_BIN" -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/_dotsecenv_core.sh'
-            secret API_KEY
+            dse get API_KEY
         " 2>&1)
     else
         result=$(zsh -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
-            secret API_KEY
+            dse get API_KEY
         " 2>&1)
     fi
 
     if [[ "$result" == "mock-api-key-12345" ]]; then
-        pass "[$shell] 'secret' alias works correctly"
+        pass "[$shell] 'dse get' subcommand works correctly"
     else
-        fail "[$shell] 'secret' alias failed, got: $result"
+        fail "[$shell] 'dse get' subcommand failed, got: $result"
     fi
 }
 
@@ -941,7 +941,7 @@ main() {
         test_security_check_world_writable "bash"
         test_two_phase_loading "bash"
         test_alias_dse "bash"
-        test_alias_secret "bash"
+        test_alias_dse_get "bash"
         test_comments_and_empty_lines "bash"
         test_quoted_values "bash"
         test_tree_scope_persist_in_subdir "bash"
@@ -965,7 +965,7 @@ main() {
             test_security_check_world_writable "zsh"
             test_two_phase_loading "zsh"
             test_alias_dse "zsh"
-            test_alias_secret "zsh"
+            test_alias_dse_get "zsh"
             test_comments_and_empty_lines "zsh"
             test_quoted_values "zsh"
             test_tree_scope_persist_in_subdir "zsh"
