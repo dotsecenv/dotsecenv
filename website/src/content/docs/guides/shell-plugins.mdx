@@ -130,18 +130,18 @@ dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
   </TabItem>
 </Tabs>
 
-## Provided Commands & Aliases
+## The `dse` Command
 
-The plugins provide several convenience commands:
+The plugins provide the `dse` command with subcommands for common operations:
 
 | Command | Description |
 |---------|-------------|
-| `dse` | Shorthand for `dotsecenv` |
-| `secret NAME` | Shorthand for `dotsecenv secret get NAME` |
-| `copysecret NAME` | Copy a secret directly to clipboard |
-| `reloadsecenv` | Reload secrets in the current directory |
+| `dse` | Shorthand for `dotsecenv` (pass-through) |
+| `dse get NAME` | Shorthand for `dotsecenv secret get NAME` |
+| `dse cp NAME` | Copy a secret directly to clipboard |
+| `dse reload` | Reload secrets in the current directory |
 
-### `dse` — Quick CLI Access
+### Pass-through to `dotsecenv`
 
 Use `dse` as a shorthand for the `dotsecenv` command:
 
@@ -153,7 +153,7 @@ dotsecenv vault describe
 dse vault describe
 ```
 
-### `secret` — Quick Secret Retrieval
+### `dse get` — Quick Secret Retrieval
 
 Retrieve a secret with minimal typing:
 
@@ -162,15 +162,15 @@ Retrieve a secret with minimal typing:
 dotsecenv secret get DATABASE_PASSWORD
 
 # Use:
-secret DATABASE_PASSWORD
+dse get DATABASE_PASSWORD
 ```
 
-### `copysecret` — Copy to Clipboard
+### `dse cp` — Copy to Clipboard
 
 Copy a secret directly to your clipboard without displaying it:
 
 ```bash
-copysecret API_KEY
+dse cp API_KEY
 # Output: dotsecenv: secret copied to clipboard
 ```
 
@@ -184,12 +184,12 @@ Clipboard support:
 - **Wayland**: Uses `wl-copy`
 - **X11**: Uses `xclip` or `xsel`
 
-### `reloadsecenv` — Reload Current Directory
+### `dse reload` — Reload Current Directory
 
 Re-trigger secret loading for the current directory without leaving and re-entering:
 
 ```bash
-reloadsecenv
+dse reload
 ```
 
 This is useful when:
@@ -326,7 +326,7 @@ This ensures plain variables are available immediately, while secrets are fetche
 1. Check the plugin is loaded:
 
    ```bash
-   type reloadsecenv  # Should show it's a function
+   type dse  # Should show it's a function
    ```
 
 2. Verify `.secenv` exists and has correct permissions:
@@ -338,7 +338,7 @@ This ensures plain variables are available immediately, while secrets are fetche
 3. Try manual reload:
 
    ```bash
-   reloadsecenv
+   dse reload
    ```
 
 ### "No TTY for trust prompt"
