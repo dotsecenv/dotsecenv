@@ -5,15 +5,15 @@ description: Automatic secret loading with shell plugins for Bash, Zsh, and Fish
 
 import { Tabs, TabItem, Aside, Steps } from '@astrojs/starlight/components';
 
-The dotsecenv shell plugins automatically load secrets from `.secenv` files when you `cd` into a directory. When you leave, secrets are automatically unloaded—keeping your environment clean and secure.
+The dotsecenv shell plugins automatically load secrets from `.secenv` files when you `cd` into a directory. When you leave, they are automatically unloaded—keeping your environment clean and secure.
 
 ## How It Works
 
-1. **On `cd` into a directory**: The plugin checks for `.env` and `.secenv` files
-2. **Security check**: Files must be owned by you (or root) and not world-writable
-3. **Trust prompt**: For `.secenv` files, you're prompted to allow loading (can be remembered)
-4. **Auto-load**: Plain variables from `.env` are loaded, then secrets are fetched from your vault
-5. **On `cd` out**: Variables are automatically unset
+1. **On `cd` into a directory**: The plugin checks for a `.secenv` file
+2. **Security check**: The file must be owned by you (or root) and not world-writable
+3. **Trust prompt**: You're prompted to allow loading (can be remembered)
+4. **Auto-load**: Plain variables are loaded first, then secrets are fetched from your vault
+5. **Tree-scoped persistence**: Secrets remain loaded in subdirectories, only unloading when you leave the tree entirely
 
 ```text
 ~/project $ cd myapp/
@@ -21,8 +21,62 @@ dotsecenv: found .secenv in /home/user/myapp
 Load secrets? [y]es / [n]o / [a]lways: y
 dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
 
-~/project/myapp $ cd ..
+~/project/myapp $ cd src/         # Secrets persist in subdirectories
+~/project/myapp/src $ cd ../..    # Leave the tree
 dotsecenv: unloaded 2 secret(s): DATABASE_URL, API_KEY
+```
+
+### Tree-Scoped Loading
+
+Secrets are **tree-scoped**, meaning they persist while you navigate within subdirectories:
+
+```text
+~/project $ cd myapp/
+dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
+
+~/project/myapp $ cd src/components/
+# Secrets still available - we're in the myapp tree
+
+~/project/myapp/src/components $ echo $DATABASE_URL
+postgres://...
+
+~/project/myapp/src/components $ cd ~/other-project/
+dotsecenv: unloaded 2 secret(s): DATABASE_URL, API_KEY
+# Secrets unloaded - we left the myapp tree
+```
+
+This behavior is ideal for common workflows where you navigate between source files while keeping your secrets loaded.
+
+### Nested .secenv Files
+
+If a subdirectory has its own `.secenv`, secrets **layer on top** of the parent:
+
+```text
+~/project $ cd myapp/
+dotsecenv: loaded 1 secret(s) from .secenv: DATABASE_URL
+
+~/project/myapp $ cd prod/
+dotsecenv: loaded 1 secret(s) from .secenv: API_KEY
+# Both DATABASE_URL (from parent) and API_KEY (from prod) are available
+
+~/project/myapp/prod $ cd ..
+dotsecenv: unloaded 1 secret(s): API_KEY
+# prod's API_KEY unloaded, parent's DATABASE_URL remains
+```
+
+If a child directory defines the same variable as the parent, the child's value takes precedence. When you leave the child, the parent's value is restored (re-fetched from the vault for security).
+
+### Re-entry Reloads Fresh
+
+When you return to a directory with `.secenv`, secrets are **reloaded fresh** from your vault:
+
+```text
+~/project/myapp $ cd ~/other-project/
+dotsecenv: unloaded 2 secret(s): DATABASE_URL, API_KEY
+
+~/other-project $ cd ~/project/myapp/
+dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
+# Fresh reload ensures you get the latest values
 ```
 
 ## Installation
@@ -86,7 +140,6 @@ The plugins provide several convenience commands:
 | `secret NAME` | Shorthand for `dotsecenv secret get NAME` |
 | `copysecret NAME` | Copy a secret directly to clipboard |
 | `reloadsecenv` | Reload secrets in the current directory |
-| `pinsecenv` | Pin current secrets to persist across directory changes |
 
 ### `dse` — Quick CLI Access
 
@@ -145,85 +198,6 @@ This is useful when:
 - You've modified the `.secenv` file
 - A secret fetch failed and you want to retry
 
-### `pinsecenv` — Pin Secrets
-
-Pin the current directory's environment variables so they persist even after you `cd` away.
-
-```bash
-pinsecenv
-# Output:
-# dotsecenv: pinned secrets: DATABASE_URL, API_KEY
-# dotsecenv: pinned env vars: NODE_ENV, PORT
-# dotsecenv: these variables will persist when you leave this directory
-# dotsecenv: you must unset them manually, e.g.: `unset VARIABLE_NAME`
-```
-
-## The Pin Use Case
-
-By default, dotsecenv automatically unloads secrets when you leave a directory. This is a security feature—secrets don't linger in your environment longer than needed.
-
-However, there are scenarios where you want secrets to persist:
-
-### Running Background Processes
-
-```bash
-cd ~/myapp
-# Secrets loaded: DATABASE_URL, API_KEY
-
-# Start a background server that needs these env vars
-npm run dev &
-
-# Pin secrets before leaving
-pinsecenv
-
-cd ~/other-project
-# Normally secrets would be unloaded, but they're pinned!
-# Your background server continues working
-```
-
-### Multi-Directory Workflows
-
-```bash
-cd ~/project-a
-# Secrets loaded for project-a
-
-pinsecenv  # Pin them
-
-cd ~/project-b
-# Project-a secrets still available
-# Project-b secrets also loaded (if .secenv exists)
-```
-
-### Long-Running Terminal Sessions
-
-If you're working across multiple projects but need consistent access to certain secrets:
-
-```bash
-cd ~/main-project
-pinsecenv
-
-# Now work anywhere while keeping main-project secrets available
-cd ~/scripts
-./deploy.sh  # Can use pinned DATABASE_URL
-```
-
-<Aside type="caution" title="Remember to Clean Up">
-Pinned variables must be manually unset:
-
-<Tabs>
-  <TabItem label="Bash/Zsh">
-    ```bash
-    unset DATABASE_URL API_KEY
-    ```
-  </TabItem>
-  <TabItem label="Fish">
-    ```bash
-    set -e DATABASE_URL API_KEY
-    ```
-  </TabItem>
-</Tabs>
-</Aside>
-
 ## Trust System
 
 The plugin uses a trust system to prevent malicious `.secenv` files from auto-loading secrets:
@@ -269,7 +243,7 @@ If a file fails these checks:
 
 ```text
 dotsecenv: refusing to load /path/.secenv - not owned by current user or root
-dotsecenv: refusing to load /path/.env - world-writable
+dotsecenv: refusing to load /path/.secenv - world-writable
 ```
 
 <Aside type="tip" title="Fixing Permissions">
@@ -284,9 +258,9 @@ chmod o-w .secenv
 
 </Aside>
 
-## .secenv File Format
+## File Format
 
-The `.secenv` file defines which secrets to load as environment variables:
+The `.secenv` file uses a simple `KEY=value` format with the `{dotsecenv}` syntax for loading secrets:
 
 ```bash
 # Load secret with matching name
@@ -295,31 +269,55 @@ DATABASE_PASSWORD={dotsecenv}
 # Load secret with different name
 DB_PASS={dotsecenv/DATABASE_PASSWORD}
 
-# Plain values work too (loaded from .secenv, not encrypted)
+# Plain values work too
 NODE_ENV=production
 
 # Load from a namespace
 API_KEY={dotsecenv/production::API_KEY}
 ```
 
-See [Your First Secret](/tutorials/first-secret/) for more details on `.secenv` syntax.
+See [Your First Secret](/tutorials/first-secret/) for more details on file syntax.
+
+### `.env` vs `.secenv`
+
+The dotsecenv plugin **only** handles `.secenv` files. This is intentional—we don't reinvent the wheel.
+
+Tools like [direnv](https://direnv.net/), [autoenv](https://github.com/hyperupcall/autoenv), and [zsh-autoenv](https://github.com/Tarrasch/zsh-autoenv) have been managing `.env` files for years. They're mature, battle-tested, and do their job well. There's no reason for dotsecenv to duplicate that functionality or force you to learn subtle differences in behavior.
+
+**Use them together:**
+
+| File | Tool | Purpose |
+|------|------|---------|
+| `.env` | direnv, autoenv, etc. | Non-sensitive configuration |
+| `.secenv` | dotsecenv | Secrets from your vault |
+
+<Aside type="tip" title="Recommended setup">
+Install both [direnv](https://direnv.net/) and dotsecenv. Let each tool do what it does best:
+
+```bash
+# .env — handled by direnv
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+LOG_LEVEL=debug
+
+# .secenv — handled by dotsecenv
+DATABASE_PASSWORD={dotsecenv}
+API_KEY={dotsecenv/production::API_KEY}
+```
+
+This separation keeps your non-sensitive config in `.env` (version-controlled, no prompts) and your actual secrets in `.secenv` (vault-backed, trust-prompted).
+</Aside>
 
 ## Loading Order
 
-When both `.env` and `.secenv` exist in a directory:
+When loading a `.secenv` file:
 
 <Steps>
-1. **Phase 1**: Load plain variables from `.env`
-2. **Phase 2**: Load plain variables from `.secenv`
-3. **Phase 3**: Load secrets from `.env` (if any `{dotsecenv}` patterns)
-4. **Phase 4**: Load secrets from `.secenv`
+1. **Phase 1**: Load plain variables (any `KEY=value` without `{dotsecenv}`)
+2. **Phase 2**: Fetch and load secrets (any `KEY={dotsecenv}` or `KEY={dotsecenv/name}`)
 </Steps>
 
-If a variable is defined in both files, `.secenv` wins with a warning:
-
-```text
-dotsecenv: warning: DATABASE_URL from .secenv overrides value from .env
-```
+This ensures plain variables are available immediately, while secrets are fetched from your vault.
 
 ## Troubleshooting
 
