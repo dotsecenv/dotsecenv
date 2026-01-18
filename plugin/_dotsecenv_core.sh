@@ -445,15 +445,22 @@ _dotsecenv_on_cd() {
     done
 
     # =========================================================================
-    # PHASE 2: RELOAD check - If we're exactly at a stack entry, reload it
+    # PHASE 2: RELOAD check - Only reload if we returned from OUTSIDE the tree
+    # (If we're navigating within the tree, e.g. subdir -> parent, don't reload)
     # =========================================================================
     stack_len=${#_DOTSECENV_SOURCE_STACK[@]}
     if [[ $stack_len -gt 0 ]]; then
         local top_dir="${_DOTSECENV_SOURCE_STACK[-1]}"
         if [[ "$new_dir" == "$top_dir" ]]; then
-            # We're back at the source directory - pop and reload fresh
-            _dotsecenv_stack_pop
-            _dotsecenv_unload_dir "$top_dir"
+            # Only reload if we came from outside this directory's tree
+            if [[ -n "$old_dir" ]] && ! _dotsecenv_is_subdir "$top_dir" "$old_dir"; then
+                # We returned from outside - pop and reload fresh
+                _dotsecenv_stack_pop
+                _dotsecenv_unload_dir "$top_dir"
+            else
+                # Coming from a subdirectory - secrets already loaded, nothing to do
+                return 0
+            fi
         fi
     fi
 

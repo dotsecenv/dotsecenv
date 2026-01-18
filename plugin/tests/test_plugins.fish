@@ -530,11 +530,11 @@ function test_tree_scope_sibling_navigation
     end
 end
 
-function test_tree_scope_reload_on_return
-    log "[fish] Testing secrets reload when returning to source dir..."
+function test_tree_scope_no_reload_from_subdir
+    log "[fish] Testing secrets persist (no reload) when returning from subdirectory..."
     set TESTS_RUN (math $TESTS_RUN + 1)
 
-    set test_dir "$TEMP_DIR/test_tree_reload"
+    set test_dir "$TEMP_DIR/test_tree_no_reload"
     mkdir -p "$test_dir/project/src"
 
     # Project has .secenv
@@ -556,13 +556,17 @@ function test_tree_scope_reload_on_return
         cd '$test_dir/project'
         cd '$test_dir/project/src'
         cd '$test_dir/project'
+        echo \$DB_PASSWORD
     " 2>&1)
 
-    # Should see "loaded" message when returning (reloading)
-    if string match -q "*loaded*secret*" "$result"
-        pass "[fish] Secrets reload when returning to source dir"
+    # Should NOT see unload/reload messages - secrets should persist
+    # But should still have the secret value
+    if string match -q "*unloaded*" "$result"
+        fail "[fish] Secrets were unnecessarily unloaded, got: $result"
+    else if string match -q "*super-secret-password*" "$result"
+        pass "[fish] Secrets persist without reload when returning from subdirectory"
     else
-        fail "[fish] Secrets did not reload on return, got: $result"
+        fail "[fish] Secret value not found, got: $result"
     end
 end
 
@@ -605,7 +609,7 @@ function main
     test_tree_scope_unload_on_leave
     test_tree_scope_nested_secenv
     test_tree_scope_sibling_navigation
-    test_tree_scope_reload_on_return
+    test_tree_scope_no_reload_from_subdir
 
     cleanup
 

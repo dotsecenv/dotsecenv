@@ -850,12 +850,12 @@ EOF
     fi
 }
 
-test_tree_scope_reload_on_return() {
+test_tree_scope_no_reload_from_subdir() {
     local shell="$1"
-    log "[$shell] Testing secrets reload when returning to source dir..."
+    log "[$shell] Testing secrets persist (no reload) when returning from subdirectory..."
     ((TESTS_RUN++)) || true
 
-    local test_dir="$TEMP_DIR/test_tree_reload"
+    local test_dir="$TEMP_DIR/test_tree_no_reload"
     mkdir -p "$test_dir/project/src"
 
     # Project has .secenv
@@ -883,7 +883,8 @@ EOF
             cd '$test_dir/project/src'
             _dotsecenv_chpwd_hook
             cd '$test_dir/project'
-            _dotsecenv_chpwd_hook 2>&1
+            _dotsecenv_chpwd_hook
+            echo \"\$DB_PASSWORD\"
         " 2>&1)
     else
         result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
@@ -891,15 +892,19 @@ EOF
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/project'
             cd '$test_dir/project/src'
-            cd '$test_dir/project' 2>&1
+            cd '$test_dir/project'
+            echo \"\$DB_PASSWORD\"
         " 2>&1)
     fi
 
-    # Should see "loaded" message when returning (reloading)
-    if [[ "$result" == *"loaded"*"secret"* ]]; then
-        pass "[$shell] Secrets reload when returning to source dir"
+    # Should NOT see unload message - secrets should persist without reloading
+    # But should still have the secret value
+    if [[ "$result" == *"unloaded"* ]]; then
+        fail "[$shell] Secrets were unnecessarily unloaded, got: $result"
+    elif [[ "$result" == *"super-secret-password"* ]]; then
+        pass "[$shell] Secrets persist without reload when returning from subdirectory"
     else
-        fail "[$shell] Secrets did not reload on return, got: $result"
+        fail "[$shell] Secret value not found, got: $result"
     fi
 }
 
@@ -943,7 +948,7 @@ main() {
         test_tree_scope_unload_on_leave "bash"
         test_tree_scope_nested_secenv "bash"
         test_tree_scope_sibling_navigation "bash"
-        test_tree_scope_reload_on_return "bash"
+        test_tree_scope_no_reload_from_subdir "bash"
     fi
 
     # Run zsh tests
@@ -967,7 +972,7 @@ main() {
             test_tree_scope_unload_on_leave "zsh"
             test_tree_scope_nested_secenv "zsh"
             test_tree_scope_sibling_navigation "zsh"
-            test_tree_scope_reload_on_return "zsh"
+            test_tree_scope_no_reload_from_subdir "zsh"
         else
             warn "Zsh not found, skipping zsh tests"
         fi
