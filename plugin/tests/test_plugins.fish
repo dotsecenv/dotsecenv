@@ -379,6 +379,194 @@ UNQUOTED=helloworld' >"$test_dir/.env"
 end
 
 # ============================================================================
+# Tree-Scoped Loading Tests
+# ============================================================================
+
+function test_tree_scope_persist_in_subdir
+    log "[fish] Testing secrets persist when entering subdirectory..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_tree_persist"
+    mkdir -p "$test_dir/parent/child"
+
+    # Parent has .secenv
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/parent/.secenv"
+    chmod 644 "$test_dir/parent/.secenv"
+
+    # Pre-trust the directory
+    set config_dir "$TEMP_DIR/config"
+    mkdir -p "$config_dir"
+    echo "$test_dir/parent" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir/parent'
+        cd '$test_dir/parent/child'
+        echo \$DB_PASSWORD
+    " 2>&1)
+
+    if string match -q "*super-secret-password*" "$result"
+        pass "[fish] Secrets persist in subdirectory"
+    else
+        fail "[fish] Secrets did not persist in subdirectory, got: $result"
+    end
+end
+
+function test_tree_scope_unload_on_leave
+    log "[fish] Testing secrets unload when leaving tree..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_tree_unload"
+    mkdir -p "$test_dir/project"
+    mkdir -p "$test_dir/other"
+
+    # Project has .secenv
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/project/.secenv"
+    chmod 644 "$test_dir/project/.secenv"
+
+    # Pre-trust the directory
+    set config_dir "$TEMP_DIR/config"
+    mkdir -p "$config_dir"
+    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir/project'
+        cd '$test_dir/other'
+        echo 'VAR='(test -n \"\$DB_PASSWORD\"; and echo \$DB_PASSWORD; or echo 'unset')
+    " 2>&1)
+
+    if string match -q "*VAR=unset*" "$result"
+        pass "[fish] Secrets unloaded when leaving tree"
+    else
+        fail "[fish] Secrets not unloaded when leaving tree, got: $result"
+    end
+end
+
+function test_tree_scope_nested_secenv
+    log "[fish] Testing nested .secenv layers on top of parent..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_tree_nested"
+    mkdir -p "$test_dir/parent/child"
+
+    # Parent has DB_PASSWORD
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/parent/.secenv"
+    chmod 644 "$test_dir/parent/.secenv"
+
+    # Child has API_KEY
+    echo 'API_KEY={dotsecenv}' >"$test_dir/parent/child/.secenv"
+    chmod 644 "$test_dir/parent/child/.secenv"
+
+    # Pre-trust both directories
+    set config_dir "$TEMP_DIR/config"
+    mkdir -p "$config_dir"
+    echo "$test_dir/parent" >"$config_dir/trusted_dirs"
+    echo "$test_dir/parent/child" >>"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir/parent'
+        cd '$test_dir/parent/child'
+        echo \$DB_PASSWORD'|'\$API_KEY
+    " 2>&1)
+
+    if string match -q "*super-secret-password|mock-api-key-12345*" "$result"
+        pass "[fish] Nested .secenv layers correctly"
+    else
+        fail "[fish] Nested .secenv layering failed, got: $result"
+    end
+end
+
+function test_tree_scope_sibling_navigation
+    log "[fish] Testing sibling navigation keeps ancestor secrets..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_tree_sibling"
+    mkdir -p "$test_dir/parent/child1"
+    mkdir -p "$test_dir/parent/child2"
+
+    # Parent has .secenv
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/parent/.secenv"
+    chmod 644 "$test_dir/parent/.secenv"
+
+    # Pre-trust the directory
+    set config_dir "$TEMP_DIR/config"
+    mkdir -p "$config_dir"
+    echo "$test_dir/parent" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir/parent'
+        cd '$test_dir/parent/child1'
+        cd '$test_dir/parent/child2'
+        echo \$DB_PASSWORD
+    " 2>&1)
+
+    if string match -q "*super-secret-password*" "$result"
+        pass "[fish] Sibling navigation keeps ancestor secrets"
+    else
+        fail "[fish] Sibling navigation lost ancestor secrets, got: $result"
+    end
+end
+
+function test_tree_scope_reload_on_return
+    log "[fish] Testing secrets reload when returning to source dir..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_tree_reload"
+    mkdir -p "$test_dir/project/src"
+
+    # Project has .secenv
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/project/.secenv"
+    chmod 644 "$test_dir/project/.secenv"
+
+    # Pre-trust the directory
+    set config_dir "$TEMP_DIR/config"
+    mkdir -p "$config_dir"
+    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir/project'
+        cd '$test_dir/project/src'
+        cd '$test_dir/project'
+    " 2>&1)
+
+    # Should see "loaded" message when returning (reloading)
+    if string match -q "*loaded*secret*" "$result"
+        pass "[fish] Secrets reload when returning to source dir"
+    else
+        fail "[fish] Secrets did not reload on return, got: $result"
+    end
+end
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -411,6 +599,13 @@ function main
     test_alias_secret
     test_comments_and_empty_lines
     test_quoted_values
+
+    # Tree-scoped loading tests
+    test_tree_scope_persist_in_subdir
+    test_tree_scope_unload_on_leave
+    test_tree_scope_nested_secenv
+    test_tree_scope_sibling_navigation
+    test_tree_scope_reload_on_return
 
     cleanup
 

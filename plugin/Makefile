@@ -30,7 +30,12 @@ test-zsh:
 .PHONY: test-fish
 test-fish:
 	@echo "Running fish shell plugin tests..."
-	@fish ./tests/test_plugins.fish
+	@./tests/test_plugins.sh --fish-only
+
+.PHONY: test
+test: test-plugins test-managers test-managers-remote
+	@echo "Running all plugin tests..."
+	@./tests/test_plugins.sh
 
 .PHONY: test-managers
 test-managers:
