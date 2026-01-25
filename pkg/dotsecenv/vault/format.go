@@ -92,8 +92,6 @@ type SecretData struct {
 	SignedBy  string    `json:"signed_by"`
 }
 
-
-
 // ToIdentity converts IdentityData to the Identity type
 func (d *IdentityData) ToIdentity() identity.Identity {
 	return identity.Identity{
@@ -129,8 +127,6 @@ func IdentityDataFromIdentity(id identity.Identity) IdentityData {
 		UID:           id.UID,
 	}
 }
-
-
 
 // MarshalEntry creates a JSON line for an entry
 func MarshalEntry(e Entry) ([]byte, error) {
