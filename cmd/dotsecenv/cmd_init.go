@@ -77,20 +77,17 @@ var initVaultCmd = &cobra.Command{
 
 Two modes of operation:
   1. With -v PATH: Initialize a specific vault file at the given path
-  2. Without -v: Interactive mode using vaults from configuration
-
-Note: Both -v and -c cannot be specified at the same time.`,
+  2. Without -v: Interactive mode using vaults from configuration`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		hasVaults := len(globalOpts.VaultPaths) > 0
-		hasConfig := globalOpts.ConfigPath != ""
-
-		if hasVaults && hasConfig {
-			fmt.Fprintf(os.Stderr, "error: Both -v and -c cannot be specified at the same time for 'init vault'\n")
-			os.Exit(int(clilib.ExitGeneralError))
-		}
 
 		if hasVaults {
+			// Validate vault paths against config (respects restrict_to_configured_vaults)
+			if err := clilib.ValidateVaultPathsAgainstConfig(globalOpts.ConfigPath, globalOpts.VaultPaths, globalOpts.Silent, os.Stderr); err != nil {
+				os.Exit(int(clilib.PrintError(os.Stderr, err)))
+			}
+
 			// Init specific vaults
 			for _, vPath := range globalOpts.VaultPaths {
 				if err := clilib.InitVaultFile(vPath, os.Stdout, os.Stderr); err != nil {

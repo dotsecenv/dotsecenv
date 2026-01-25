@@ -203,6 +203,73 @@ func saveConfigWithComments(path string, cfg config.Config) error {
 	return nil
 }
 
+// ValidateVaultPathsAgainstConfig checks if specified vault paths are allowed per config.
+// Returns an error if restrict_to_configured_vaults is true and paths are not in config.
+// Prints a warning if paths are not in config but restriction is off.
+// If configPath is empty, uses the default resolved config path.
+func ValidateVaultPathsAgainstConfig(configPath string, vaultPaths []string, silent bool, stderr io.Writer) *Error {
+	if len(vaultPaths) == 0 {
+		return nil
+	}
+
+	// Resolve config path
+	effectiveConfigPath := ResolveConfigPath(configPath, true, stderr) // silent for resolution
+
+	// Load config (if it doesn't exist, no validation needed - allow creating vault anywhere)
+	cfg, err := config.Load(effectiveConfigPath)
+	if err != nil {
+		// Config doesn't exist or can't be read - allow vault creation
+		return nil
+	}
+
+	// If no vaults configured, allow creating at any path
+	if len(cfg.Vault) == 0 {
+		return nil
+	}
+
+	// Normalize config paths
+	configPaths := make(map[string]bool)
+	for _, p := range cfg.Vault {
+		expanded := vault.ExpandPath(p)
+		if abs, absErr := filepath.Abs(expanded); absErr == nil {
+			configPaths[abs] = true
+		} else {
+			configPaths[expanded] = true
+		}
+	}
+
+	// Check if any specified path is NOT in config
+	var nonConfigPaths []string
+	for _, p := range vaultPaths {
+		expanded := vault.ExpandPath(p)
+		abs, absErr := filepath.Abs(expanded)
+		target := expanded
+		if absErr == nil {
+			target = abs
+		}
+
+		if !configPaths[target] {
+			nonConfigPaths = append(nonConfigPaths, p)
+		}
+	}
+
+	if len(nonConfigPaths) == 0 {
+		return nil // All paths are in config
+	}
+
+	// If restrict_to_configured_vaults is set, this is an error
+	if cfg.ShouldRestrictToConfiguredVaults() {
+		return NewError("restrict_to_configured_vaults: specified vault path is not in configuration", ExitGeneralError)
+	}
+
+	// Otherwise, just warn (consistent with NewCLI behavior)
+	if !silent {
+		_, _ = fmt.Fprintf(stderr, "warning: ignoring vaults in configuration and using specified vault arguments\n")
+	}
+
+	return nil
+}
+
 // InitVaultFile initializes a specific vault file
 func InitVaultFile(vaultPath string, stdout, stderr io.Writer) *Error {
 	// Check if file exists
