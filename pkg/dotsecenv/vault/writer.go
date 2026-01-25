@@ -598,12 +598,12 @@ func (w *Writer) ReadVault() (Vault, error) {
 				return v, fmt.Errorf("failed to parse value entry at line %d: %w", valLineNum, err)
 			}
 
-			valData, err := ParseValueData(valEntry)
+			valData, err := ParseSecretValue(valEntry)
 			if err != nil {
 				return v, err
 			}
 
-			secret.Values = append(secret.Values, valData.ToSecretValue())
+			secret.Values = append(secret.Values, *valData)
 		}
 
 		v.Secrets = append(v.Secrets, secret)

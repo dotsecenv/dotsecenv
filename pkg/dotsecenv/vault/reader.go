@@ -264,7 +264,7 @@ func (r *Reader) GetSecret(key string) (*SecretData, error) {
 }
 
 // GetSecretValues retrieves all values for a secret
-func (r *Reader) GetSecretValues(key string) ([]ValueData, error) {
+func (r *Reader) GetSecretValues(key string) ([]SecretValue, error) {
 	if r.header == nil {
 		return nil, fmt.Errorf("secret not found: %s", key)
 	}
@@ -274,14 +274,14 @@ func (r *Reader) GetSecretValues(key string) ([]ValueData, error) {
 		return nil, fmt.Errorf("secret not found: %s", key)
 	}
 
-	values := make([]ValueData, 0, len(idx.Values))
+	values := make([]SecretValue, 0, len(idx.Values))
 	for _, lineNum := range idx.Values {
 		entry, err := r.ReadEntry(lineNum)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read value at line %d: %w", lineNum, err)
 		}
 
-		data, err := ParseValueData(entry)
+		data, err := ParseSecretValue(entry)
 		if err != nil {
 			return nil, err
 		}

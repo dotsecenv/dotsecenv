@@ -92,16 +92,7 @@ type SecretData struct {
 	SignedBy  string    `json:"signed_by"`
 }
 
-// ValueData represents a secret value entry's data
-type ValueData struct {
-	AddedAt     time.Time `json:"added_at"`
-	AvailableTo []string  `json:"available_to"`
-	Deleted     bool      `json:"deleted,omitempty"`
-	Hash        string    `json:"hash"`
-	Signature   string    `json:"signature"`
-	SignedBy    string    `json:"signed_by"`
-	Value       string    `json:"value"`
-}
+
 
 // ToIdentity converts IdentityData to the Identity type
 func (d *IdentityData) ToIdentity() identity.Identity {
@@ -139,23 +130,7 @@ func IdentityDataFromIdentity(id identity.Identity) IdentityData {
 	}
 }
 
-// ToSecretValue converts ValueData to SecretValue
-func (d *ValueData) ToSecretValue() SecretValue {
-	return SecretValue{
-		AddedAt:     d.AddedAt,
-		AvailableTo: d.AvailableTo,
-		Deleted:     d.Deleted,
-		Hash:        d.Hash,
-		Signature:   d.Signature,
-		SignedBy:    d.SignedBy,
-		Value:       d.Value,
-	}
-}
 
-// ValueDataFromSecretValue converts SecretValue to ValueData
-func ValueDataFromSecretValue(sv SecretValue) ValueData {
-	return ValueData(sv)
-}
 
 // MarshalEntry creates a JSON line for an entry
 func MarshalEntry(e Entry) ([]byte, error) {
@@ -405,14 +380,14 @@ func ParseSecretData(e *Entry) (*SecretData, error) {
 	return &data, nil
 }
 
-// ParseValueData extracts ValueData from an Entry
-func ParseValueData(e *Entry) (*ValueData, error) {
+// ParseSecretValue extracts SecretValue from an Entry
+func ParseSecretValue(e *Entry) (*SecretValue, error) {
 	if e.Type != EntryTypeValue {
 		return nil, fmt.Errorf("entry is not a value (type=%s)", e.Type)
 	}
-	var data ValueData
+	var data SecretValue
 	if err := json.Unmarshal(e.Data, &data); err != nil {
-		return nil, fmt.Errorf("failed to parse value data: %w", err)
+		return nil, fmt.Errorf("failed to parse secret value: %w", err)
 	}
 	return &data, nil
 }
@@ -451,7 +426,7 @@ func CreateSecretEntry(s Secret) (*Entry, error) {
 
 // CreateValueEntry creates an Entry for a secret value
 func CreateValueEntry(secretKey string, sv SecretValue) (*Entry, error) {
-	data := ValueDataFromSecretValue(sv)
+	data := sv
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal value data: %w", err)
