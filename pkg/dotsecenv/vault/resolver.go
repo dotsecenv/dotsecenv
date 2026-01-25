@@ -1,8 +1,10 @@
 package vault
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 	"sync"
@@ -124,11 +126,21 @@ func (vr *VaultResolver) OpenVaultsFromPaths(paths []string, stderr io.Writer) e
 	// Open vaults
 	for i, entry := range vr.config.Entries {
 		if _, err := os.Stat(entry.Path); err != nil {
-			return fmt.Errorf("vault file not found: %s", entry.Path)
+			if os.IsNotExist(err) {
+				return fmt.Errorf("vault file not found: %s", entry.Path)
+			}
+			if os.IsPermission(err) {
+				return fmt.Errorf("vault file permission denied: %s\nCheck file permissions or run with appropriate privileges", entry.Path)
+			}
+			return fmt.Errorf("cannot access vault file: %s: %v", entry.Path, err)
 		}
 
 		manager := NewManager(entry.Path, vr.config.RequireExplicitVaultUpgrade)
 		if err := manager.OpenAndLock(); err != nil {
+			// Use errors.Is to detect wrapped permission errors
+			if errors.Is(err, fs.ErrPermission) {
+				return fmt.Errorf("vault file permission denied: %s\nCheck file permissions or run with appropriate privileges", entry.Path)
+			}
 			return fmt.Errorf("failed to open vault %s: %v", entry.Path, err)
 		}
 

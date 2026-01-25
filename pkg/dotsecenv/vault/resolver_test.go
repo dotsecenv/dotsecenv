@@ -2,6 +2,7 @@ package vault
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -263,5 +264,64 @@ func TestOpenVaults_EmptyConfig(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "no vaults configured") {
 		t.Errorf("expected error to mention 'no vaults configured', got: %v", err)
+	}
+}
+
+func TestOpenVaultsFromPaths_NotFound(t *testing.T) {
+	resolver := NewVaultResolver(VaultConfig{})
+	stderr := &bytes.Buffer{}
+
+	err := resolver.OpenVaultsFromPaths([]string{"/nonexistent/vault/path"}, stderr)
+
+	if err == nil {
+		t.Fatal("expected error for non-existent vault file")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "not found") {
+		t.Errorf("expected error to contain 'not found', got: %v", errMsg)
+	}
+}
+
+func TestOpenVaultsFromPaths_PermissionDenied(t *testing.T) {
+	// Skip if running as root (root can read any file)
+	if os.Getuid() == 0 {
+		t.Skip("skipping permission test when running as root")
+	}
+
+	// Create a vault file with no read permissions
+	tmpDir := t.TempDir()
+	vaultPath := filepath.Join(tmpDir, "noperm.vault")
+
+	// Create the file first
+	if err := os.WriteFile(vaultPath, []byte("test"), 0o600); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	// Remove all permissions
+	if err := os.Chmod(vaultPath, 0o000); err != nil {
+		t.Fatalf("failed to chmod test file: %v", err)
+	}
+
+	// Ensure cleanup restores permissions so temp dir can be removed
+	t.Cleanup(func() {
+		_ = os.Chmod(vaultPath, 0o600)
+	})
+
+	resolver := NewVaultResolver(VaultConfig{})
+	stderr := &bytes.Buffer{}
+
+	err := resolver.OpenVaultsFromPaths([]string{vaultPath}, stderr)
+
+	if err == nil {
+		t.Fatal("expected error for permission denied")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "permission denied") {
+		t.Errorf("expected error to contain 'permission denied', got: %v", errMsg)
+	}
+	if !strings.Contains(errMsg, "Check file permissions") {
+		t.Errorf("expected error to contain helpful suggestion, got: %v", errMsg)
 	}
 }
