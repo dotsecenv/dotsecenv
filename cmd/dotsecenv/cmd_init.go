@@ -5,6 +5,7 @@ import (
 	"os"
 
 	clilib "github.com/dotsecenv/dotsecenv/internal/cli"
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/output"
 	"github.com/spf13/cobra"
 )
 
@@ -30,6 +31,14 @@ func (p *pathValue) Set(s string) error {
 
 func (p *pathValue) Type() string {
 	return "string"
+}
+
+// defaultOutput creates a default output handler with silent mode from global options
+func defaultOutput() *output.Handler {
+	return output.NewHandler(os.Stdout, os.Stderr,
+		output.WithSilent(globalOpts.Silent),
+		output.WithStdin(os.Stdin),
+	)
 }
 
 var initCmd = &cobra.Command{
@@ -61,8 +70,9 @@ Use -c to specify a custom path.`,
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		targetConfig := clilib.ResolveConfigPath(globalOpts.ConfigPath, globalOpts.Silent, os.Stderr)
-		err := clilib.InitConfig(targetConfig, globalOpts.VaultPaths, initConfigOpts.GPGProgram, initConfigOpts.NoGPGProgram, initConfigOpts.LoginFingerprint, os.Stdout, os.Stderr)
+		out := defaultOutput()
+		targetConfig := clilib.ResolveConfigPath(globalOpts.ConfigPath, globalOpts.Silent, out.Stderr())
+		err := clilib.InitConfig(targetConfig, globalOpts.VaultPaths, initConfigOpts.GPGProgram, initConfigOpts.NoGPGProgram, initConfigOpts.LoginFingerprint, out)
 		if err != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, err)))
 		}
@@ -80,17 +90,18 @@ Two modes of operation:
   2. Without -v: Interactive mode using vaults from configuration`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		out := defaultOutput()
 		hasVaults := len(globalOpts.VaultPaths) > 0
 
 		if hasVaults {
 			// Validate vault paths against config (respects restrict_to_configured_vaults)
-			if err := clilib.ValidateVaultPathsAgainstConfig(globalOpts.ConfigPath, globalOpts.VaultPaths, globalOpts.Silent, os.Stderr); err != nil {
+			if err := clilib.ValidateVaultPathsAgainstConfig(globalOpts.ConfigPath, globalOpts.VaultPaths, out); err != nil {
 				os.Exit(int(clilib.PrintError(os.Stderr, err)))
 			}
 
 			// Init specific vaults
 			for _, vPath := range globalOpts.VaultPaths {
-				if err := clilib.InitVaultFile(vPath, os.Stdout, os.Stderr); err != nil {
+				if err := clilib.InitVaultFile(vPath, out); err != nil {
 					os.Exit(int(clilib.PrintError(os.Stderr, err)))
 				}
 			}
@@ -98,8 +109,8 @@ Two modes of operation:
 		}
 
 		// Interactive mode
-		effectiveConfig := clilib.ResolveConfigPath(globalOpts.ConfigPath, globalOpts.Silent, os.Stderr)
-		exitErr := clilib.InitVaultInteractiveStandalone(effectiveConfig, os.Stdout, os.Stderr)
+		effectiveConfig := clilib.ResolveConfigPath(globalOpts.ConfigPath, globalOpts.Silent, out.Stderr())
+		exitErr := clilib.InitVaultInteractiveStandalone(effectiveConfig, out)
 		if exitErr != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, exitErr)))
 		}

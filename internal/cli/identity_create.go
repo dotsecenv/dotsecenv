@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/config"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/output"
 )
 
 // IdentityCreateOptions holds options for the identity create command.
@@ -42,16 +42,16 @@ func (c *CLI) IdentityCreate(opts IdentityCreateOptions) *Error {
 
 // IdentityCreateStandalone runs identity create without requiring full CLI initialization.
 // This is used when no config exists yet.
-func IdentityCreateStandalone(opts IdentityCreateOptions, stdout, stderr, stdin *os.File) *Error {
+func IdentityCreateStandalone(opts IdentityCreateOptions, out *output.Handler) *Error {
 	// Ensure GPG program is configured (use PATH lookup for standalone mode)
 	if err := gpg.ValidateAndSetGPGProgram("PATH"); err != nil {
 		return NewError(fmt.Sprintf("GPG not found: %v", err), ExitGPGError)
 	}
 
 	io := &identityCreateIO{
-		stdout: stdout,
-		stderr: stderr,
-		stdin:  stdin,
+		stdout: out.Stdout(),
+		stderr: out.Stderr(),
+		stdin:  out.Stdin(),
 	}
 
 	// Use default config for algorithm validation

@@ -10,6 +10,7 @@ import (
 // It supports silent mode (suppress warnings), strict mode (warnings become errors),
 // and JSON mode (envelope output).
 type Handler struct {
+	stdin    io.Reader
 	stdout   io.Writer
 	stderr   io.Writer
 	silent   bool
@@ -39,6 +40,13 @@ func WithStrict(strict bool) HandlerOption {
 func WithJSON(json bool) HandlerOption {
 	return func(h *Handler) {
 		h.json = json
+	}
+}
+
+// WithStdin sets the stdin reader.
+func WithStdin(stdin io.Reader) HandlerOption {
+	return func(h *Handler) {
+		h.stdin = stdin
 	}
 }
 
@@ -188,10 +196,16 @@ func (h *Handler) Stderr() io.Writer {
 	return h.stderr
 }
 
+// Stdin returns the stdin reader.
+func (h *Handler) Stdin() io.Reader {
+	return h.stdin
+}
+
 // Clone creates a new handler with the same settings but fresh warning collection.
 // Useful for per-command handlers.
 func (h *Handler) Clone() *Handler {
 	return &Handler{
+		stdin:    h.stdin,
 		stdout:   h.stdout,
 		stderr:   h.stderr,
 		silent:   h.silent,
@@ -205,6 +219,7 @@ func (h *Handler) Clone() *Handler {
 // The new handler shares stdout/stderr but has fresh warning collection.
 func (h *Handler) WithJSONMode(enabled bool) *Handler {
 	return &Handler{
+		stdin:    h.stdin,
 		stdout:   h.stdout,
 		stderr:   h.stderr,
 		silent:   h.silent,

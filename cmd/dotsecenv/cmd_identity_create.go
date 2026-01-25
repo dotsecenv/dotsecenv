@@ -5,6 +5,7 @@ import (
 
 	clilib "github.com/dotsecenv/dotsecenv/internal/cli"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/output"
 	"github.com/spf13/cobra"
 )
 
@@ -56,7 +57,11 @@ setting. See https://dotsecenv.com/concepts/compliance/ for details.`,
 		cli, err := createCLI()
 		if err != nil {
 			// If config doesn't exist, use standalone mode with default config
-			exitErr := clilib.IdentityCreateStandalone(opts, os.Stdout, os.Stderr, os.Stdin)
+			out := output.NewHandler(os.Stdout, os.Stderr,
+				output.WithSilent(globalOpts.Silent),
+				output.WithStdin(os.Stdin),
+			)
+			exitErr := clilib.IdentityCreateStandalone(opts, out)
 			exitWithError(exitErr)
 			return
 		}
