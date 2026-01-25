@@ -237,7 +237,20 @@ func InitVaultFile(vaultPath string, stdout, stderr io.Writer) *Error {
 func InitVaultInteractiveStandalone(configPath string, stdout, stderr io.Writer) *Error {
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		return NewError(fmt.Sprintf("failed to load config: %v\nRun 'dotsecenv init config' first.", err), ExitConfigError)
+		// Provide helpful suggestion based on execution context
+		var suggestion string
+		isSUID := os.Getuid() != os.Geteuid()
+		if isSUID {
+			// SUID mode: config at /etc/dotsecenv/config, init commands are blocked
+			suggestion = fmt.Sprintf("failed to load config: %v\nContact your system administrator to create this file.", err)
+		} else if os.Getuid() == 0 {
+			// Running as actual root (e.g., via sudo)
+			suggestion = fmt.Sprintf("failed to load config: %v\nRun 'sudo dotsecenv init config' first.", err)
+		} else {
+			// Normal user
+			suggestion = fmt.Sprintf("failed to load config: %v\nRun 'dotsecenv init config' first.", err)
+		}
+		return NewError(suggestion, ExitConfigError)
 	}
 
 	vaultCfg, err := vault.ParseVaultConfig(cfg.Vault)

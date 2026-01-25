@@ -80,7 +80,19 @@ func newCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, NewError(fmt.Sprintf("config file not found: %s\nRun 'dotsecenv init config' to create one", configPath), ExitConfigError)
+			// Provide helpful suggestion based on execution context
+			var suggestion string
+			if isSUID() {
+				// SUID mode: config at /etc/dotsecenv/config, init commands are blocked
+				suggestion = fmt.Sprintf("config file not found: %s\nContact your system administrator to create this file.", configPath)
+			} else if os.Getuid() == 0 {
+				// Running as actual root (e.g., via sudo)
+				suggestion = fmt.Sprintf("config file not found: %s\nRun 'sudo dotsecenv init config' to create one", configPath)
+			} else {
+				// Normal user
+				suggestion = fmt.Sprintf("config file not found: %s\nRun 'dotsecenv init config' to create one", configPath)
+			}
+			return nil, NewError(suggestion, ExitConfigError)
 		}
 		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
 	}
