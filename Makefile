@@ -190,7 +190,7 @@ GOLANGCI_LINT := $(GOBIN)/golangci-lint
 install-lint:
 	@if ! [ -x "$(GOLANGCI_LINT)" ]; then \
 		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $${GOBIN:-$$(go env GOPATH)/bin} $(GOLANGCI_LINT_VERSION); \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_LINT_VERSION); \
 	fi
 
 SYFT := $(GOBIN)/syft
@@ -199,7 +199,7 @@ SYFT := $(GOBIN)/syft
 install-syft:
 	@if ! [ -x "$(SYFT)" ]; then \
 		echo "Installing syft..."; \
-		curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b $${GOBIN:-$$(go env GOPATH)/bin}; \
+		curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b $(GOBIN); \
 	fi
 
 GORELEASER := $(GOBIN)/goreleaser

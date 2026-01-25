@@ -183,9 +183,9 @@ func TestCreateValueEntry(t *testing.T) {
 		t.Errorf("expected secret key MY_SECRET, got %s", entry.SecretKey)
 	}
 
-	data, err := ParseValueData(entry)
+	data, err := ParseSecretValue(entry)
 	if err != nil {
-		t.Fatalf("ParseValueData failed: %v", err)
+		t.Fatalf("ParseSecretValue failed: %v", err)
 	}
 
 	if data.Value != sv.Value {
