@@ -561,3 +561,7 @@ deploy:
 | "GPG error" | Check key: `gpg --list-secret-keys` |
 | "Config not found" | Run: `dotsecenv init config` |
 | "Vault not found" | Run: `dotsecenv init vault` |
+| "Permission denied" on vault | Check file permissions: `ls -la /path/to/vault` |
+| Config error running as root | Use: `sudo dotsecenv init config` |
+| Config error in SUID mode | Contact your system administrator |
+| Vault path not in config | Add path to config or use `restrict_to_configured_vaults: false` |

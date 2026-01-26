@@ -105,9 +105,7 @@ Two modes of operation:
 1. With `-v PATH`: Initialize a specific vault file at the given path
 2. Without `-v`: Interactive mode using vaults from configuration
 
-<Aside type="note">
-Both `-v` and `-c` cannot be specified at the same time.
-</Aside>
+When using `-v` with a configuration file present, dotsecenv validates the path against configured vaults. If `restrict_to_configured_vaults` is enabled, specifying a path not in your config results in an error. Otherwise, a warning is displayed.
 
 **Examples:**
 
