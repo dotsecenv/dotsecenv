@@ -1,0 +1,87 @@
+name: Hermetic E2E
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  # Job 1: harden-runner enforcement
+  hermetic-harden-runner:
+    name: Hermetic E2E (harden-runner)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: block
+          allowed-endpoints: ""
+          disable-sudo: false
+
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+
+      - name: Run hermetic e2e
+        run: make e2e
+        # harden-runner blocks all network, job summary shows 0 connections
+
+  # Job 2: Self-hosted eBPF monitoring with network namespace
+  hermetic-bpf-verified:
+    name: Hermetic E2E (bpfcc + namespace)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+
+      - name: Install eBPF tools
+        run: sudo apt-get update && sudo apt-get install -y bpfcc-tools
+
+      - name: Run hermetic e2e with eBPF tracing
+        run: |
+          # Start eBPF network tracer in background
+          sudo tcpconnect-bpfcc -t > /tmp/connections.log 2>&1 &
+          TRACER_PID=$!
+          sleep 2
+
+          # Run e2e in network namespace (no external connectivity)
+          sudo unshare --net bash -c '
+            ip link set lo up
+            make e2e
+          '
+
+          # Stop tracer
+          sudo kill $TRACER_PID 2>/dev/null || true
+          sleep 1
+
+          # Verify zero external connections
+          echo "=== eBPF Connection Log ==="
+          cat /tmp/connections.log
+
+          EXTERNAL=$(grep -v "127.0.0.1" /tmp/connections.log | grep -v "^TIME" | wc -l || echo 0)
+          echo "External connections detected: $EXTERNAL"
+
+          if [ "$EXTERNAL" -gt 0 ]; then
+            echo "FAILED: External network connections detected"
+            exit 1
+          fi
+
+          echo "PASSED: Zero external network connections verified by eBPF"
+
+      - name: Upload eBPF trace
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ebpf-connection-trace
+          path: /tmp/connections.log
+          retention-days: 30

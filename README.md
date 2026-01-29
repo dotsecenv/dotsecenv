@@ -3,6 +3,7 @@
 [![CI](https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml)
 [![Release](https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml)
 [![GitHub Action E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml)
+[![Hermetic E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml)
 [![Publish Packages](https://github.com/dotsecenv/packages/actions/workflows/publish.yml/badge.svg)](https://github.com/dotsecenv/packages/actions/workflows/publish.yml)
 [![Homebrew install](https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml/badge.svg)](https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml)
 [![Shell plugins CI](https://github.com/dotsecenv/plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/dotsecenv/plugin/actions/workflows/ci.yml)
@@ -515,6 +516,7 @@ Each entry includes a hash and cryptographic signature to prevent against tamper
 - Validation logic with optional auto-fix
 - SUID mode restrictions for elevated privilege protection
 - [SLSA Build Level 3](https://slsa.dev/spec/v1.2/build-requirements): Release binaries include verifiable provenance attestations generated via GitHub's [attest-build-provenance](https://github.com/actions/attest-build-provenance) action on hardened GitHub-hosted runners
+- **Hermetic E2E Testing**: Every pull request runs e2e tests in a network-isolated Linux namespace with eBPF verification via [harden-runner](https://github.com/step-security/harden-runner), proving zero external network connections. See [Security Model](https://dotsecenv.com/concepts/threat-model/#hermetic-testing).
 
 ### SUID Mode Restrictions
 
@@ -686,6 +688,7 @@ This creates both `v0.1.2` and `v0` tags pointing to the same commit, signs them
 - Access to secrets by unauthorized users without GPG keys
 - Tampering with vault entries (signature verification)
 - Privilege escalation via SUID binaries
+- Stealth network exfiltration of secrets during CI/CD (hermetic testing)
 
 ### What dotsecenv DOES NOT Protect Against
 
