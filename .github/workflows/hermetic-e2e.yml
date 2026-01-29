@@ -31,6 +31,8 @@ jobs:
 
       - name: Run hermetic e2e
         run: make e2e
+        env:
+          GOTOOLCHAIN: local
         # harden-runner blocks all network, job summary shows 0 connections
 
   # Job 2: Self-hosted eBPF monitoring with network namespace
@@ -48,6 +50,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y bpfcc-tools
 
       - name: Run hermetic e2e with eBPF tracing
+        env:
+          GOTOOLCHAIN: local
         run: |
           # Start eBPF network tracer in background
           sudo tcpconnect-bpfcc -t > /tmp/connections.log 2>&1 &
@@ -56,6 +60,7 @@ jobs:
 
           # Run e2e in network namespace (no external connectivity)
           sudo unshare --net bash -c '
+            export GOTOOLCHAIN=local
             ip link set lo up
             make e2e
           '
