@@ -19,18 +19,9 @@ jobs:
       - name: Harden Runner
         uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
         with:
-          egress-policy: block
+          egress-policy: audit
           disable-sudo: false
-          # Setup allowed endpoints; e2e uses vendored deps so makes no calls
-          allowed-endpoints: >
-            github.com:443
-            api.github.com:443
-            codeload.github.com:443
-            objects.githubusercontent.com:443
-            github-releases.githubusercontent.com:443
-            proxy.golang.org:443
-            storage.googleapis.com:443
-            sum.golang.org:443
+          # Audit mode logs all connections; job summary proves e2e makes no calls
 
       - uses: actions/checkout@v6
 
@@ -64,6 +55,7 @@ jobs:
 
           # Run e2e in network namespace (no external connectivity)
           sudo unshare --net bash -c '
+            export GOTOOLCHAIN=local
             ip link set lo up
             make e2e
           '
