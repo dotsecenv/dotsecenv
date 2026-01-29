@@ -32,9 +32,9 @@ jobs:
       - name: Run hermetic e2e
         run: make e2e
 
-  # Job 2: Self-hosted eBPF monitoring with network namespace
-  hermetic-bpf-verified:
-    name: Hermetic E2E (bpfcc + namespace)
+  # Job 2: Network namespace + strace verification
+  hermetic-strace-verified:
+    name: Hermetic E2E (strace + namespace)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -43,45 +43,39 @@ jobs:
         with:
           go-version-file: "go.mod"
 
-      - name: Install eBPF tools
-        run: sudo apt-get update && sudo apt-get install -y bpfcc-tools
-
-      - name: Run hermetic e2e with eBPF tracing
+      - name: Run hermetic e2e with strace verification
         run: |
-          # Start eBPF network tracer in background
-          sudo tcpconnect-bpfcc -t > /tmp/connections.log 2>&1 &
-          TRACER_PID=$!
-          sleep 2
-
-          # Run e2e in network namespace (no external connectivity)
-          # Preserve PATH so we use setup-go's Go, not system Go
+          # Run e2e in network namespace with strace tracing network syscalls
+          # strace traces ONLY our process tree
           sudo --preserve-env=PATH,GOROOT,GOPATH unshare --net bash -c '
             ip link set lo up
-            make e2e
+            echo "=== Network namespace active - only loopback ==="
+            ip addr
+
+            # Trace network syscalls: connect, sendto, recvfrom, socket
+            strace -f -e trace=network -o /tmp/network-syscalls.log make e2e 2>&1
           '
 
-          # Stop tracer
-          sudo kill $TRACER_PID 2>/dev/null || true
-          sleep 1
+          echo "=== Network Syscall Trace ==="
+          cat /tmp/network-syscalls.log || true
 
-          # Verify zero external connections
-          echo "=== eBPF Connection Log ==="
-          cat /tmp/connections.log
-
-          EXTERNAL=$(grep -v "127.0.0.1" /tmp/connections.log | grep -v "^TIME" | wc -l || echo 0)
-          echo "External connections detected: $EXTERNAL"
+          # Check for any connect() calls to non-loopback addresses
+          # Loopback connects (127.0.0.1, ::1) are OK for internal tests
+          EXTERNAL=$(grep -E "connect\(" /tmp/network-syscalls.log 2>/dev/null | grep -v "127.0.0.1" | grep -v "::1" | grep -v "AF_UNIX" | wc -l || echo 0)
+          echo "External connect() calls: $EXTERNAL"
 
           if [ "$EXTERNAL" -gt 0 ]; then
-            echo "FAILED: External network connections detected"
+            echo "FAILED: External network syscalls detected"
+            grep -E "connect\(" /tmp/network-syscalls.log | grep -v "127.0.0.1" | grep -v "::1" | grep -v "AF_UNIX" || true
             exit 1
           fi
 
-          echo "PASSED: Zero external network connections verified by eBPF"
+          echo "PASSED: Zero external network syscalls verified by strace"
 
-      - name: Upload eBPF trace
-        uses: actions/upload-artifact@v6
+      - name: Upload strace log
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ebpf-connection-trace
-          path: /tmp/connections.log
+          name: network-syscall-trace
+          path: /tmp/network-syscalls.log
           retention-days: 30
