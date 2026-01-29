@@ -54,8 +54,8 @@ jobs:
           sleep 2
 
           # Run e2e in network namespace (no external connectivity)
-          sudo unshare --net bash -c '
-            export GOTOOLCHAIN=local
+          # Preserve PATH so we use setup-go's Go, not system Go
+          sudo --preserve-env=PATH,GOROOT,GOPATH unshare --net bash -c '
             ip link set lo up
             make e2e
           '
