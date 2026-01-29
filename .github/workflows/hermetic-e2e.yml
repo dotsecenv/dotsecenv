@@ -21,6 +21,7 @@ jobs:
         with:
           egress-policy: block
           disable-sudo: false
+          # Setup allowed endpoints; e2e uses vendored deps so makes no calls
           allowed-endpoints: >
             github.com:443
             api.github.com:443
@@ -36,9 +37,6 @@ jobs:
 
       - name: Run hermetic e2e
         run: make e2e
-        env:
-          GOTOOLCHAIN: local
-        # Setup endpoints allowed above; e2e uses vendored deps so makes no calls
 
   # Job 2: Self-hosted eBPF monitoring with network namespace
   hermetic-bpf-verified:
@@ -55,8 +53,6 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y bpfcc-tools
 
       - name: Run hermetic e2e with eBPF tracing
-        env:
-          GOTOOLCHAIN: local
         run: |
           # Start eBPF network tracer in background
           sudo tcpconnect-bpfcc -t > /tmp/connections.log 2>&1 &
@@ -65,7 +61,6 @@ jobs:
 
           # Run e2e in network namespace (no external connectivity)
           sudo unshare --net bash -c '
-            export GOTOOLCHAIN=local
             ip link set lo up
             make e2e
           '
