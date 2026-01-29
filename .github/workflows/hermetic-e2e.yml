@@ -19,9 +19,9 @@ jobs:
       - name: Harden Runner
         uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
         with:
+          # Audit mode logs all connections; job summary proves e2e makes no calls
           egress-policy: audit
           disable-sudo: false
-          # Audit mode logs all connections; job summary proves e2e makes no calls
 
       - uses: actions/checkout@v6
 
