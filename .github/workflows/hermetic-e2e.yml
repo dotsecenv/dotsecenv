@@ -20,8 +20,13 @@ jobs:
         uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
         with:
           egress-policy: block
-          allowed-endpoints: ""
           disable-sudo: false
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            objects.githubusercontent.com:443
+            proxy.golang.org:443
+            storage.googleapis.com:443
 
       - uses: actions/checkout@v6
 
@@ -33,7 +38,7 @@ jobs:
         run: make e2e
         env:
           GOTOOLCHAIN: local
-        # harden-runner blocks all network, job summary shows 0 connections
+        # Setup endpoints allowed above; e2e uses vendored deps so makes no calls
 
   # Job 2: Self-hosted eBPF monitoring with network namespace
   hermetic-bpf-verified:
