@@ -43,7 +43,7 @@ build:
 .PHONY: fmt
 fmt:
 	@echo "Formatting Go code..."
-	@gofmt -s -w .
+	@find . -name '*.go' -not -path './vendor/*' -exec gofmt -s -w {} +
 	@$(GOLANGCI_LINT) run --fix ./...
 
 .PHONY: lint
@@ -51,9 +51,9 @@ lint: install-lint
 	@echo "Running go mod tidy..."
 	@go mod tidy
 	@echo "Checking code formatting..."
-	@if [ -n "$$(gofmt -l .)" ]; then \
+	@if [ -n "$$(gofmt -l . | grep -v '^vendor/')" ]; then \
 		echo "Go code is not formatted:"; \
-		gofmt -l .; \
+		gofmt -l . | grep -v '^vendor/'; \
 		exit 1; \
 	fi
 	@echo "Running golangci-lint..."
