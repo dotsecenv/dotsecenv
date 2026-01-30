@@ -225,9 +225,11 @@ This prevents accidental reliance on PATH resolution in security-sensitive envir
 
 ## Hermetic Testing
 
+[![Hermetic E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml)
+
 <Aside type="tip" title="Trust verification">
-  Every pull request runs e2e tests in a network-isolated environment, with
-  eBPF-level proof that no external connections were made.
+  Every pull request runs e2e tests in a network-isolated environment with dual
+  verification that no external connections were made.
 </Aside>
 
 ### Why Hermetic Testing Matters
@@ -235,11 +237,12 @@ This prevents accidental reliance on PATH resolution in security-sensitive envir
 A secrets management tool that "phones home" or makes unexpected network connections poses a severe security risk. To address this concern, dotsecenv's CI pipeline includes **hermetic e2e testing** with dual independent verification:
 
 1. **Vendored Dependencies**: Go modules are vendored, eliminating network requirements during build
-2. **Dual eBPF Verification**: Two independent parallel jobs verify zero network connections:
-   - [step-security/harden-runner](https://github.com/step-security/harden-runner) - blocks + monitors at eBPF level
-   - Self-hosted bpfcc-tools - traces connections in network namespace
-3. **Defense in Depth**: If one tool has a bug, the other catches any violations
-4. **Auditable Artifacts**: Both job summaries AND downloadable eBPF traces
+2. **Dual Verification**: Two independent parallel jobs verify zero network connections:
+   - [step-security/harden-runner](https://github.com/step-security/harden-runner) - blocks egress at kernel level
+   - Network namespace + strace - traces all network syscalls in isolated namespace
+3. **Defense in Depth**: If one method has a bug, the other catches any violations
+4. **Auditable Artifacts**: Job summaries AND downloadable syscall traces
+5. **Release Gate**: Releases are blocked if hermetic tests fail
 
 ### How It Works
 
@@ -248,31 +251,21 @@ A secrets management tool that "phones home" or makes unexpected network connect
 │                        GitHub Actions                                  │
 ├───────────────────────────────────────────────────────────────────────┤
 │                                                                        │
-│  Job 1: harden-runner              Job 2: bpfcc + namespace           │
+│  Job 1: harden-runner              Job 2: strace + namespace          │
 │  ┌─────────────────────────┐       ┌─────────────────────────┐        │
-│  │ egress-policy: block    │       │ tcpconnect-bpfcc (trace)│        │
-│  │ ────────────────────    │       │ ────────────────────────│        │
-│  │                         │       │                         │        │
-│  │      make e2e           │       │ unshare --net make e2e  │        │
-│  │  (vendored, no net)     │       │ (namespace blocks net)  │        │
-│  │                         │       │                         │        │
+│  │ egress-policy: block    │       │ unshare --net (isolate) │        │
+│  │ ────────────────────    │       │ strace -e network       │        │
+│  │                         │       │ ────────────────────────│        │
+│  │      make e2e           │       │                         │        │
+│  │  (vendored, no net)     │       │   make build e2e        │        │
+│  │                         │       │   (namespace blocks)    │        │
 │  │      ↓                  │       │      ↓                  │        │
-│  │ Job Summary: 0 conn     │       │ Artifact: trace.log     │        │
+│  │ Job Summary: 0 conn     │       │ Artifact: syscall.log   │        │
 │  └─────────────────────────┘       └─────────────────────────┘        │
 │                                                                        │
 │  ✓ Both jobs must pass = zero network connections verified twice       │
 └───────────────────────────────────────────────────────────────────────┘
 ```
-
-### Verification Badge
-
-[![Hermetic E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml)
-
-Every green badge confirms:
-
-- The e2e test suite passed
-- Zero external network connections were made
-- eBPF-verified network isolation
 
 ### Trusted By
 
@@ -280,9 +273,9 @@ The harden-runner tool is used by Microsoft, Google, CISA, DataDog, Intel, Kuber
 
 ### Inspecting the Proof
 
-1. Open any Hermetic E2E workflow run on GitHub Actions
+1. Open any [Hermetic E2E workflow](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml) run on GitHub Actions
 2. Check the **Job Summary** for harden-runner's network activity report
-3. Verify "Outbound Connections" shows only loopback or nothing
+3. Download the `network-syscall-trace` artifact to see the strace log
 
 You can also click the harden-runner dashboard link in the job summary for detailed analysis.
 
@@ -503,7 +496,7 @@ The vault is designed to be safe in public repositories:
 | Tampering              | Yes        | Signature verification                |
 | Weak algorithms        | Yes        | Config-enforced minimums              |
 | PATH injection         | Yes        | Configure absolute `gpg.program` path |
-| Stealth network egress | Yes        | Hermetic e2e with eBPF verification   |
+| Stealth network egress | Yes        | Hermetic e2e with dual verification   |
 | Root access            | No         | OS-level compromise                   |
 | Key theft              | No         | Guard your private key                |
 | Env snooping           | No         | Post-decryption risk                  |

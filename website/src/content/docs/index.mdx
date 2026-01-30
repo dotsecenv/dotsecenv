@@ -72,6 +72,7 @@ echo "$AWS_SECRET_ACCESS_KEY" # is now set to 'your-secret-key'
   </Card>
   <Card title="No data collection" icon="approve-check">
     No telemetry, no call-home features. Your secrets stay yours.
+    Tested with <a href="/concepts/threat-model/#hermetic-testing">network disabled</a> as proof.
   </Card>
   <Card title="No centralized keys" icon="random">
     Uses existing GPG keys. No cloud services required.
@@ -79,10 +80,6 @@ echo "$AWS_SECRET_ACCESS_KEY" # is now set to 'your-secret-key'
   <Card title="Unix philosophy" icon="puzzle">
     Does one thing well. Composable with git, gpg, and your shell.
     <a href="/concepts/philosophy/">Read more →</a>
-  </Card>
-  <Card title="Hermetic Testing" icon="shield">
-    E2E tests run in network-isolated environments, verified with eBPF.
-    <a href="/concepts/threat-model/#hermetic-testing">Learn more →</a>
   </Card>
 </CardGrid>
 
