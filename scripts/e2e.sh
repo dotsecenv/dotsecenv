@@ -13,7 +13,7 @@
 #
 set -e
 
-BIN="dotsecenv"
+BIN="bin/dotsecenv"
 
 # Ensure the binary is executable
 chmod +x "$BIN"
