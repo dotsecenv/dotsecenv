@@ -3,7 +3,7 @@
 # e2e.sh - End-to-end integration tests for dotsecenv
 #
 # This script assumes it's running in an isolated environment set up by:
-#   make e2e
+#   make build e2e
 #
 # The Makefile handles:
 # - Creating isolated HOME, GNUPGHOME, XDG_* directories
@@ -13,7 +13,10 @@
 #
 set -e
 
-BIN="dotsecenv"
+BIN="bin/dotsecenv"
+
+# Ensure the binary is executable
+chmod +x "$BIN"
 
 echo "==> Generating test keys in $GNUPGHOME"
 

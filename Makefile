@@ -9,7 +9,7 @@ help:
 	@echo "  make lint           - Run linting (vet + fmt check)"
 	@echo "  make test           - Run tests"
 	@echo "  make test-race      - Run tests with race condition detection"
-	@echo "  make e2e            - Run end-to-end tests using the compiled binary"
+	@echo "  make e2e            - Run end-to-end tests using bin/dotsecenv"
 	@echo "  make sandbox        - Create an interactive sandbox environment"
 	@echo "  make demo           - Run demo recording in sandbox (requires asciinema)"
 	@echo "  make completions    - Generate shell completions"
@@ -32,17 +32,18 @@ clean:
 	go clean -testcache
 	
 # Build with Go's native FIPS 140-3 module (no CGO required)
+# Uses vendored dependencies for hermetic builds
 # See: https://go.dev/blog/fips140
 .PHONY: build
 build:
 	@echo "Building dotsecenv with FIPS 140-3 crypto..."
-	CGO_ENABLED=0 GOFIPS140=v1.0.0 go build -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
+	CGO_ENABLED=0 GOFIPS140=v1.0.0 go build -mod=vendor -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
 	@echo "Binary built at: bin/dotsecenv"
 
 .PHONY: fmt
 fmt:
 	@echo "Formatting Go code..."
-	@gofmt -s -w .
+	@find . -name '*.go' -not -path './vendor/*' -exec gofmt -s -w {} +
 	@$(GOLANGCI_LINT) run --fix ./...
 
 .PHONY: lint
@@ -50,9 +51,9 @@ lint: install-lint
 	@echo "Running go mod tidy..."
 	@go mod tidy
 	@echo "Checking code formatting..."
-	@if [ -n "$$(gofmt -l .)" ]; then \
+	@if [ -n "$$(gofmt -l . | grep -v '^vendor/')" ]; then \
 		echo "Go code is not formatted:"; \
-		gofmt -l .; \
+		gofmt -l . | grep -v '^vendor/'; \
 		exit 1; \
 	fi
 	@echo "Running golangci-lint..."
@@ -69,8 +70,9 @@ test-race:
 	go test -race -v -p 1 ./...
 
 # E2E tests in isolated environment
+# Requires bin/dotsecenv to exist (run `make build` first, or download pre-built)
 .PHONY: e2e
-e2e: build
+e2e:
 	@echo "Running e2e tests in isolated environment..."
 	@E2E_HOME=$$(mktemp -d) && \
 	mkdir -p "$$E2E_HOME/.gnupg" "$$E2E_HOME/.config" "$$E2E_HOME/.local/share" "$$E2E_HOME/.local/state" "$$E2E_HOME/.cache" "$$E2E_HOME/bin" && \

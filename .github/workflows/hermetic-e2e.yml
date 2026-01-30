@@ -1,0 +1,103 @@
+name: Hermetic E2E
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  # Job 1: Build and prepare artifacts (with network)
+  setup:
+    name: Build artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+          cache-dependency-path: "go.sum"
+
+      - name: Build binary
+        run: make build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: e2e-artifacts
+          path: |
+            Makefile
+            bin/dotsecenv
+            scripts/e2e.sh
+          retention-days: 1
+
+  # Job 2: harden-runner enforcement (no network needed)
+  hermetic-harden-runner:
+    name: Hermetic E2E (harden-runner)
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 #v2.14.1
+        with:
+          egress-policy: block
+          disable-sudo-and-containers: true
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: e2e-artifacts
+
+      - name: Run hermetic e2e
+        run: make e2e
+
+  # Job 3: Network namespace + strace verification
+  hermetic-strace-verified:
+    name: Hermetic E2E (strace + namespace)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+          cache-dependency-path: "go.sum"
+
+      - name: Run hermetic e2e with strace verification
+        run: |
+          # Run e2e in network namespace with strace tracing network syscalls
+          sudo --preserve-env=PATH,GOROOT,GOPATH unshare --net bash -c '
+            ip link set lo up
+            echo "=== Network namespace active - only loopback ==="
+            ip addr
+
+            strace -f -e trace=network -o /tmp/network-syscalls.log make build e2e 2>&1
+          '
+
+          echo "=== Network Syscall Trace ==="
+          cat /tmp/network-syscalls.log || true
+
+          # Check for any connect() calls to non-loopback addresses
+          EXTERNAL=$(grep -E "connect\(" /tmp/network-syscalls.log 2>/dev/null | grep -v "127.0.0.1" | grep -v "::1" | grep -v "AF_UNIX" | wc -l || echo 0)
+          echo "External connect() calls: $EXTERNAL"
+
+          if [ "$EXTERNAL" -gt 0 ]; then
+            echo "FAILED: External network syscalls detected"
+            grep -E "connect\(" /tmp/network-syscalls.log | grep -v "127.0.0.1" | grep -v "::1" | grep -v "AF_UNIX" || true
+            exit 1
+          fi
+
+          echo "PASSED: Zero external network syscalls verified by strace"
+
+      - name: Upload strace log
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: network-syscall-trace
+          path: /tmp/network-syscalls.log
+          retention-days: 30
