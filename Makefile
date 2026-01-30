@@ -9,7 +9,7 @@ help:
 	@echo "  make lint           - Run linting (vet + fmt check)"
 	@echo "  make test           - Run tests"
 	@echo "  make test-race      - Run tests with race condition detection"
-	@echo "  make e2e            - Run end-to-end tests using the compiled binary"
+	@echo "  make e2e            - Run end-to-end tests using bin/dotsecenv"
 	@echo "  make sandbox        - Create an interactive sandbox environment"
 	@echo "  make demo           - Run demo recording in sandbox (requires asciinema)"
 	@echo "  make completions    - Generate shell completions"

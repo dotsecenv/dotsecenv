@@ -657,7 +657,7 @@ make test
 make test-race
 
 # Run end-to-end tests
-make e2e
+make build e2e
 ```
 
 ### Linting
