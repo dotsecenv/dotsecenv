@@ -3,7 +3,7 @@ title: Security Model
 description: What dotsecenv protects against and its security boundaries
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside } from "@astrojs/starlight/components";
 
 ## Overview
 
@@ -157,19 +157,19 @@ dotsecenv secret get DATABASE_PASSWORD  # Secrets exfiltrated!
 
 ```yaml
 gpg:
-  program: /usr/bin/gpg  # Always uses this exact binary
+  program: /usr/bin/gpg # Always uses this exact binary
 ```
 
 #### Security Benefits
 
-| Benefit | Description |
-|---------|-------------|
+| Benefit                       | Description                                                                                                                         |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | **PATH injection prevention** | Attackers cannot redirect GPG operations by modifying PATH, shell configs, or placing malicious binaries earlier in the search path |
-| **Deterministic execution** | The same binary executes regardless of shell configuration, environment state, or current working directory |
-| **Multi-version isolation** | Systems with multiple GPG installations (Homebrew, system, MacPorts) always use the explicitly configured version |
-| **Audit compliance** | Security teams can verify exactly which binary handles cryptographic operations |
-| **Container safety** | Works reliably in containers where PATH may be minimal or misconfigured |
-| **CI/CD reproducibility** | Different runners with different PATH configurations still use the same GPG binary |
+| **Deterministic execution**   | The same binary executes regardless of shell configuration, environment state, or current working directory                         |
+| **Multi-version isolation**   | Systems with multiple GPG installations (Homebrew, system, MacPorts) always use the explicitly configured version                   |
+| **Audit compliance**          | Security teams can verify exactly which binary handles cryptographic operations                                                     |
+| **Container safety**          | Works reliably in containers where PATH may be minimal or misconfigured                                                             |
+| **CI/CD reproducibility**     | Different runners with different PATH configurations still use the same GPG binary                                                  |
 
 #### Wrapper Script Support
 
@@ -211,21 +211,87 @@ In **strict mode** (`strict: true`), dotsecenv requires an explicit `gpg.program
 ```yaml
 strict: true
 gpg:
-  program: /usr/bin/gpg  # Required in strict mode
+  program: /usr/bin/gpg # Required in strict mode
 ```
 
 This prevents accidental reliance on PATH resolution in security-sensitive environments.
 
 <Aside type="tip">
-For maximum security, always configure `gpg.program` with an absolute path, especially in production, CI/CD, and multi-user environments.
+  For maximum security, always configure `gpg.program` with an absolute path,
+  especially in production, CI/CD, and multi-user environments.
 </Aside>
+
+---
+
+## Hermetic Testing
+
+<Aside type="tip" title="Trust verification">
+  Every pull request runs e2e tests in a network-isolated environment, with
+  eBPF-level proof that no external connections were made.
+</Aside>
+
+### Why Hermetic Testing Matters
+
+A secrets management tool that "phones home" or makes unexpected network connections poses a severe security risk. To address this concern, dotsecenv's CI pipeline includes **hermetic e2e testing** with dual independent verification:
+
+1. **Vendored Dependencies**: Go modules are vendored, eliminating network requirements during build
+2. **Dual eBPF Verification**: Two independent parallel jobs verify zero network connections:
+   - [step-security/harden-runner](https://github.com/step-security/harden-runner) - blocks + monitors at eBPF level
+   - Self-hosted bpfcc-tools - traces connections in network namespace
+3. **Defense in Depth**: If one tool has a bug, the other catches any violations
+4. **Auditable Artifacts**: Both job summaries AND downloadable eBPF traces
+
+### How It Works
+
+```text
+┌───────────────────────────────────────────────────────────────────────┐
+│                        GitHub Actions                                  │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  Job 1: harden-runner              Job 2: bpfcc + namespace           │
+│  ┌─────────────────────────┐       ┌─────────────────────────┐        │
+│  │ egress-policy: block    │       │ tcpconnect-bpfcc (trace)│        │
+│  │ ────────────────────    │       │ ────────────────────────│        │
+│  │                         │       │                         │        │
+│  │      make e2e           │       │ unshare --net make e2e  │        │
+│  │  (vendored, no net)     │       │ (namespace blocks net)  │        │
+│  │                         │       │                         │        │
+│  │      ↓                  │       │      ↓                  │        │
+│  │ Job Summary: 0 conn     │       │ Artifact: trace.log     │        │
+│  └─────────────────────────┘       └─────────────────────────┘        │
+│                                                                        │
+│  ✓ Both jobs must pass = zero network connections verified twice       │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+### Verification Badge
+
+[![Hermetic E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml)
+
+Every green badge confirms:
+
+- The e2e test suite passed
+- Zero external network connections were made
+- eBPF-verified network isolation
+
+### Trusted By
+
+The harden-runner tool is used by Microsoft, Google, CISA, DataDog, Intel, Kubernetes, Node.js, and 8,000+ open source projects. It detected the tj-actions/changed-files supply chain attack (CVE-2025-30066).
+
+### Inspecting the Proof
+
+1. Open any Hermetic E2E workflow run on GitHub Actions
+2. Check the **Job Summary** for harden-runner's network activity report
+3. Verify "Outbound Connections" shows only loopback or nothing
+
+You can also click the harden-runner dashboard link in the job summary for detailed analysis.
 
 ---
 
 ## What dotsecenv Does NOT Protect Against
 
 <Aside type="caution" title="Security boundaries">
-No tool provides absolute security. Understanding these limits is essential.
+  No tool provides absolute security. Understanding these limits is essential.
 </Aside>
 
 ### Root/Admin Access
@@ -291,13 +357,13 @@ This is acceptable because:
 
 ## Cryptographic Guarantees
 
-| Property | Mechanism | Strength |
-|----------|-----------|----------|
-| Confidentiality | AES-256-GCM | 256-bit symmetric |
-| Key protection | GPG (RSA/ECC) | 2048-bit+ RSA, P-384+ ECC |
-| Integrity | AEAD + HMAC | 128-bit authentication tag |
-| Authenticity | Detached signatures | SHA-256/SHA-512 |
-| Non-repudiation | GPG signatures | Tied to specific key |
+| Property        | Mechanism           | Strength                   |
+| --------------- | ------------------- | -------------------------- |
+| Confidentiality | AES-256-GCM         | 256-bit symmetric          |
+| Key protection  | GPG (RSA/ECC)       | 2048-bit+ RSA, P-384+ ECC  |
+| Integrity       | AEAD + HMAC         | 128-bit authentication tag |
+| Authenticity    | Detached signatures | SHA-256/SHA-512            |
+| Non-repudiation | GPG signatures      | Tied to specific key       |
 
 ---
 
@@ -314,7 +380,13 @@ dotsecenv cryptographic operations align with the following NIST and IETF standa
 - Replaces RFC 4880's CFB mode with modern authenticated encryption
 
 <Aside type="note" title="Cipher negotiation">
-dotsecenv uses gopenpgp's `profile.RFC9580()` which sets AES-256-GCM as the preferred cipher and enables AEAD mode. However, OpenPGP performs cipher negotiation based on recipient key preferences. The actual cipher used depends on what the recipient's public key advertises it supports. RFC 9580-compliant keys must support AES-256-GCM, so messages between modern keys will use it. When decrypting messages from older RFC 4880 implementations, legacy ciphers may be encountered.
+  dotsecenv uses gopenpgp's `profile.RFC9580()` which sets AES-256-GCM as the
+  preferred cipher and enables AEAD mode. However, OpenPGP performs cipher
+  negotiation based on recipient key preferences. The actual cipher used depends
+  on what the recipient's public key advertises it supports. RFC 9580-compliant
+  keys must support AES-256-GCM, so messages between modern keys will use it.
+  When decrypting messages from older RFC 4880 implementations, legacy ciphers
+  may be encountered.
 </Aside>
 
 **[NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final)** — GCM Mode
@@ -350,7 +422,8 @@ Vault entries are signed using FIPS 186-5 compliant algorithms:
 Since v0.3.0, dotsecenv uses Go's native [FIPS 140-3 validated cryptographic modules](https://go.dev/blog/fips140), which provide certified implementations of AES, SHA, RSA, and ECC operations across all supported platforms.
 
 <Aside type="tip">
-For maximum standards compliance, combine dotsecenv with a FIPS-validated GPG installation built against a certified libgcrypt or OpenSSL module.
+  For maximum standards compliance, combine dotsecenv with a FIPS-validated GPG
+  installation built against a certified libgcrypt or OpenSSL module.
 </Aside>
 
 ---
@@ -359,14 +432,16 @@ For maximum standards compliance, combine dotsecenv with a FIPS-validated GPG in
 
 dotsecenv uses FIPS 186-5 compliant defaults out of the box:
 
-| Component | Algorithm |
-|-----------|-----------|
-| Symmetric | AES-256-GCM |
-| Hash | SHA-256/SHA-512 |
+| Component  | Algorithm                                       |
+| ---------- | ----------------------------------------------- |
+| Symmetric  | AES-256-GCM                                     |
+| Hash       | SHA-256/SHA-512                                 |
 | Asymmetric | RSA 2048+, ECC P-384/P-521, EdDSA Ed25519/Ed448 |
 
 <Aside type="note">
-Compliance is only as strong as your underlying GPG installation. For regulated environments, ensure you're using a FIPS-validated OpenSSL/libgcrypt.
+  Compliance is only as strong as your underlying GPG installation. For
+  regulated environments, ensure you're using a FIPS-validated
+  OpenSSL/libgcrypt.
 </Aside>
 
 ---
@@ -412,24 +487,24 @@ The vault is designed to be safe in public repositories:
 - Regular key rotation
 
 <Aside type="caution">
-The security of your vault depends on:
-1. Strength of GPG keys (use 4096-bit RSA or ECC)
-2. Security of private key storage (passphrase, hardware token)
-3. Not sharing private keys
+  The security of your vault depends on: 1. Strength of GPG keys (use 4096-bit
+  RSA or ECC) 2. Security of private key storage (passphrase, hardware token) 3.
+  Not sharing private keys
 </Aside>
 
 ---
 
 ## Summary
 
-| Threat | Protected? | Notes |
-|--------|------------|-------|
-| Git exposure | Yes | Encrypted at rest |
-| File theft | Yes | Requires private key |
-| Tampering | Yes | Signature verification |
-| Weak algorithms | Yes | Config-enforced minimums |
-| PATH injection | Yes | Configure absolute `gpg.program` path |
-| Root access | No | OS-level compromise |
-| Key theft | No | Guard your private key |
-| Env snooping | No | Post-decryption risk |
-| Quantum | No | Future GPG update |
+| Threat                 | Protected? | Notes                                 |
+| ---------------------- | ---------- | ------------------------------------- |
+| Git exposure           | Yes        | Encrypted at rest                     |
+| File theft             | Yes        | Requires private key                  |
+| Tampering              | Yes        | Signature verification                |
+| Weak algorithms        | Yes        | Config-enforced minimums              |
+| PATH injection         | Yes        | Configure absolute `gpg.program` path |
+| Stealth network egress | Yes        | Hermetic e2e with eBPF verification   |
+| Root access            | No         | OS-level compromise                   |
+| Key theft              | No         | Guard your private key                |
+| Env snooping           | No         | Post-decryption risk                  |
+| Quantum                | No         | Future GPG update                     |
