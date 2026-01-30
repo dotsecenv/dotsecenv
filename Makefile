@@ -70,8 +70,9 @@ test-race:
 	go test -race -v -p 1 ./...
 
 # E2E tests in isolated environment
+# Requires bin/dotsecenv to exist (run `make build` first, or download pre-built)
 .PHONY: e2e
-e2e: build
+e2e:
 	@echo "Running e2e tests in isolated environment..."
 	@E2E_HOME=$$(mktemp -d) && \
 	mkdir -p "$$E2E_HOME/.gnupg" "$$E2E_HOME/.config" "$$E2E_HOME/.local/share" "$$E2E_HOME/.local/state" "$$E2E_HOME/.cache" "$$E2E_HOME/bin" && \

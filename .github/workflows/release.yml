@@ -11,8 +11,9 @@ permissions:
   attestations: write
 
 jobs:
-  hermetic-test:
-    name: Hermetic E2E Verification
+  # Job 1: Build artifacts (with network)
+  hermetic-setup:
+    name: Build E2E Artifacts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -21,16 +22,38 @@ jobs:
         with:
           go-version-file: "go.mod"
 
-      # Enable network blocking AFTER setup completes
+      - name: Build binary
+        run: make build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-e2e-artifacts
+          path: |
+            Makefile
+            bin/dotsecenv
+            scripts/e2e.sh
+          retention-days: 1
+
+  # Job 2: Hermetic E2E (network blocked)
+  hermetic-test:
+    name: Hermetic E2E Verification
+    needs: hermetic-setup
+    runs-on: ubuntu-latest
+    steps:
       - name: Harden Runner
         uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9
         with:
           egress-policy: block
           disable-sudo: false
 
+      - name: Download artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: release-e2e-artifacts
+
       - name: Run hermetic e2e
         run: make e2e
-        # Network is BLOCKED - any call here fails the release
 
   goreleaser:
     needs: hermetic-test
