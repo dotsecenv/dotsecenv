@@ -16,21 +16,22 @@ jobs:
     name: Hermetic E2E (harden-runner)
     runs-on: ubuntu-latest
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
-        with:
-          # Audit mode logs all connections; job summary proves e2e makes no calls
-          egress-policy: audit
-          disable-sudo: false
-
       - uses: actions/checkout@v6
 
       - uses: actions/setup-go@v6
         with:
           go-version-file: "go.mod"
 
+      # Enable network blocking AFTER setup completes
+      - name: Harden Runner
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9
+        with:
+          egress-policy: block
+          disable-sudo: false
+
       - name: Run hermetic e2e
         run: make e2e
+        # Network is BLOCKED - any call here fails the job
 
   # Job 2: Network namespace + strace verification
   hermetic-strace-verified:
