@@ -11,4 +11,4 @@ pre-push:
   follow: true
   commands:
     test:
-      run: make clean test e2e
+      run: make clean test build e2e
