@@ -3,7 +3,10 @@ package output
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 // Handler manages output emission based on mode and format.
@@ -184,6 +187,14 @@ func (h *Handler) IsSilent() bool {
 // IsStrict returns whether strict mode is enabled.
 func (h *Handler) IsStrict() bool {
 	return h.strict
+}
+
+// IsTerminal returns true if stdin is connected to an interactive terminal.
+func (h *Handler) IsTerminal() bool {
+	if f, ok := h.stdin.(*os.File); ok {
+		return term.IsTerminal(int(f.Fd()))
+	}
+	return false
 }
 
 // Stdout returns the stdout writer.

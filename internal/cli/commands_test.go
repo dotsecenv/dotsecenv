@@ -1344,3 +1344,65 @@ func TestSecretList_VaultPath(t *testing.T) {
 		t.Errorf("Expected output NOT to contain 'SECRET_B', got: %s", out)
 	}
 }
+
+// TestSecretGet_WarnsWithoutTTY tests that secret get emits a warning when not in a TTY
+func TestSecretGet_WarnsWithoutTTY(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	testFP := "TESTFINGERPRINT"
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		},
+		Fingerprint: testFP,
+	}
+
+	// Setup mock vault resolver with a secret
+	mockVaultResolver := NewMockVaultResolver()
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"MY_SECRET": {
+			Key: "MY_SECRET",
+			Values: []vault.SecretValue{
+				{Value: "c2VjcmV0", AvailableTo: []string{testFP}},
+			},
+		},
+	}
+	mockVaultResolver.VaultPaths = []string{"/vault.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: "/vault.yaml"}}
+
+	mockGPGClient := &MockGPGClientWithDecrypt{
+		MockGPGClient: NewMockGPGClient(),
+		DecryptFunc: func(ciphertext []byte, fingerprint string) ([]byte, error) {
+			return []byte("decrypted_value"), nil
+		},
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""), // Not a TTY
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	// Use --all to bypass vault manager requirement in test
+	err := cli.SecretGet("MY_SECRET", true, false, false, "", 0)
+
+	if err != nil {
+		t.Fatalf("Expected SecretGet to succeed, got: %v", err)
+	}
+
+	// Verify warning was emitted
+	stderr := stderrBuf.String()
+	if !strings.Contains(stderr, "non-interactive terminal") {
+		t.Errorf("Expected non-interactive warning, got stderr: %s", stderr)
+	}
+	if !strings.Contains(stderr, "dotsecenv.com") {
+		t.Errorf("Expected dotsecenv.com URL in warning, got stderr: %s", stderr)
+	}
+}

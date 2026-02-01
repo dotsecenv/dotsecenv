@@ -57,4 +57,22 @@ echo abc | "$BIN" secret put SEC2 -v 1
 
 "$BIN" validate
 
+echo "==> Testing non-TTY warning behavior"
+
+# Test: non-TTY decryption should succeed but emit warning
+output=$("$BIN" secret get SEC1 </dev/null 2>&1)
+if ! echo "$output" | grep -q "non-interactive terminal"; then
+    echo "FAIL: Expected non-interactive terminal warning"
+    echo "Got: $output"
+    exit 1
+fi
+
+if ! echo "$output" | grep -q "dotsecenv.com"; then
+    echo "FAIL: Expected dotsecenv.com URL in warning"
+    echo "Got: $output"
+    exit 1
+fi
+
+echo "  non-TTY warning tests passed"
+
 echo "==> E2E tests passed"
