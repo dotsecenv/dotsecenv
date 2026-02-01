@@ -1345,74 +1345,18 @@ func TestSecretList_VaultPath(t *testing.T) {
 	}
 }
 
-// TestSecretGet_BlockedWithoutTTY tests that secret get is blocked when RequireTTYForDecryption is true and no TTY
-func TestSecretGet_BlockedWithoutTTY(t *testing.T) {
-	t.Setenv("DOTSECENV_FINGERPRINT", "")
-	t.Setenv("DOTSECENV_CONFIG", "")
-
-	// Setup mock with RequireTTYForDecryption: true
-	requireTTY := true
-	mockConfig := config.Config{
-		ApprovedAlgorithms: []config.ApprovedAlgorithm{
-			{Algo: "RSA", MinBits: 2048},
-		},
-		Fingerprint: "TESTFINGERPRINT",
-		Behavior: config.BehaviorConfig{
-			RequireTTYForDecryption: &requireTTY,
-		},
-	}
-
-	// Setup mock vault resolver with a secret
-	mockVaultResolver := NewMockVaultResolver()
-	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
-		"MY_SECRET": {
-			Key: "MY_SECRET",
-			Values: []vault.SecretValue{
-				{Value: "c2VjcmV0", AvailableTo: []string{"TESTFINGERPRINT"}},
-			},
-		},
-	}
-	mockVaultResolver.VaultPaths = []string{"/vault.yaml"}
-	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: "/vault.yaml"}}
-
-	stdoutBuf := &bytes.Buffer{}
-	stderrBuf := &bytes.Buffer{}
-
-	cli := &CLI{
-		config:        mockConfig,
-		vaultResolver: mockVaultResolver,
-		gpgClient:     NewMockGPGClient(),
-		stdin:         strings.NewReader(""), // Not a TTY
-		output:        output.NewHandler(stdoutBuf, stderrBuf),
-	}
-
-	err := cli.SecretGet("MY_SECRET", false, false, false, "", 0)
-
-	if err == nil {
-		t.Fatal("Expected SecretGet to fail without TTY")
-	}
-	if err.ExitCode != ExitAccessDenied {
-		t.Errorf("Expected ExitAccessDenied (%d), got %d", ExitAccessDenied, err.ExitCode)
-	}
-	if !strings.Contains(err.Message, "TTY required") {
-		t.Errorf("Expected TTY error message, got: %s", err.Message)
-	}
-}
-
-// TestSecretGet_AllowedWhenRequireTTYDisabled tests that secret get works when RequireTTYForDecryption is disabled
-func TestSecretGet_AllowedWhenRequireTTYDisabled(t *testing.T) {
+// TestSecretGet_WarnsWithoutTTY tests that secret get emits a warning when not in a TTY
+func TestSecretGet_WarnsWithoutTTY(t *testing.T) {
 	t.Setenv("DOTSECENV_FINGERPRINT", "")
 	t.Setenv("DOTSECENV_CONFIG", "")
 
 	testFP := "TESTFINGERPRINT"
 
-	// Setup mock with RequireTTYForDecryption: nil (disabled)
 	mockConfig := config.Config{
 		ApprovedAlgorithms: []config.ApprovedAlgorithm{
 			{Algo: "RSA", MinBits: 2048},
 		},
 		Fingerprint: testFP,
-		// Behavior.RequireTTYForDecryption is nil (default)
 	}
 
 	// Setup mock vault resolver with a secret
@@ -1442,7 +1386,7 @@ func TestSecretGet_AllowedWhenRequireTTYDisabled(t *testing.T) {
 		config:        mockConfig,
 		vaultResolver: mockVaultResolver,
 		gpgClient:     mockGPGClient,
-		stdin:         strings.NewReader(""), // Not a TTY, but flag is disabled
+		stdin:         strings.NewReader(""), // Not a TTY
 		output:        output.NewHandler(stdoutBuf, stderrBuf),
 	}
 
@@ -1450,57 +1394,15 @@ func TestSecretGet_AllowedWhenRequireTTYDisabled(t *testing.T) {
 	err := cli.SecretGet("MY_SECRET", true, false, false, "", 0)
 
 	if err != nil {
-		t.Fatalf("Expected SecretGet to succeed when TTY requirement is disabled, got: %v", err)
-	}
-}
-
-// TestSecretGet_BlockedWithStrictMode tests that secret get is blocked when Strict is true (fallback behavior)
-func TestSecretGet_BlockedWithStrictMode(t *testing.T) {
-	t.Setenv("DOTSECENV_FINGERPRINT", "")
-	t.Setenv("DOTSECENV_CONFIG", "")
-
-	// Setup mock with Strict: true (RequireTTYForDecryption should inherit this)
-	mockConfig := config.Config{
-		ApprovedAlgorithms: []config.ApprovedAlgorithm{
-			{Algo: "RSA", MinBits: 2048},
-		},
-		Fingerprint: "TESTFINGERPRINT",
-		Strict:      true, // Legacy strict mode should trigger TTY requirement
+		t.Fatalf("Expected SecretGet to succeed, got: %v", err)
 	}
 
-	// Setup mock vault resolver with a secret
-	mockVaultResolver := NewMockVaultResolver()
-	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
-		"MY_SECRET": {
-			Key: "MY_SECRET",
-			Values: []vault.SecretValue{
-				{Value: "c2VjcmV0", AvailableTo: []string{"TESTFINGERPRINT"}},
-			},
-		},
+	// Verify warning was emitted
+	stderr := stderrBuf.String()
+	if !strings.Contains(stderr, "non-interactive terminal") {
+		t.Errorf("Expected non-interactive warning, got stderr: %s", stderr)
 	}
-	mockVaultResolver.VaultPaths = []string{"/vault.yaml"}
-	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: "/vault.yaml"}}
-
-	stdoutBuf := &bytes.Buffer{}
-	stderrBuf := &bytes.Buffer{}
-
-	cli := &CLI{
-		config:        mockConfig,
-		vaultResolver: mockVaultResolver,
-		gpgClient:     NewMockGPGClient(),
-		stdin:         strings.NewReader(""), // Not a TTY
-		output:        output.NewHandler(stdoutBuf, stderrBuf),
-	}
-
-	err := cli.SecretGet("MY_SECRET", false, false, false, "", 0)
-
-	if err == nil {
-		t.Fatal("Expected SecretGet to fail without TTY when Strict mode is enabled")
-	}
-	if err.ExitCode != ExitAccessDenied {
-		t.Errorf("Expected ExitAccessDenied (%d), got %d", ExitAccessDenied, err.ExitCode)
-	}
-	if !strings.Contains(err.Message, "TTY required") {
-		t.Errorf("Expected TTY error message, got: %s", err.Message)
+	if !strings.Contains(stderr, "gpg-agent") {
+		t.Errorf("Expected gpg-agent recommendation in warning, got stderr: %s", stderr)
 	}
 }

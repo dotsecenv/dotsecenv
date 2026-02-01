@@ -57,48 +57,22 @@ echo abc | "$BIN" secret put SEC2 -v 1
 
 "$BIN" validate
 
-echo "==> Testing require_tty_for_decryption behavior"
+echo "==> Testing non-TTY warning behavior"
 
-# Backup original config
-cp "$HOME/.config/dotsecenv/config" "$HOME/.config/dotsecenv/config.bak"
-
-# Enable require_tty_for_decryption by appending to existing behavior section
-# First, remove the existing behavior section and add a complete one
-sed -i.tmp '/^behavior:/,/^[^ ]/{ /^behavior:/d; /^  /d; }' "$HOME/.config/dotsecenv/config"
-cat >> "$HOME/.config/dotsecenv/config" << 'EOF'
-behavior:
-  require_explicit_vault_upgrade: false
-  restrict_to_configured_vaults: false
-  require_tty_for_decryption: true
-EOF
-
-# Test: non-TTY decryption should be blocked
-if "$BIN" secret get SEC1 </dev/null 2>&1; then
-    echo "FAIL: Expected non-TTY decryption to be blocked"
-    mv "$HOME/.config/dotsecenv/config.bak" "$HOME/.config/dotsecenv/config"
-    exit 1
-fi
-
-# Verify error message contains expected text
-output=$("$BIN" secret get SEC1 </dev/null 2>&1 || true)
-if ! echo "$output" | grep -q "TTY required"; then
-    echo "FAIL: Expected TTY required error"
+# Test: non-TTY decryption should succeed but emit warning
+output=$("$BIN" secret get SEC1 </dev/null 2>&1)
+if ! echo "$output" | grep -q "non-interactive terminal"; then
+    echo "FAIL: Expected non-interactive terminal warning"
     echo "Got: $output"
-    mv "$HOME/.config/dotsecenv/config.bak" "$HOME/.config/dotsecenv/config"
     exit 1
 fi
 
-# Verify exit code is 8 (ExitAccessDenied)
-"$BIN" secret get SEC1 </dev/null 2>&1 || exit_code=$?
-if [ "${exit_code:-0}" != "8" ]; then
-    echo "FAIL: Expected exit code 8, got ${exit_code:-0}"
-    mv "$HOME/.config/dotsecenv/config.bak" "$HOME/.config/dotsecenv/config"
+if ! echo "$output" | grep -q "gpg-agent"; then
+    echo "FAIL: Expected gpg-agent recommendation in warning"
+    echo "Got: $output"
     exit 1
 fi
 
-# Restore original config
-mv "$HOME/.config/dotsecenv/config.bak" "$HOME/.config/dotsecenv/config"
-
-echo "  require_tty_for_decryption tests passed"
+echo "  non-TTY warning tests passed"
 
 echo "==> E2E tests passed"

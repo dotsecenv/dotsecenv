@@ -244,12 +244,9 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		return err
 	}
 
-	// Check if TTY is required for decryption
-	if c.config.ShouldRequireTTYForDecryption() && !c.isTerminal() {
-		return NewError(
-			"secret decryption blocked: TTY required but not detected (behavior.require_tty_for_decryption is enabled)",
-			ExitAccessDenied,
-		)
+	// Warn when decrypting in non-interactive context
+	if !c.isTerminal() {
+		c.Warnf("decrypting in non-interactive terminal; for better security, configure GPG to require passphrase entry (see gpg-agent.conf)")
 	}
 
 	// Handle --last + -v combination - always error (conflicting flags)

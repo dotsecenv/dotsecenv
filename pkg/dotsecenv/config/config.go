@@ -33,10 +33,6 @@ type BehaviorConfig struct {
 
 	// RestrictToConfiguredVaults when true ignores CLI -v flags and uses only config vaults.
 	RestrictToConfiguredVaults *bool `yaml:"restrict_to_configured_vaults,omitempty"`
-
-	// RequireTTYForDecryption when true prevents secret decryption in non-TTY terminals.
-	// This helps prevent automated scripts from exfiltrating secrets.
-	RequireTTYForDecryption *bool `yaml:"require_tty_for_decryption,omitempty"`
 }
 
 // Login represents authenticated login state with cryptographic proof.
@@ -106,16 +102,6 @@ func (c *Config) ShouldRequireExplicitVaultUpgrade() bool {
 func (c *Config) ShouldRestrictToConfiguredVaults() bool {
 	if c.Behavior.RestrictToConfiguredVaults != nil {
 		return *c.Behavior.RestrictToConfiguredVaults
-	}
-	return c.Strict
-}
-
-// ShouldRequireTTYForDecryption returns true if secret decryption should be blocked
-// in non-TTY terminals.
-// Checks behavior setting first, falls back to legacy Strict field.
-func (c *Config) ShouldRequireTTYForDecryption() bool {
-	if c.Behavior.RequireTTYForDecryption != nil {
-		return *c.Behavior.RequireTTYForDecryption
 	}
 	return c.Strict
 }
