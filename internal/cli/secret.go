@@ -246,7 +246,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 
 	// Warn when decrypting in non-interactive context
 	if !c.output.IsTerminal() {
-		c.Warnf("decrypting in non-interactive terminal; for better security, configure GPG to require passphrase entry (https://dotsecenv.com/docs/concepts/threat-model#automated-secret-exfiltration)")
+		c.Warnf("decrypting in non-interactive terminal; for better security, configure GPG to require passphrase entry (https://dotsecenv.com/concepts/threat-model/#automated-secret-exfiltration)")
 	}
 
 	// Handle --last + -v combination - always error (conflicting flags)
