@@ -326,7 +326,7 @@ dotsecenv validate --fix  # Attempt to fix issues
 | `init config [--gpg-program\|--no-gpg-program]` | Initialize configuration file                |
 | `init vault`                                    | Initialize vault file(s)                     |
 | `login FINGERPRINT`                             | Initialize user identity                     |
-| `secret store SECRET`                             | Store an encrypted secret (reads from stdin) |
+| `secret store SECRET`                           | Store an encrypted secret (reads from stdin) |
 | `secret get SECRET [--all\|--last\|--json]`     | Retrieve a secret value                      |
 | `secret share SECRET FINGERPRINT [--all]`       | Share a secret with another identity         |
 | `secret revoke SECRET FINGERPRINT [--all]`      | Revoke access to a secret                    |
