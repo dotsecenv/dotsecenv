@@ -31,12 +31,12 @@ var suidDisallowedCommands = map[string]bool{
 	"login":         true,
 	"init config":   true,
 	"init vault":    true,
-	"secret put":    true,
+	"secret store":  true,
 	"secret share":  true,
 	"secret revoke": true,
 }
 
-// getCommandPath returns the full command path (e.g., "secret put", "vault describe")
+// getCommandPath returns the full command path (e.g., "secret store", "vault describe")
 func getCommandPath(cmd *cobra.Command) string {
 	var parts []string
 	for c := cmd; c != nil && c.Name() != "dotsecenv"; c = c.Parent() {

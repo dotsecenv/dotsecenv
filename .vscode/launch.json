@@ -38,7 +38,7 @@
             "showLog": true
         },
         {
-            "name": "Debug: secret put <key>",
+            "name": "Debug: secret store <key>",
             "type": "go",
             "request": "launch",
             "mode": "debug",

@@ -237,15 +237,15 @@ gpg:
 	// Init vault (use non-strict config for setup)
 	_, _, _ = runCmdWithEnv(envA, "init", "vault", "-v", vaultPath)
 
-	// Identities are auto-added by secret put (for User A) and secret share (for User B)
+	// Identities are auto-added by secret store (for User A) and secret share (for User B)
 
-	// 1. Put secret SEC1 (User A)
-	cmd := exec.Command(binaryPath, "-c", configPathNonStrict, "secret", "put", "SEC1")
+	// 1. Store secret SEC1 (User A)
+	cmd := exec.Command(binaryPath, "-c", configPathNonStrict, "secret", "store", "SEC1")
 	cmd.Env = append(filteredEnv(), envA...)
 	cmd.Stdin = strings.NewReader("secret_value_1")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("secret put failed: %v\n%s", err, out)
+		t.Fatalf("secret store failed: %v\n%s", err, out)
 	}
 
 	// 2. Share with User B (User A)

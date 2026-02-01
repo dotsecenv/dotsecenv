@@ -67,7 +67,7 @@ pe "dotsecenv login $KEY_ID"
 
 p ""
 p "# 1. Create your first secret"
-pe "echo \"my-database-password\" | dotsecenv secret put DATABASE_PASSWORD"
+pe "echo \"my-database-password\" | dotsecenv secret store DATABASE_PASSWORD"
 
 p ""
 p "# 2. You can now decrypt the secret, on demand"
