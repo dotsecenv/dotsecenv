@@ -17,19 +17,65 @@ hero:
       icon: external
 ---
 
-import { Tabs, TabItem, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
-import DownloadCommands from '../../components/DownloadCommands.astro';
-import AsciinemaPlayer from '../../components/AsciinemaPlayer.astro';
+import {
+  Tabs,
+  TabItem,
+  Card,
+  CardGrid,
+  LinkCard,
+} from "@astrojs/starlight/components";
+import DownloadCommands from "../../components/DownloadCommands.astro";
+import AsciinemaPlayer from "../../components/AsciinemaPlayer.astro";
 
 <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-  <a href="https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml"><img src="https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml"><img src="https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml/badge.svg" alt="Release" /></a>
-  <a href="https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml"><img src="https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml/badge.svg" alt="GitHub Action E2E" /></a>
-  <a href="https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml"><img src="https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml/badge.svg" alt="Hermetic E2E" /></a>
-  <a href="https://github.com/dotsecenv/packages/actions/workflows/publish.yml"><img src="https://github.com/dotsecenv/packages/actions/workflows/publish.yml/badge.svg" alt="Publish Packages" /></a>
-  <a href="https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml"><img src="https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml/badge.svg" alt="Homebrew install" /></a>
-  <a href="https://github.com/dotsecenv/plugin/actions/workflows/ci.yml"><img src="https://github.com/dotsecenv/plugin/actions/workflows/ci.yml/badge.svg" alt="Shell plugins CI" /></a>
-  <a href="https://github.com/dotsecenv/website/actions/workflows/deploy-website.yml"><img src="https://github.com/dotsecenv/website/actions/workflows/deploy-website.yml/badge.svg" alt="Publish Website" /></a>
+  <a href="https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml">
+    <img
+      src="https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml/badge.svg"
+      alt="CI"
+    />
+  </a>
+  <a href="https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml">
+    <img
+      src="https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml/badge.svg"
+      alt="Release"
+    />
+  </a>
+  <a href="https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml">
+    <img
+      src="https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml/badge.svg"
+      alt="GitHub Action E2E"
+    />
+  </a>
+  <a href="https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml">
+    <img
+      src="https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml/badge.svg"
+      alt="Hermetic E2E"
+    />
+  </a>
+  <a href="https://github.com/dotsecenv/packages/actions/workflows/publish.yml">
+    <img
+      src="https://github.com/dotsecenv/packages/actions/workflows/publish.yml/badge.svg"
+      alt="Publish Packages"
+    />
+  </a>
+  <a href="https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml">
+    <img
+      src="https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml/badge.svg"
+      alt="Homebrew install"
+    />
+  </a>
+  <a href="https://github.com/dotsecenv/plugin/actions/workflows/ci.yml">
+    <img
+      src="https://github.com/dotsecenv/plugin/actions/workflows/ci.yml/badge.svg"
+      alt="Shell plugins CI"
+    />
+  </a>
+  <a href="https://github.com/dotsecenv/website/actions/workflows/deploy-website.yml">
+    <img
+      src="https://github.com/dotsecenv/website/actions/workflows/deploy-website.yml/badge.svg"
+      alt="Publish Website"
+    />
+  </a>
 </div>
 
 ## What can go wrong?
@@ -71,8 +117,9 @@ echo "$AWS_SECRET_ACCESS_KEY" # is now set to 'your-secret-key'
     Fully open source. Audit the code yourself.
   </Card>
   <Card title="No data collection" icon="approve-check">
-    No telemetry, no call-home features. Your secrets stay yours.
-    Tested with <a href="/concepts/threat-model/#hermetic-testing">network disabled</a> as proof.
+    No telemetry, no call-home features. Your secrets stay yours. Tested with{" "}
+    <a href="/concepts/security-model/#hermetic-testing">network disabled</a> as
+    proof.
   </Card>
   <Card title="No centralized keys" icon="random">
     Uses existing GPG keys. No cloud services required.
@@ -91,7 +138,7 @@ Key capabilities:
 
 - **Store secrets** encrypted in a JSONL vault file
 - **Share secrets** with teammates using GPG multi-recipient encryption
-- **Auto-load secrets** when entering directories, via  shell plugins (zsh/bash/fish)
+- **Auto-load secrets** when entering directories, via shell plugins (zsh/bash/fish)
 - **Built-in auditability** with append-only operations
 - **Validate integrity** with cryptographic signatures
 
@@ -105,7 +152,7 @@ Here's what a typical dotsecenv workflow looks like:
 # 1. Configure dotsecenv
 dotsecenv init config
 dotsecenv init vault
-dotsecenv login [YOUR_PUBLIC_KEY_FINGERPRINT] # see `gpg --list-secret-keys` 
+dotsecenv login [YOUR_PUBLIC_KEY_FINGERPRINT] # see `gpg --list-secret-keys`
 
 # 2. Create your first secret
 echo "my-database-password" | dotsecenv secret put DATABASE_PASSWORD
@@ -138,6 +185,7 @@ echo $DATABASE_PASSWORD
     Or download directly:
 
     <DownloadCommands platform="darwin" />
+
   </TabItem>
 
   <TabItem label="Ubuntu/Debian">
@@ -155,6 +203,7 @@ echo $DATABASE_PASSWORD
     sudo apt-get update
     sudo apt-get install dotsecenv
     ```
+
   </TabItem>
 
   <TabItem label="Fedora/RHEL">
@@ -173,6 +222,7 @@ echo $DATABASE_PASSWORD
     # 2. Install
     sudo dnf install dotsecenv
     ```
+
   </TabItem>
 
   <TabItem label="Arch">
@@ -191,11 +241,12 @@ echo $DATABASE_PASSWORD
     # 3. Install
     sudo pacman -Sy dotsecenv
     ```
+
   </TabItem>
 
-  <TabItem label="Binary">
-    <DownloadCommands platform="linux" />
-  </TabItem>
+<TabItem label="Binary">
+  <DownloadCommands platform="linux" />
+</TabItem>
 
   <TabItem label="mise">
     ```bash
@@ -203,6 +254,7 @@ echo $DATABASE_PASSWORD
     ```
 
     [mise](https://mise.jdx.dev/) is a universal version manager.
+
   </TabItem>
 </Tabs>
 
@@ -210,22 +262,38 @@ echo $DATABASE_PASSWORD
 
 ## Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **Encrypted at Rest** | All secrets encrypted using AES-256-GCM (RFC 9580) |
-| **Portable Vault** | Vault files are safe to commit to git and share between machines |
-| **Multi-User Support** | Share secrets with teammates using GPG multi-recipient encryption |
-| **Shell Integration** | Automatically load secrets when entering directories via `.secenv` files |
-| **Append-Only Audit Trail** | Cryptographic history preserved for compliance and security audits |
-| **SLSA Build Level 3** | Release binaries include verified provenance attestations |
+| Feature                     | Description                                                              |
+| --------------------------- | ------------------------------------------------------------------------ |
+| **Encrypted at Rest**       | All secrets encrypted using AES-256-GCM (RFC 9580)                       |
+| **Portable Vault**          | Vault files are safe to commit to git and share between machines         |
+| **Multi-User Support**      | Share secrets with teammates using GPG multi-recipient encryption        |
+| **Shell Integration**       | Automatically load secrets when entering directories via `.secenv` files |
+| **Append-Only Audit Trail** | Cryptographic history preserved for compliance and security audits       |
+| **SLSA Build Level 3**      | Release binaries include verified provenance attestations                |
 
 ---
 
 ## Next Steps
 
 <CardGrid>
-  <LinkCard title="Getting Started" description="Get up and running in 5 minutes" href="/getting-started/" />
-  <LinkCard title="Installation Guide" description="Detailed platform-specific instructions" href="/tutorials/installation/" />
-  <LinkCard title="Security Model" description="Understand how dotsecenv protects your secrets" href="/concepts/threat-model/" />
-  <LinkCard title="CLI Reference" description="Complete command documentation" href="/reference/" />
+  <LinkCard
+    title="Getting Started"
+    description="Get up and running in 5 minutes"
+    href="/getting-started/"
+  />
+  <LinkCard
+    title="Installation Guide"
+    description="Detailed platform-specific instructions"
+    href="/tutorials/installation/"
+  />
+  <LinkCard
+    title="Security Model"
+    description="Understand how dotsecenv protects your secrets"
+    href="/concepts/security-model/"
+  />
+  <LinkCard
+    title="CLI Reference"
+    description="Complete command documentation"
+    href="/reference/"
+  />
 </CardGrid>

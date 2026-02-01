@@ -3,20 +3,20 @@ title: Philosophy & Non-Goals
 description: Design principles, UNIX philosophy, and what dotsecenv deliberately doesn't do
 ---
 
-import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+import { Aside, Card, CardGrid } from "@astrojs/starlight/components";
 
 ## Design Philosophy
 
 **`dotsecenv` prioritizes usability**. Security tools that frustrate developers don't get used.
 
-| Philosophy | Implementation |
-|------------|----------------|
-| UX-first | Simple commands, minimal config |
-| UNIX philosophy | Do one thing well, be composable |
-| Decentralized | GPG keys, no clouds required |
-| Offline-first | Works without a network |
-| Development focus | SDLC, not production |
-| Append-only | Auditability, additive changes by default |
+| Philosophy        | Implementation                            |
+| ----------------- | ----------------------------------------- |
+| UX-first          | Simple commands, minimal config           |
+| UNIX philosophy   | Do one thing well, be composable          |
+| Decentralized     | GPG keys, no clouds required              |
+| Offline-first     | Works without a network                   |
+| Development focus | SDLC, not production                      |
+| Append-only       | Auditability, additive changes by default |
 
 ### Core Principles
 
@@ -58,12 +58,12 @@ dotsecenv follows the [UNIX philosophy](https://en.wikipedia.org/wiki/Unix_philo
 
 ### Applied to dotsecenv
 
-| Principle | Application |
-|-----------|-------------|
-| **Do one thing well** | Encrypt/decrypt secrets. That's it. |
-| **Composable** | Works with git, shell, other tools |
-| **Text streams** | Secrets via stdin/stdout. JSON output with `--json` |
-| **No Swiss Army knife** | Doesn't try to do everything |
+| Principle               | Application                                         |
+| ----------------------- | --------------------------------------------------- |
+| **Do one thing well**   | Encrypt/decrypt secrets. That's it.                 |
+| **Composable**          | Works with git, shell, other tools                  |
+| **Text streams**        | Secrets via stdin/stdout. JSON output with `--json` |
+| **No Swiss Army knife** | Doesn't try to do everything                        |
 
 ### Standing on Giants
 
@@ -83,12 +83,12 @@ dotsecenv adds a minimal layer of usability and relies on these vetted, stable t
 
 **However, age lacks signatures.**
 
-| Capability | GPG | age |
-|------------|-----|-----|
-| Encryption | Yes | Yes |
-| Signing | Yes | **No** |
-| Web of trust | Yes | No |
-| Key servers | Yes | No |
+| Capability   | GPG | age    |
+| ------------ | --- | ------ |
+| Encryption   | Yes | Yes    |
+| Signing      | Yes | **No** |
+| Web of trust | Yes | No     |
+| Key servers  | Yes | No     |
 
 dotsecenv needs **signatures for trust**. Without cryptographic signatures:
 
@@ -99,7 +99,9 @@ dotsecenv needs **signatures for trust**. Without cryptographic signatures:
 GPG's signing capability lets dotsecenv verify that each vault entry was created by the identity it claims to be from.
 
 <Aside type="note">
-age is an excellent tool for its use case (simple file encryption). It's not a criticism—it's a deliberate design choice by age's creators to omit signing for simplicity.
+  age is an excellent tool for its use case (simple file encryption). It's not a
+  criticism—it's a deliberate design choice by age's creators to omit signing
+  for simplicity.
 </Aside>
 
 ---
@@ -117,13 +119,13 @@ age is an excellent tool for its use case (simple file encryption). It's not a c
 
 ### Where dotsecenv Differs
 
-| Aspect | dotsecenv | SOPS |
-|--------|-----------|------|
-| **Primary use case** | Developer workflow | Production config |
-| **Identity management** | First-class | None (just keys) |
-| **Shell integration** | Built-in plugins | Use with direnv |
-| **Audit trail** | Append-only vault | Git history |
-| **Multi-user UX** | Share/revoke commands | Manual key management |
+| Aspect                  | dotsecenv             | SOPS                  |
+| ----------------------- | --------------------- | --------------------- |
+| **Primary use case**    | Developer workflow    | Production config     |
+| **Identity management** | First-class           | None (just keys)      |
+| **Shell integration**   | Built-in plugins      | Use with direnv       |
+| **Audit trail**         | Append-only vault     | Git history           |
+| **Multi-user UX**       | Share/revoke commands | Manual key management |
 
 **Simply put: UX**
 
@@ -136,7 +138,9 @@ SOPS's real power comes from cloud KMS integration—AWS KMS, GCP KMS, Azure Key
 dotsecenv takes a **decentralized, offline approach**. Your GPG keys, your control.
 
 <Aside type="note">
-SOPS can use GPG alone, but the multi-identity workflow requires manual key management. dotsecenv provides `share` and `revoke` commands specifically for this.
+  SOPS can use GPG alone, but the multi-identity workflow requires manual key
+  management. dotsecenv provides `share` and `revoke` commands specifically for
+  this.
 </Aside>
 
 ---
@@ -191,7 +195,7 @@ The append-only design means:
 - Post-decryption environment snooping
 - Quantum attacks (current GPG algorithms)
 
-See [Security Model](/concepts/threat-model/) for details.
+See [Security Model](/concepts/security-model/) for details.
 
 ---
 

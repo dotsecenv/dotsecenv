@@ -3,7 +3,7 @@ title: Revoke Access
 description: Remove access to a secret and understand revocation caveats
 ---
 
-import { Steps, Aside } from '@astrojs/starlight/components';
+import { Steps, Aside } from "@astrojs/starlight/components";
 
 ## Goal
 
@@ -63,7 +63,8 @@ Revoke someone's access to a secret. Understand what revocation does and doesn't
 4. **Rotate the secret value** (Critical!)
 
    <Aside type="danger" title="Essential security step">
-   Revoking access **does not** prevent the revoked user from accessing the **previous** value. They already decrypted it.
+     Revoking access **does not** prevent the revoked user from accessing the
+     **previous** value. They already decrypted it.
    </Aside>
 
    Store a new value:
@@ -106,14 +107,14 @@ dotsecenv vault describe
 ## What Revocation Does NOT Do
 
 <Aside type="caution" title="Understanding revocation limits">
-Revocation in dotsecenv (and any GPG-based system) has inherent limitations:
+  Revocation in dotsecenv (and any GPG-based system) has inherent limitations:
 </Aside>
 
 | Revocation protects against | Revocation does NOT protect against |
-|----------------------------|--------------------------------------|
-| Future secret values | Previously shared values |
-| New secrets | Old values they already decrypted |
-| Access to new entries | Copy/paste of decrypted values |
+| --------------------------- | ----------------------------------- |
+| Future secret values        | Previously shared values            |
+| New secrets                 | Old values they already decrypted   |
+| Access to new entries       | Copy/paste of decrypted values      |
 
 ### Why is this the case?
 
@@ -158,7 +159,9 @@ dotsecenv secret revoke "*" FINGERPRINT --all
 ```
 
 <Aside type="note">
-Revoking access doesn't delete their access to previously shared values. It only prevents them from decrypting future values. To fully clean up the vault, run `vault doctor` after revoking all access.
+  Revoking access doesn't delete their access to previously shared values. It
+  only prevents them from decrypting future values. To fully clean up the vault,
+  run `vault doctor` after revoking all access.
 </Aside>
 
 ---
@@ -212,12 +215,13 @@ dotsecenv vault doctor
 The doctor command checks vault health and offers to defragment if needed.
 
 <Aside type="caution">
-Defragmenting removes old entries. This breaks access to historical values but doesn't affect current values.
+  Defragmenting removes old entries. This breaks access to historical values but
+  doesn't affect current values.
 </Aside>
 
 ---
 
 ## Next Steps
 
-- [Security Model](/concepts/threat-model/) — Understand what dotsecenv protects against
+- [Threat Model](/concepts/threat-model/) — Understand what dotsecenv protects against
 - [Architecture](/concepts/architecture/) — How the vault and encryption work

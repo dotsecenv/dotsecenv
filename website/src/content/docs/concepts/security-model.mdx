@@ -1,0 +1,243 @@
+---
+title: Security Model
+description: How dotsecenv's cryptographic mechanisms protect your secrets
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+dotsecenv uses a layered encryption model combining symmetric and asymmetric cryptography. For threat analysis and what dotsecenv does/doesn't protect against, see the [Threat Model](/concepts/threat-model).
+
+## Encryption Model
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                     Secret Value                            │
+│                    "my-password"                            │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│           Symmetric Encryption (AES-256-GCM)                │
+│                                                             │
+│   Random session key (256-bit) + Nonce (96-bit)             │
+│   → Encrypted data + Authentication tag                     │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│             Asymmetric Encryption (GPG)                     │
+│                                                             │
+│   Session key encrypted for each recipient's public key     │
+│   → One key blob per authorized identity                    │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│            Cryptographic Signature (GPG)                    │
+│                                                             │
+│   SHA-256/SHA-512 hash signed with originator's key         │
+│   → Detached signature for integrity + non-repudiation      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The choice of SHA-256/SHA-512 depends on the originator's
+key strength.
+
+### Why Hybrid Encryption?
+
+Asymmetric encryption (RSA/ECC) is slow for large data. Symmetric encryption (AES) is fast but requires secure key exchange.
+
+Hybrid encryption gets the best of both:
+
+1. Generate a random **session key** (fast)
+2. Encrypt data with **AES-256-GCM** using session key (fast, authenticated)
+3. Encrypt session key with each **recipient's public key** (slow, but small data)
+4. Sign the result with **originator's private key** (authenticity)
+
+### Multi-Recipient Efficiency
+
+When sharing a secret with 5 people, the secret is encrypted **once**. Only the session key is encrypted 5 times:
+
+```text
+Secret Value  → AES-256-GCM  → Encrypted Data (1 copy)
+                    │
+                    ├─→ Session key encrypted for Alice
+                    ├─→ Session key encrypted for Bob
+                    ├─→ Session key encrypted for Carol
+                    ├─→ Session key encrypted for Dave
+                    └─→ Session key encrypted for Eve
+```
+
+---
+
+## Cryptographic Guarantees
+
+| Property        | Mechanism           | Strength                   |
+| --------------- | ------------------- | -------------------------- |
+| Confidentiality | AES-256-GCM         | 256-bit symmetric          |
+| Key protection  | GPG (RSA/ECC)       | 2048-bit+ RSA, P-384+ ECC  |
+| Integrity       | AEAD + HMAC         | 128-bit authentication tag |
+| Authenticity    | Detached signatures | SHA-256/SHA-512            |
+| Non-repudiation | GPG signatures      | Tied to specific key       |
+
+---
+
+## Standards Compliance
+
+dotsecenv cryptographic operations align with the following NIST and IETF standards:
+
+### Symmetric Encryption
+
+**[RFC 9580](https://www.rfc-editor.org/rfc/rfc9580.html)** — OpenPGP (2024 revision)
+
+- Mandates AEAD (Authenticated Encryption with Associated Data)
+- AES-256-GCM as the default symmetric cipher
+- Replaces RFC 4880's CFB mode with modern authenticated encryption
+
+<Aside type="note" title="Cipher negotiation">
+  dotsecenv uses gopenpgp's `profile.RFC9580()` which sets AES-256-GCM as the
+  preferred cipher and enables AEAD mode. However, OpenPGP performs cipher
+  negotiation based on recipient key preferences. The actual cipher used depends
+  on what the recipient's public key advertises it supports. RFC 9580-compliant
+  keys must support AES-256-GCM, so messages between modern keys will use it.
+  When decrypting messages from older RFC 4880 implementations, legacy ciphers
+  may be encountered.
+</Aside>
+
+**[NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final)** — GCM Mode
+
+- Specifies Galois/Counter Mode for AES
+- Provides both confidentiality and authenticity
+- 128-bit authentication tags prevent tampering
+
+### Digital Signatures
+
+**[FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final)** — Digital Signature Standard (2023)
+
+- Approves RSA, ECDSA, and EdDSA for digital signatures
+- Deprecates DSA (removed from dotsecenv's approved algorithms)
+- EdDSA (Ed25519, Ed448) added as approved algorithms
+
+Vault entries are signed using FIPS 186-5 compliant algorithms:
+
+- **RSA** — RSASSA-PKCS1-v1_5 or RSASSA-PSS (2048-bit minimum)
+- **ECDSA** — P-384, P-521 curves
+- **EdDSA** — Ed25519 for performance, Ed448 for higher security
+
+### Cryptographic Modules
+
+**[FIPS 140-3](https://csrc.nist.gov/pubs/fips/140-3/final)** — Security Requirements for Cryptographic Modules
+
+- Default configuration enforces FIPS-compliant algorithm minimums
+- Actual compliance depends on underlying GPG/libgcrypt installation
+- Use FIPS-validated cryptographic libraries in regulated environments
+
+### Go Cryptographic Modules
+
+Since v0.3.0, dotsecenv uses Go's native [FIPS 140-3 validated cryptographic modules](https://go.dev/blog/fips140), which provide certified implementations of AES, SHA, RSA, and ECC operations across all supported platforms.
+
+<Aside type="tip">
+  For maximum standards compliance, combine dotsecenv with a FIPS-validated GPG
+  installation built against a certified libgcrypt or OpenSSL module.
+</Aside>
+
+---
+
+## Default Algorithm Requirements
+
+dotsecenv uses FIPS 186-5 compliant defaults out of the box:
+
+| Component  | Algorithm                                       |
+| ---------- | ----------------------------------------------- |
+| Symmetric  | AES-256-GCM                                     |
+| Hash       | SHA-256/SHA-512                                 |
+| Asymmetric | RSA 2048+, ECC P-384/P-521, EdDSA Ed25519/Ed448 |
+
+<Aside type="note">
+  Compliance is only as strong as your underlying GPG installation. For
+  regulated environments, ensure you're using a FIPS-validated
+  OpenSSL/libgcrypt.
+</Aside>
+
+---
+
+## Signature Verification
+
+Every vault entry is signed. Verification happens on read:
+
+```text
+Entry signature covers:
+├── Secret key name
+├── Available-to list (fingerprints)
+├── Encrypted value blob
+├── Timestamp
+└── Originator fingerprint
+```
+
+If any field is modified, verification fails:
+
+```bash
+dotsecenv validate
+# ✓ Vault header: valid
+# ✓ Identity entries: 2 valid
+# ✗ Secret entry 5: signature mismatch
+# Error: vault validation failed
+```
+
+---
+
+## Hermetic Testing
+
+[![Hermetic E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml)
+
+<Aside type="tip" title="Trust verification">
+  Every pull request runs e2e tests in a network-isolated environment with dual
+  verification that no external connections were made.
+</Aside>
+
+### Why Hermetic Testing Matters
+
+A secrets management tool that "phones home" or makes unexpected network connections poses a severe security risk. To address this concern, dotsecenv's CI pipeline includes **hermetic e2e testing** with dual independent verification:
+
+1. **Vendored Dependencies**: Go modules are vendored, eliminating network requirements during build
+2. **Dual Verification**: Two independent parallel jobs verify zero network connections:
+   - [step-security/harden-runner](https://github.com/step-security/harden-runner) - blocks egress at kernel level
+   - Network namespace + strace - traces all network syscalls in isolated namespace
+3. **Defense in Depth**: If one method has a bug, the other catches any violations
+4. **Auditable Artifacts**: Job summaries AND downloadable syscall traces
+5. **Release Gate**: Releases are blocked if hermetic tests fail
+
+### How It Works
+
+```text
+┌───────────────────────────────────────────────────────────────────────┐
+│                        GitHub Actions                                  │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  Job 1: harden-runner              Job 2: strace + namespace          │
+│  ┌─────────────────────────┐       ┌─────────────────────────┐        │
+│  │ egress-policy: block    │       │ unshare --net (isolate) │        │
+│  │ ────────────────────    │       │ strace -e network       │        │
+│  │                         │       │ ────────────────────────│        │
+│  │      make e2e           │       │                         │        │
+│  │  (vendored, no net)     │       │   make build e2e        │        │
+│  │                         │       │   (namespace blocks)    │        │
+│  │      ↓                  │       │      ↓                  │        │
+│  │ Job Summary: 0 conn     │       │ Artifact: syscall.log   │        │
+│  └─────────────────────────┘       └─────────────────────────┘        │
+│                                                                        │
+│  ✓ Both jobs must pass = zero network connections verified twice       │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+### Trusted By
+
+The harden-runner tool is used by Microsoft, Google, CISA, DataDog, Intel, Kubernetes, Node.js, and 8,000+ open source projects. It detected the tj-actions/changed-files supply chain attack (CVE-2025-30066).
+
+### Inspecting the Proof
+
+1. Open any [Hermetic E2E workflow](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml) run on GitHub Actions
+2. Check the **Job Summary** for harden-runner's network activity report
+3. Download the `network-syscall-trace` artifact to see the strace log
+
+You can also click the harden-runner dashboard link in the job summary for detailed analysis.
