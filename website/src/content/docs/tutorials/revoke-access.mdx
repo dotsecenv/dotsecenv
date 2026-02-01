@@ -70,7 +70,7 @@ Revoke someone's access to a secret. Understand what revocation does and doesn't
    Store a new value:
 
    ```bash
-   echo "new-secret-value" | dotsecenv secret put DATABASE_PASSWORD
+   echo "new-secret-value" | dotsecenv secret store DATABASE_PASSWORD
    ```
 
    This creates a new entry that the revoked user cannot access.
@@ -184,8 +184,8 @@ FINGERPRINT="THEIR_FINGERPRINT"
 dotsecenv secret revoke "*" "$FINGERPRINT" --all
 
 # 2. Rotate secrets (do this for each secret)
-echo "new-value" | dotsecenv secret put DATABASE_PASSWORD
-echo "new-value" | dotsecenv secret put API_KEY
+echo "new-value" | dotsecenv secret store DATABASE_PASSWORD
+echo "new-value" | dotsecenv secret store API_KEY
 # ... repeat for all secrets
 
 # 3. Commit

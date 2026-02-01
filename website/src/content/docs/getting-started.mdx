@@ -110,7 +110,7 @@ You need a GPG key. Most developers already have one for signing git commits. If
 5. **Store your first secret**
 
    ```bash
-   echo "my-secret-database-password" | dotsecenv secret put DATABASE_PASSWORD
+   echo "my-secret-database-password" | dotsecenv secret store DATABASE_PASSWORD
    ```
 
    The secret is now encrypted in your vault.

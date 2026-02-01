@@ -339,12 +339,12 @@ OLD_SECRET (deleted)
 ]
 ```
 
-### secret put
+### secret store
 
 Store an encrypted secret value.
 
 ```bash
-dotsecenv secret put SECRET [flags]
+dotsecenv secret store SECRET [flags]
 ```
 
 **Secret key formats:**
@@ -363,19 +363,19 @@ The secret value is read from stdin. Use `-v` to specify which vault to store th
 
 ```bash
 # Store a secret (pipe from echo)
-echo "my-secret-value" | dotsecenv secret put DATABASE_PASSWORD
+echo "my-secret-value" | dotsecenv secret store DATABASE_PASSWORD
 
 # Store a namespaced secret
-echo "prod-password" | dotsecenv secret put prod::DATABASE_PASSWORD
+echo "prod-password" | dotsecenv secret store prod::DATABASE_PASSWORD
 
 # Store interactively (type value, then Ctrl+D)
-dotsecenv secret put API_KEY
+dotsecenv secret store API_KEY
 
 # Store from file
-cat ~/.ssh/private_key | dotsecenv secret put SSH_PRIVATE_KEY
+cat ~/.ssh/private_key | dotsecenv secret store SSH_PRIVATE_KEY
 
 # Store in specific vault
-echo "value" | dotsecenv secret put -v ./vault SECRET_NAME
+echo "value" | dotsecenv secret store -v ./vault SECRET_NAME
 ```
 
 ### secret share
@@ -437,7 +437,7 @@ dotsecenv secret revoke DATABASE_PASSWORD FINGERPRINT
 dotsecenv secret revoke DATABASE_PASSWORD FINGERPRINT --all
 
 # Then rotate the secret
-echo "new-value" | dotsecenv secret put DATABASE_PASSWORD
+echo "new-value" | dotsecenv secret store DATABASE_PASSWORD
 ```
 
 ### secret forget
@@ -638,7 +638,7 @@ v0.4 changed the hash computation format to improve security. Secrets created wi
 
    ```bash
    # For each secret you created
-   dotsecenv secret get SECRET_KEY | dotsecenv secret put SECRET_KEY
+   dotsecenv secret get SECRET_KEY | dotsecenv secret store SECRET_KEY
    ```
 
 2. After re-signing, edit the vault file manually to remove old values that no longer validate. Look for entries where the `hash` field fails verification and delete those value blocks.

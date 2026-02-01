@@ -96,7 +96,7 @@ In 2024, [according to GitHub](https://resources.github.com/enterprise/understan
 
 ```bash
 # Store a secret (encrypted in vault, safe to commit)
-echo "your-secret-key" | dotsecenv secret put AWS_SECRET_ACCESS_KEY
+echo "your-secret-key" | dotsecenv secret store AWS_SECRET_ACCESS_KEY
 
 # Retrieve when needed (decrypted on-demand)
 dotsecenv secret get AWS_SECRET_ACCESS_KEY
@@ -155,7 +155,7 @@ dotsecenv init vault
 dotsecenv login [YOUR_PUBLIC_KEY_FINGERPRINT] # see `gpg --list-secret-keys`
 
 # 2. Create your first secret
-echo "my-database-password" | dotsecenv secret put DATABASE_PASSWORD
+echo "my-database-password" | dotsecenv secret store DATABASE_PASSWORD
 
 # 3. Retrieve it
 dotsecenv secret get DATABASE_PASSWORD

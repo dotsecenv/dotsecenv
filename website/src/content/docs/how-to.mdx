@@ -56,10 +56,10 @@ Move sensitive values from a plaintext `.env` to encrypted storage.
 
    ```bash
    # From .env: DATABASE_PASSWORD=super-secret
-   echo "super-secret" | dotsecenv secret put DATABASE_PASSWORD
+   echo "super-secret" | dotsecenv secret store DATABASE_PASSWORD
 
    # From .env: API_KEY=sk-abc123
-   echo "sk-abc123" | dotsecenv secret put API_KEY
+   echo "sk-abc123" | dotsecenv secret store API_KEY
    ```
 
 3. **Create .secenv file**
@@ -106,13 +106,13 @@ Store a new encrypted secret in your vault.
 ### From stdin (recommended)
 
 ```bash
-echo "my-secret-value" | dotsecenv secret put SECRET_NAME
+echo "my-secret-value" | dotsecenv secret store SECRET_NAME
 ```
 
 ### Interactive input
 
 ```bash
-dotsecenv secret put SECRET_NAME
+dotsecenv secret store SECRET_NAME
 # Type or paste the value
 # Press Ctrl+D when done
 ```
@@ -120,20 +120,20 @@ dotsecenv secret put SECRET_NAME
 ### From a file
 
 ```bash
-cat ~/.ssh/private_key | dotsecenv secret put SSH_PRIVATE_KEY
+cat ~/.ssh/private_key | dotsecenv secret store SSH_PRIVATE_KEY
 ```
 
 ### With a namespace
 
 ```bash
-echo "prod-password" | dotsecenv secret put prod::DATABASE_PASSWORD
-echo "dev-password" | dotsecenv secret put dev::DATABASE_PASSWORD
+echo "prod-password" | dotsecenv secret store prod::DATABASE_PASSWORD
+echo "dev-password" | dotsecenv secret store dev::DATABASE_PASSWORD
 ```
 
 ### To a specific vault
 
 ```bash
-echo "value" | dotsecenv secret put -v ./project/vault PROJECT_SECRET
+echo "value" | dotsecenv secret store -v ./project/vault PROJECT_SECRET
 ```
 
 <Aside type="tip">
@@ -232,7 +232,7 @@ dotsecenv secret revoke DATABASE_PASSWORD THEIR_FINGERPRINT
 Revoking access does NOT prevent them from decrypting the old value. Always rotate the secret after revoking:
 
 ```bash
-echo "new-value" | dotsecenv secret put DATABASE_PASSWORD
+echo "new-value" | dotsecenv secret store DATABASE_PASSWORD
 ```
 
 </Aside>
@@ -265,8 +265,8 @@ v0.4 changed the hash computation format to improve security (prevents value tra
    dotsecenv vault describe
 
    # For each secret you created, re-sign it
-   dotsecenv secret get DATABASE_PASSWORD | dotsecenv secret put DATABASE_PASSWORD
-   dotsecenv secret get API_KEY | dotsecenv secret put API_KEY
+   dotsecenv secret get DATABASE_PASSWORD | dotsecenv secret store DATABASE_PASSWORD
+   dotsecenv secret get API_KEY | dotsecenv secret store API_KEY
    # ... repeat for each secret
    ```
 
