@@ -242,8 +242,8 @@ gpg:
 	_, _, _ = runCmd("init", "vault", "-v", vaultPath)
 
 	// Test: dotsecenv validate -c conf -v vault
-	// Note: "secret put" reads secret from stdin usually, but we can pipe it
-	// However, "secret put" requires a login/fingerprint usually.
+	// Note: "secret store" reads secret from stdin usually, but we can pipe it
+	// However, "secret store" requires a login/fingerprint usually.
 	// "validate" is easier to test without extensive setup.
 	// Let's use "validate" with mixed flags.
 

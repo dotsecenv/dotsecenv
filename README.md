@@ -20,7 +20,7 @@ A complete Go CLI application for securely managing environment secrets with GPG
 dotsecenv init config
 dotsecenv init vault -v ~/.local/share/dotsecenv/vault
 dotsecenv login <YOUR GPG FINGERPRINT> # gpg --list-public-keys
-echo "xyz" | dotsecenv secret put TEST_SECRET
+echo "xyz" | dotsecenv secret store TEST_SECRET
 # Subsequently, you can decrypt secrets
 # as long as you hold the corresponding secret key in GPG agent
 dotsecenv secret get TEST_SECRET # should output "xyz"
@@ -282,7 +282,7 @@ dotsecenv init vault -v /path/to/vault
 dotsecenv login <FINGERPRINT>
 
 # Store a secret (reads value from stdin)
-echo "secret-value" | dotsecenv secret put MY_SECRET
+echo "secret-value" | dotsecenv secret store MY_SECRET
 
 # Retrieve a secret
 dotsecenv secret get MY_SECRET
@@ -326,7 +326,7 @@ dotsecenv validate --fix  # Attempt to fix issues
 | `init config [--gpg-program\|--no-gpg-program]` | Initialize configuration file                |
 | `init vault`                                    | Initialize vault file(s)                     |
 | `login FINGERPRINT`                             | Initialize user identity                     |
-| `secret put SECRET`                             | Store an encrypted secret (reads from stdin) |
+| `secret store SECRET`                             | Store an encrypted secret (reads from stdin) |
 | `secret get SECRET [--all\|--last\|--json]`     | Retrieve a secret value                      |
 | `secret share SECRET FINGERPRINT [--all]`       | Share a secret with another identity         |
 | `secret revoke SECRET FINGERPRINT [--all]`      | Revoke access to a secret                    |
@@ -525,7 +525,7 @@ When running with SUID privileges, the following restrictions apply:
 - `-c` and `-v` flags are blocked
 - `DOTSECENV_CONFIG` and `DOTSECENV_FINGERPRINT` environment variables are ignored
 - Config defaults to `/etc/dotsecenv/config`
-- Write operations are blocked: `login`, `init config`, `init vault`, `secret put`, `secret share`, `secret revoke`
+- Write operations are blocked: `login`, `init config`, `init vault`, `secret store`, `secret share`, `secret revoke`
 
 This prevents privilege escalation attacks when the binary is installed with elevated permissions.
 

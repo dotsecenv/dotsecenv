@@ -14,13 +14,13 @@ import (
 var secretCmd = &cobra.Command{
 	Use:   "secret",
 	Short: "Manage secrets",
-	Long:  `Commands for managing secrets: put, get, share, revoke, forget.`,
+	Long:  `Commands for managing secrets: store, get, share, revoke, forget.`,
 }
 
-// secret put (alias: store)
+// secret store (alias: put)
 var secretPutCmd = &cobra.Command{
-	Use:     "put SECRET",
-	Aliases: []string{"store"},
+	Use:     "store SECRET",
+	Aliases: []string{"put"},
 	Short:   "Store an encrypted secret",
 	Long: `Store an encrypted secret value.
 
@@ -54,7 +54,7 @@ to store the secret in (either a path or 1-based index).`,
 		}
 
 		// Read stdin BEFORE creating CLI (which acquires vault locks) to prevent
-		// deadlock when piping: `dotsecenv secret get KEY | dotsecenv secret put KEY`
+		// deadlock when piping: `dotsecenv secret get KEY | dotsecenv secret store KEY`
 		// If stdin is piped (not TTY), read it now before vault lock acquisition.
 		var preReadValue string
 		if !term.IsTerminal(int(os.Stdin.Fd())) {

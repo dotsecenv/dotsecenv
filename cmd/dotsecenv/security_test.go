@@ -116,15 +116,15 @@ gpg:
 
 	envA := []string{"GNUPGHOME=" + gpgHome, "DOTSECENV_FINGERPRINT=" + fpA}
 
-	// Init vault (identities are auto-added by secret put and secret share)
+	// Init vault (identities are auto-added by secret store and secret share)
 	_, _, _ = runCmdWithEnv(envA, "init", "vault", "-v", vaultPath)
 
-	// 1. User A puts secret
-	cmd := exec.Command(binaryPath, "-c", configPath, "secret", "put", "SEC1")
+	// 1. User A stores secret
+	cmd := exec.Command(binaryPath, "-c", configPath, "secret", "store", "SEC1")
 	cmd.Env = append(filteredEnv(), envA...)
 	cmd.Stdin = strings.NewReader("secret_value_1")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("secret put failed: %v\n%s", err, out)
+		t.Fatalf("secret store failed: %v\n%s", err, out)
 	}
 
 	// 2. User A shares with User B
@@ -213,11 +213,11 @@ gpg:
 	envA := []string{"GNUPGHOME=" + gpgHome, "DOTSECENV_FINGERPRINT=" + fpA}
 	envB := []string{"GNUPGHOME=" + gpgHome, "DOTSECENV_FINGERPRINT=" + fpB}
 
-	// Init vault (identities are auto-added by secret put and secret share)
+	// Init vault (identities are auto-added by secret store and secret share)
 	_, _, _ = runCmdWithEnv(envA, "init", "vault", "-v", vaultPath)
 
 	// 1. A creates secret (v1)
-	cmd := exec.Command(binaryPath, "-c", configPath, "secret", "put", "SEC1")
+	cmd := exec.Command(binaryPath, "-c", configPath, "secret", "store", "SEC1")
 	cmd.Env = append(filteredEnv(), envA...)
 	cmd.Stdin = strings.NewReader("v1")
 	_ = cmd.Run()
@@ -229,7 +229,7 @@ gpg:
 	_, _, _ = runCmdWithEnv(envA, "-c", configPath, "secret", "share", "SEC1", fpC)
 
 	// 4. A updates secret (v4) -> Only A has access
-	cmd = exec.Command(binaryPath, "-c", configPath, "secret", "put", "SEC1")
+	cmd = exec.Command(binaryPath, "-c", configPath, "secret", "store", "SEC1")
 	cmd.Env = append(filteredEnv(), envA...)
 	cmd.Stdin = strings.NewReader("v4")
 	_ = cmd.Run()

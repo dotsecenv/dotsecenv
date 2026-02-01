@@ -32,7 +32,7 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 		return NewError(vault.FormatSecretKeyError(normErr), ExitValidationError)
 	}
 
-	fp, err := c.checkFingerprintRequired("secret put")
+	fp, err := c.checkFingerprintRequired("secret store")
 	if err != nil {
 		return err
 	}

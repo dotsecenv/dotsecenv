@@ -25,7 +25,7 @@ COMMANDS:
   init config [-c PATH]         Initialize configuration file
   init vault [-c PATH]          Initialize vault (interactive from config)
   init vault -v PATH            Initialize specific vault file
-  secret put SECRET             Store encrypted secret
+  secret store SECRET           Store encrypted secret
   secret get SECRET [--all] [--json] Retrieve secret value(s)
   secret share SECRET FINGERPRINT [--all] Share secret with another identity
   secret revoke SECRET FINGERPRINT [--all] Revoke access from identity
