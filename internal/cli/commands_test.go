@@ -1402,7 +1402,7 @@ func TestSecretGet_WarnsWithoutTTY(t *testing.T) {
 	if !strings.Contains(stderr, "non-interactive terminal") {
 		t.Errorf("Expected non-interactive warning, got stderr: %s", stderr)
 	}
-	if !strings.Contains(stderr, "gpg-agent") {
-		t.Errorf("Expected gpg-agent recommendation in warning, got stderr: %s", stderr)
+	if !strings.Contains(stderr, "dotsecenv.com") {
+		t.Errorf("Expected dotsecenv.com URL in warning, got stderr: %s", stderr)
 	}
 }

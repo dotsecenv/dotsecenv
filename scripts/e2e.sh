@@ -67,8 +67,8 @@ if ! echo "$output" | grep -q "non-interactive terminal"; then
     exit 1
 fi
 
-if ! echo "$output" | grep -q "gpg-agent"; then
-    echo "FAIL: Expected gpg-agent recommendation in warning"
+if ! echo "$output" | grep -q "dotsecenv.com"; then
+    echo "FAIL: Expected dotsecenv.com URL in warning"
     echo "Got: $output"
     exit 1
 fi

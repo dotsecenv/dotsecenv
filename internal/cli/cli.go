@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/term"
-
 	"github.com/dotsecenv/dotsecenv/internal/xdg"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/config"
@@ -279,12 +277,4 @@ func (c *CLI) checkFingerprintRequired(operation string) (string, *Error) {
 		return "", NewError(msg, ExitFingerprintRequired)
 	}
 	return fp, nil
-}
-
-// isTerminal returns true if stdin is connected to a TTY.
-func (c *CLI) isTerminal() bool {
-	if f, ok := c.stdin.(*os.File); ok {
-		return term.IsTerminal(int(f.Fd()))
-	}
-	return false
 }
