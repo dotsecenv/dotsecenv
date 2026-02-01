@@ -25,6 +25,8 @@ export default defineConfig({
         baseUrl: 'https://github.com/dotsecenv/website/edit/main/',
       },
 
+      disable404Route: true,
+
       customCss: [
         '@fontsource/inter/400.css',
         '@fontsource/inter/500.css',

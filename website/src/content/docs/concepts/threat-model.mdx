@@ -127,6 +127,39 @@ dotsecenv refuses to encrypt/decrypt with weaker algorithms.
 
 In SUID mode, dotsecenv blocks write operations to prevent privilege escalation attacks. Read operations only.
 
+### Automated Secret Exfiltration
+
+AI coding assistants, build scripts, and other automated tools may attempt to read secrets programmatically. dotsecenv emits a **warning** when decrypting secrets in non-interactive terminals:
+
+```shell
+warning: decrypting in non-interactive terminal; for better security, configure GPG to require passphrase entry (https://dotsecenv.com/docs/concepts/threat-model#automated-secret-exfiltration)
+```
+
+<Aside type="caution" title="Not a Security Boundary">
+  This warning is for **awareness only**—dotsecenv does not block non-TTY access. TTY detection is trivially bypassed by attackers with code execution (e.g., using `script`, `unbuffer`, or allocating a PTY programmatically).
+
+An attacker can also bypass dotsecenv entirely by discovering your GPG key fingerprint from the vault and calling GPG directly.
+
+</Aside>
+
+**The only robust defense** against automated local secret exfiltration is **user presence verification** via GPG pinentry. Configure your GPG agent to never cache your passphrase:
+
+```ini
+# ~/.gnupg/gpg-agent.conf
+default-cache-ttl 0
+max-cache-ttl 0
+```
+
+This forces manual passphrase entry for every decryption operation, which automated tools cannot provide without higher privileges (e.g., root access or window server access to inject keystrokes).
+
+### Protecting .secenv Files
+
+To protect secrets stored in `.secenv` files from unauthorized decryption:
+
+1. Use the [shell plugin](/guides/shell-plugins) to decrypt secrets only when entering the directory.
+
+This ensures secrets are kept in **environment variables** (memory) rather than decrypted to disk. While effectively mitigating file theft, note that this is still vulnerable to **[Environment Snooping](#environment-snooping)** if an attacker has root/process access.
+
 ### PATH Injection Attacks
 
 dotsecenv supports configuring an **absolute path** to the GPG executable via `gpg.program`. This provides several security benefits:
@@ -497,6 +530,7 @@ The vault is designed to be safe in public repositories:
 | Weak algorithms        | Yes        | Config-enforced minimums              |
 | PATH injection         | Yes        | Configure absolute `gpg.program` path |
 | Stealth network egress | Yes        | Hermetic e2e with dual verification   |
+| Automated exfiltration | Partial    | `pinentry` (disable gpg-agent cache)  |
 | Root access            | No         | OS-level compromise                   |
 | Key theft              | No         | Guard your private key                |
 | Env snooping           | No         | Post-decryption risk                  |

@@ -3,7 +3,7 @@ title: Shell Plugins
 description: Automatic secret loading with shell plugins for Bash, Zsh, and Fish
 ---
 
-import { Tabs, TabItem, Aside, Steps } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Aside, Steps } from "@astrojs/starlight/components";
 
 The dotsecenv shell plugins automatically load secrets from `.secenv` files when you `cd` into a directory. When you leave, they are automatically unloaded—keeping your environment clean and secure.
 
@@ -25,6 +25,13 @@ dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
 ~/project/myapp/src $ cd ../..    # Leave the tree
 dotsecenv: unloaded 2 secret(s): DATABASE_URL, API_KEY
 ```
+
+<Aside type="tip" title="Security Benefit">
+  Using `.secenv` files keeps your secrets in environment variables (memory)
+  rather than written to disk in plaintext files. See [Protecting .secenv
+  Files](/concepts/threat-model/#protecting-secenv-files) in the Threat Model
+  for details.
+</Aside>
 
 ### Tree-Scoped Loading
 
@@ -103,6 +110,7 @@ dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
     ```bash
     source /path/to/dotsecenv.plugin.zsh
     ```
+
   </TabItem>
 
   <TabItem label="Bash">
@@ -115,6 +123,7 @@ dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
     ```bash
     curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
     ```
+
   </TabItem>
 
   <TabItem label="Fish">
@@ -127,6 +136,7 @@ dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
     ```bash
     source /path/to/conf.d/dotsecenv.fish
     ```
+
   </TabItem>
 </Tabs>
 
@@ -134,12 +144,12 @@ dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
 
 The plugins provide the `dse` command with subcommands for common operations:
 
-| Command | Description |
-|---------|-------------|
-| `dse` | Shorthand for `dotsecenv` (pass-through) |
+| Command        | Description                               |
+| -------------- | ----------------------------------------- |
+| `dse`          | Shorthand for `dotsecenv` (pass-through)  |
 | `dse get NAME` | Shorthand for `dotsecenv secret get NAME` |
-| `dse cp NAME` | Copy a secret directly to clipboard |
-| `dse reload` | Reload secrets in the current directory |
+| `dse cp NAME`  | Copy a secret directly to clipboard       |
+| `dse reload`   | Reload secrets in the current directory   |
 
 ### Pass-through to `dotsecenv`
 
@@ -175,7 +185,8 @@ dse cp API_KEY
 ```
 
 <Aside type="tip">
-This is safer than piping to `pbcopy` manually since the secret is never displayed on screen or saved to shell history.
+  This is safer than piping to `pbcopy` manually since the secret is never
+  displayed on screen or saved to shell history.
 </Aside>
 
 Clipboard support:
@@ -211,11 +222,11 @@ dotsecenv: found .secenv in /path/to/project
 Load secrets? [y]es / [n]o / [a]lways:
 ```
 
-| Option | Behavior |
-|--------|----------|
-| **y** / **yes** | Load secrets for this session only |
-| **n** / **no** | Skip loading for this session |
-| **a** / **always** | Permanently trust this directory |
+| Option             | Behavior                           |
+| ------------------ | ---------------------------------- |
+| **y** / **yes**    | Load secrets for this session only |
+| **n** / **no**     | Skip loading for this session      |
+| **a** / **always** | Permanently trust this directory   |
 
 ### Persistent Trust
 
@@ -286,10 +297,10 @@ Tools like [direnv](https://direnv.net/), [autoenv](https://github.com/hyperupca
 
 **Use them together:**
 
-| File | Tool | Purpose |
-|------|------|---------|
-| `.env` | direnv, autoenv, etc. | Non-sensitive configuration |
-| `.secenv` | dotsecenv | Secrets from your vault |
+| File      | Tool                  | Purpose                     |
+| --------- | --------------------- | --------------------------- |
+| `.env`    | direnv, autoenv, etc. | Non-sensitive configuration |
+| `.secenv` | dotsecenv             | Secrets from your vault     |
 
 <Aside type="tip" title="Recommended setup">
 Install both [direnv](https://direnv.net/) and dotsecenv. Let each tool do what it does best:
@@ -306,6 +317,7 @@ API_KEY={dotsecenv/production::API_KEY}
 ```
 
 This separation keeps your non-sensitive config in `.env` (version-controlled, no prompts) and your actual secrets in `.secenv` (vault-backed, trust-prompted).
+
 </Aside>
 
 ## Loading Order
@@ -313,8 +325,9 @@ This separation keeps your non-sensitive config in `.env` (version-controlled, n
 When loading a `.secenv` file:
 
 <Steps>
-1. **Phase 1**: Load plain variables (any `KEY=value` without `{dotsecenv}`)
-2. **Phase 2**: Fetch and load secrets (any `KEY={dotsecenv}` or `KEY={dotsecenv/name}`)
+  1. **Phase 1**: Load plain variables (any `KEY=value` without `{dotsecenv}`)
+  2. **Phase 2**: Fetch and load secrets (any `KEY={dotsecenv}` or `KEY=
+  {dotsecenv / name}`)
 </Steps>
 
 This ensures plain variables are available immediately, while secrets are fetched from your vault.
