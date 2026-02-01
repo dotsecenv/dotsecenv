@@ -10,14 +10,12 @@ import (
 )
 
 // Handler manages output emission based on mode and format.
-// It supports silent mode (suppress warnings), strict mode (warnings become errors),
-// and JSON mode (envelope output).
+// It supports silent mode (suppress warnings) and JSON mode (envelope output).
 type Handler struct {
 	stdin    io.Reader
 	stdout   io.Writer
 	stderr   io.Writer
 	silent   bool
-	strict   bool
 	json     bool
 	warnings []*Warning
 }
@@ -29,13 +27,6 @@ type HandlerOption func(*Handler)
 func WithSilent(silent bool) HandlerOption {
 	return func(h *Handler) {
 		h.silent = silent
-	}
-}
-
-// WithStrict sets strict mode (warnings become errors).
-func WithStrict(strict bool) HandlerOption {
-	return func(h *Handler) {
-		h.strict = strict
 	}
 }
 
@@ -68,33 +59,24 @@ func NewHandler(stdout, stderr io.Writer, opts ...HandlerOption) *Handler {
 
 // Warn emits a warning. In text mode, it prints immediately (unless silent).
 // In JSON mode, warnings are collected for the envelope.
-// Returns an error if strict mode is enabled.
-func (h *Handler) Warn(w *Warning) error {
+func (h *Handler) Warn(w *Warning) {
 	h.warnings = append(h.warnings, w)
-
-	if h.strict {
-		return w.ToError()
-	}
 
 	if !h.silent && !h.json {
 		// Immediate emission for text mode
 		_, _ = fmt.Fprintf(h.stderr, "warning: %s\n", w.Message)
 	}
-
-	return nil
 }
 
 // Warnf creates and emits a warning with a formatted message.
-// Returns an error if strict mode is enabled.
-func (h *Handler) Warnf(code Code, format string, args ...interface{}) error {
-	return h.Warn(NewWarningf(code, format, args...))
+func (h *Handler) Warnf(code Code, format string, args ...interface{}) {
+	h.Warn(NewWarningf(code, format, args...))
 }
 
 // WarnWithDetails creates and emits a warning with metadata.
-// Returns an error if strict mode is enabled.
-func (h *Handler) WarnWithDetails(code Code, message string, details map[string]interface{}) error {
+func (h *Handler) WarnWithDetails(code Code, message string, details map[string]interface{}) {
 	w := NewWarning(code, message).WithDetails(details)
-	return h.Warn(w)
+	h.Warn(w)
 }
 
 // Error emits an error to stderr (text mode only).
@@ -184,11 +166,6 @@ func (h *Handler) IsSilent() bool {
 	return h.silent
 }
 
-// IsStrict returns whether strict mode is enabled.
-func (h *Handler) IsStrict() bool {
-	return h.strict
-}
-
 // IsTerminal returns true if stdin is connected to an interactive terminal.
 func (h *Handler) IsTerminal() bool {
 	if f, ok := h.stdin.(*os.File); ok {
@@ -220,7 +197,6 @@ func (h *Handler) Clone() *Handler {
 		stdout:   h.stdout,
 		stderr:   h.stderr,
 		silent:   h.silent,
-		strict:   h.strict,
 		json:     h.json,
 		warnings: make([]*Warning, 0),
 	}
@@ -234,7 +210,6 @@ func (h *Handler) WithJSONMode(enabled bool) *Handler {
 		stdout:   h.stdout,
 		stderr:   h.stderr,
 		silent:   h.silent,
-		strict:   h.strict,
 		json:     enabled,
 		warnings: make([]*Warning, 0),
 	}

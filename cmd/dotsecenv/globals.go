@@ -124,7 +124,7 @@ func createCLI() (*clilib.CLI, error) {
 		return nil, err
 	}
 
-	return clilib.NewCLI(resolvedPaths, globalOpts.ConfigPath, globalOpts.Silent, false, os.Stdin, os.Stdout, os.Stderr)
+	return clilib.NewCLI(resolvedPaths, globalOpts.ConfigPath, globalOpts.Silent, os.Stdin, os.Stdout, os.Stderr)
 }
 
 // parseVaultSpec parses a vault specification (-v value) and returns the vault path and index

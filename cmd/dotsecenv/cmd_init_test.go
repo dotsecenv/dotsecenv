@@ -28,7 +28,6 @@ type configForTest struct {
 	} `yaml:"approved_algorithms"`
 	Fingerprint string   `yaml:"fingerprint,omitempty"`
 	Vault       []string `yaml:"vault"`
-	Strict      bool     `yaml:"strict"`
 	Behavior    struct {
 		RequireExplicitVaultUpgrade *bool `yaml:"require_explicit_vault_upgrade,omitempty"`
 		RestrictToConfiguredVaults  *bool `yaml:"restrict_to_configured_vaults,omitempty"`

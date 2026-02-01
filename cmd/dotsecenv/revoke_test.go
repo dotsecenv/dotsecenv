@@ -184,42 +184,19 @@ func TestSecretRevoke_Self(t *testing.T) {
 	tmpDir := t.TempDir()
 	vaultPath := filepath.Join(tmpDir, "vault")
 
-	// Create two configs: one with strict mode, one without
-	configPathStrict := filepath.Join(tmpDir, "config-strict.yaml")
-	configPathNonStrict := filepath.Join(tmpDir, "config.yaml")
+	configPath := filepath.Join(tmpDir, "config.yaml")
 
-	// Get the gpg path for strict mode config
-	gpgPath, err := exec.LookPath("gpg")
-	if err != nil {
-		t.Fatalf("failed to find gpg: %v", err)
-	}
-
-	configContentStrict := fmt.Sprintf(`
+	configContent := fmt.Sprintf(`
 approved_algorithms:
   - algo: RSA
     min_bits: 2048
 vault:
   - "%s"
-strict: true
-gpg:
-  program: "%s"
-`, vaultPath, gpgPath)
-
-	configContentNonStrict := fmt.Sprintf(`
-approved_algorithms:
-  - algo: RSA
-    min_bits: 2048
-vault:
-  - "%s"
-strict: false
 gpg:
   program: PATH
 `, vaultPath)
 
-	if err := os.WriteFile(configPathStrict, []byte(configContentStrict), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(configPathNonStrict, []byte(configContentNonStrict), 0600); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -234,13 +211,13 @@ gpg:
 		"DOTSECENV_FINGERPRINT=" + fpB,
 	}
 
-	// Init vault (use non-strict config for setup)
+	// Init vault
 	_, _, _ = runCmdWithEnv(envA, "init", "vault", "-v", vaultPath)
 
 	// Identities are auto-added by secret store (for User A) and secret share (for User B)
 
 	// 1. Store secret SEC1 (User A)
-	cmd := exec.Command(binaryPath, "-c", configPathNonStrict, "secret", "store", "SEC1")
+	cmd := exec.Command(binaryPath, "-c", configPath, "secret", "store", "SEC1")
 	cmd.Env = append(filteredEnv(), envA...)
 	cmd.Stdin = strings.NewReader("secret_value_1")
 	out, err := cmd.CombinedOutput()
@@ -249,13 +226,13 @@ gpg:
 	}
 
 	// 2. Share with User B (User A)
-	_, _, err = runCmdWithEnv(envA, "-c", configPathNonStrict, "secret", "share", "SEC1", fpB)
+	_, _, err = runCmdWithEnv(envA, "-c", configPath, "secret", "share", "SEC1", fpB)
 	if err != nil {
 		t.Fatalf("secret share failed: %v", err)
 	}
 
 	// Verify User B can access
-	stdout, _, err := runCmdWithEnv(envB, "-c", configPathNonStrict, "secret", "get", "SEC1")
+	stdout, _, err := runCmdWithEnv(envB, "-c", configPath, "secret", "get", "SEC1")
 	if err != nil {
 		t.Fatalf("secret get (B) failed: %v", err)
 	}
@@ -265,7 +242,7 @@ gpg:
 
 	// 3. Revoke User A (Self Revocation)
 	// User A revokes themselves.
-	_, _, err = runCmdWithEnv(envA, "-c", configPathNonStrict, "secret", "revoke", "SEC1", fpA)
+	_, _, err = runCmdWithEnv(envA, "-c", configPath, "secret", "revoke", "SEC1", fpA)
 	if err != nil {
 		t.Fatalf("secret revoke (self) failed: %v", err)
 	}
@@ -273,7 +250,7 @@ gpg:
 	// 4. Verify User A can still access older value after self-revocation
 	// After self-revocation, User A can still decrypt their original value
 	// (Fallback to older values is always allowed silently)
-	stdout, _, err = runCmdWithEnv(envA, "-c", configPathNonStrict, "secret", "get", "SEC1")
+	stdout, _, err = runCmdWithEnv(envA, "-c", configPath, "secret", "get", "SEC1")
 	if err != nil {
 		t.Errorf("expected secret get (A) to succeed with older value after self-revocation, got error: %v", err)
 	}
@@ -283,7 +260,7 @@ gpg:
 	}
 
 	// 5. Verify User B CAN still access (with either config)
-	stdout, _, err = runCmdWithEnv(envB, "-c", configPathNonStrict, "secret", "get", "SEC1")
+	stdout, _, err = runCmdWithEnv(envB, "-c", configPath, "secret", "get", "SEC1")
 	if err != nil {
 		t.Errorf("secret get (B) failed after A revoked self: %v", err)
 	}

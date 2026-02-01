@@ -49,7 +49,6 @@ type CLI struct {
 	gpgClient     gpg.Client
 	stdin         io.Reader
 	Silent        bool
-	Strict        bool            // Strict mode: certain warnings become errors
 	output        *output.Handler // Unified output handler
 }
 
@@ -58,12 +57,12 @@ func isSUID() bool {
 	return os.Getuid() != os.Geteuid()
 }
 
-func NewCLI(vaultPaths []string, configPath string, silent bool, strict bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
-	return newCLI(vaultPaths, configPath, silent, strict, stdin, stdout, stderr, nil)
+func NewCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
+	return newCLI(vaultPaths, configPath, silent, stdin, stdout, stderr, nil)
 }
 
 // newCLI creates a CLI instance. If requireExplicitUpgradeOverride is non-nil, it overrides the config setting.
-func newCLI(vaultPaths []string, configPath string, silent bool, strict bool, stdin io.Reader, stdout, stderr io.Writer, requireExplicitUpgradeOverride *bool) (*CLI, error) {
+func newCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer, requireExplicitUpgradeOverride *bool) (*CLI, error) {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
 		return nil, NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
@@ -97,20 +96,11 @@ func newCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
 	}
 
-	// Deprecation warning for strict: true
-	if cfg.Strict && !silent {
-		_, _ = fmt.Fprintf(stderr, "warning: 'strict: true' is deprecated and will be removed in a future version\n")
-		_, _ = fmt.Fprintf(stderr, "         Migrate to granular behavior settings: https://dotsecenv.com/docs/concepts/behavior-settings\n")
-	}
-
 	// Deprecation warning for fingerprint field (use login section instead)
 	if cfg.HasDeprecatedFingerprint() && !silent {
 		_, _ = fmt.Fprintf(stderr, "warning: 'fingerprint:' field is deprecated and will be removed in a future version\n")
 		_, _ = fmt.Fprintf(stderr, "         Run 'dotsecenv login %s' to migrate to signed login\n", cfg.Fingerprint)
 	}
-
-	// Compute effective strict mode early (CLI flag or config setting)
-	effectiveStrict := strict || cfg.Strict
 
 	// Validate and set GPG program path from config
 	if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program); err != nil {
@@ -214,10 +204,8 @@ func newCLI(vaultPaths []string, configPath string, silent bool, strict bool, st
 			gpgClient:     &gpg.GPGClient{},
 			stdin:         stdin,
 			Silent:        silent,
-			Strict:        effectiveStrict,
 			output: output.NewHandler(stdout, stderr,
 				output.WithSilent(silent),
-				output.WithStrict(effectiveStrict),
 			),
 		},
 		nil
