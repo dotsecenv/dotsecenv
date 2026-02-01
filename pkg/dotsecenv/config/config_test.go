@@ -125,3 +125,36 @@ vault:
 		t.Errorf("expected custom error message, got: %v", err)
 	}
 }
+
+// boolPtr returns a pointer to a bool value
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func TestShouldRequireTTYForDecryption(t *testing.T) {
+	tests := []struct {
+		name     string
+		behavior *bool
+		strict   bool
+		expected bool
+	}{
+		{"nil behavior, strict false", nil, false, false},
+		{"nil behavior, strict true", nil, true, true},
+		{"explicit false, strict true", boolPtr(false), true, false},
+		{"explicit true, strict false", boolPtr(true), false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{
+				Strict: tt.strict,
+				Behavior: BehaviorConfig{
+					RequireTTYForDecryption: tt.behavior,
+				},
+			}
+			if got := cfg.ShouldRequireTTYForDecryption(); got != tt.expected {
+				t.Errorf("ShouldRequireTTYForDecryption() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}

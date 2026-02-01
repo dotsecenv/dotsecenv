@@ -244,6 +244,14 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		return err
 	}
 
+	// Check if TTY is required for decryption
+	if c.config.ShouldRequireTTYForDecryption() && !c.isTerminal() {
+		return NewError(
+			"secret decryption blocked: TTY required but not detected (behavior.require_tty_for_decryption is enabled)",
+			ExitAccessDenied,
+		)
+	}
+
 	// Handle --last + -v combination - always error (conflicting flags)
 	if last && (vaultPath != "" || fromIndex != 0) {
 		vaultPaths := c.vaultResolver.GetVaultPaths()

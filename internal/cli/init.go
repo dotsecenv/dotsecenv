@@ -187,6 +187,8 @@ func saveConfigWithComments(path string, cfg config.Config) error {
 	sb.WriteString("  require_explicit_vault_upgrade: false\n")
 	sb.WriteString("  # Ignore CLI -v flags; only use vaults from this config file\n")
 	sb.WriteString("  restrict_to_configured_vaults: false\n")
+	sb.WriteString("  # Require a TTY for secret decryption (blocks automated/piped access)\n")
+	sb.WriteString("  require_tty_for_decryption: false\n")
 
 	// GPG section
 	sb.WriteString("\ngpg:\n")
