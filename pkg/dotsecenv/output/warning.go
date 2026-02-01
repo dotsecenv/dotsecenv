@@ -51,43 +51,6 @@ func (w *Warning) WithDetails(details map[string]interface{}) *Warning {
 	return w
 }
 
-// ToError converts a warning to an error for strict mode.
-// The error code is prefixed with "STRICT_" to indicate it originated as a warning.
-func (w *Warning) ToError() *Error {
-	// Map warning codes to appropriate error codes
-	errorCode := w.warningToErrorCode()
-
-	return &Error{
-		Code:    errorCode,
-		Message: "strict mode error: " + w.Message,
-		Details: w.Details,
-	}
-}
-
-// warningToErrorCode maps warning codes to appropriate error codes.
-func (w *Warning) warningToErrorCode() Code {
-	switch w.Code {
-	case CodeWarnIgnoringConfig:
-		return CodeConfigInvalid
-	case CodeWarnVaultNotInConfig:
-		return CodeVaultNotFound
-	case CodeWarnFlagIgnored, CodeWarnFlagConflict:
-		return CodeInvalidInput
-	case CodeWarnSelfRevoke:
-		return CodeAccessDenied
-	case CodeWarnIdentityNotFound:
-		return CodeIdentityNotFound
-	case CodeWarnDecodeFailure, CodeWarnDecryptFailure:
-		return CodeGPGDecryptFailed
-	case CodeWarnFallbackValue:
-		return CodeAccessDenied
-	case CodeWarnVaultLoadError:
-		return CodeVaultLoadError
-	default:
-		return CodeGeneralError
-	}
-}
-
 // String returns a human-readable representation of the warning.
 func (w *Warning) String() string {
 	return fmt.Sprintf("warning: %s", w.Message)

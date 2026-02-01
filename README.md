@@ -389,7 +389,6 @@ approved_algorithms:
     min_bits: 2048
 vault:
   - /path/to/vault1
-strict: false
 gpg:
   program: gpg # Path to GPG executable
 ```

@@ -249,9 +249,9 @@ func (m *Manager) GetSecretByKey(key string) *Secret {
 }
 
 // GetAccessibleSecretValue gets the most recent accessible secret value.
-// If strict is true, only returns a value if the identity has access to the LATEST value.
-func (m *Manager) GetAccessibleSecretValue(fingerprint, secretKey string, strict bool) *SecretValue {
-	return m.vault.GetAccessibleSecretValue(fingerprint, secretKey, strict)
+// Returns the most recent value the identity has access to (falls back to older values if needed).
+func (m *Manager) GetAccessibleSecretValue(fingerprint, secretKey string) *SecretValue {
+	return m.vault.GetAccessibleSecretValue(fingerprint, secretKey)
 }
 
 // CanIdentityAccessSecret checks if an identity can access a secret

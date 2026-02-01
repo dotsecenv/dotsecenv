@@ -390,7 +390,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		// Use GetAccessibleSecretFromAnyVault to find a value THIS user can access
 		// Always allow fallback to older values if latest is not accessible
 		var errGet error
-		secret, errGet = c.vaultResolver.GetAccessibleSecretFromAnyVault(secretKey, fp, false)
+		secret, errGet = c.vaultResolver.GetAccessibleSecretFromAnyVault(secretKey, fp)
 		if errGet != nil {
 			return NewError(fmt.Sprintf("access denied: secret '%s' not found or not accessible", secretKey), ExitAccessDenied)
 		}
@@ -528,7 +528,7 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 		}
 
 		// Always allow fallback to older values if latest is not accessible
-		val := manager.GetAccessibleSecretValue(fp, key, false)
+		val := manager.GetAccessibleSecretValue(fp, key)
 		if val == nil {
 			return NewError(fmt.Sprintf("access denied: you do not have access to secret '%s'", key), ExitAccessDenied)
 		}

@@ -177,8 +177,8 @@ func TestManagerGetAccessibleSecretValue(t *testing.T) {
 		},
 	})
 
-	// Non-strict mode: FP1 should get v1 (most recent they can access)
-	val := m.GetAccessibleSecretValue("FP1", "MY_SECRET", false)
+	// FP1 should get v1 (falls back to most recent they can access)
+	val := m.GetAccessibleSecretValue("FP1", "MY_SECRET")
 	if val == nil {
 		t.Fatal("expected value for FP1")
 	}
@@ -186,19 +186,19 @@ func TestManagerGetAccessibleSecretValue(t *testing.T) {
 		t.Errorf("expected v1, got %s", val.Value)
 	}
 
-	// Strict mode: FP1 cannot access latest (v2), so returns nil
-	val = m.GetAccessibleSecretValue("FP1", "MY_SECRET", true)
-	if val != nil {
-		t.Error("expected nil in strict mode for FP1")
-	}
-
-	// FP2 can access latest
-	val = m.GetAccessibleSecretValue("FP2", "MY_SECRET", true)
+	// FP2 can access latest (v2)
+	val = m.GetAccessibleSecretValue("FP2", "MY_SECRET")
 	if val == nil {
-		t.Fatal("expected value for FP2 in strict mode")
+		t.Fatal("expected value for FP2")
 	}
 	if val.Value != "v2" {
 		t.Errorf("expected v2, got %s", val.Value)
+	}
+
+	// FP3 has no access
+	val = m.GetAccessibleSecretValue("FP3", "MY_SECRET")
+	if val != nil {
+		t.Error("expected nil for FP3 (no access)")
 	}
 }
 
