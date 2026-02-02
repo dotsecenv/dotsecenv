@@ -42,6 +42,8 @@ jobs:
 
       - name: Build website
         run: make build
+        env:
+          DOTSECENV_VERSION: ${{ github.event.client_payload.version || '' }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

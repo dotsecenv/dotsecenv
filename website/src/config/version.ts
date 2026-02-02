@@ -1,14 +1,25 @@
 /**
  * dotsecenv version configuration
  *
- * Fetches the latest release version from GitHub at build time.
- * Falls back to a hardcoded version if the API is unavailable.
+ * Priority:
+ * 1. DOTSECENV_VERSION environment variable (if set)
+ * 2. Fetches the latest release version from GitHub at build time
+ * 3. Falls back to a hardcoded version if the API is unavailable
  */
 
 const GITHUB_REPO = 'dotsecenv/dotsecenv';
 const FALLBACK_VERSION = '0.2.1';
 
-async function fetchLatestVersion(): Promise<string> {
+async function getVersion(): Promise<string> {
+  // Check for environment variable override first
+  const envVersion = process.env.DOTSECENV_VERSION;
+  if (envVersion && envVersion.trim() !== '') {
+    const version = envVersion.trim().replace(/^v/, '');
+    console.log(`Using dotsecenv version from environment: ${version}`);
+    return version;
+  }
+
+  // Fetch from GitHub API
   try {
     const response = await fetch(
       `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
@@ -40,5 +51,5 @@ async function fetchLatestVersion(): Promise<string> {
   }
 }
 
-// Fetch once at module load time (build time in Astro)
-export const DOTSECENV_VERSION: Promise<string> = fetchLatestVersion();
+// Resolve version once at module load time (build time in Astro)
+export const DOTSECENV_VERSION: Promise<string> = getVersion();
