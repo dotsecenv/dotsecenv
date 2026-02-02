@@ -1,0 +1,384 @@
+---
+title: Changelog
+description: Release history for dotsecenv
+---
+
+All notable changes to dotsecenv are documented here. Each version includes changes from the previous release.
+
+---
+
+## v0.4.6
+
+_February 1, 2026_
+
+### Features
+
+- Warn when decrypting secrets in non-interactive terminals
+- Rename subcommand: `secret put` to `secret store`
+
+### Other
+
+- Update actions/download-artifact to v7
+- GitHub workflow and documentation updates
+
+---
+
+## v0.4.5
+
+_January 30, 2026_
+
+### Other
+
+- Prove 'no call home' with hermetic E2E testing
+
+---
+
+## v0.4.4
+
+_January 25, 2026_
+
+### Bug Fixes
+
+- Remove extra newline from `secret get` output
+- Allow Claude Code reviews for bots
+
+### Other
+
+- Remove extraneous data structures, print helpful errors, reduce complexity
+
+---
+
+## v0.4.3
+
+_January 12, 2026_
+
+### Features
+
+- Add list mode to `secret get` command
+
+### Bug Fixes
+
+- Consolidate hash computation to prevent signing/validation mismatch (breaking change)
+- Allow `secret put` to accept piped input
+
+---
+
+## v0.4.2
+
+_January 12, 2026_
+
+### Bug Fixes
+
+- Update homebrew-tap with post-notarization checksums
+
+---
+
+## v0.4.1
+
+_January 12, 2026_
+
+### Bug Fixes
+
+- Remove quarantine hook for notarized Homebrew binaries
+
+---
+
+## v0.4.0
+
+_January 12, 2026_
+
+### Features
+
+- Add macOS notarization for Darwin builds
+- Add `identity create` command and signed login proof
+- Simplify vault subcommands and add doctor health checks
+- Refactor strict mode option and simplify commands, warnings, and errors
+- Support multiple vault versions
+- Add `identity add -v` with clearer output and strict error behavior
+
+### Bug Fixes
+
+- Include .sig files in checksums regeneration
+- Attest Darwin archives after notarization
+- Detect GPG program before login handling
+- Add checkout step for verifying notarization
+- Consistent errors on `identity add` with missing/unreadable vaults
+- `identity add` should always prompt on multiple options
+- Uniform error messages in strict mode
+- Secrets are typed without echoing to terminal
+
+### Other
+
+- Add Claude Code Security Review workflow
+- Add Claude Code GitHub workflow
+- Sandbox helper for GPG e2e testing
+- Update dependencies (golang.org/x/term, golang.org/x/sys, actions/checkout)
+
+---
+
+## v0.3.3
+
+_January 4, 2026_
+
+### Bug Fixes
+
+- Release automation fixes
+
+---
+
+## v0.3.2
+
+_January 4, 2026_
+
+### Features
+
+- Add `init` config flags
+- Add GitHub Action support for `init` config with flags
+
+### Other
+
+- Update tagline
+- Suggest correct namespace separator if invalid one provided
+- Allow releases to trigger website redeploys
+
+---
+
+## v0.3.1
+
+_January 3, 2026_
+
+### Features
+
+- Secret keys now support dots (`.`)
+
+### Other
+
+- E2E test runs no longer pollute user's home directory
+- Only offer vaults that exist for prompt selection
+- Trigger website update on release
+
+---
+
+## v0.3.0
+
+_January 2, 2026_
+
+### Features
+
+- FIPS 140-3 compliance via crypto/fips140
+- Additional secret subcommands: `store`, `forget`
+- Configurable GPG program path
+
+### Other
+
+- Update dependencies (peter-evans/repository-dispatch, mlugg/setup-zig, actions/attest-build-provenance, actions/setup-go)
+- Add renovate.json for automated dependency updates
+
+---
+
+## v0.2.1
+
+_December 31, 2025_
+
+### Features
+
+- Configurable GPG program
+- Fail if GPG not found on init
+
+### Bug Fixes
+
+- Fix gpg_program logic
+
+### Other
+
+- Improve command error handling
+- Command suggestions for `identity`/`vault` check and login
+- Pre-commit hooks and CI improvements
+- Started working on Windows arm64/amd64 support
+
+---
+
+## v0.2.0
+
+_December 27, 2025_
+
+### Features
+
+- Use FIPS 140-3 validated boringcrypto for Linux builds
+- Default to FIPS 186-5 compliant algorithms and AES-256-GCM/AEAD encryption (RFC 9580)
+
+### Bug Fixes
+
+- Fix arm/amd compilation with CGO
+- Migrate away from deprecated mise ubi backend
+
+---
+
+## v0.1.0
+
+_December 25, 2025_
+
+### Features
+
+- Define `namespace::secret` naming convention
+
+### Other
+
+- Expanded FAQ and shell plugin references
+- Improved identity error messages
+
+---
+
+## v0.0.11
+
+_January 12, 2026_
+
+### Bug Fixes
+
+- Attest Darwin archives after notarization
+- Detect GPG program before login handling
+
+---
+
+## v0.0.10
+
+_January 12, 2026_
+
+### Bug Fixes
+
+- Add checkout step for verifying notarization
+
+---
+
+## v0.0.9
+
+_January 12, 2026_
+
+### Features
+
+- Add macOS notarization for Darwin builds
+- Add `identity create` command and signed login proof
+- Simplify vault subcommands and add doctor health checks
+- Refactor strict mode option and simplify commands
+- Support multiple vault versions
+- Additional secret subcommands: `store`, `forget`
+- Init config flags
+- Secret keys support dots
+- FIPS 140-3 via crypto/fips140
+- Configurable GPG program path
+- FIPS 186-5 compliant algorithms and AES-256-GCM/AEAD encryption
+
+### Bug Fixes
+
+- Consistent errors on identity add with missing/unreadable vaults
+- Identity add prompts on multiple options
+- Uniform error messages in strict mode
+- Secrets typed without echoing to terminal
+- Release automation fixes
+- Arm/amd compilation with CGO
+
+### Other
+
+- Claude Code Security Review and GitHub workflows
+- Sandbox helper for GPG e2e testing
+- Dependency updates
+- Pre-commit hooks and test improvements
+
+---
+
+## v0.0.8
+
+_December 22, 2025_
+
+### Other
+
+- Remove initial macOS call from tests
+
+---
+
+## v0.0.7
+
+_December 22, 2025_
+
+### Bug Fixes
+
+- Fix macOS quarantine prompt
+
+### Other
+
+- Cache artifacts in tests
+
+---
+
+## v0.0.6
+
+_December 22, 2025_
+
+### Bug Fixes
+
+- Homebrew man pages are correctly included
+
+---
+
+## v0.0.5
+
+_December 22, 2025_
+
+### Bug Fixes
+
+- Fix GitHub Action GPG signature verification
+
+---
+
+## v0.0.4
+
+_December 22, 2025_
+
+### Features
+
+- Generate SBOMs and trigger e2e tests after release
+
+---
+
+## v0.0.3
+
+_December 22, 2025_
+
+### Features
+
+- Trigger e2e tests after release
+
+### Bug Fixes
+
+- Fix SBOM generation
+- Fix GitHub Action build-from-source
+
+---
+
+## v0.0.2
+
+_December 21, 2025_
+
+### Features
+
+- Add GitHub Action
+
+### Other
+
+- Fix release tag format
+
+---
+
+## v0.0.1
+
+_December 20, 2025_
+
+Initial release.
+
+### Features
+
+- Core secret management CLI
+- GPG-based encryption at rest
+- Vault format for organizing secrets
+- Identity management commands
+- Shell integration support

@@ -119,6 +119,7 @@ export default defineConfig({
           label: 'Reference',
           items: [
             { label: 'CLI Reference', slug: 'reference' },
+            { label: 'Changelog', slug: 'changelog' },
           ],
         },
       ],
