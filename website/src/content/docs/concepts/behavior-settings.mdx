@@ -7,11 +7,7 @@ import { Aside, Badge, Tabs, TabItem } from '@astrojs/starlight/components';
 
 ## Overview
 
-dotsecenv provides granular behavior settings that control how the tool handles various edge cases and error conditions. These settings replace the previous all-or-nothing `strict: true` flag with fine-grained controls.
-
-<Aside type="caution" title="Deprecation Notice">
-  The `strict: true` configuration option is deprecated and will be removed in a future version. Please migrate to the granular behavior settings described below.
-</Aside>
+dotsecenv provides granular behavior settings that control how the tool handles various edge cases and error conditions.
 
 ## Configuration
 
@@ -64,9 +60,9 @@ behavior:
   restrict_to_configured_vaults: true
 ```
 
-## Simplified Behaviors
+## Default Behaviors
 
-Several behaviors that were previously controlled by `strict: true` now have sensible defaults that cannot be changed:
+The following behaviors have sensible defaults:
 
 | Behavior | Default | Rationale |
 |----------|---------|-----------|
@@ -89,7 +85,7 @@ This allows multi-user scenarios where each user maintains their own private val
 
 ## GPG Program Configuration
 
-The GPG program path is now configured explicitly:
+The GPG program path is configured explicitly:
 
 ```yaml
 gpg:
@@ -101,46 +97,6 @@ gpg:
 <Aside type="note">
   An empty or missing `gpg.program` value will cause an error. You must explicitly set it to `PATH` or provide an absolute path.
 </Aside>
-
-## Migration from `strict: true`
-
-If you currently use `strict: true`, here's how to migrate:
-
-<Tabs>
-  <TabItem label="Before">
-
-    ```yaml
-    # Old configuration
-    strict: true
-    ```
-
-  </TabItem>
-  <TabItem label="After">
-
-    ```yaml
-    # New configuration - choose which behaviors you need
-    behavior:
-      require_explicit_vault_upgrade: true
-      restrict_to_configured_vaults: true
-
-    gpg:
-      program: /usr/bin/gpg  # Or PATH
-    ```
-
-  </TabItem>
-</Tabs>
-
-The `strict: true` shorthand still works during the deprecation period and is equivalent to setting both behavior flags to `true`.
-
-### Hybrid Configuration
-
-You can use `strict: true` with individual overrides:
-
-```yaml
-strict: true
-behavior:
-  require_explicit_vault_upgrade: false  # Override: allow auto-upgrades
-```
 
 ## Example Configurations
 

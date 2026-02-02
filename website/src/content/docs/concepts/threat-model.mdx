@@ -172,17 +172,16 @@ This enables:
 - Integration with hardware security modules (HSMs)
 - Rate limiting to prevent abuse
 
-#### Strict Mode Requirement
+#### Explicit GPG Path Configuration
 
-In **strict mode** (`strict: true`), dotsecenv requires an explicit `gpg.program` path:
+For security-sensitive environments, configure an explicit `gpg.program` path:
 
 ```yaml
-strict: true
 gpg:
-  program: /usr/bin/gpg # Required in strict mode
+  program: /usr/bin/gpg # Explicit path recommended
 ```
 
-This prevents accidental reliance on PATH resolution in security-sensitive environments.
+This prevents accidental reliance on PATH resolution.
 
 <Aside type="tip">
   For maximum security, always configure `gpg.program` with an absolute path,
