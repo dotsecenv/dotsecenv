@@ -108,7 +108,7 @@ func (m *MockVaultResolver) GetSecretFromAnyVault(key string, stderr io.Writer) 
 	return nil, fmt.Errorf("secret not found")
 }
 
-func (m *MockVaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint string, strict bool) (*vault.SecretValue, error) {
+func (m *MockVaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint string) (*vault.SecretValue, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -125,18 +125,7 @@ func (m *MockVaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint str
 					continue
 				}
 
-				// In strict mode, only check the latest value
-				if strict {
-					latestValue := &secret.Values[len(secret.Values)-1]
-					for _, fp := range latestValue.AvailableTo {
-						if fp == fingerprint {
-							return latestValue, nil
-						}
-					}
-					continue
-				}
-
-				// Non-strict: check from most recent to oldest for accessible value
+				// Check from most recent to oldest for accessible value
 				for j := len(secret.Values) - 1; j >= 0; j-- {
 					for _, fp := range secret.Values[j].AvailableTo {
 						if fp == fingerprint {

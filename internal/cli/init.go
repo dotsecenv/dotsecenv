@@ -277,7 +277,7 @@ func InitVaultFile(vaultPath string, out *output.Handler) *Error {
 		return NewError(fmt.Sprintf("vault file already exists: %s", vaultPath), ExitVaultError)
 	}
 
-	// Create empty vault structure (strictMode=false since we're creating new)
+	// Create empty vault structure (requireExplicitUpgrade=false since we're creating new)
 	vm := vault.NewManager(vaultPath, false)
 
 	// Create directory if needed

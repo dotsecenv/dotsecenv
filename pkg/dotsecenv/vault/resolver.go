@@ -212,8 +212,8 @@ func (vr *VaultResolver) GetSecretFromAnyVault(key string, stderr io.Writer) (*S
 }
 
 // GetAccessibleSecretFromAnyVault retrieves the most recent accessible secret value from any vault, searching in order.
-// If strict is true, only returns a value if the identity has access to the LATEST value of the secret.
-func (vr *VaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint string, strict bool) (*SecretValue, error) {
+// Returns the most recent value the identity has access to (falls back to older values if needed).
+func (vr *VaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint string) (*SecretValue, error) {
 	vr.mu.RLock()
 	defer vr.mu.RUnlock()
 
@@ -225,7 +225,7 @@ func (vr *VaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint string
 			continue
 		}
 
-		val := manager.GetAccessibleSecretValue(fingerprint, key, strict)
+		val := manager.GetAccessibleSecretValue(fingerprint, key)
 		if val != nil {
 			return val, nil
 		}

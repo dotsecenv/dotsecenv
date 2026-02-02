@@ -15,7 +15,7 @@ func (c *CLI) ensureIdentityInVault(fingerprint string, index int) *Error {
 		return nil
 	}
 
-	// Always auto-add with warning (simplified behavior - no strict mode check)
+	// Auto-add with warning
 	vaultPath := c.vaultResolver.GetConfig().Entries[index].Path
 	_, _ = fmt.Fprintf(c.output.Stderr(), "warning: identity %s did not previously exist in vault\n", fingerprint)
 	_, _ = fmt.Fprintf(c.output.Stderr(), "warning: adding identity to vault %d (%s)\n", index+1, vaultPath)

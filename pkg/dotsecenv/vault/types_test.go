@@ -97,33 +97,27 @@ func TestVault_GetAccessibleSecretValue(t *testing.T) {
 		},
 	}
 
-	// Test Strict Mode
-	t.Run("Strict Mode", func(t *testing.T) {
-		// User2 should see "new"
-		val := v.GetAccessibleSecretValue("user2", "secret1", true)
-		if val == nil || val.Value != "new" {
-			t.Error("user2 should see 'new' in strict mode")
-		}
-
-		// User1 should see nil because they don't have access to "new" (latest)
-		val = v.GetAccessibleSecretValue("user1", "secret1", true)
-		if val != nil {
-			t.Error("user1 should not see anything in strict mode (only has access to old)")
-		}
-	})
-
-	// Test Non-Strict Mode (Fallback)
-	t.Run("Non-Strict Mode", func(t *testing.T) {
-		// User2 should see "new"
-		val := v.GetAccessibleSecretValue("user2", "secret1", false)
+	t.Run("user with latest access", func(t *testing.T) {
+		// User2 should see "new" (latest value they have access to)
+		val := v.GetAccessibleSecretValue("user2", "secret1")
 		if val == nil || val.Value != "new" {
 			t.Error("user2 should see 'new'")
 		}
+	})
 
-		// User1 should see "old" (fallback)
-		val = v.GetAccessibleSecretValue("user1", "secret1", false)
+	t.Run("user with fallback access", func(t *testing.T) {
+		// User1 should see "old" (falls back to older value they have access to)
+		val := v.GetAccessibleSecretValue("user1", "secret1")
 		if val == nil || val.Value != "old" {
 			t.Error("user1 should see 'old'")
+		}
+	})
+
+	t.Run("user with no access", func(t *testing.T) {
+		// User3 should see nil (no access to any value)
+		val := v.GetAccessibleSecretValue("user3", "secret1")
+		if val != nil {
+			t.Error("user3 should not see anything")
 		}
 	})
 }
@@ -204,19 +198,14 @@ func TestVault_GetAccessibleSecretValue_Deleted(t *testing.T) {
 
 	t.Run("deleted secret returns nil", func(t *testing.T) {
 		// Even though user1 had access to the old value, deleted secret returns nil
-		val := v.GetAccessibleSecretValue("user1", "deleted_secret", false)
+		val := v.GetAccessibleSecretValue("user1", "deleted_secret")
 		if val != nil {
 			t.Error("deleted secret should return nil even for user with previous access")
-		}
-
-		val = v.GetAccessibleSecretValue("user1", "deleted_secret", true)
-		if val != nil {
-			t.Error("deleted secret should return nil in strict mode too")
 		}
 	})
 
 	t.Run("active secret still works", func(t *testing.T) {
-		val := v.GetAccessibleSecretValue("user1", "active_secret", false)
+		val := v.GetAccessibleSecretValue("user1", "active_secret")
 		if val == nil || val.Value != "value" {
 			t.Error("active secret should be accessible")
 		}

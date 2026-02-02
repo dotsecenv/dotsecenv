@@ -28,7 +28,6 @@ type configForTest struct {
 	} `yaml:"approved_algorithms"`
 	Fingerprint string   `yaml:"fingerprint,omitempty"`
 	Vault       []string `yaml:"vault"`
-	Strict      bool     `yaml:"strict"`
 	Behavior    struct {
 		RequireExplicitVaultUpgrade *bool `yaml:"require_explicit_vault_upgrade,omitempty"`
 		RestrictToConfiguredVaults  *bool `yaml:"restrict_to_configured_vaults,omitempty"`
@@ -126,18 +125,6 @@ func TestInitConfig_NoStrictFieldInOutput(t *testing.T) {
 	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
 	if err != nil {
 		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
-	}
-
-	// Read raw config and verify strict field is not present
-	// (we use behavior section now instead)
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatalf("failed to read config file: %v", err)
-	}
-	content := string(data)
-
-	if strings.Contains(content, "strict:") {
-		t.Errorf("expected config to NOT contain 'strict:' field, but it does")
 	}
 }
 

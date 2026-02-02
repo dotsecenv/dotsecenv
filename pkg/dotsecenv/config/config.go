@@ -25,7 +25,6 @@ type GPGConfig struct {
 
 // BehaviorConfig holds granular behavior settings.
 // All fields are *bool to distinguish between "not set" (nil) and "explicitly false".
-// When nil, the legacy Strict field is used as fallback.
 type BehaviorConfig struct {
 	// RequireExplicitVaultUpgrade when true prevents automatic vault format upgrades.
 	// Users must run `dotsecenv vault upgrade` explicitly.
@@ -50,7 +49,6 @@ type Config struct {
 	Login              *Login              `yaml:"login,omitempty"`       // Authenticated login with cryptographic proof
 	Fingerprint        string              `yaml:"fingerprint,omitempty"` // DEPRECATED: use login section instead
 	Vault              []string            `yaml:"vault"`                 // List of vault paths
-	Strict             bool                `yaml:"strict"`                // DEPRECATED: use behavior section
 	Behavior           BehaviorConfig      `yaml:"behavior,omitempty"`    // Granular behavior settings
 	GPG                GPGConfig           `yaml:"gpg,omitempty"`         // GPG configuration
 }
@@ -89,21 +87,19 @@ func (c *Config) UnmarshalYAML(node *yaml.Node) error {
 }
 
 // ShouldRequireExplicitVaultUpgrade returns true if automatic vault upgrades should be prevented.
-// Checks behavior setting first, falls back to legacy Strict field.
 func (c *Config) ShouldRequireExplicitVaultUpgrade() bool {
 	if c.Behavior.RequireExplicitVaultUpgrade != nil {
 		return *c.Behavior.RequireExplicitVaultUpgrade
 	}
-	return c.Strict
+	return false
 }
 
 // ShouldRestrictToConfiguredVaults returns true if CLI -v flags should be ignored.
-// Checks behavior setting first, falls back to legacy Strict field.
 func (c *Config) ShouldRestrictToConfiguredVaults() bool {
 	if c.Behavior.RestrictToConfiguredVaults != nil {
 		return *c.Behavior.RestrictToConfiguredVaults
 	}
-	return c.Strict
+	return false
 }
 
 // GetFingerprint returns the active fingerprint, preferring login.fingerprint over the deprecated field.
@@ -151,7 +147,6 @@ func DefaultConfig() Config {
 			},
 		},
 		Fingerprint: "",
-		Strict:      false,
 		Vault:       []string{},                 // No default vaults from library; caller must populate
 		GPG:         GPGConfig{Program: "PATH"}, // Default to PATH inference
 	}

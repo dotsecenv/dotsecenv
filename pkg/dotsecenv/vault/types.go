@@ -114,8 +114,8 @@ func (s Secret) IsDeleted() bool {
 // GetAccessibleSecretValue returns the most recent secret value accessible to the identity.
 // Returns nil if identity cannot access any version of the secret.
 // Returns nil if the secret is deleted (latest value has Deleted=true).
-// If strict is true, only returns a value if the identity has access to the LATEST value.
-func (v Vault) GetAccessibleSecretValue(fingerprint, secretKey string, strict bool) *SecretValue {
+// Falls back to older values if the identity doesn't have access to the latest.
+func (v Vault) GetAccessibleSecretValue(fingerprint, secretKey string) *SecretValue {
 	secret := v.GetSecretByKey(secretKey)
 	if secret == nil {
 		return nil
@@ -130,18 +130,7 @@ func (v Vault) GetAccessibleSecretValue(fingerprint, secretKey string, strict bo
 		return nil
 	}
 
-	// In strict mode, only check the latest value
-	if strict {
-		latestValue := &secret.Values[len(secret.Values)-1]
-		for _, fp := range latestValue.AvailableTo {
-			if fp == fingerprint {
-				return latestValue
-			}
-		}
-		return nil
-	}
-
-	// Non-strict mode: check from most recent to oldest (fallback behavior)
+	// Check from most recent to oldest (fallback behavior)
 	for i := len(secret.Values) - 1; i >= 0; i-- {
 		for _, fp := range secret.Values[i].AvailableTo {
 			if fp == fingerprint {

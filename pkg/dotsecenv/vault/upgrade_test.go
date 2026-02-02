@@ -392,7 +392,7 @@ func TestUpgradeV1ToV2(t *testing.T) {
 	}
 }
 
-func TestStrictModeNoUpgrade(t *testing.T) {
+func TestRequireExplicitUpgrade_NoAutoUpgrade(t *testing.T) {
 	// Copy v1 fixture to temp dir
 	tmpDir := t.TempDir()
 	vaultPath := filepath.Join(tmpDir, "vault")
@@ -411,13 +411,13 @@ func TestStrictModeNoUpgrade(t *testing.T) {
 		t.Fatalf("NewWriter failed: %v", err)
 	}
 
-	// Check with strict mode - should not upgrade
+	// With requireExplicitUpgrade=true, should not auto-upgrade
 	upgraded, err := CheckAndUpgradeVault(w, vaultPath, true)
 	if err != nil {
 		t.Fatalf("CheckAndUpgradeVault failed: %v", err)
 	}
 	if upgraded {
-		t.Error("strict mode should not upgrade vault")
+		t.Error("requireExplicitUpgrade=true should not auto-upgrade vault")
 	}
 
 	// Verify file unchanged (still has v1 content in JSON)
@@ -426,7 +426,7 @@ func TestStrictModeNoUpgrade(t *testing.T) {
 		t.Fatalf("failed to read vault: %v", err)
 	}
 	if !strings.Contains(string(data), `"version":1`) {
-		t.Errorf("vault should still have version 1 in header JSON in strict mode")
+		t.Errorf("vault should still have version 1 in header JSON when requireExplicitUpgrade=true")
 	}
 }
 
@@ -503,7 +503,7 @@ func TestManagerAutoUpgrade(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
-	// Open with Manager (non-strict mode)
+	// Open with Manager (auto-upgrade enabled)
 	m := NewManager(vaultPath, false)
 	if err := m.OpenAndLock(); err != nil {
 		t.Fatalf("OpenAndLock failed: %v", err)
@@ -539,7 +539,7 @@ func TestManagerAutoUpgrade(t *testing.T) {
 	}
 }
 
-func TestManagerStrictModeNoUpgrade(t *testing.T) {
+func TestManagerRequireExplicitUpgrade_NoAutoUpgrade(t *testing.T) {
 	// Copy v1 fixture to temp dir
 	tmpDir := t.TempDir()
 	vaultPath := filepath.Join(tmpDir, "vault")
@@ -552,7 +552,7 @@ func TestManagerStrictModeNoUpgrade(t *testing.T) {
 		t.Fatalf("failed to write vault: %v", err)
 	}
 
-	// Open with Manager (strict mode)
+	// Open with Manager (requireExplicitUpgrade=true)
 	m := NewManager(vaultPath, true)
 	if err := m.OpenAndLock(); err != nil {
 		t.Fatalf("OpenAndLock failed: %v", err)
@@ -561,7 +561,7 @@ func TestManagerStrictModeNoUpgrade(t *testing.T) {
 
 	// Verify vault is NOT upgraded (still v1)
 	if m.Version() != 1 {
-		t.Errorf("strict mode should not upgrade, expected version 1, got %d", m.Version())
+		t.Errorf("requireExplicitUpgrade=true should not auto-upgrade, expected version 1, got %d", m.Version())
 	}
 
 	// Verify data is still accessible

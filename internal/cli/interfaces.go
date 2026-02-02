@@ -12,7 +12,7 @@ type VaultResolver interface {
 	AddSecret(secret vault.Secret, index int) error
 	SaveAll() error
 	GetSecretFromAnyVault(key string, stderr io.Writer) (*vault.SecretValue, error)
-	GetAccessibleSecretFromAnyVault(key, fingerprint string, strict bool) (*vault.SecretValue, error)
+	GetAccessibleSecretFromAnyVault(key, fingerprint string) (*vault.SecretValue, error)
 	GetSecretByKeyFromVault(index int, key string) *vault.Secret
 	FindSecretVaultIndex(key string) int
 	GetVaultManager(index int) *vault.Manager
