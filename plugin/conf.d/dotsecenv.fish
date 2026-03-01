@@ -281,6 +281,10 @@ function _dotsecenv_load_file
                     set -g -a _DOTSECENV_SECRETS_LOADED "$key"
                     # Show any warnings that were emitted
                     test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
+                    # Warn if value contains newlines (fish splits on newlines into list elements)
+                    if test (count $secret_result) -gt 1
+                        echo "dotsecenv: warning: $key contains newlines; use (string join \\n \$$key) to reconstruct the full value" >&2
+                    end
                 else
                     echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
                     cat "$secret_stderr_file" >&2
@@ -344,6 +348,9 @@ function _dotsecenv_refetch_key
                     if test $status -eq 0
                         set -gx $key "$secret_result"
                         test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
+                        if test (count $secret_result) -gt 1
+                            echo "dotsecenv: warning: $key contains newlines; use (string join \\n \$$key) to reconstruct the full value" >&2
+                        end
                     end
                     rm -f "$secret_stderr_file"
                 else if test "$ptype" = plain

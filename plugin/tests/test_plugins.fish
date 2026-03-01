@@ -84,6 +84,7 @@ if [[ "$1" == "secret" && "$2" == "get" ]]; then
         "API_KEY") echo "mock-api-key-12345" ;;
         "PROD_SECRET") echo "production-secret-value" ;;
         "MISSING_SECRET") exit 1 ;;
+        "MULTILINE_SECRET") printf 'line1\nline2\nline3' ;;
         *) exit 1 ;;
     esac
 else
@@ -570,6 +571,38 @@ function test_tree_scope_no_reload_from_subdir
     end
 end
 
+function test_multiline_warning
+    log "[fish] Testing multiline value warning..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_multiline"
+    mkdir -p "$test_dir"
+
+    echo 'MULTILINE_SECRET={dotsecenv}' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    set config_dir "$TEMP_DIR/config"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir'
+        _dotsecenv_on_cd '' '$test_dir'
+    " 2>&1)
+
+    if string match -q "*contains newlines*" "$result"; and string match -q "*string join*" "$result"
+        pass "[fish] Multiline value warning displayed correctly"
+    else
+        fail "[fish] Multiline value warning not displayed, got: $result"
+    end
+end
+
 # ============================================================================
 # Main
 # ============================================================================
@@ -610,6 +643,7 @@ function main
     test_tree_scope_nested_secenv
     test_tree_scope_sibling_navigation
     test_tree_scope_no_reload_from_subdir
+    test_multiline_warning
 
     cleanup
 

@@ -124,6 +124,7 @@ if [[ "$1" == "secret" && "$2" == "get" ]]; then
         "API_KEY") echo "mock-api-key-12345" ;;
         "PROD_SECRET") echo "production-secret-value" ;;
         "MISSING_SECRET") exit 1 ;;
+        "MULTILINE_SECRET") printf 'line1\nline2\nline3' ;;
         *) exit 1 ;;
     esac
 else
@@ -908,6 +909,50 @@ EOF
     fi
 }
 
+test_multiline_warning() {
+    local shell="$1"
+    log "[$shell] Testing multiline value warning..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_multiline"
+    mkdir -p "$test_dir"
+
+    cat >"$test_dir/.secenv" <<'EOF'
+MULTILINE_SECRET={dotsecenv}
+EOF
+    chmod 644 "$test_dir/.secenv"
+
+    local config_dir="$TEMP_DIR/config"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir'
+            _dotsecenv_chpwd_hook
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir'
+        " 2>&1)
+    fi
+
+    if [[ "$result" == *"contains newlines"* && "$result" == *"always quote"* ]]; then
+        pass "[$shell] Multiline value warning displayed correctly"
+    else
+        fail "[$shell] Multiline value warning not displayed, got: $result"
+    fi
+}
+
 # ============================================================================
 # Main
 # ============================================================================
@@ -949,6 +994,7 @@ main() {
         test_tree_scope_nested_secenv "bash"
         test_tree_scope_sibling_navigation "bash"
         test_tree_scope_no_reload_from_subdir "bash"
+        test_multiline_warning "bash"
     fi
 
     # Run zsh tests
@@ -973,6 +1019,7 @@ main() {
             test_tree_scope_nested_secenv "zsh"
             test_tree_scope_sibling_navigation "zsh"
             test_tree_scope_no_reload_from_subdir "zsh"
+            test_multiline_warning "zsh"
         else
             warn "Zsh not found, skipping zsh tests"
         fi

@@ -294,6 +294,10 @@ _dotsecenv_load_file() {
                     _DOTSECENV_SECRETS_LOADED+=("$key")
                     # Show any warnings that were emitted
                     [[ -s "$secret_stderr_file" ]] && cat "$secret_stderr_file" >&2
+                    # Warn if value contains newlines
+                    if [[ "$secret_result" == *$'\n'* ]]; then
+                        echo "dotsecenv: warning: $key contains newlines; always quote it: \"\$$key\"" >&2
+                    fi
                 else
                     echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
                     cat "$secret_stderr_file" >&2
@@ -358,6 +362,9 @@ _dotsecenv_refetch_key() {
                     if secret_result=$(dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
                         export "$key=$secret_result"
                         [[ -s "$secret_stderr_file" ]] && cat "$secret_stderr_file" >&2
+                        if [[ "$secret_result" == *$'\n'* ]]; then
+                            echo "dotsecenv: warning: $key contains newlines; always quote it: \"\$$key\"" >&2
+                        fi
                     fi
                     rm -f "$secret_stderr_file"
                 elif [[ "$ptype" == "plain" ]]; then
