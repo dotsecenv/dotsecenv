@@ -30,7 +30,7 @@ COMMANDS:
   secret share SECRET FINGERPRINT [--all] Share secret with another identity
   secret revoke SECRET FINGERPRINT [--all] Revoke access from identity
   vault describe [--json]       Describe vaults with identities and secrets
-  vault doctor [--json]         Run health checks and fix issues
+  vault doctor [--json] [--fix] Run health checks and fix issues
   validate                      Validate vault and config
   version                       Show version information
 

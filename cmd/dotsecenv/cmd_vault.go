@@ -38,6 +38,7 @@ Options:
 
 // vault doctor flags
 var vaultDoctorJSON bool
+var vaultDoctorFix bool
 
 var vaultDoctorCmd = &cobra.Command{
 	Use:   "doctor",
@@ -56,7 +57,8 @@ pipelines.
 Use -v to target a specific vault for checks.
 
 Options:
-  --json  Output as JSON`,
+  --json  Output as JSON
+  --fix   Auto-fix issues without prompting`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cli, err := createCLI()
@@ -70,7 +72,7 @@ Options:
 			os.Exit(int(clilib.PrintError(os.Stderr, clilib.NewError(parseErr.Error(), clilib.ExitGeneralError))))
 		}
 
-		exitErr := cli.VaultDoctor(vaultDoctorJSON, vaultPath, fromIndex)
+		exitErr := cli.VaultDoctor(vaultDoctorJSON, vaultDoctorFix, vaultPath, fromIndex)
 		exitWithError(exitErr)
 	},
 }
@@ -81,6 +83,7 @@ func init() {
 
 	// vault doctor flags
 	vaultDoctorCmd.Flags().BoolVar(&vaultDoctorJSON, "json", false, "Output as JSON")
+	vaultDoctorCmd.Flags().BoolVar(&vaultDoctorFix, "fix", false, "Auto-fix issues without prompting")
 
 	// Build command tree
 	vaultCmd.AddCommand(vaultDescribeCmd)

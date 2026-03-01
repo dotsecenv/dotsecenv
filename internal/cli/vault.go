@@ -319,10 +319,18 @@ type DoctorCheckJSON struct {
 	Details string `json:"details,omitempty"`
 }
 
+// DoctorFixJSON represents a fix action in JSON output
+type DoctorFixJSON struct {
+	Name    string `json:"name"`
+	Status  string `json:"status"` // "ok" or "error"
+	Message string `json:"message"`
+}
+
 // DoctorResultJSON is the JSON output structure for doctor
 type DoctorResultJSON struct {
 	Status string            `json:"status"` // "healthy", "warning", "error"
 	Checks []DoctorCheckJSON `json:"checks"`
+	Fixes  []DoctorFixJSON   `json:"fixes,omitempty"`
 }
 
 // upgradeCandidate tracks a vault that needs format upgrade
@@ -341,7 +349,8 @@ type defragCandidate struct {
 
 // VaultDoctor runs health checks on the vault configuration and environment.
 // In CI environments, interactive prompts are skipped automatically.
-func (c *CLI) VaultDoctor(jsonOutput bool, vaultPath string, fromIndex int) *Error {
+// When fix is true, upgrades and defragmentation are performed non-interactively.
+func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex int) *Error {
 	cfg := c.vaultResolver.GetConfig()
 
 	var checks []DoctorCheckJSON
@@ -491,11 +500,52 @@ func (c *CLI) VaultDoctor(jsonOutput bool, vaultPath string, fromIndex int) *Err
 		})
 	}
 
+	// Auto-fix: perform upgrades and defragmentation non-interactively
+	var fixes []DoctorFixJSON
+	if fix {
+		for _, candidate := range upgradeCandidates {
+			expandedPath := vault.ExpandPath(candidate.path)
+			if upgradeErr := c.performVaultUpgrade(candidate.index, candidate.path, candidate.currentVersion); upgradeErr != nil {
+				fixes = append(fixes, DoctorFixJSON{
+					Name:    fmt.Sprintf("upgrade_vault_%d", candidate.index+1),
+					Status:  "error",
+					Message: fmt.Sprintf("failed to upgrade %s: %s", expandedPath, upgradeErr.Message),
+				})
+			} else {
+				fixes = append(fixes, DoctorFixJSON{
+					Name:    fmt.Sprintf("upgrade_vault_%d", candidate.index+1),
+					Status:  "ok",
+					Message: fmt.Sprintf("upgraded %s from v%d to v%d", expandedPath, candidate.currentVersion, vault.LatestFormatVersion),
+				})
+			}
+		}
+
+		for _, candidate := range defragCandidates {
+			expandedPath := vault.ExpandPath(candidate.path)
+			manager := c.vaultResolver.GetVaultManager(candidate.index)
+			newStats, defragErr := manager.Defragment()
+			if defragErr != nil {
+				fixes = append(fixes, DoctorFixJSON{
+					Name:    fmt.Sprintf("defrag_vault_%d", candidate.index+1),
+					Status:  "error",
+					Message: fmt.Sprintf("failed to defragment %s: %v", expandedPath, defragErr),
+				})
+			} else {
+				fixes = append(fixes, DoctorFixJSON{
+					Name:    fmt.Sprintf("defrag_vault_%d", candidate.index+1),
+					Status:  "ok",
+					Message: fmt.Sprintf("defragmented %s (%.1f%% -> %.1f%%)", expandedPath, candidate.stats.FragmentationRatio*100, newStats.FragmentationRatio*100),
+				})
+			}
+		}
+	}
+
 	// Output results
 	if jsonOutput {
 		result := DoctorResultJSON{
 			Status: overallStatus,
 			Checks: checks,
+			Fixes:  fixes,
 		}
 		encoder := json.NewEncoder(c.output.Stdout())
 		encoder.SetIndent("", "  ")
@@ -525,8 +575,19 @@ func (c *CLI) VaultDoctor(jsonOutput bool, vaultPath string, fromIndex int) *Err
 
 	_, _ = fmt.Fprintf(c.output.Stdout(), "\nStatus: %s\n", overallStatus)
 
-	// In CI environments, skip all interactive prompts
-	if isCI() {
+	// Print fix results if any
+	for _, f := range fixes {
+		var statusIcon string
+		if f.Status == "ok" {
+			statusIcon = "✓"
+		} else {
+			statusIcon = "✗"
+		}
+		_, _ = fmt.Fprintf(c.output.Stdout(), "  [%s] %s\n", statusIcon, f.Message)
+	}
+
+	// Skip interactive prompts if --fix was used or in CI
+	if fix || isCI() {
 		return nil
 	}
 
