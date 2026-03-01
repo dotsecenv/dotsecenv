@@ -24,10 +24,10 @@
     "sharp": "^0.34.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
+    "@eslint/js": "^10.0.0",
     "@fontsource/inter": "^5.1.1",
     "@fontsource/jetbrains-mono": "^5.1.1",
-    "eslint": "^9.39.2",
+    "eslint": "^10.0.0",
     "eslint-plugin-mdx": "^3.6.2",
     "markdownlint-cli": "^0.47.0",
     "typescript-eslint": "^8.51.0"
