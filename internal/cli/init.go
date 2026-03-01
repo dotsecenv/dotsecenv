@@ -150,32 +150,32 @@ func saveConfigWithComments(path string, cfg config.Config) error {
 	// Approved algorithms section
 	sb.WriteString("approved_algorithms:\n")
 	for _, alg := range cfg.ApprovedAlgorithms {
-		sb.WriteString(fmt.Sprintf("  - algo: %s\n", alg.Algo))
+		fmt.Fprintf(&sb, "  - algo: %s\n", alg.Algo)
 		if len(alg.Curves) > 0 {
 			sb.WriteString("    curves:\n")
 			for _, curve := range alg.Curves {
-				sb.WriteString(fmt.Sprintf("      - %s\n", curve))
+				fmt.Fprintf(&sb, "      - %s\n", curve)
 			}
 		}
-		sb.WriteString(fmt.Sprintf("    min_bits: %d\n", alg.MinBits))
+		fmt.Fprintf(&sb, "    min_bits: %d\n", alg.MinBits)
 	}
 
 	// Login section (only if set) - preferred over deprecated fingerprint
 	if cfg.Login != nil && cfg.Login.Fingerprint != "" {
 		sb.WriteString("login:\n")
-		sb.WriteString(fmt.Sprintf("  fingerprint: %s\n", cfg.Login.Fingerprint))
-		sb.WriteString(fmt.Sprintf("  added_at: %s\n", cfg.Login.AddedAt.Format("2006-01-02T15:04:05Z07:00")))
-		sb.WriteString(fmt.Sprintf("  hash: %s\n", cfg.Login.Hash))
-		sb.WriteString(fmt.Sprintf("  signature: %s\n", cfg.Login.Signature))
+		fmt.Fprintf(&sb, "  fingerprint: %s\n", cfg.Login.Fingerprint)
+		fmt.Fprintf(&sb, "  added_at: %s\n", cfg.Login.AddedAt.Format("2006-01-02T15:04:05Z07:00"))
+		fmt.Fprintf(&sb, "  hash: %s\n", cfg.Login.Hash)
+		fmt.Fprintf(&sb, "  signature: %s\n", cfg.Login.Signature)
 	} else if cfg.Fingerprint != "" {
 		// Deprecated fingerprint field (for backward compatibility)
-		sb.WriteString(fmt.Sprintf("fingerprint: %s\n", cfg.Fingerprint))
+		fmt.Fprintf(&sb, "fingerprint: %s\n", cfg.Fingerprint)
 	}
 
 	// Vault paths
 	sb.WriteString("vault:\n")
 	for _, v := range cfg.Vault {
-		sb.WriteString(fmt.Sprintf("  - %s\n", v))
+		fmt.Fprintf(&sb, "  - %s\n", v)
 	}
 
 	// Behavior section with comments
@@ -191,7 +191,7 @@ func saveConfigWithComments(path string, cfg config.Config) error {
 	// GPG section
 	sb.WriteString("\ngpg:\n")
 	if cfg.GPG.Program != "" {
-		sb.WriteString(fmt.Sprintf("  program: %s\n", cfg.GPG.Program))
+		fmt.Fprintf(&sb, "  program: %s\n", cfg.GPG.Program)
 	} else {
 		sb.WriteString("  program: \"\"\n")
 	}

@@ -100,11 +100,11 @@ func resolveVaultPaths(configPath string, vaultPaths []string) ([]string, error)
 
 			if idx <= 0 || idx > len(vaultCfg.Entries) {
 				var sb strings.Builder
-				sb.WriteString(fmt.Sprintf("-v index %d exceeds number of configured vaults (%d)", idx, len(vaultCfg.Entries)))
+				fmt.Fprintf(&sb, "-v index %d exceeds number of configured vaults (%d)", idx, len(vaultCfg.Entries))
 				if len(vaultCfg.Entries) > 0 {
 					sb.WriteString("\nConfigured vaults:\n")
 					for k, entry := range vaultCfg.Entries {
-						sb.WriteString(fmt.Sprintf("  %d: %s\n", k+1, entry.Path))
+						fmt.Fprintf(&sb, "  %d: %s\n", k+1, entry.Path)
 					}
 				}
 				return nil, fmt.Errorf("%s", sb.String())

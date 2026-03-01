@@ -641,9 +641,9 @@ func (w *Writer) IsEmpty() bool {
 // String returns a string representation of the vault for debugging
 func (w *Writer) String() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Vault: %s\n", w.path))
-	sb.WriteString(fmt.Sprintf("  Identities: %d\n", len(w.header.Identities)))
-	sb.WriteString(fmt.Sprintf("  Secrets: %d\n", len(w.header.Secrets)))
-	sb.WriteString(fmt.Sprintf("  Total lines: %d\n", len(w.lines)))
+	fmt.Fprintf(&sb, "Vault: %s\n", w.path)
+	fmt.Fprintf(&sb, "  Identities: %d\n", len(w.header.Identities))
+	fmt.Fprintf(&sb, "  Secrets: %d\n", len(w.header.Secrets))
+	fmt.Fprintf(&sb, "  Total lines: %d\n", len(w.lines))
 	return sb.String()
 }

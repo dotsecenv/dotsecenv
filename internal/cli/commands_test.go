@@ -789,7 +789,7 @@ func TestSecretForget_Basic(t *testing.T) {
 	}
 
 	// Forget the secret
-	forgetErr := cli.SecretForget("MY_SECRET", vaultPath, 0)
+	forgetErr := cli.SecretForget("MY_SECRET", vaultPath, 0, false)
 	if forgetErr != nil {
 		t.Fatalf("SecretForget failed unexpectedly: %v", forgetErr)
 	}
@@ -872,7 +872,7 @@ func TestSecretForget_AlreadyDeleted(t *testing.T) {
 	}
 
 	// Try to forget the already-deleted secret
-	forgetErr := cli.SecretForget("MY_SECRET", vaultPath, 0)
+	forgetErr := cli.SecretForget("MY_SECRET", vaultPath, 0, false)
 	if forgetErr == nil {
 		t.Fatal("SecretForget should fail for already-deleted secret")
 	}
@@ -926,7 +926,7 @@ func TestSecretForget_NotFound(t *testing.T) {
 	}
 
 	// Try to forget a non-existent secret
-	forgetErr := cli.SecretForget("NONEXISTENT", vaultPath, 0)
+	forgetErr := cli.SecretForget("NONEXISTENT", vaultPath, 0, false)
 	if forgetErr == nil {
 		t.Fatal("SecretForget should fail for non-existent secret")
 	}
@@ -1075,7 +1075,7 @@ func TestSecretForget_NoAccess(t *testing.T) {
 	}
 
 	// Try to forget a secret we don't have access to
-	forgetErr := cli.SecretForget("OTHER_SECRET", vaultPath, 0)
+	forgetErr := cli.SecretForget("OTHER_SECRET", vaultPath, 0, false)
 	if forgetErr == nil {
 		t.Fatal("SecretForget should fail without access")
 	}

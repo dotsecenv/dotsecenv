@@ -17,7 +17,7 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 
 ### Prerequisites
 
-- **Go 1.25+** (check with `go version`)
+- **Go 1.26+** (check with `go version`)
 - **GPG** (check with `gpg --version`)
 - **Make** (check with `make --version`)
 - **mise** (optional, for tool management)

@@ -18,9 +18,18 @@ import (
 
 // SecretValueJSON is the JSON output structure for secret values
 type SecretValueJSON struct {
-	AddedAt time.Time `json:"added_at"`
-	Value   string    `json:"value"`
-	Vault   string    `json:"vault,omitempty"`
+	AddedAt time.Time   `json:"added_at"`
+	Value   interface{} `json:"value"`
+	Vault   string      `json:"vault,omitempty"`
+}
+
+// smartJSONValue returns a json.RawMessage if the value is a JSON object or array,
+// otherwise returns the plain string. This avoids double-escaping stored JSON.
+func smartJSONValue(s string) interface{} {
+	if len(s) > 0 && (s[0] == '{' || s[0] == '[') && json.Valid([]byte(s)) {
+		return json.RawMessage(s)
+	}
+	return s
 }
 
 // SecretPut stores a secret in the vault.
@@ -148,7 +157,7 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 
 // SecretForget marks a secret as deleted by adding a deletion marker value.
 // The deletion marker has deleted=true and an empty available_to list.
-func (c *CLI) SecretForget(secretKeyArg, vaultPath string, fromIndex int) *Error {
+func (c *CLI) SecretForget(secretKeyArg, vaultPath string, fromIndex int, ignoreNotFound bool) *Error {
 	secretKey, normErr := vault.NormalizeSecretKey(secretKeyArg)
 	if normErr != nil {
 		return NewError(vault.FormatSecretKeyError(normErr), ExitValidationError)
@@ -166,16 +175,25 @@ func (c *CLI) SecretForget(secretKeyArg, vaultPath string, fromIndex int) *Error
 
 	existingSecret := c.vaultResolver.GetSecretByKeyFromVault(targetIndex, secretKey)
 	if existingSecret == nil {
+		if ignoreNotFound {
+			return nil
+		}
 		return NewError(fmt.Sprintf("secret '%s' not found in vault", secretKey), ExitVaultError)
 	}
 
 	if len(existingSecret.Values) == 0 {
+		if ignoreNotFound {
+			return nil
+		}
 		return NewError(fmt.Sprintf("secret '%s' has no values", secretKey), ExitVaultError)
 	}
 
 	// Check if already deleted
 	latestValue := existingSecret.Values[len(existingSecret.Values)-1]
 	if latestValue.Deleted {
+		if ignoreNotFound {
+			return nil
+		}
 		return NewError(fmt.Sprintf("secret '%s' is already deleted", secretKey), ExitGeneralError)
 	}
 
@@ -372,7 +390,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 			decryptedValues = append(decryptedValues, valStr)
 			decryptedValuesWithTime = append(decryptedValuesWithTime, SecretValueJSON{
 				AddedAt: val.AddedAt,
-				Value:   valStr,
+				Value:   smartJSONValue(valStr),
 				Vault:   item.VaultPath,
 			})
 		}
@@ -427,7 +445,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		} else {
 			output := SecretValueJSON{
 				AddedAt: secret.AddedAt,
-				Value:   decryptedValues[0],
+				Value:   smartJSONValue(decryptedValues[0]),
 				Vault:   secretVaultPath,
 			}
 			if err := encoder.Encode(output); err != nil {
@@ -511,7 +529,7 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 			decryptedValues = append(decryptedValues, valStr)
 			decryptedValuesWithTime = append(decryptedValuesWithTime, SecretValueJSON{
 				AddedAt: val.AddedAt,
-				Value:   valStr,
+				Value:   smartJSONValue(valStr),
 				Vault:   vaultPath,
 			})
 		}
@@ -545,7 +563,7 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 		decryptedValues = append(decryptedValues, string(plaintext))
 		decryptedValuesWithTime = append(decryptedValuesWithTime, SecretValueJSON{
 			AddedAt: val.AddedAt,
-			Value:   string(plaintext),
+			Value:   smartJSONValue(string(plaintext)),
 			Vault:   vaultPath,
 		})
 	}
@@ -642,7 +660,7 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 		encoder.SetIndent("", "  ")
 		output := SecretValueJSON{
 			AddedAt: mostRecentValue.AddedAt,
-			Value:   string(plaintext),
+			Value:   smartJSONValue(string(plaintext)),
 			Vault:   mostRecentVaultPath,
 		}
 		if err := encoder.Encode(output); err != nil {

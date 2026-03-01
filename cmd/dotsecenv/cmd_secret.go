@@ -1,9 +1,11 @@
 package main
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	clilib "github.com/dotsecenv/dotsecenv/internal/cli"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
@@ -58,15 +60,22 @@ to store the secret in (either a path or 1-based index).`,
 		// If stdin is piped (not TTY), read it now before vault lock acquisition.
 		var preReadValue string
 		if !term.IsTerminal(int(os.Stdin.Fd())) {
-			scanner := bufio.NewScanner(os.Stdin)
-			if scanner.Scan() {
-				preReadValue = scanner.Text()
-			} else if err := scanner.Err(); err != nil {
-				fmt.Fprintf(os.Stderr, "error: failed to read secret from stdin: %v\n", err)
+			data, readErr := io.ReadAll(os.Stdin)
+			if readErr != nil {
+				fmt.Fprintf(os.Stderr, "error: failed to read from stdin: %v\n", readErr)
 				os.Exit(int(clilib.ExitGeneralError))
-			} else {
+			}
+			preReadValue = strings.TrimRight(string(data), "\n")
+			if preReadValue == "" {
 				fmt.Fprintf(os.Stderr, "error: no input provided on stdin\n")
 				os.Exit(int(clilib.ExitGeneralError))
+			}
+		}
+
+		if secretPutJSON && preReadValue != "" {
+			if !json.Valid([]byte(preReadValue)) {
+				fmt.Fprintf(os.Stderr, "error: --json flag set but stdin is not valid JSON\n")
+				os.Exit(int(clilib.ExitValidationError))
 			}
 		}
 
@@ -85,6 +94,9 @@ to store the secret in (either a path or 1-based index).`,
 		exitWithError(exitErr)
 	},
 }
+
+// secret store flags
+var secretPutJSON bool
 
 // secret get flags
 var (
@@ -303,6 +315,9 @@ Options:
 	},
 }
 
+// secret forget flags
+var secretForgetIgnoreNotFound bool
+
 // secret forget
 var secretForgetCmd = &cobra.Command{
 	Use:   "forget SECRET",
@@ -348,12 +363,15 @@ or 1-based index).`,
 		}
 		defer func() { _ = cli.Close() }()
 
-		exitErr := cli.SecretForget(secretKey, vaultPath, fromIndex)
+		exitErr := cli.SecretForget(secretKey, vaultPath, fromIndex, secretForgetIgnoreNotFound)
 		exitWithError(exitErr)
 	},
 }
 
 func init() {
+	// secret store flags
+	secretPutCmd.Flags().BoolVar(&secretPutJSON, "json", false, "Validate stdin is valid JSON before storing")
+
 	// secret get flags
 	secretGetCmd.Flags().BoolVar(&secretGetAll, "all", false, "Retrieve all values")
 	secretGetCmd.Flags().BoolVar(&secretGetLast, "last", false, "Retrieve most recent value across all vaults")
@@ -364,6 +382,9 @@ func init() {
 
 	// secret revoke flags
 	secretRevokeCmd.Flags().BoolVar(&secretRevokeAll, "all", false, "Revoke from all vaults")
+
+	// secret forget flags
+	secretForgetCmd.Flags().BoolVar(&secretForgetIgnoreNotFound, "ignore-not-found", false, "Exit successfully if secret is not found or already deleted")
 
 	secretCmd.AddCommand(secretPutCmd)
 	secretCmd.AddCommand(secretGetCmd)

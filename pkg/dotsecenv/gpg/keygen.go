@@ -130,26 +130,26 @@ func GenerateKeyTemplate(algo KeyAlgorithm, name, email string, opts *KeyTemplat
 	sb.WriteString("# https://dotsecenv.com\n")
 
 	// Key type
-	sb.WriteString(fmt.Sprintf("Key-Type: %s\n", info.KeyType))
+	fmt.Fprintf(&sb, "Key-Type: %s\n", info.KeyType)
 
 	// Curve or length depending on algorithm
 	if info.KeyCurve != "" {
-		sb.WriteString(fmt.Sprintf("Key-Curve: %s\n", info.KeyCurve))
+		fmt.Fprintf(&sb, "Key-Curve: %s\n", info.KeyCurve)
 	}
 	if info.KeyLength > 0 {
-		sb.WriteString(fmt.Sprintf("Key-Length: %d\n", info.KeyLength))
+		fmt.Fprintf(&sb, "Key-Length: %d\n", info.KeyLength)
 	}
 
 	// Key usage - signing only for primary key
 	sb.WriteString("Key-Usage: sign\n")
 
 	// Encryption subkey
-	sb.WriteString(fmt.Sprintf("Subkey-Type: %s\n", info.SubkeyType))
+	fmt.Fprintf(&sb, "Subkey-Type: %s\n", info.SubkeyType)
 	if info.SubkeyCurve != "" {
-		sb.WriteString(fmt.Sprintf("Subkey-Curve: %s\n", info.SubkeyCurve))
+		fmt.Fprintf(&sb, "Subkey-Curve: %s\n", info.SubkeyCurve)
 	}
 	if info.SubkeyLength > 0 {
-		sb.WriteString(fmt.Sprintf("Subkey-Length: %d\n", info.SubkeyLength))
+		fmt.Fprintf(&sb, "Subkey-Length: %d\n", info.SubkeyLength)
 	}
 	sb.WriteString("Subkey-Usage: encrypt\n")
 
@@ -157,8 +157,8 @@ func GenerateKeyTemplate(algo KeyAlgorithm, name, email string, opts *KeyTemplat
 	sb.WriteString("Preferences: AES256 SHA512 Uncompressed\n")
 
 	// User identity
-	sb.WriteString(fmt.Sprintf("Name-Real: %s\n", name))
-	sb.WriteString(fmt.Sprintf("Name-Email: %s\n", email))
+	fmt.Fprintf(&sb, "Name-Real: %s\n", name)
+	fmt.Fprintf(&sb, "Name-Email: %s\n", email)
 
 	// Expiration (2 years by default)
 	sb.WriteString("Expire-Date: 2y\n")
