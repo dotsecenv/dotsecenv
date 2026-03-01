@@ -123,7 +123,7 @@ jobs:
 
       - name: Attest Build Provenance
         if: ${{ !github.event.repository.private }}
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: "dist/*"
 
@@ -265,7 +265,7 @@ jobs:
 
       - name: Attest Darwin Archives
         if: ${{ !github.event.repository.private }}
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: "dotsecenv_*_Darwin_*.tar.gz"
 
