@@ -57,6 +57,26 @@ jobs:
 
       - run: make build e2e
 
+  e2e-terraform:
+    name: E2E Terraform Credentials Helper (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+          cache-dependency-path: "go.sum"
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - run: terraform version
+
+      - run: make build e2e-terraform
+
   docs:
     name: Generate Docs (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

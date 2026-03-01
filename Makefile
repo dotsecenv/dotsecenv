@@ -10,6 +10,7 @@ help:
 	@echo "  make test           - Run tests"
 	@echo "  make test-race      - Run tests with race condition detection"
 	@echo "  make e2e            - Run end-to-end tests using bin/dotsecenv"
+	@echo "  make e2e-terraform  - Run Terraform credentials helper E2E tests"
 	@echo "  make sandbox        - Create an interactive sandbox environment"
 	@echo "  make demo           - Run demo recording in sandbox (requires asciinema)"
 	@echo "  make completions    - Generate shell completions"
@@ -20,7 +21,7 @@ help:
 	@echo "  make install-tools  - Install all dev tools"
 
 .PHONY: all
-all: clean update build lint test test-race e2e completions docs man
+all: clean update build lint test test-race e2e e2e-terraform completions docs man
 
 # Common ldflags for version info
 LDFLAGS := -X main.version=$$(git describe --tags --always --dirty) -X main.commit=$$(git rev-parse --short HEAD) -X main.date=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -91,6 +92,30 @@ e2e:
 	bash ./e2e.sh $(E2E_FLAGS) && \
 	rm -rf "$$E2E_HOME" && \
 	echo "E2E tests passed, cleaned up $$E2E_HOME"
+
+# Terraform credentials helper E2E tests
+# Requires bin/dotsecenv and contrib/ to exist
+.PHONY: e2e-terraform
+e2e-terraform:
+	@echo "Running terraform credentials helper e2e tests..."
+	@E2E_HOME=$$(mktemp -d) && \
+	mkdir -p "$$E2E_HOME/.gnupg" "$$E2E_HOME/.config" "$$E2E_HOME/.local/share" "$$E2E_HOME/.local/state" "$$E2E_HOME/.cache" "$$E2E_HOME/bin" "$$E2E_HOME/contrib" && \
+	chmod 700 "$$E2E_HOME/.gnupg" && \
+	cp bin/dotsecenv "$$E2E_HOME/bin/" && \
+	cp contrib/terraform-credentials-dotsecenv "$$E2E_HOME/contrib/" && \
+	cp scripts/e2e-terraform.sh "$$E2E_HOME/" && \
+	echo "E2E environment: $$E2E_HOME" && \
+	cd "$$E2E_HOME" && \
+	HOME="$$E2E_HOME" \
+	PATH="$$E2E_HOME/bin:$$PATH" \
+	GNUPGHOME="$$E2E_HOME/.gnupg" \
+	XDG_CONFIG_HOME="$$E2E_HOME/.config" \
+	XDG_DATA_HOME="$$E2E_HOME/.local/share" \
+	XDG_STATE_HOME="$$E2E_HOME/.local/state" \
+	XDG_CACHE_HOME="$$E2E_HOME/.cache" \
+	bash ./e2e-terraform.sh && \
+	rm -rf "$$E2E_HOME" && \
+	echo "Terraform e2e tests passed, cleaned up $$E2E_HOME"
 
 # Interactive sandbox for manual testing
 .PHONY: sandbox

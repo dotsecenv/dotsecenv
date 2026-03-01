@@ -45,6 +45,7 @@ archives:
       - README.md
       - man/man1/*
       - completions/*
+      - contrib/*
 
 checksum:
   name_template: 'checksums.txt'
@@ -139,6 +140,10 @@ nfpms:
         dst: /usr/share/zsh/site-functions/_dotsecenv
       - src: completions/dotsecenv.fish
         dst: /usr/share/fish/vendor_completions.d/dotsecenv.fish
+      - src: contrib/terraform-credentials-dotsecenv
+        dst: /usr/share/terraform/plugins/terraform-credentials-dotsecenv
+        file_info:
+          mode: 0755
 
 sboms:
   - disable: false
