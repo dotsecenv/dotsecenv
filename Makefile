@@ -11,17 +11,19 @@ help:
 	@echo "  make test-race      - Run tests with race condition detection"
 	@echo "  make e2e            - Run end-to-end tests using bin/dotsecenv"
 	@echo "  make e2e-terraform  - Run Terraform credentials helper E2E tests"
+	@echo "  make e2e-install    - Run install.sh E2E tests (requires network)"
 	@echo "  make sandbox        - Create an interactive sandbox environment"
 	@echo "  make demo           - Run demo recording in sandbox (requires asciinema)"
 	@echo "  make completions    - Generate shell completions"
 	@echo "  make docs           - Generate markdown documentation"
 	@echo "  make man            - Generate man pages"
+	@echo "  make plugin         - Copy or clone shell plugin files for packaging"
 	@echo "  make hooks          - Install git hooks using lefthook"
 	@echo "  make release-test   - Test release build (snapshot)"
 	@echo "  make install-tools  - Install all dev tools"
 
 .PHONY: all
-all: clean update build lint test test-race e2e e2e-terraform completions docs man
+all: clean update build lint test test-race e2e e2e-terraform e2e-install completions docs man plugin
 
 # Common ldflags for version info
 LDFLAGS := -X main.version=$$(git describe --tags --always --dirty) -X main.commit=$$(git rev-parse --short HEAD) -X main.date=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -117,6 +119,12 @@ e2e-terraform:
 	rm -rf "$$E2E_HOME" && \
 	echo "Terraform e2e tests passed, cleaned up $$E2E_HOME"
 
+# Install script E2E tests (requires network)
+.PHONY: e2e-install
+e2e-install:
+	@echo "Running install.sh e2e tests..."
+	@bash scripts/e2e-install.sh
+
 # Interactive sandbox for manual testing
 .PHONY: sandbox
 sandbox: build
@@ -181,6 +189,19 @@ docs:
 man:
 	@echo "Generating man pages..."
 	@go run -tags gendocs ./cmd/dotsecenv -o man/man1
+
+.PHONY: plugin
+plugin:
+	@if [ -d ../plugin ]; then \
+		echo "Copying plugin files from sibling repo..."; \
+		mkdir -p build/plugin/conf.d && \
+		cp ../plugin/_dotsecenv_core.sh ../plugin/dotsecenv.plugin.bash \
+		   ../plugin/dotsecenv.plugin.zsh build/plugin/ && \
+		cp ../plugin/conf.d/dotsecenv.fish build/plugin/conf.d/; \
+	else \
+		echo "Cloning plugin repo..."; \
+		git clone --depth 1 https://github.com/dotsecenv/plugin.git build/plugin; \
+	fi
 
 .PHONY: hooks
 hooks: install-lefthook

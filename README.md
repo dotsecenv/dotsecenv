@@ -28,20 +28,105 @@ dotsecenv secret get TEST_SECRET # should output "xyz"
 
 ### Installation
 
-#### Mise (universal)
+#### Install Script (recommended)
+
+The universal install script (`install.sh`) is the fastest way to install dotsecenv on macOS and Linux. It auto-detects your platform, downloads the correct binary, verifies checksums and GPG signatures, and installs shell completions, man pages, the shell plugin, and the Terraform credentials helper automatically.
+
+##### Usage
+
+```bash
+# Piped (simplest)
+curl -fsSL https://get.dotsecenv.com/install.sh | bash
+
+# Piped with CLI flags
+curl -fsSL https://get.dotsecenv.com/install.sh | bash -s -- [OPTIONS]
+
+# Piped with environment variables
+VERSION=v1.2.3 curl -fsSL https://get.dotsecenv.com/install.sh | bash
+
+# Downloaded and run locally
+curl -fsSL https://get.dotsecenv.com/install.sh -o install.sh
+chmod +x install.sh
+./install.sh --version v1.2.3
+```
+
+The script works with either `curl` or `wget`.
+
+##### Options
+
+Every setting can be configured via a CLI flag or an environment variable. **Precedence order:** CLI flags > environment variables > defaults.
+
+| Setting | CLI Flag | Env Var | Default | Description |
+|---------|----------|---------|---------|-------------|
+| Version | `--version VERSION` | `VERSION` | `latest` | Version to install (e.g., `v1.2.3`) |
+| Install directory | `--install-dir DIR` | `INSTALL_DIR` | auto-detect | Binary install path (`/usr/local/bin` if writable, else `~/.local/bin`) |
+| Shell plugin | `--[no-]install-shell-plugin` | `INSTALL_SHELL_PLUGIN` | `1` (yes) | Install the shell plugin for zsh/bash/fish |
+| Completions | `--[no-]install-completions` | `INSTALL_COMPLETIONS` | `1` (yes) | Install shell completions for bash, zsh, and fish |
+| Man pages | `--[no-]install-man-pages` | `INSTALL_MAN_PAGES` | `1` (yes) | Install man pages |
+| TF credentials helper | `--[no-]install-tf-credentials-helper` | `INSTALL_TF_CREDENTIALS_HELPER` | `1` (yes) | Install the Terraform credentials helper |
+| Verification | `--[no-]verify` | `VERIFY` | `1` (yes) | Verify SHA-256 checksums and GPG signatures |
+| Help | `-h`, `--help` | — | — | Show help and exit |
+
+##### What the Installer Does
+
+1. **Detects your platform** — OS (Linux or macOS) and architecture (x86_64 or arm64)
+2. **Resolves the version** — Queries the GitHub API for the latest release, or uses the version you specified
+3. **Downloads the release archive** — From GitHub Releases
+4. **Verifies integrity** — SHA-256 checksum verification and GPG signature verification (when `gpg` is available)
+5. **Installs the binary** — To `/usr/local/bin` (or `~/.local/bin` if no write access), using `sudo` when needed
+6. **Installs shell completions** — For bash, zsh, and fish, placed in the appropriate system or user directories
+7. **Installs man pages** — System-wide or under `~/.local/share/man/man1`
+8. **Installs the shell plugin** — Auto-detects your plugin manager (Oh My Zsh, Zinit, Antidote, Oh My Bash, Fisher, Oh My Fish) and installs accordingly. Falls back to cloning to `~/.local/share/dotsecenv/plugin` with manual sourcing instructions.
+9. **Installs the Terraform credentials helper** — To `~/.terraform.d/plugins/` (skip with `--no-install-tf-credentials-helper`)
+
+##### Examples
+
+**CI/CD: Install specific version, skip interactive components:**
+
+```bash
+VERSION=v1.2.3 INSTALL_SHELL_PLUGIN=0 INSTALL_MAN_PAGES=0 \
+  curl -fsSL https://get.dotsecenv.com/install.sh | bash
+```
+
+**Custom install directory:**
+
+```bash
+curl -fsSL https://get.dotsecenv.com/install.sh | bash -s -- \
+  --install-dir /opt/dotsecenv/bin
+```
+
+**Minimal install (binary only):**
+
+```bash
+curl -fsSL https://get.dotsecenv.com/install.sh | bash -s -- \
+  --no-install-shell-plugin \
+  --no-install-completions \
+  --no-install-man-pages \
+  --no-install-tf-credentials-helper
+```
+
+**Download and inspect before running:**
+
+```bash
+curl -fsSL https://get.dotsecenv.com/install.sh -o install.sh
+less install.sh  # review the script
+bash install.sh --version v1.2.3
+```
+
+#### Mise
 
 ```bash
 mise use github:dotsecenv/dotsecenv
 ```
 
-### MacOS/Homebrew
+#### macOS (Homebrew)
 
 ```bash
 brew tap dotsecenv/tap
 brew install dotsecenv
 ```
 
-### Linux package managers
+#### Linux Package Managers
 
 Package repositories for Debian/Ubuntu, RHEL/CentOS/Fedora, and Arch Linux are available at [get.dotsecenv.com](https://get.dotsecenv.com).
 
