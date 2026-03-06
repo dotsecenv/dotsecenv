@@ -8,7 +8,7 @@ set -euo pipefail
 
 readonly GITHUB_ORG="dotsecenv"
 readonly GITHUB_REPO="dotsecenv"
-readonly GPG_KEY_URL="https://get.dotsecenv.com/gpg-key.asc"
+readonly GPG_KEY_URL="https://get.dotsecenv.com/key.asc"
 
 # ---------------------------------------------------------------------------
 # Color setup (conditional on tty)
@@ -43,7 +43,7 @@ error()   { printf "${RED}error:${RESET} %s\n" "$*" >&2; exit 1; }
 VERSION="${VERSION:-latest}"
 INSTALL_DIR="${INSTALL_DIR:-}"
 INSTALL_SHELL_PLUGIN="${INSTALL_SHELL_PLUGIN:-1}"
-INSTALL_TF_CREDENTIALS_HELPER="${INSTALL_TF_CREDENTIALS_HELPER:-0}"
+INSTALL_TF_CREDENTIALS_HELPER="${INSTALL_TF_CREDENTIALS_HELPER:-1}"
 INSTALL_COMPLETIONS="${INSTALL_COMPLETIONS:-1}"
 INSTALL_MAN_PAGES="${INSTALL_MAN_PAGES:-1}"
 VERIFY="${VERIFY:-1}"
@@ -611,7 +611,7 @@ Options:
   --version VERSION                  Install specific version (default: latest)
   --install-dir DIR                  Install binary to DIR (default: auto-detect)
   --[no-]install-shell-plugin        Install shell plugin (default: yes)
-  --[no-]install-tf-credentials-helper  Install Terraform helper (default: no)
+  --[no-]install-tf-credentials-helper  Install Terraform helper (default: yes)
   --[no-]install-completions         Install shell completions (default: yes)
   --[no-]install-man-pages           Install man pages (default: yes)
   --[no-]verify                      Verify checksums and GPG (default: yes)
