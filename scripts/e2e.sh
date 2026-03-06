@@ -2,8 +2,8 @@
 #
 # e2e.sh - End-to-end integration tests for dotsecenv
 #
-# This script assumes it's running in an isolated environment set up by:
-#   make build e2e
+# This script does not require network access. Set up the environment with:
+#   make build
 #
 # The Makefile handles:
 # - Creating isolated HOME, GNUPGHOME, XDG_* directories

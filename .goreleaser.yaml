@@ -6,6 +6,7 @@ before:
   hooks:
     - go mod tidy
     - make build completions docs man
+    - make plugin
 
 builds:
   # All platforms use Go's native FIPS 140-3 module (no CGO required)
@@ -46,6 +47,14 @@ archives:
       - man/man1/*
       - completions/*
       - contrib/*
+      - src: build/plugin/dotsecenv.plugin.zsh
+        dst: plugin/dotsecenv.plugin.zsh
+      - src: build/plugin/dotsecenv.plugin.bash
+        dst: plugin/dotsecenv.plugin.bash
+      - src: build/plugin/_dotsecenv_core.sh
+        dst: plugin/_dotsecenv_core.sh
+      - src: build/plugin/conf.d/dotsecenv.fish
+        dst: plugin/conf.d/dotsecenv.fish
 
 checksum:
   name_template: 'checksums.txt'
@@ -144,6 +153,14 @@ nfpms:
         dst: /usr/share/terraform/plugins/terraform-credentials-dotsecenv
         file_info:
           mode: 0755
+      - src: build/plugin/dotsecenv.plugin.zsh
+        dst: /usr/share/dotsecenv/plugin/dotsecenv.plugin.zsh
+      - src: build/plugin/dotsecenv.plugin.bash
+        dst: /usr/share/dotsecenv/plugin/dotsecenv.plugin.bash
+      - src: build/plugin/_dotsecenv_core.sh
+        dst: /usr/share/dotsecenv/plugin/_dotsecenv_core.sh
+      - src: build/plugin/conf.d/dotsecenv.fish
+        dst: /usr/share/dotsecenv/plugin/conf.d/dotsecenv.fish
 
 sboms:
   - disable: false
