@@ -439,15 +439,33 @@ install_shell_plugin() {
     detect_plugin_managers
 
     local plugin_repo="https://github.com/${GITHUB_ORG}/plugin.git"
-    local plugin_dir="${HOME}/.local/share/dotsecenv/plugin"
+    local plugin_dir
+    if is_system_install; then
+        local share_prefix="/usr/share"
+        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
+        plugin_dir="${share_prefix}/dotsecenv/plugin"
+    else
+        plugin_dir="${HOME}/.local/share/dotsecenv/plugin"
+    fi
     local instructions=()
 
-    # Always clone to ~/.local/share/dotsecenv/plugin
-    if [ -d "${plugin_dir}" ]; then
-        info "Plugin already installed, updating..."
-        git -C "${plugin_dir}" pull --quiet 2>/dev/null || true
+    # Clone plugin
+    if need_sudo "${plugin_dir}" 2>/dev/null || need_sudo "$(dirname "${plugin_dir}")" 2>/dev/null; then
+        if [ -d "${plugin_dir}" ]; then
+            info "Plugin already installed, updating..."
+            maybe_sudo git -C "${plugin_dir}" pull --quiet 2>/dev/null || true
+        else
+            maybe_sudo mkdir -p "$(dirname "${plugin_dir}")"
+            maybe_sudo git clone --quiet "${plugin_repo}" "${plugin_dir}"
+        fi
     else
-        git clone --quiet "${plugin_repo}" "${plugin_dir}"
+        if [ -d "${plugin_dir}" ]; then
+            info "Plugin already installed, updating..."
+            git -C "${plugin_dir}" pull --quiet 2>/dev/null || true
+        else
+            mkdir -p "$(dirname "${plugin_dir}")"
+            git clone --quiet "${plugin_repo}" "${plugin_dir}"
+        fi
     fi
     success "Plugin installed to ${plugin_dir}"
 
@@ -585,7 +603,17 @@ print_summary() {
     printf "  Binary:       ${INSTALL_DIR}/dotsecenv\n"
     [ "${INSTALL_COMPLETIONS}" = "1" ] && printf "  Completions:  ${comp_dir}/\n"
     [ "${INSTALL_MAN_PAGES}" = "1" ] && printf "  Man pages:    ${man_dir}/\n"
-    [ "${INSTALL_SHELL_PLUGIN}" = "1" ] && printf "  Shell plugin: ${HOME}/.local/share/dotsecenv/plugin/\n"
+    if [ "${INSTALL_SHELL_PLUGIN}" = "1" ]; then
+        local plugin_summary_dir
+        if is_system_install; then
+            local sp="/usr/share"
+            [ "$(uname -s)" = "Darwin" ] && sp="/usr/local/share"
+            plugin_summary_dir="${sp}/dotsecenv/plugin"
+        else
+            plugin_summary_dir="${HOME}/.local/share/dotsecenv/plugin"
+        fi
+        printf "  Shell plugin: ${plugin_summary_dir}/\n"
+    fi
     [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ] && printf "  TF helper:    ${tf_dir}/\n"
     printf "\n"
     printf "  Get started:  ${BOLD}dotsecenv --help${RESET}\n"
