@@ -7,6 +7,26 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 ---
 
+## v0.4.7
+
+_March 6, 2026_
+
+### Features
+
+- Add universal install script (`install.sh`) as the primary installation method, with full CLI flags and environment variable support, checksum/GPG verification, and automatic shell plugin and completions setup
+- Add `contrib/terraform-credentials-dotsecenv` wrapper script implementing Terraform's credentials helper protocol (`get`/`store`/`forget` verbs)
+- Add `--json` flag to `secret store` for JSON validation
+- Add `--json` flag to `secret get` for structured JSON output with smart marshaling
+- Add `--ignore-not-found` flag to `secret forget` for idempotent deletes
+- Add explicit `--fix` flag to `vault doctor` for auto-fixing without interactive prompts
+
+### Other
+
+- Remove deprecated strict mode
+- Add community standards (CODE_OF_CONDUCT, CONTRIBUTING, SECURITY)
+
+---
+
 ## v0.4.6
 
 _February 1, 2026_
