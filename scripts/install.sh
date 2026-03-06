@@ -538,7 +538,14 @@ install_tf_helper() {
 
     info "Installing Terraform credentials helper..."
 
-    local tf_plugin_dir="${HOME}/.terraform.d/plugins"
+    local tf_plugin_dir
+    if is_system_install; then
+        local share_prefix="/usr/share"
+        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
+        tf_plugin_dir="${share_prefix}/terraform/plugins"
+    else
+        tf_plugin_dir="${HOME}/.terraform.d/plugins"
+    fi
     local helper_src="${tmp_dir}/contrib/terraform-credentials-dotsecenv"
 
     if [ ! -f "${helper_src}" ]; then
@@ -546,8 +553,13 @@ install_tf_helper() {
         return 0
     fi
 
-    mkdir -p "${tf_plugin_dir}"
-    install -m 755 "${helper_src}" "${tf_plugin_dir}/terraform-credentials-dotsecenv"
+    if need_sudo "${tf_plugin_dir}" 2>/dev/null; then
+        maybe_sudo mkdir -p "${tf_plugin_dir}"
+        maybe_sudo install -m 755 "${helper_src}" "${tf_plugin_dir}/terraform-credentials-dotsecenv"
+    else
+        mkdir -p "${tf_plugin_dir}"
+        install -m 755 "${helper_src}" "${tf_plugin_dir}/terraform-credentials-dotsecenv"
+    fi
     success "Terraform credentials helper installed to ${tf_plugin_dir}"
 
     printf "\n"
@@ -563,15 +575,17 @@ TFEOF
 # Summary
 # ---------------------------------------------------------------------------
 print_summary() {
-    local comp_dir man_dir
+    local share_prefix comp_dir man_dir tf_dir
     if is_system_install; then
-        local share_prefix="/usr/share"
+        share_prefix="/usr/share"
         [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
         comp_dir="${share_prefix}"
         man_dir="/usr/local/share/man/man1"
+        tf_dir="${share_prefix}/terraform/plugins"
     else
         comp_dir="${HOME}/.local/share"
         man_dir="${HOME}/.local/share/man/man1"
+        tf_dir="${HOME}/.terraform.d/plugins"
     fi
 
     printf "\n"
@@ -581,7 +595,7 @@ print_summary() {
     [ "${INSTALL_COMPLETIONS}" = "1" ] && printf "  Completions:  ${comp_dir}/\n"
     [ "${INSTALL_MAN_PAGES}" = "1" ] && printf "  Man pages:    ${man_dir}/\n"
     [ "${INSTALL_SHELL_PLUGIN}" = "1" ] && printf "  Shell plugin: installed\n"
-    [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ] && printf "  TF helper:    ${HOME}/.terraform.d/plugins/\n"
+    [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ] && printf "  TF helper:    ${tf_dir}/\n"
     printf "\n"
     printf "  Get started:  ${BOLD}dotsecenv --help${RESET}\n"
     printf "\n"
