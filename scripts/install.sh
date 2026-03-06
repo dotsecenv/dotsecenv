@@ -108,8 +108,20 @@ download() {
 download_to_stdout() {
     local url="$1"
     case "${DOWNLOADER}" in
-        curl) curl -fsSL "$url" ;;
-        wget) wget -qO- "$url" ;;
+        curl)
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
+                curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" "$url"
+            else
+                curl -fsSL "$url"
+            fi
+            ;;
+        wget)
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
+                wget -qO- --header="Authorization: token ${GITHUB_TOKEN}" "$url"
+            else
+                wget -qO- "$url"
+            fi
+            ;;
     esac
 }
 
