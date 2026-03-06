@@ -60,7 +60,8 @@ Every setting can be configured via a CLI flag or an environment variable. **Pre
 | Setting | CLI Flag | Env Var | Default | Description |
 |---------|----------|---------|---------|-------------|
 | Version | `--version VERSION` | `VERSION` | `latest` | Version to install (e.g., `v1.2.3`) |
-| Install directory | `--install-dir DIR` | `INSTALL_DIR` | auto-detect | Binary install path (`/usr/local/bin` if writable, else `~/.local/bin`) |
+| Install directory | `--install-dir DIR` | `INSTALL_DIR` | `~/.local/bin` | Binary install path |
+| System-wide install | `--system` | `SYSTEM_INSTALL` | `0` (no) | Install to system paths (`/usr/local/bin` on macOS, `/usr/local/bin` on Linux) instead of user-level paths |
 | Shell plugin | `--[no-]install-shell-plugin` | `INSTALL_SHELL_PLUGIN` | `1` (yes) | Install the shell plugin for zsh/bash/fish |
 | Completions | `--[no-]install-completions` | `INSTALL_COMPLETIONS` | `1` (yes) | Install shell completions for bash, zsh, and fish |
 | Man pages | `--[no-]install-man-pages` | `INSTALL_MAN_PAGES` | `1` (yes) | Install man pages |
@@ -74,9 +75,9 @@ Every setting can be configured via a CLI flag or an environment variable. **Pre
 2. **Resolves the version** — Queries the GitHub API for the latest release, or uses the version you specified
 3. **Downloads the release archive** — From GitHub Releases
 4. **Verifies integrity** — SHA-256 checksum verification and GPG signature verification (when `gpg` is available)
-5. **Installs the binary** — To `/usr/local/bin` (or `~/.local/bin` if no write access), using `sudo` when needed
-6. **Installs shell completions** — For bash, zsh, and fish, placed in the appropriate system or user directories
-7. **Installs man pages** — System-wide or under `~/.local/share/man/man1`
+5. **Installs the binary** — To `~/.local/bin` by default; pass `--system` to install to `/usr/local/bin` instead (uses `sudo` when needed)
+6. **Installs shell completions** — For bash, zsh, and fish, placed under `~/.local/share/` by default (or system directories with `--system`)
+7. **Installs man pages** — To `~/.local/share/man/man1/` by default (or `/usr/local/share/man/man1/` / `/usr/share/man/man1/` with `--system`)
 8. **Installs the shell plugin** — Auto-detects your plugin manager (Oh My Zsh, Zinit, Antidote, Oh My Bash, Fisher, Oh My Fish) and installs accordingly. Falls back to cloning to `~/.local/share/dotsecenv/plugin` with manual sourcing instructions.
 9. **Installs the Terraform credentials helper** — To `~/.terraform.d/plugins/` (skip with `--no-install-tf-credentials-helper`)
 
@@ -94,6 +95,12 @@ VERSION=v1.2.3 INSTALL_SHELL_PLUGIN=0 INSTALL_MAN_PAGES=0 \
 ```bash
 curl -fsSL https://get.dotsecenv.com/install.sh | bash -s -- \
   --install-dir /opt/dotsecenv/bin
+```
+
+**System-wide install:**
+
+```bash
+curl -fsSL https://get.dotsecenv.com/install.sh | bash -s -- --system
 ```
 
 **Minimal install (binary only):**
