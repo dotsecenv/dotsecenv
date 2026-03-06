@@ -50,7 +50,7 @@ SYSTEM_INSTALL="${SYSTEM_INSTALL:-0}"
 VERIFY="${VERIFY:-1}"
 
 TMPDIR_ROOT=""
-PLUGIN_LOCATION=""
+PLUGIN_LOCATIONS=()
 
 # ---------------------------------------------------------------------------
 # Cleanup
@@ -460,7 +460,7 @@ install_shell_plugin() {
             fi
         fi
 
-        PLUGIN_LOCATION="${fallback_dir}"
+        PLUGIN_LOCATIONS+=("${fallback_dir}")
         success "Plugin cloned to ${fallback_dir}"
         instructions+=("Add to your ${BOLD}.zshrc${RESET} or ${BOLD}.bashrc${RESET}:")
         instructions+=("  source ~/.local/share/dotsecenv/plugin/dotsecenv.plugin.zsh  # for zsh")
@@ -485,18 +485,18 @@ install_shell_plugin() {
                 else
                     git clone --quiet "${plugin_repo}" "${omz_plugin_dir}"
                 fi
-                PLUGIN_LOCATION="${omz_plugin_dir}"
+                PLUGIN_LOCATIONS+=("Oh My Zsh: ${omz_plugin_dir}")
                 success "Oh My Zsh plugin installed"
                 instructions+=("${BOLD}Oh My Zsh:${RESET} Add ${BOLD}dotsecenv${RESET} to plugins=(...) in your .zshrc")
                 ;;
             zinit)
-                PLUGIN_LOCATION="managed by Zinit"
+                PLUGIN_LOCATIONS+=("Zinit: add to .zshrc")
                 success "Zinit detected"
                 instructions+=("${BOLD}Zinit:${RESET} Add to your .zshrc:")
                 instructions+=("  zinit light ${GITHUB_ORG}/plugin")
                 ;;
             antidote)
-                PLUGIN_LOCATION="managed by Antidote"
+                PLUGIN_LOCATIONS+=("Antidote: add to .zsh_plugins.txt")
                 success "Antidote detected"
                 instructions+=("${BOLD}Antidote:${RESET} Add to ~/.zsh_plugins.txt:")
                 instructions+=("  ${GITHUB_ORG}/plugin")
@@ -510,20 +510,20 @@ install_shell_plugin() {
                 else
                     git clone --quiet "${plugin_repo}" "${omb_plugin_dir}"
                 fi
-                PLUGIN_LOCATION="${omb_plugin_dir}"
+                PLUGIN_LOCATIONS+=("Oh My Bash: ${omb_plugin_dir}")
                 success "Oh My Bash plugin installed"
                 instructions+=("${BOLD}Oh My Bash:${RESET} Add ${BOLD}dotsecenv${RESET} to plugins=(...) in your .bashrc")
                 ;;
             fisher)
                 info "Installing plugin via Fisher..."
                 fish -c "fisher install ${GITHUB_ORG}/plugin" 2>/dev/null || warn "Fisher install failed"
-                PLUGIN_LOCATION="managed by Fisher"
+                PLUGIN_LOCATIONS+=("Fisher: installed")
                 success "Fisher plugin installed"
                 ;;
             ohmyfish)
                 info "Installing plugin via Oh My Fish..."
                 fish -c "omf install ${GITHUB_ORG}/plugin" 2>/dev/null || warn "Oh My Fish install failed"
-                PLUGIN_LOCATION="managed by Oh My Fish"
+                PLUGIN_LOCATIONS+=("Oh My Fish: installed")
                 success "Oh My Fish plugin installed"
                 ;;
         esac
@@ -602,7 +602,12 @@ print_summary() {
     printf "  Binary:       ${INSTALL_DIR}/dotsecenv\n"
     [ "${INSTALL_COMPLETIONS}" = "1" ] && printf "  Completions:  ${comp_dir}/\n"
     [ "${INSTALL_MAN_PAGES}" = "1" ] && printf "  Man pages:    ${man_dir}/\n"
-    [ "${INSTALL_SHELL_PLUGIN}" = "1" ] && [ -n "${PLUGIN_LOCATION}" ] && printf "  Shell plugin: ${PLUGIN_LOCATION}\n"
+    if [ "${INSTALL_SHELL_PLUGIN}" = "1" ] && [ "${#PLUGIN_LOCATIONS[@]}" -gt 0 ]; then
+        printf "  Shell plugin:\n"
+        for loc in "${PLUGIN_LOCATIONS[@]}"; do
+            printf "    - ${loc}\n"
+        done
+    fi
     [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ] && printf "  TF helper:    ${tf_dir}/\n"
     printf "\n"
     printf "  Get started:  ${BOLD}dotsecenv --help${RESET}\n"
