@@ -261,8 +261,10 @@ run_test "Bash completion file exists" bash -c "
     found=0
     # Per-user path
     [ -f '${E2E_TMP2}/.local/share/bash-completion/completions/dotsecenv' ] && found=1
-    # System path (if installed as root)
+    # System path (Linux)
     [ -f '/usr/share/bash-completion/completions/dotsecenv' ] && found=1
+    # System path (macOS - SIP prevents /usr/share writes)
+    [ -f '/usr/local/share/bash-completion/completions/dotsecenv' ] && found=1
     [ \$found -eq 1 ] || { echo 'Bash completion not found'; exit 1; }
 "
 
@@ -271,6 +273,7 @@ run_test "Zsh completion _dotsecenv file exists" bash -c "
     found=0
     [ -f '${E2E_TMP2}/.local/share/zsh/site-functions/_dotsecenv' ] && found=1
     [ -f '/usr/share/zsh/site-functions/_dotsecenv' ] && found=1
+    [ -f '/usr/local/share/zsh/site-functions/_dotsecenv' ] && found=1
     [ \$found -eq 1 ] || { echo 'Zsh completion not found'; exit 1; }
 "
 
@@ -279,6 +282,7 @@ run_test "Fish completion dotsecenv.fish file exists" bash -c "
     found=0
     [ -f '${E2E_TMP2}/.config/fish/completions/dotsecenv.fish' ] && found=1
     [ -f '/usr/share/fish/vendor_completions.d/dotsecenv.fish' ] && found=1
+    [ -f '/usr/local/share/fish/vendor_completions.d/dotsecenv.fish' ] && found=1
     [ \$found -eq 1 ] || { echo 'Fish completion not found'; exit 1; }
 "
 

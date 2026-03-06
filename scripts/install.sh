@@ -313,9 +313,12 @@ install_completions() {
 
     local bash_comp_dir zsh_comp_dir fish_comp_dir
     if is_system_install; then
-        bash_comp_dir="/usr/share/bash-completion/completions"
-        zsh_comp_dir="/usr/share/zsh/site-functions"
-        fish_comp_dir="/usr/share/fish/vendor_completions.d"
+        local share_prefix="/usr/share"
+        # macOS SIP prevents writes to /usr/share; use /usr/local/share instead
+        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
+        bash_comp_dir="${share_prefix}/bash-completion/completions"
+        zsh_comp_dir="${share_prefix}/zsh/site-functions"
+        fish_comp_dir="${share_prefix}/fish/vendor_completions.d"
     else
         bash_comp_dir="${HOME}/.local/share/bash-completion/completions"
         zsh_comp_dir="${HOME}/.local/share/zsh/site-functions"
