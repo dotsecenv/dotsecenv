@@ -50,7 +50,6 @@ SYSTEM_INSTALL="${SYSTEM_INSTALL:-0}"
 VERIFY="${VERIFY:-1}"
 
 TMPDIR_ROOT=""
-PLUGIN_LOCATIONS=()
 
 # ---------------------------------------------------------------------------
 # Cleanup
@@ -440,63 +439,47 @@ install_shell_plugin() {
     detect_plugin_managers
 
     local plugin_repo="https://github.com/${GITHUB_ORG}/plugin.git"
+    local plugin_dir="${HOME}/.local/share/dotsecenv/plugin"
     local instructions=()
 
-    if [ "${#DETECTED_MANAGERS[@]}" -eq 0 ]; then
-        # No manager detected — fallback: clone to ~/.local/share
-        local fallback_dir="${HOME}/.local/share/dotsecenv/plugin"
-        if [ -d "${fallback_dir}" ]; then
-            info "Plugin already cloned at ${fallback_dir}, updating..."
-            git -C "${fallback_dir}" pull --quiet 2>/dev/null || true
-        else
-            git clone --quiet "${plugin_repo}" "${fallback_dir}"
-        fi
-        # Install fish conf.d file if fish config dir exists
-        local fish_conf_dir="${HOME}/.config/fish/conf.d"
-        if [ -d "${HOME}/.config/fish" ]; then
-            mkdir -p "${fish_conf_dir}"
-            if [ -f "${fallback_dir}/conf.d/dotsecenv.fish" ]; then
-                ln -sf "${fallback_dir}/conf.d/dotsecenv.fish" "${fish_conf_dir}/dotsecenv.fish"
-            fi
-        fi
+    # Always clone to ~/.local/share/dotsecenv/plugin
+    if [ -d "${plugin_dir}" ]; then
+        info "Plugin already installed, updating..."
+        git -C "${plugin_dir}" pull --quiet 2>/dev/null || true
+    else
+        git clone --quiet "${plugin_repo}" "${plugin_dir}"
+    fi
+    success "Plugin installed to ${plugin_dir}"
 
-        PLUGIN_LOCATIONS+=("${fallback_dir}")
-        success "Plugin cloned to ${fallback_dir}"
-        instructions+=("Add to your ${BOLD}.zshrc${RESET} or ${BOLD}.bashrc${RESET}:")
-        instructions+=("  source ~/.local/share/dotsecenv/plugin/dotsecenv.plugin.zsh  # for zsh")
-        instructions+=("  source ~/.local/share/dotsecenv/plugin/dotsecenv.plugin.bash  # for bash")
-        if [ -d "${HOME}/.config/fish" ]; then
-            instructions+=("${BOLD}Fish:${RESET} conf.d/dotsecenv.fish has been linked automatically")
-        else
-            instructions+=("${BOLD}Fish:${RESET} Link or copy the conf.d file:")
-            instructions+=("  ln -s ~/.local/share/dotsecenv/plugin/conf.d/dotsecenv.fish ~/.config/fish/conf.d/dotsecenv.fish")
+    # Link fish conf.d if fish is present
+    if [ -d "${HOME}/.config/fish" ]; then
+        local fish_conf_dir="${HOME}/.config/fish/conf.d"
+        mkdir -p "${fish_conf_dir}"
+        if [ -f "${plugin_dir}/conf.d/dotsecenv.fish" ]; then
+            ln -sf "${plugin_dir}/conf.d/dotsecenv.fish" "${fish_conf_dir}/dotsecenv.fish"
+            success "Fish conf.d linked"
         fi
     fi
 
+    # Additionally integrate with detected plugin managers
     local mgr
     for mgr in "${DETECTED_MANAGERS[@]}"; do
         case "${mgr}" in
             ohmyzsh)
                 local omz_custom="${ZSH_CUSTOM:-${ZSH:-${HOME}/.oh-my-zsh}/custom}"
                 local omz_plugin_dir="${omz_custom}/plugins/dotsecenv"
-                if [ -d "${omz_plugin_dir}" ]; then
-                    info "Oh My Zsh plugin already installed, updating..."
-                    git -C "${omz_plugin_dir}" pull --quiet 2>/dev/null || true
-                else
-                    git clone --quiet "${plugin_repo}" "${omz_plugin_dir}"
+                if [ ! -d "${omz_plugin_dir}" ]; then
+                    ln -sf "${plugin_dir}" "${omz_plugin_dir}"
                 fi
-                PLUGIN_LOCATIONS+=("Oh My Zsh: ${omz_plugin_dir}")
-                success "Oh My Zsh plugin installed"
+                success "Oh My Zsh plugin linked"
                 instructions+=("${BOLD}Oh My Zsh:${RESET} Add ${BOLD}dotsecenv${RESET} to plugins=(...) in your .zshrc")
                 ;;
             zinit)
-                PLUGIN_LOCATIONS+=("Zinit: add to .zshrc")
                 success "Zinit detected"
                 instructions+=("${BOLD}Zinit:${RESET} Add to your .zshrc:")
                 instructions+=("  zinit light ${GITHUB_ORG}/plugin")
                 ;;
             antidote)
-                PLUGIN_LOCATIONS+=("Antidote: add to .zsh_plugins.txt")
                 success "Antidote detected"
                 instructions+=("${BOLD}Antidote:${RESET} Add to ~/.zsh_plugins.txt:")
                 instructions+=("  ${GITHUB_ORG}/plugin")
@@ -504,30 +487,30 @@ install_shell_plugin() {
             ohmybash)
                 local omb_dir="${OSH:-${HOME}/.oh-my-bash}"
                 local omb_plugin_dir="${omb_dir}/custom/plugins/dotsecenv"
-                if [ -d "${omb_plugin_dir}" ]; then
-                    info "Oh My Bash plugin already installed, updating..."
-                    git -C "${omb_plugin_dir}" pull --quiet 2>/dev/null || true
-                else
-                    git clone --quiet "${plugin_repo}" "${omb_plugin_dir}"
+                if [ ! -d "${omb_plugin_dir}" ]; then
+                    ln -sf "${plugin_dir}" "${omb_plugin_dir}"
                 fi
-                PLUGIN_LOCATIONS+=("Oh My Bash: ${omb_plugin_dir}")
-                success "Oh My Bash plugin installed"
+                success "Oh My Bash plugin linked"
                 instructions+=("${BOLD}Oh My Bash:${RESET} Add ${BOLD}dotsecenv${RESET} to plugins=(...) in your .bashrc")
                 ;;
             fisher)
                 info "Installing plugin via Fisher..."
                 fish -c "fisher install ${GITHUB_ORG}/plugin" 2>/dev/null || warn "Fisher install failed"
-                PLUGIN_LOCATIONS+=("Fisher: installed")
                 success "Fisher plugin installed"
                 ;;
             ohmyfish)
                 info "Installing plugin via Oh My Fish..."
                 fish -c "omf install ${GITHUB_ORG}/plugin" 2>/dev/null || warn "Oh My Fish install failed"
-                PLUGIN_LOCATIONS+=("Oh My Fish: installed")
                 success "Oh My Fish plugin installed"
                 ;;
         esac
     done
+
+    # Source instructions for shells without a detected manager
+    instructions+=("Add to your ${BOLD}.zshrc${RESET}:")
+    instructions+=("  source ${plugin_dir}/dotsecenv.plugin.zsh")
+    instructions+=("Add to your ${BOLD}.bashrc${RESET}:")
+    instructions+=("  source ${plugin_dir}/dotsecenv.plugin.bash")
 
     if [ "${#instructions[@]}" -gt 0 ]; then
         printf "\n"
@@ -602,12 +585,7 @@ print_summary() {
     printf "  Binary:       ${INSTALL_DIR}/dotsecenv\n"
     [ "${INSTALL_COMPLETIONS}" = "1" ] && printf "  Completions:  ${comp_dir}/\n"
     [ "${INSTALL_MAN_PAGES}" = "1" ] && printf "  Man pages:    ${man_dir}/\n"
-    if [ "${INSTALL_SHELL_PLUGIN}" = "1" ] && [ "${#PLUGIN_LOCATIONS[@]}" -gt 0 ]; then
-        printf "  Shell plugin:\n"
-        for loc in "${PLUGIN_LOCATIONS[@]}"; do
-            printf "    - ${loc}\n"
-        done
-    fi
+    [ "${INSTALL_SHELL_PLUGIN}" = "1" ] && printf "  Shell plugin: ${HOME}/.local/share/dotsecenv/plugin/\n"
     [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ] && printf "  TF helper:    ${tf_dir}/\n"
     printf "\n"
     printf "  Get started:  ${BOLD}dotsecenv --help${RESET}\n"
