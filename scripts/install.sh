@@ -563,14 +563,25 @@ TFEOF
 # Summary
 # ---------------------------------------------------------------------------
 print_summary() {
+    local comp_dir man_dir
+    if is_system_install; then
+        local share_prefix="/usr/share"
+        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
+        comp_dir="${share_prefix}"
+        man_dir="/usr/local/share/man/man1"
+    else
+        comp_dir="${HOME}/.local/share"
+        man_dir="${HOME}/.local/share/man/man1"
+    fi
+
     printf "\n"
     printf "${GREEN}${BOLD}dotsecenv ${VERSION} installation complete!${RESET}\n"
     printf "\n"
     printf "  Binary:       ${INSTALL_DIR}/dotsecenv\n"
-    [ "${INSTALL_COMPLETIONS}" = "1" ] && printf "  Completions:  installed\n"
-    [ "${INSTALL_MAN_PAGES}" = "1" ] && printf "  Man pages:    installed\n"
+    [ "${INSTALL_COMPLETIONS}" = "1" ] && printf "  Completions:  ${comp_dir}/\n"
+    [ "${INSTALL_MAN_PAGES}" = "1" ] && printf "  Man pages:    ${man_dir}/\n"
     [ "${INSTALL_SHELL_PLUGIN}" = "1" ] && printf "  Shell plugin: installed\n"
-    [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ] && printf "  TF helper:    installed\n"
+    [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ] && printf "  TF helper:    ${HOME}/.terraform.d/plugins/\n"
     printf "\n"
     printf "  Get started:  ${BOLD}dotsecenv --help${RESET}\n"
     printf "\n"
