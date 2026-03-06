@@ -11,12 +11,8 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "dotsecenv",
-	Short: "Safe environment secrets",
-	Long: `dotsecenv: safe environment secrets — encrypted at rest, ready to commit, easy to share.
-
-A secure tool for managing environment secrets using GPG encryption.
-Secrets are stored in vault files and can be shared between team members.`,
+	Use:           "dotsecenv",
+	Short:         "Safe environment secrets",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
@@ -29,6 +25,11 @@ Secrets are stored in vault files and can be shared between team members.`,
 }
 
 func init() {
+	rootCmd.Long = "dotsecenv " + version + `: safe environment secrets — encrypted at rest, ready to commit, easy to share.
+
+A secure tool for managing environment secrets using GPG encryption.
+Secrets are stored in vault files and can be shared between team members.`
+
 	// Persistent flags available to all commands
 	rootCmd.PersistentFlags().StringVarP(&globalOpts.ConfigPath, "config", "c", "", "Path to config file")
 	rootCmd.PersistentFlags().StringArrayVarP(&globalOpts.VaultPaths, "vault", "v", nil, "Path to vault file or vault index (1-based)")
