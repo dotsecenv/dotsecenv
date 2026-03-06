@@ -492,6 +492,16 @@ The `doctor` command performs these checks:
 
 After displaying health check results, doctor offers to fix any issues found (upgrade outdated vaults, defragment fragmented vaults).
 
+### Auto-fix without prompting
+
+Use `--fix` to automatically apply all fixes without interactive confirmation:
+
+```bash
+dotsecenv vault doctor --fix
+```
+
+This is useful in scripts or when you already know fixes are safe to apply.
+
 ### JSON output (for CI)
 
 ```bash
@@ -499,7 +509,7 @@ dotsecenv vault doctor --json
 ```
 
 <Aside type="note">
-In CI environments (`CI=true`, `GITHUB_ACTIONS`, `GITLAB_CI`, etc.), interactive prompts are automatically skipped to avoid blocking pipelines.
+In CI environments (`CI=true`, `GITHUB_ACTIONS`, `GITLAB_CI`, etc.), interactive prompts are automatically skipped to avoid blocking pipelines. You can also use `--fix` to explicitly auto-fix in any environment.
 </Aside>
 
 <Aside type="caution">

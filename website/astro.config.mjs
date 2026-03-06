@@ -112,6 +112,7 @@ export default defineConfig({
           items: [
             { label: 'Shell Plugins', slug: 'guides/shell-plugins' },
             { label: 'GitHub Action', slug: 'guides/github-action' },
+            { label: 'Terraform & OpenTofu', slug: 'guides/terraform-credentials-helper' },
             { label: 'How-To', slug: 'how-to' },
           ],
         },

@@ -259,10 +259,11 @@ The vault never modifies existing entries—only appends:
 Over time, the vault accumulates obsolete entries. The `vault doctor` command checks vault health and can defragment it:
 
 ```bash
-dotsecenv vault doctor
+dotsecenv vault doctor        # interactive — prompts before fixing
+dotsecenv vault doctor --fix  # auto-fix without prompting
 ```
 
-After displaying health checks, doctor offers to defragment if needed. This removes:
+After displaying health checks, doctor offers to defragment if needed (or applies fixes automatically with `--fix`). This removes:
 
 - Old value entries (keeps latest per recipient set)
 - Obsolete entries

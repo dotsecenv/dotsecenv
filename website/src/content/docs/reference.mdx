@@ -534,7 +534,7 @@ Performs the following checks:
 - **Vault format version** - checks if vaults need upgrading to the latest format
 - **Vault fragmentation** - checks if vaults would benefit from defragmentation
 
-After displaying health check results, the command offers to fix any issues found (upgrade outdated vaults, defragment fragmented vaults).
+After displaying health check results, the command offers to fix any issues found (upgrade outdated vaults, defragment fragmented vaults). Use `--fix` to auto-fix without prompting.
 
 :::note[CI Environment Detection]
 In CI environments (`CI=true`, `GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `CIRCLECI`, etc.), interactive prompts are automatically skipped to avoid blocking pipelines. Use `--json` for machine-readable output in CI.
@@ -544,6 +544,7 @@ In CI environments (`CI=true`, `GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `CI
 
 | Flag | Description |
 |------|-------------|
+| `--fix` | Auto-fix issues without prompting |
 | `--json` | Output as JSON |
 
 **Examples:**
@@ -551,6 +552,9 @@ In CI environments (`CI=true`, `GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `CI
 ```bash
 # Run health checks
 dotsecenv vault doctor
+
+# Auto-fix issues (upgrade vaults, defragment) without prompting
+dotsecenv vault doctor --fix
 
 # Output as JSON (useful for CI)
 dotsecenv vault doctor --json

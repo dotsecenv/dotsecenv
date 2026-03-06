@@ -41,13 +41,22 @@ You need a GPG key. Most developers already have one for signing git commits. If
 1. **Install dotsecenv**
 
    <Tabs>
-     <TabItem label="macOS">
+     <TabItem label="Install Script">
+       The fastest way to install on macOS or Linux:
+
+       ```bash
+       curl -fsSL https://get.dotsecenv.com/install.sh | bash
+       ```
+
+       This auto-detects your platform, verifies checksums, and installs the binary, shell completions, man pages, and shell plugin. See the [installation tutorial](/tutorials/installation/) for all options.
+     </TabItem>
+     <TabItem label="macOS (Homebrew)">
        ```bash
        brew tap dotsecenv/tap
        brew install dotsecenv
        ```
      </TabItem>
-     <TabItem label="Linux">
+     <TabItem label="Linux (apt)">
        ```bash
        # Debian/Ubuntu
        curl -fsSL https://get.dotsecenv.com/key.asc | \
