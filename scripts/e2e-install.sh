@@ -256,42 +256,28 @@ run_test "Full install with completions + man pages succeeds" \
     --no-install-shell-plugin \
     --no-verify
 
-# Test 19: Verify bash completion file
+# Test 19: Verify bash completion file (default: user home dir)
 run_test "Bash completion file exists" bash -c "
-    found=0
-    # Per-user path
-    [ -f '${E2E_TMP2}/.local/share/bash-completion/completions/dotsecenv' ] && found=1
-    # System path (Linux)
-    [ -f '/usr/share/bash-completion/completions/dotsecenv' ] && found=1
-    # System path (macOS - SIP prevents /usr/share writes)
-    [ -f '/usr/local/share/bash-completion/completions/dotsecenv' ] && found=1
-    [ \$found -eq 1 ] || { echo 'Bash completion not found'; exit 1; }
+    [ -f '${E2E_TMP2}/.local/share/bash-completion/completions/dotsecenv' ] || \
+        { echo 'Bash completion not found'; exit 1; }
 "
 
 # Test 20: Verify zsh completion file
 run_test "Zsh completion _dotsecenv file exists" bash -c "
-    found=0
-    [ -f '${E2E_TMP2}/.local/share/zsh/site-functions/_dotsecenv' ] && found=1
-    [ -f '/usr/share/zsh/site-functions/_dotsecenv' ] && found=1
-    [ -f '/usr/local/share/zsh/site-functions/_dotsecenv' ] && found=1
-    [ \$found -eq 1 ] || { echo 'Zsh completion not found'; exit 1; }
+    [ -f '${E2E_TMP2}/.local/share/zsh/site-functions/_dotsecenv' ] || \
+        { echo 'Zsh completion not found'; exit 1; }
 "
 
 # Test 21: Verify fish completion file
 run_test "Fish completion dotsecenv.fish file exists" bash -c "
-    found=0
-    [ -f '${E2E_TMP2}/.config/fish/completions/dotsecenv.fish' ] && found=1
-    [ -f '/usr/share/fish/vendor_completions.d/dotsecenv.fish' ] && found=1
-    [ -f '/usr/local/share/fish/vendor_completions.d/dotsecenv.fish' ] && found=1
-    [ \$found -eq 1 ] || { echo 'Fish completion not found'; exit 1; }
+    [ -f '${E2E_TMP2}/.config/fish/completions/dotsecenv.fish' ] || \
+        { echo 'Fish completion not found'; exit 1; }
 "
 
-# Test 22: Verify man page exists
+# Test 22: Verify man page exists (default: user home dir)
 run_test "At least one man page exists" bash -c "
-    found=0
-    if ls '${E2E_TMP2}/.local/share/man/man1/'*.1 >/dev/null 2>&1; then found=1; fi
-    if ls '/usr/local/share/man/man1/dotsecenv'*.1 >/dev/null 2>&1; then found=1; fi
-    [ \$found -eq 1 ] || { echo 'No man pages found'; exit 1; }
+    ls '${E2E_TMP2}/.local/share/man/man1/'*.1 >/dev/null 2>&1 || \
+        { echo 'No man pages found'; exit 1; }
 "
 
 rm -rf "${E2E_TMP2}"

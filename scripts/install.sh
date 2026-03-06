@@ -46,6 +46,7 @@ INSTALL_SHELL_PLUGIN="${INSTALL_SHELL_PLUGIN:-1}"
 INSTALL_TF_CREDENTIALS_HELPER="${INSTALL_TF_CREDENTIALS_HELPER:-1}"
 INSTALL_COMPLETIONS="${INSTALL_COMPLETIONS:-1}"
 INSTALL_MAN_PAGES="${INSTALL_MAN_PAGES:-1}"
+SYSTEM_INSTALL="${SYSTEM_INSTALL:-0}"
 VERIFY="${VERIFY:-1}"
 
 TMPDIR_ROOT=""
@@ -300,10 +301,7 @@ install_binary() {
 # Completions
 # ---------------------------------------------------------------------------
 is_system_install() {
-    case "${INSTALL_DIR}" in
-        /usr/local/bin|/usr/bin) return 0 ;;
-        *) return 1 ;;
-    esac
+    [ "${SYSTEM_INSTALL}" -eq 1 ]
 }
 
 install_completions() {
@@ -610,6 +608,8 @@ parse_args() {
                 INSTALL_MAN_PAGES=1; shift ;;
             --no-install-man-pages)
                 INSTALL_MAN_PAGES=0; shift ;;
+            --system)
+                SYSTEM_INSTALL=1; shift ;;
             --verify)
                 VERIFY=1; shift ;;
             --no-verify)
@@ -629,12 +629,14 @@ Options:
   --[no-]install-tf-credentials-helper  Install Terraform helper (default: yes)
   --[no-]install-completions         Install shell completions (default: yes)
   --[no-]install-man-pages           Install man pages (default: yes)
+  --system                           Install completions/man pages system-wide
+                                     instead of to user home directory
   --[no-]verify                      Verify checksums and GPG (default: yes)
   -h, --help                         Show this help
 
 Environment variables:
   VERSION, INSTALL_DIR, INSTALL_SHELL_PLUGIN, INSTALL_TF_CREDENTIALS_HELPER,
-  INSTALL_COMPLETIONS, INSTALL_MAN_PAGES, VERIFY
+  INSTALL_COMPLETIONS, INSTALL_MAN_PAGES, SYSTEM_INSTALL, VERIFY
 USAGE
                 exit 0
                 ;;
