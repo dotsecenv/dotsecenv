@@ -46,6 +46,7 @@ INSTALL_SHELL_PLUGIN="${INSTALL_SHELL_PLUGIN:-1}"
 INSTALL_TF_CREDENTIALS_HELPER="${INSTALL_TF_CREDENTIALS_HELPER:-1}"
 INSTALL_COMPLETIONS="${INSTALL_COMPLETIONS:-1}"
 INSTALL_MAN_PAGES="${INSTALL_MAN_PAGES:-1}"
+SYSTEM_INSTALL="${SYSTEM_INSTALL:-0}"
 VERIFY="${VERIFY:-1}"
 
 TMPDIR_ROOT=""
@@ -229,9 +230,7 @@ resolve_install_dir() {
         return
     fi
 
-    if [ -w "/usr/local/bin" ]; then
-        INSTALL_DIR="/usr/local/bin"
-    elif command -v sudo >/dev/null 2>&1; then
+    if [ "${SYSTEM_INSTALL}" -eq 1 ]; then
         INSTALL_DIR="/usr/local/bin"
     else
         INSTALL_DIR="${HOME}/.local/bin"
@@ -300,10 +299,7 @@ install_binary() {
 # Completions
 # ---------------------------------------------------------------------------
 is_system_install() {
-    case "${INSTALL_DIR}" in
-        /usr/local/bin|/usr/bin) return 0 ;;
-        *) return 1 ;;
-    esac
+    [ "${SYSTEM_INSTALL}" -eq 1 ]
 }
 
 install_completions() {
@@ -313,9 +309,12 @@ install_completions() {
 
     local bash_comp_dir zsh_comp_dir fish_comp_dir
     if is_system_install; then
-        bash_comp_dir="/usr/share/bash-completion/completions"
-        zsh_comp_dir="/usr/share/zsh/site-functions"
-        fish_comp_dir="/usr/share/fish/vendor_completions.d"
+        local share_prefix="/usr/share"
+        # macOS SIP prevents writes to /usr/share; use /usr/local/share instead
+        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
+        bash_comp_dir="${share_prefix}/bash-completion/completions"
+        zsh_comp_dir="${share_prefix}/zsh/site-functions"
+        fish_comp_dir="${share_prefix}/fish/vendor_completions.d"
     else
         bash_comp_dir="${HOME}/.local/share/bash-completion/completions"
         zsh_comp_dir="${HOME}/.local/share/zsh/site-functions"
@@ -440,51 +439,57 @@ install_shell_plugin() {
     detect_plugin_managers
 
     local plugin_repo="https://github.com/${GITHUB_ORG}/plugin.git"
+    local plugin_dir
+    if is_system_install; then
+        local share_prefix="/usr/share"
+        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
+        plugin_dir="${share_prefix}/dotsecenv/plugin"
+    else
+        plugin_dir="${HOME}/.local/share/dotsecenv/plugin"
+    fi
     local instructions=()
 
-    if [ "${#DETECTED_MANAGERS[@]}" -eq 0 ]; then
-        # No manager detected — fallback: clone to ~/.local/share
-        local fallback_dir="${HOME}/.local/share/dotsecenv/plugin"
-        if [ -d "${fallback_dir}" ]; then
-            info "Plugin already cloned at ${fallback_dir}, updating..."
-            git -C "${fallback_dir}" pull --quiet 2>/dev/null || true
+    # Clone plugin
+    if need_sudo "${plugin_dir}" 2>/dev/null || need_sudo "$(dirname "${plugin_dir}")" 2>/dev/null; then
+        if [ -d "${plugin_dir}" ]; then
+            info "Plugin already installed, updating..."
+            maybe_sudo git -C "${plugin_dir}" pull --quiet 2>/dev/null || true
         else
-            git clone --quiet "${plugin_repo}" "${fallback_dir}"
+            maybe_sudo mkdir -p "$(dirname "${plugin_dir}")"
+            maybe_sudo git clone --quiet "${plugin_repo}" "${plugin_dir}"
         fi
-        # Install fish conf.d file if fish config dir exists
-        local fish_conf_dir="${HOME}/.config/fish/conf.d"
-        if [ -d "${HOME}/.config/fish" ]; then
-            mkdir -p "${fish_conf_dir}"
-            if [ -f "${fallback_dir}/conf.d/dotsecenv.fish" ]; then
-                ln -sf "${fallback_dir}/conf.d/dotsecenv.fish" "${fish_conf_dir}/dotsecenv.fish"
-            fi
+    else
+        if [ -d "${plugin_dir}" ]; then
+            info "Plugin already installed, updating..."
+            git -C "${plugin_dir}" pull --quiet 2>/dev/null || true
+        else
+            mkdir -p "$(dirname "${plugin_dir}")"
+            git clone --quiet "${plugin_repo}" "${plugin_dir}"
         fi
+    fi
+    success "Plugin installed to ${plugin_dir}"
 
-        success "Plugin cloned to ${fallback_dir}"
-        instructions+=("Add to your ${BOLD}.zshrc${RESET} or ${BOLD}.bashrc${RESET}:")
-        instructions+=("  source ~/.local/share/dotsecenv/plugin/dotsecenv.plugin.zsh  # for zsh")
-        instructions+=("  source ~/.local/share/dotsecenv/plugin/dotsecenv.plugin.bash  # for bash")
-        if [ -d "${HOME}/.config/fish" ]; then
-            instructions+=("${BOLD}Fish:${RESET} conf.d/dotsecenv.fish has been linked automatically")
-        else
-            instructions+=("${BOLD}Fish:${RESET} Link or copy the conf.d file:")
-            instructions+=("  ln -s ~/.local/share/dotsecenv/plugin/conf.d/dotsecenv.fish ~/.config/fish/conf.d/dotsecenv.fish")
+    # Link fish conf.d if fish is present
+    if [ -d "${HOME}/.config/fish" ]; then
+        local fish_conf_dir="${HOME}/.config/fish/conf.d"
+        mkdir -p "${fish_conf_dir}"
+        if [ -f "${plugin_dir}/conf.d/dotsecenv.fish" ]; then
+            ln -sf "${plugin_dir}/conf.d/dotsecenv.fish" "${fish_conf_dir}/dotsecenv.fish"
+            success "Fish conf.d linked"
         fi
     fi
 
+    # Additionally integrate with detected plugin managers
     local mgr
     for mgr in "${DETECTED_MANAGERS[@]}"; do
         case "${mgr}" in
             ohmyzsh)
                 local omz_custom="${ZSH_CUSTOM:-${ZSH:-${HOME}/.oh-my-zsh}/custom}"
                 local omz_plugin_dir="${omz_custom}/plugins/dotsecenv"
-                if [ -d "${omz_plugin_dir}" ]; then
-                    info "Oh My Zsh plugin already installed, updating..."
-                    git -C "${omz_plugin_dir}" pull --quiet 2>/dev/null || true
-                else
-                    git clone --quiet "${plugin_repo}" "${omz_plugin_dir}"
+                if [ ! -d "${omz_plugin_dir}" ]; then
+                    ln -sf "${plugin_dir}" "${omz_plugin_dir}"
                 fi
-                success "Oh My Zsh plugin installed"
+                success "Oh My Zsh plugin linked"
                 instructions+=("${BOLD}Oh My Zsh:${RESET} Add ${BOLD}dotsecenv${RESET} to plugins=(...) in your .zshrc")
                 ;;
             zinit)
@@ -500,13 +505,10 @@ install_shell_plugin() {
             ohmybash)
                 local omb_dir="${OSH:-${HOME}/.oh-my-bash}"
                 local omb_plugin_dir="${omb_dir}/custom/plugins/dotsecenv"
-                if [ -d "${omb_plugin_dir}" ]; then
-                    info "Oh My Bash plugin already installed, updating..."
-                    git -C "${omb_plugin_dir}" pull --quiet 2>/dev/null || true
-                else
-                    git clone --quiet "${plugin_repo}" "${omb_plugin_dir}"
+                if [ ! -d "${omb_plugin_dir}" ]; then
+                    ln -sf "${plugin_dir}" "${omb_plugin_dir}"
                 fi
-                success "Oh My Bash plugin installed"
+                success "Oh My Bash plugin linked"
                 instructions+=("${BOLD}Oh My Bash:${RESET} Add ${BOLD}dotsecenv${RESET} to plugins=(...) in your .bashrc")
                 ;;
             fisher)
@@ -521,6 +523,12 @@ install_shell_plugin() {
                 ;;
         esac
     done
+
+    # Source instructions for shells without a detected manager
+    instructions+=("Add to your ${BOLD}.zshrc${RESET}:")
+    instructions+=("  source ${plugin_dir}/dotsecenv.plugin.zsh")
+    instructions+=("Add to your ${BOLD}.bashrc${RESET}:")
+    instructions+=("  source ${plugin_dir}/dotsecenv.plugin.bash")
 
     if [ "${#instructions[@]}" -gt 0 ]; then
         printf "\n"
@@ -539,7 +547,14 @@ install_tf_helper() {
 
     info "Installing Terraform credentials helper..."
 
-    local tf_plugin_dir="${HOME}/.terraform.d/plugins"
+    local tf_plugin_dir
+    if is_system_install; then
+        local share_prefix="/usr/share"
+        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
+        tf_plugin_dir="${share_prefix}/terraform/plugins"
+    else
+        tf_plugin_dir="${HOME}/.terraform.d/plugins"
+    fi
     local helper_src="${tmp_dir}/contrib/terraform-credentials-dotsecenv"
 
     if [ ! -f "${helper_src}" ]; then
@@ -547,12 +562,17 @@ install_tf_helper() {
         return 0
     fi
 
-    mkdir -p "${tf_plugin_dir}"
-    install -m 755 "${helper_src}" "${tf_plugin_dir}/terraform-credentials-dotsecenv"
+    if need_sudo "${tf_plugin_dir}" 2>/dev/null; then
+        maybe_sudo mkdir -p "${tf_plugin_dir}"
+        maybe_sudo install -m 755 "${helper_src}" "${tf_plugin_dir}/terraform-credentials-dotsecenv"
+    else
+        mkdir -p "${tf_plugin_dir}"
+        install -m 755 "${helper_src}" "${tf_plugin_dir}/terraform-credentials-dotsecenv"
+    fi
     success "Terraform credentials helper installed to ${tf_plugin_dir}"
 
     printf "\n"
-    info "Add the following to your ${BOLD}~/.terraformrc${RESET}:"
+    printf "${BLUE}==>${RESET} Add the following to your ${BOLD}~/.terraformrc${RESET}:\n"
     cat <<'TFEOF'
 
     credentials_helper "dotsecenv" {}
@@ -564,14 +584,37 @@ TFEOF
 # Summary
 # ---------------------------------------------------------------------------
 print_summary() {
+    local share_prefix comp_dir man_dir tf_dir
+    if is_system_install; then
+        share_prefix="/usr/share"
+        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
+        comp_dir="${share_prefix}"
+        man_dir="/usr/local/share/man/man1"
+        tf_dir="${share_prefix}/terraform/plugins"
+    else
+        comp_dir="${HOME}/.local/share"
+        man_dir="${HOME}/.local/share/man/man1"
+        tf_dir="${HOME}/.terraform.d/plugins"
+    fi
+
     printf "\n"
     printf "${GREEN}${BOLD}dotsecenv ${VERSION} installation complete!${RESET}\n"
     printf "\n"
     printf "  Binary:       ${INSTALL_DIR}/dotsecenv\n"
-    [ "${INSTALL_COMPLETIONS}" = "1" ] && printf "  Completions:  installed\n"
-    [ "${INSTALL_MAN_PAGES}" = "1" ] && printf "  Man pages:    installed\n"
-    [ "${INSTALL_SHELL_PLUGIN}" = "1" ] && printf "  Shell plugin: installed\n"
-    [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ] && printf "  TF helper:    installed\n"
+    [ "${INSTALL_COMPLETIONS}" = "1" ] && printf "  Completions:  ${comp_dir}/\n"
+    [ "${INSTALL_MAN_PAGES}" = "1" ] && printf "  Man pages:    ${man_dir}/\n"
+    if [ "${INSTALL_SHELL_PLUGIN}" = "1" ]; then
+        local plugin_summary_dir
+        if is_system_install; then
+            local sp="/usr/share"
+            [ "$(uname -s)" = "Darwin" ] && sp="/usr/local/share"
+            plugin_summary_dir="${sp}/dotsecenv/plugin"
+        else
+            plugin_summary_dir="${HOME}/.local/share/dotsecenv/plugin"
+        fi
+        printf "  Shell plugin: ${plugin_summary_dir}/\n"
+    fi
+    [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ] && printf "  TF helper:    ${tf_dir}/\n"
     printf "\n"
     printf "  Get started:  ${BOLD}dotsecenv --help${RESET}\n"
     printf "\n"
@@ -607,6 +650,8 @@ parse_args() {
                 INSTALL_MAN_PAGES=1; shift ;;
             --no-install-man-pages)
                 INSTALL_MAN_PAGES=0; shift ;;
+            --system)
+                SYSTEM_INSTALL=1; shift ;;
             --verify)
                 VERIFY=1; shift ;;
             --no-verify)
@@ -621,17 +666,19 @@ Usage:
 
 Options:
   --version VERSION                  Install specific version (default: latest)
-  --install-dir DIR                  Install binary to DIR (default: auto-detect)
+  --install-dir DIR                  Install binary to DIR (default: ~/.local/bin)
   --[no-]install-shell-plugin        Install shell plugin (default: yes)
   --[no-]install-tf-credentials-helper  Install Terraform helper (default: yes)
   --[no-]install-completions         Install shell completions (default: yes)
   --[no-]install-man-pages           Install man pages (default: yes)
+  --system                           Install system-wide (/usr/local/bin, shared
+                                     completions/man pages) instead of user home
   --[no-]verify                      Verify checksums and GPG (default: yes)
   -h, --help                         Show this help
 
 Environment variables:
   VERSION, INSTALL_DIR, INSTALL_SHELL_PLUGIN, INSTALL_TF_CREDENTIALS_HELPER,
-  INSTALL_COMPLETIONS, INSTALL_MAN_PAGES, VERIFY
+  INSTALL_COMPLETIONS, INSTALL_MAN_PAGES, SYSTEM_INSTALL, VERIFY
 USAGE
                 exit 0
                 ;;
