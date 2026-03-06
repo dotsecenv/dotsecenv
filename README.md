@@ -3,6 +3,7 @@
 [![CI](https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml)
 [![Release](https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml)
 [![GitHub Action E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml)
+[![Contrib E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/contrib-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/contrib-e2e.yml)
 [![Hermetic E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml)
 [![Publish Packages](https://github.com/dotsecenv/packages/actions/workflows/publish.yml/badge.svg)](https://github.com/dotsecenv/packages/actions/workflows/publish.yml)
 [![Homebrew install](https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml/badge.svg)](https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml)
