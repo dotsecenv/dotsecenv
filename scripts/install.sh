@@ -230,9 +230,7 @@ resolve_install_dir() {
         return
     fi
 
-    if [ -w "/usr/local/bin" ]; then
-        INSTALL_DIR="/usr/local/bin"
-    elif command -v sudo >/dev/null 2>&1; then
+    if [ "${SYSTEM_INSTALL}" -eq 1 ]; then
         INSTALL_DIR="/usr/local/bin"
     else
         INSTALL_DIR="${HOME}/.local/bin"
@@ -624,13 +622,13 @@ Usage:
 
 Options:
   --version VERSION                  Install specific version (default: latest)
-  --install-dir DIR                  Install binary to DIR (default: auto-detect)
+  --install-dir DIR                  Install binary to DIR (default: ~/.local/bin)
   --[no-]install-shell-plugin        Install shell plugin (default: yes)
   --[no-]install-tf-credentials-helper  Install Terraform helper (default: yes)
   --[no-]install-completions         Install shell completions (default: yes)
   --[no-]install-man-pages           Install man pages (default: yes)
-  --system                           Install completions/man pages system-wide
-                                     instead of to user home directory
+  --system                           Install system-wide (/usr/local/bin, shared
+                                     completions/man pages) instead of user home
   --[no-]verify                      Verify checksums and GPG (default: yes)
   -h, --help                         Show this help
 
