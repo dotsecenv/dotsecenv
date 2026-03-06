@@ -553,7 +553,7 @@ install_tf_helper() {
     success "Terraform credentials helper installed to ${tf_plugin_dir}"
 
     printf "\n"
-    info "Add the following to your ${BOLD}~/.terraformrc${RESET}:"
+    printf "${BLUE}==>${RESET} Add the following to your ${BOLD}~/.terraformrc${RESET}:\n"
     cat <<'TFEOF'
 
     credentials_helper "dotsecenv" {}
