@@ -3,7 +3,7 @@ module github.com/dotsecenv/dotsecenv
 go 1.26.0
 
 require (
-	github.com/ProtonMail/go-crypto v1.4.0
+	github.com/ProtonMail/go-crypto v1.4.1
 	github.com/ProtonMail/gopenpgp/v3 v3.3.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/sys v0.41.0
