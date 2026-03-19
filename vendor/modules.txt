@@ -1,4 +1,4 @@
-# github.com/ProtonMail/go-crypto v1.4.0
+# github.com/ProtonMail/go-crypto v1.4.1
 ## explicit; go 1.23.0
 github.com/ProtonMail/go-crypto/bitcurves
 github.com/ProtonMail/go-crypto/brainpool
@@ -24,8 +24,8 @@ github.com/ProtonMail/go-crypto/openpgp/s2k
 github.com/ProtonMail/go-crypto/openpgp/v2
 github.com/ProtonMail/go-crypto/openpgp/x25519
 github.com/ProtonMail/go-crypto/openpgp/x448
-# github.com/ProtonMail/gopenpgp/v3 v3.3.0
-## explicit; go 1.22.0
+# github.com/ProtonMail/gopenpgp/v3 v3.4.0
+## explicit; go 1.23.0
 github.com/ProtonMail/gopenpgp/v3/armor
 github.com/ProtonMail/gopenpgp/v3/constants
 github.com/ProtonMail/gopenpgp/v3/crypto
