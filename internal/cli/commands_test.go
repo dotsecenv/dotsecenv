@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -1393,5 +1394,341 @@ func TestSecretGet_WarnsWithoutTTY(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "dotsecenv.com") {
 		t.Errorf("Expected dotsecenv.com URL in warning, got stderr: %s", stderr)
+	}
+}
+
+func TestSmartJSONValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantType string // "raw" or "string"
+	}{
+		{"json_object", `{"key":"val"}`, "raw"},
+		{"json_array", `[1,2,3]`, "raw"},
+		{"nested_json", `{"a":{"b":1}}`, "raw"},
+		{"plain_string", "hello world", "string"},
+		{"invalid_json_brace", "{not json", "string"},
+		{"empty_string", "", "string"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := smartJSONValue(tt.input)
+			switch tt.wantType {
+			case "raw":
+				raw, ok := got.(json.RawMessage)
+				if !ok {
+					t.Fatalf("expected json.RawMessage, got %T", got)
+				}
+				if string(raw) != tt.input {
+					t.Errorf("expected %s, got %s", tt.input, string(raw))
+				}
+			case "string":
+				s, ok := got.(string)
+				if !ok {
+					t.Fatalf("expected string, got %T", got)
+				}
+				if s != tt.input {
+					t.Errorf("expected %q, got %q", tt.input, s)
+				}
+			}
+		})
+	}
+}
+
+func TestSecretForget_IgnoreNotFound_NotFound(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	mockVaultResolver := NewMockVaultResolver()
+	testFP := "TESTFINGERPRINT"
+
+	mockVaultResolver.Identities[testFP] = vault.Identity{
+		Fingerprint:   testFP,
+		PublicKey:     "mock_public_key",
+		Algorithm:     "RSA",
+		AlgorithmBits: 2048,
+	}
+
+	mockGPGClient := NewMockGPGClient()
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		},
+		Fingerprint: testFP,
+	}
+
+	tmpFile, err := os.CreateTemp("", "testvault_*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
+
+	vaultPath := tmpFile.Name()
+	mockVaultResolver.VaultPaths = []string{vaultPath}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: vaultPath}}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(&bytes.Buffer{}, &bytes.Buffer{}),
+	}
+
+	forgetErr := cli.SecretForget("NONEXISTENT", vaultPath, 0, true)
+	if forgetErr != nil {
+		t.Fatalf("SecretForget with ignoreNotFound=true should succeed for non-existent secret, got: %v", forgetErr)
+	}
+}
+
+func TestSecretForget_IgnoreNotFound_NoValues(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	mockVaultResolver := NewMockVaultResolver()
+	testFP := "TESTFINGERPRINT"
+
+	mockVaultResolver.Identities[testFP] = vault.Identity{
+		Fingerprint:   testFP,
+		PublicKey:     "mock_public_key",
+		Algorithm:     "RSA",
+		AlgorithmBits: 2048,
+	}
+
+	mockGPGClient := NewMockGPGClient()
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		},
+		Fingerprint: testFP,
+	}
+
+	tmpFile, err := os.CreateTemp("", "testvault_*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
+
+	vaultPath := tmpFile.Name()
+	mockVaultResolver.VaultPaths = []string{vaultPath}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: vaultPath}}
+
+	// Secret exists but has no values
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"MY_SECRET": {
+			Key:     "MY_SECRET",
+			AddedAt: time.Now(),
+			Values:  []vault.SecretValue{},
+		},
+	}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(&bytes.Buffer{}, &bytes.Buffer{}),
+	}
+
+	forgetErr := cli.SecretForget("MY_SECRET", vaultPath, 0, true)
+	if forgetErr != nil {
+		t.Fatalf("SecretForget with ignoreNotFound=true should succeed for secret with no values, got: %v", forgetErr)
+	}
+}
+
+func TestSecretForget_IgnoreNotFound_AlreadyDeleted(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	mockVaultResolver := NewMockVaultResolver()
+	testFP := "TESTFINGERPRINT"
+
+	mockVaultResolver.Identities[testFP] = vault.Identity{
+		Fingerprint:   testFP,
+		PublicKey:     "mock_public_key",
+		Algorithm:     "RSA",
+		AlgorithmBits: 2048,
+	}
+
+	mockGPGClient := NewMockGPGClient()
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		},
+		Fingerprint: testFP,
+	}
+
+	tmpFile, err := os.CreateTemp("", "testvault_*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
+
+	vaultPath := tmpFile.Name()
+	mockVaultResolver.VaultPaths = []string{vaultPath}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: vaultPath}}
+
+	// Secret exists but is already deleted
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"MY_SECRET": {
+			Key:     "MY_SECRET",
+			AddedAt: time.Now(),
+			Values: []vault.SecretValue{
+				{Value: "secret_value", AvailableTo: []string{testFP}},
+				{Value: "", AvailableTo: []string{}, Deleted: true},
+			},
+		},
+	}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(&bytes.Buffer{}, &bytes.Buffer{}),
+	}
+
+	forgetErr := cli.SecretForget("MY_SECRET", vaultPath, 0, true)
+	if forgetErr != nil {
+		t.Fatalf("SecretForget with ignoreNotFound=true should succeed for already-deleted secret, got: %v", forgetErr)
+	}
+}
+
+func TestSecretGet_JSONOutput(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	testFP := "TESTFINGERPRINT"
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		},
+		Fingerprint: testFP,
+	}
+
+	mockVaultResolver := NewMockVaultResolver()
+	secretTime := time.Date(2024, 6, 15, 10, 30, 0, 0, time.UTC)
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"API_KEY": {
+			Key: "API_KEY",
+			Values: []vault.SecretValue{
+				{AddedAt: secretTime, Value: "c2VjcmV0", AvailableTo: []string{testFP}},
+			},
+		},
+	}
+	mockVaultResolver.VaultPaths = []string{"/vault.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: "/vault.yaml"}}
+
+	mockGPGClient := &MockGPGClientWithDecrypt{
+		MockGPGClient: NewMockGPGClient(),
+		DecryptFunc: func(ciphertext []byte, fingerprint string) ([]byte, error) {
+			return []byte("my_api_key_value"), nil
+		},
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	getErr := cli.SecretGet("API_KEY", false, false, true, "", 0)
+	if getErr != nil {
+		t.Fatalf("SecretGet with jsonOutput=true failed: %v", getErr)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(stdoutBuf.Bytes(), &result); err != nil {
+		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, stdoutBuf.String())
+	}
+
+	if result["value"] != "my_api_key_value" {
+		t.Errorf("Expected value 'my_api_key_value', got: %v", result["value"])
+	}
+	if result["vault"] != "/vault.yaml" {
+		t.Errorf("Expected vault '/vault.yaml', got: %v", result["vault"])
+	}
+	if _, ok := result["added_at"]; !ok {
+		t.Error("Expected 'added_at' field in JSON output")
+	}
+}
+
+func TestSecretGet_JSONOutput_SmartMarshal(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	testFP := "TESTFINGERPRINT"
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		},
+		Fingerprint: testFP,
+	}
+
+	mockVaultResolver := NewMockVaultResolver()
+	secretTime := time.Date(2024, 6, 15, 10, 30, 0, 0, time.UTC)
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"DB_CONFIG": {
+			Key: "DB_CONFIG",
+			Values: []vault.SecretValue{
+				{AddedAt: secretTime, Value: "c2VjcmV0", AvailableTo: []string{testFP}},
+			},
+		},
+	}
+	mockVaultResolver.VaultPaths = []string{"/vault.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: "/vault.yaml"}}
+
+	// Return a JSON object as the decrypted value
+	mockGPGClient := &MockGPGClientWithDecrypt{
+		MockGPGClient: NewMockGPGClient(),
+		DecryptFunc: func(ciphertext []byte, fingerprint string) ([]byte, error) {
+			return []byte(`{"db":"host","port":5432}`), nil
+		},
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	getErr := cli.SecretGet("DB_CONFIG", false, false, true, "", 0)
+	if getErr != nil {
+		t.Fatalf("SecretGet with jsonOutput=true failed: %v", getErr)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(stdoutBuf.Bytes(), &result); err != nil {
+		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, stdoutBuf.String())
+	}
+
+	// The value should be an embedded object, not a double-escaped string
+	valueObj, ok := result["value"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected value to be a JSON object (smart marshaled), got %T: %v", result["value"], result["value"])
+	}
+	if valueObj["db"] != "host" {
+		t.Errorf("Expected db='host', got: %v", valueObj["db"])
+	}
+	if valueObj["port"] != float64(5432) {
+		t.Errorf("Expected port=5432, got: %v", valueObj["port"])
 	}
 }
