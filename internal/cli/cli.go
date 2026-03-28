@@ -50,6 +50,17 @@ type CLI struct {
 	stdin         io.Reader
 	Silent        bool
 	output        *output.Handler // Unified output handler
+	hasTTY        func() bool     // Returns true if a controlling terminal is present
+}
+
+// defaultHasTTY checks for a controlling terminal via /dev/tty.
+func defaultHasTTY() bool {
+	tty, err := os.Open("/dev/tty")
+	if err != nil {
+		return false
+	}
+	_ = tty.Close()
+	return true
 }
 
 // NewCLI creates a new CLI instance
@@ -207,6 +218,7 @@ func newCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader
 			output: output.NewHandler(stdout, stderr,
 				output.WithSilent(silent),
 			),
+			hasTTY: defaultHasTTY,
 		},
 		nil
 }

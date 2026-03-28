@@ -59,20 +59,26 @@ echo abc | "$BIN" secret store SEC2 -v 1
 
 echo "==> Testing non-TTY warning behavior"
 
-# Test: non-TTY decryption should succeed but emit warning
-output=$("$BIN" secret get SEC1 </dev/null 2>&1)
-if ! echo "$output" | grep -q "non-interactive terminal"; then
-    echo "FAIL: Expected non-interactive terminal warning"
-    echo "Got: $output"
-    exit 1
-fi
+# Test: non-TTY decryption should succeed but emit warning.
+# The check uses /dev/tty (not stdout isatty), so we need a new session without
+# a controlling terminal. setsid is available on Linux; on macOS the unit test
+# covers this path via the injectable hasTTY field.
+if command -v setsid >/dev/null 2>&1; then
+    output=$(setsid "$BIN" secret get SEC1 2>&1)
+    if ! echo "$output" | grep -q "non-interactive terminal"; then
+        echo "FAIL: Expected non-interactive terminal warning" >&2
+        echo "Got: $output" >&2
+        exit 1
+    fi
 
-if ! echo "$output" | grep -q "dotsecenv.com"; then
-    echo "FAIL: Expected dotsecenv.com URL in warning"
-    echo "Got: $output"
-    exit 1
+    if ! echo "$output" | grep -q "dotsecenv.com"; then
+        echo "FAIL: Expected dotsecenv.com URL in warning" >&2
+        echo "Got: $output" >&2
+        exit 1
+    fi
+    echo "  non-TTY warning tests passed" >&2
+else
+    echo "  non-TTY warning test skipped (setsid not available, covered by unit tests)" >&2
 fi
-
-echo "  non-TTY warning tests passed"
 
 echo "==> E2E tests passed"

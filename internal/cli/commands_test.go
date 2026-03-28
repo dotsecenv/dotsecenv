@@ -1378,6 +1378,7 @@ func TestSecretGet_WarnsWithoutTTY(t *testing.T) {
 		gpgClient:     mockGPGClient,
 		stdin:         strings.NewReader(""), // Not a TTY
 		output:        output.NewHandler(stdoutBuf, stderrBuf),
+		hasTTY:        func() bool { return false }, // Simulate no controlling terminal
 	}
 
 	// Use --all to bypass vault manager requirement in test
