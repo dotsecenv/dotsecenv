@@ -262,9 +262,14 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		return err
 	}
 
-	// Warn when decrypting in non-interactive context
-	if !c.output.IsTerminal() {
+	// Warn when decrypting without a controlling terminal (cron, CI, Docker without -t, etc.).
+	// We check /dev/tty instead of stdout's IsTerminal() because the shell plugin invokes
+	// `dotsecenv secret get` via command substitution $(...), which makes stdout a pipe even
+	// though the user is sitting at an interactive terminal.
+	if tty, err := os.Open("/dev/tty"); err != nil {
 		c.Warnf("decrypting in non-interactive terminal; for better security, configure GPG to require passphrase entry (https://dotsecenv.com/concepts/threat-model/#automated-secret-exfiltration)")
+	} else {
+		_ = tty.Close()
 	}
 
 	// Handle --last + -v combination - always error (conflicting flags)
