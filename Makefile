@@ -5,6 +5,7 @@ help:
 	@echo "  make clean          - Clean build artifacts"
 	@echo "  make update         - Update go dependencies"
 	@echo "  make build          - Build with FIPS 140-3 crypto (no CGO)"
+	@echo "  make build-link     - Build and symlink to ~/.local/bin/dotsecenv"
 	@echo "  make fmt            - Format Go code"
 	@echo "  make lint           - Run linting (vet + fmt check)"
 	@echo "  make test           - Run tests"
@@ -42,6 +43,12 @@ build:
 	@echo "Building dotsecenv with FIPS 140-3 crypto..."
 	CGO_ENABLED=0 GOFIPS140=v1.0.0 go build -mod=vendor -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
 	@echo "Binary built at: bin/dotsecenv"
+
+.PHONY: build-link
+build-link: build
+	@mkdir -p ~/.local/bin
+	@ln -sf $(CURDIR)/bin/dotsecenv ~/.local/bin/dotsecenv
+	@echo "Symlinked ~/.local/bin/dotsecenv -> $(CURDIR)/bin/dotsecenv"
 
 .PHONY: fmt
 fmt:
