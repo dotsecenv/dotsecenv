@@ -1,11 +1,24 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightBlog from 'starlight-blog';
 import { SITE_TITLE } from './src/consts';
 
 export default defineConfig({
   site: 'https://dotsecenv.com',
   integrations: [
     starlight({
+      plugins: [
+        starlightBlog({
+          authors: {
+            dotsecenv: {
+              name: 'dotsecenv',
+              title: 'Maintainer',
+              picture: '/favicon.png',
+              url: 'https://dotsecenv.com',
+            },
+          },
+        }),
+      ],
       title: SITE_TITLE,
       routeMiddleware: ['./src/route-data'],
       logo: {
