@@ -31,4 +31,4 @@ jobs:
       - uses: releasetools/cli@v0
 
       - name: Create tag
-        run: rt git::release --major --push "$TAG"
+        run: releasetools git::release --major --push "$TAG"
