@@ -20,6 +20,7 @@ help:
 	@echo "  make plugin         - Copy or clone shell plugin files for packaging"
 	@echo "  make hooks          - Install git hooks using lefthook"
 	@echo "  make release-test   - Test release build (snapshot)"
+	@echo "  make link           - Build and symlink to ~/.local/bin/dotsecenv"
 	@echo "  make install-tools  - Install all dev tools"
 
 .PHONY: all
@@ -42,6 +43,12 @@ build:
 	@echo "Building dotsecenv with FIPS 140-3 crypto..."
 	CGO_ENABLED=0 GOFIPS140=v1.0.0 go build -mod=vendor -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
 	@echo "Binary built at: bin/dotsecenv"
+
+.PHONY: build-link
+build-link: build
+	@mkdir -p ~/.local/bin
+	@ln -sf $(CURDIR)/bin/dotsecenv ~/.local/bin/dotsecenv
+	@echo "Symlinked ~/.local/bin/dotsecenv -> $(CURDIR)/bin/dotsecenv"
 
 .PHONY: fmt
 fmt:
