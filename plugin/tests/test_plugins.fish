@@ -604,6 +604,142 @@ function test_multiline_warning
 end
 
 # ============================================================================
+# dse up Tests
+# ============================================================================
+
+function test_dse_up_basic
+    log "[fish] Testing 'dse up' loads ancestor .secenv..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_dse_up_basic"
+    mkdir -p "$test_dir/project/terraform/modules"
+
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/project/.secenv"
+    chmod 644 "$test_dir/project/.secenv"
+
+    set config_dir "$TEMP_DIR/config_dse_up_basic"
+    mkdir -p "$config_dir"
+    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir/project/terraform/modules'
+        dse up '$test_dir'
+        echo \$DB_PASSWORD
+    " 2>&1)
+
+    if string match -q "*super-secret-password*" "$result"
+        pass "[fish] 'dse up' loads ancestor .secenv correctly"
+    else
+        fail "[fish] 'dse up' failed to load ancestor .secenv, got: $result"
+    end
+end
+
+function test_dse_up_multiple_ancestors
+    log "[fish] Testing 'dse up' loads multiple ancestor .secenv files..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_dse_up_multi"
+    mkdir -p "$test_dir/root/project/src"
+
+    echo 'APP_ENV=production' >"$test_dir/root/.secenv"
+    chmod 644 "$test_dir/root/.secenv"
+
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/root/project/.secenv"
+    chmod 644 "$test_dir/root/project/.secenv"
+
+    set config_dir "$TEMP_DIR/config_dse_up_multi"
+    mkdir -p "$config_dir"
+    echo "$test_dir/root" >"$config_dir/trusted_dirs"
+    echo "$test_dir/root/project" >>"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir/root/project/src'
+        dse up '$test_dir'
+        echo \$APP_ENV'|'\$DB_PASSWORD
+    " 2>&1)
+
+    if string match -q "*production|super-secret-password*" "$result"
+        pass "[fish] 'dse up' loads multiple ancestor .secenv files correctly"
+    else
+        fail "[fish] 'dse up' multi-ancestor failed, got: $result"
+    end
+end
+
+function test_dse_up_skips_already_loaded
+    log "[fish] Testing 'dse up' skips already-loaded ancestors..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_dse_up_skip"
+    mkdir -p "$test_dir/project/src"
+
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/project/.secenv"
+    chmod 644 "$test_dir/project/.secenv"
+
+    set config_dir "$TEMP_DIR/config_dse_up_skip"
+    mkdir -p "$config_dir"
+    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir/project'
+        cd '$test_dir/project/src'
+        dse up '$test_dir'
+        echo \$DB_PASSWORD
+    " 2>&1)
+
+    if string match -q "*no new ancestor*" "$result"; and string match -q "*super-secret-password*" "$result"
+        pass "[fish] 'dse up' correctly skips already-loaded ancestors"
+    else
+        fail "[fish] 'dse up' skip-already-loaded failed, got: $result"
+    end
+end
+
+function test_dse_up_no_ancestors
+    log "[fish] Testing 'dse up' graceful when no ancestor .secenv exists..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_dse_up_none"
+    mkdir -p "$test_dir/project/src"
+
+    set config_dir "$TEMP_DIR/config_dse_up_none"
+    mkdir -p "$config_dir"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir/project/src'
+        dse up '$test_dir'
+    " 2>&1)
+
+    if string match -q "*no new ancestor .secenv files found*" "$result"
+        pass "[fish] 'dse up' gracefully reports no ancestors"
+    else
+        fail "[fish] 'dse up' no-ancestors failed, got: $result"
+    end
+end
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -644,6 +780,12 @@ function main
     test_tree_scope_sibling_navigation
     test_tree_scope_no_reload_from_subdir
     test_multiline_warning
+
+    # dse up tests
+    test_dse_up_basic
+    test_dse_up_multiple_ancestors
+    test_dse_up_skips_already_loaded
+    test_dse_up_no_ancestors
 
     cleanup
 

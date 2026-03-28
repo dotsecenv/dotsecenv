@@ -223,9 +223,9 @@ _dotsecenv_parse_line() {
                 secret_name="${secret_name%\}}"
                 # Validate: no additional slashes, valid secret name format
                 if [[ -z "$secret_name" ]]; then
-                    # Empty name like {dotsecenv/} - treat as plain value silently
-                    _DOTSECENV_PARSE_VALUE="$value"
-                    _DOTSECENV_PARSE_TYPE="plain"
+                    # Empty name like {dotsecenv/} - treat same as {dotsecenv}
+                    _DOTSECENV_PARSE_VALUE="$_DOTSECENV_PARSE_KEY"
+                    _DOTSECENV_PARSE_TYPE="secret_same"
                 elif [[ "$secret_name" == */* ]]; then
                     echo "dotsecenv: error: invalid syntax '$value' - only one '/' allowed" >&2
                     return 1
@@ -552,6 +552,79 @@ _dotsecenv_on_cd() {
     fi
 }
 
+# Walk up from current directory and load ancestor .secenv files (root-first)
+# Arguments: [boundary_dir]
+#   boundary_dir: stop walking at this directory (default: git root, fallback: filesystem root)
+_dotsecenv_load_ancestors() {
+    local original_dir="$PWD"
+    local boundary="${1:-}"
+
+    # Determine boundary
+    if [[ -z "$boundary" ]]; then
+        boundary=$(git rev-parse --show-toplevel 2>/dev/null) || boundary=""
+    fi
+
+    # Walk up from current dir (exclusive) to boundary (inclusive), collect dirs with .secenv
+    local -a ancestor_secenvs=()
+    local dir="$original_dir"
+    local parent=""
+    while true; do
+        parent=$(dirname "$dir")
+        [[ "$parent" == "$dir" ]] && break # reached filesystem root
+        dir="$parent"
+        if [[ -f "$dir/.secenv" ]]; then
+            ancestor_secenvs+=("$dir")
+        fi
+        [[ -n "$boundary" && "$dir" == "$boundary" ]] && break
+    done
+
+    # Filter out directories already on the stack
+    local -a to_load=()
+    local ancestor="" stack_entry="" already_loaded=0
+    for ancestor in "${ancestor_secenvs[@]}"; do
+        already_loaded=0
+        for stack_entry in "${_DOTSECENV_SOURCE_STACK[@]}"; do
+            [[ "$stack_entry" == "$ancestor" ]] && {
+                already_loaded=1
+                break
+            }
+        done
+        [[ $already_loaded -eq 0 ]] && to_load+=("$ancestor")
+    done
+
+    if [[ ${#to_load[@]} -eq 0 ]]; then
+        echo "dotsecenv: no new ancestor .secenv files found" >&2
+        return 0
+    fi
+
+    # Process root-first (reverse the collected list) by cd-ing into each directory.
+    # Actual cd is required so dotsecenv CLI resolves vault paths relative to the
+    # .secenv directory. In zsh, cd triggers chpwd hook automatically. In bash,
+    # PROMPT_COMMAND won't fire mid-function so we trigger the hook manually.
+    # Note: zsh arrays are 1-indexed, bash arrays are 0-indexed
+    local i=0 start_idx=0 end_idx=0
+    if [[ -n "$ZSH_VERSION" ]]; then
+        start_idx=${#to_load[@]}
+        end_idx=1
+    else
+        start_idx=$((${#to_load[@]} - 1))
+        end_idx=0
+    fi
+
+    for ((i = start_idx; i >= end_idx; i--)); do
+        cd "${to_load[$i]}" || continue
+        if [[ -z "$ZSH_VERSION" ]]; then
+            _dotsecenv_chpwd_hook
+        fi
+    done
+
+    # Return to the original directory
+    cd "$original_dir" || return 1
+    if [[ -z "$ZSH_VERSION" ]]; then
+        _dotsecenv_chpwd_hook
+    fi
+}
+
 # Clipboard helper - copies stdin to clipboard
 _dotsecenv_clipboard_copy() {
     # macOS - use pbcopy
@@ -605,6 +678,10 @@ dse() {
         else
             return 1
         fi
+        ;;
+    up)
+        shift
+        _dotsecenv_load_ancestors "$@"
         ;;
     *)
         dotsecenv "$@"

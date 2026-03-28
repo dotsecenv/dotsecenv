@@ -141,11 +141,12 @@ If both `.env` and `.secenv` define the same variable, `.secenv` takes precedenc
 
 ## Aliases
 
-| Alias           | Command                                  | Description                 |
-| --------------- | ---------------------------------------- | --------------------------- |
-| `dse`           | `dotsecenv`                              | Shorthand for dotsecenv CLI |
-| `secret NAME`   | `dotsecenv secret get NAME`              | Retrieve a secret           |
-| `copysecret NAME` | `dotsecenv secret get NAME \| clipboard` | Copy secret to clipboard    |
+| Alias           | Command                                  | Description                          |
+| --------------- | ---------------------------------------- | ------------------------------------ |
+| `dse`           | `dotsecenv`                              | Shorthand for dotsecenv CLI          |
+| `secret NAME`   | `dotsecenv secret get NAME`              | Retrieve a secret                    |
+| `copysecret NAME` | `dotsecenv secret get NAME \| clipboard` | Copy secret to clipboard           |
+| `dse up [DIR]`  | *(built-in)*                             | Load ancestor `.secenv` files        |
 
 ### Clipboard Support
 

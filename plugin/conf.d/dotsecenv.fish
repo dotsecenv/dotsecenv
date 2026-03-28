@@ -512,6 +512,69 @@ function _dotsecenv_on_cd
     end
 end
 
+# Walk up from current directory and load ancestor .secenv files (root-first)
+# Arguments: [boundary_dir]
+#   boundary_dir: stop walking at this directory (default: git root, fallback: filesystem root)
+function _dotsecenv_load_ancestors
+    set -l original_dir "$PWD"
+    set -l boundary ""
+
+    if test (count $argv) -gt 0
+        set boundary $argv[1]
+    end
+
+    # Determine boundary
+    if test -z "$boundary"
+        set boundary (git rev-parse --show-toplevel 2>/dev/null)
+        or set boundary ""
+    end
+
+    # Walk up from current dir (exclusive) to boundary (inclusive), collect dirs with .secenv
+    set -l ancestor_secenvs
+    set -l dir "$original_dir"
+    while true
+        set -l parent (dirname "$dir")
+        test "$parent" = "$dir"; and break # reached filesystem root
+        set dir "$parent"
+        if test -f "$dir/.secenv"
+            set -a ancestor_secenvs "$dir"
+        end
+        if test -n "$boundary"; and test "$dir" = "$boundary"
+            break
+        end
+    end
+
+    # Filter out directories already on the stack
+    set -l to_load
+    for ancestor in $ancestor_secenvs
+        set -l already_loaded 0
+        for stack_entry in $_DOTSECENV_SOURCE_STACK
+            if test "$stack_entry" = "$ancestor"
+                set already_loaded 1
+                break
+            end
+        end
+        if test $already_loaded -eq 0
+            set -a to_load "$ancestor"
+        end
+    end
+
+    if test (count $to_load) -eq 0
+        echo "dotsecenv: no new ancestor .secenv files found" >&2
+        return 0
+    end
+
+    # Process root-first (reverse) by cd-ing into each directory.
+    # Actual cd is required so dotsecenv CLI resolves vault paths relative to the
+    # .secenv directory. Fish's --on-variable PWD hook fires automatically from cd.
+    for i in (seq (count $to_load) -1 1)
+        cd "$to_load[$i]"; or continue
+    end
+
+    # Return to the original directory
+    cd "$original_dir"
+end
+
 # Hook function called on directory change
 function _dotsecenv_cd_hook --on-variable PWD
     set -l old_dir "$_DOTSECENV_PREV_PWD"
@@ -583,6 +646,8 @@ function dse
             else
                 return 1
             end
+        case up
+            _dotsecenv_load_ancestors $argv[2..]
         case '*'
             dotsecenv $argv
     end

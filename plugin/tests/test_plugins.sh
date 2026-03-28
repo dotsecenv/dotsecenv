@@ -954,6 +954,203 @@ EOF
 }
 
 # ============================================================================
+# dse up Tests
+# ============================================================================
+
+test_dse_up_basic() {
+    local shell="$1"
+    log "[$shell] Testing 'dse up' loads ancestor .secenv..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_dse_up_basic"
+    mkdir -p "$test_dir/project/terraform/modules"
+
+    cat >"$test_dir/project/.secenv" <<'EOF'
+DB_PASSWORD={dotsecenv}
+EOF
+    chmod 644 "$test_dir/project/.secenv"
+
+    local config_dir="$TEMP_DIR/config_dse_up_basic"
+    mkdir -p "$config_dir"
+    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir/project/terraform/modules'
+            _dotsecenv_chpwd_hook
+            dse up '$test_dir'
+            echo \"\$DB_PASSWORD\"
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir/project/terraform/modules'
+            dse up '$test_dir'
+            echo \"\$DB_PASSWORD\"
+        " 2>&1)
+    fi
+
+    if [[ "$result" == *"super-secret-password"* ]]; then
+        pass "[$shell] 'dse up' loads ancestor .secenv correctly"
+    else
+        fail "[$shell] 'dse up' failed to load ancestor .secenv, got: $result"
+    fi
+}
+
+test_dse_up_multiple_ancestors() {
+    local shell="$1"
+    log "[$shell] Testing 'dse up' loads multiple ancestor .secenv files..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_dse_up_multi"
+    mkdir -p "$test_dir/root/project/src"
+
+    cat >"$test_dir/root/.secenv" <<'EOF'
+APP_ENV=production
+EOF
+    chmod 644 "$test_dir/root/.secenv"
+
+    cat >"$test_dir/root/project/.secenv" <<'EOF'
+DB_PASSWORD={dotsecenv}
+EOF
+    chmod 644 "$test_dir/root/project/.secenv"
+
+    local config_dir="$TEMP_DIR/config_dse_up_multi"
+    mkdir -p "$config_dir"
+    echo "$test_dir/root" >"$config_dir/trusted_dirs"
+    echo "$test_dir/root/project" >>"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir/root/project/src'
+            _dotsecenv_chpwd_hook
+            dse up '$test_dir'
+            echo \"\$APP_ENV|\$DB_PASSWORD\"
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir/root/project/src'
+            dse up '$test_dir'
+            echo \"\$APP_ENV|\$DB_PASSWORD\"
+        " 2>&1)
+    fi
+
+    if [[ "$result" == *"production|super-secret-password"* ]]; then
+        pass "[$shell] 'dse up' loads multiple ancestor .secenv files correctly"
+    else
+        fail "[$shell] 'dse up' multi-ancestor failed, got: $result"
+    fi
+}
+
+test_dse_up_skips_already_loaded() {
+    local shell="$1"
+    log "[$shell] Testing 'dse up' skips already-loaded ancestors..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_dse_up_skip"
+    mkdir -p "$test_dir/project/src"
+
+    cat >"$test_dir/project/.secenv" <<'EOF'
+DB_PASSWORD={dotsecenv}
+EOF
+    chmod 644 "$test_dir/project/.secenv"
+
+    local config_dir="$TEMP_DIR/config_dse_up_skip"
+    mkdir -p "$config_dir"
+    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir/project'
+            _dotsecenv_chpwd_hook
+            cd '$test_dir/project/src'
+            _dotsecenv_chpwd_hook
+            dse up '$test_dir'
+            echo \"\$DB_PASSWORD\"
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir/project'
+            cd '$test_dir/project/src'
+            dse up '$test_dir'
+            echo \"\$DB_PASSWORD\"
+        " 2>&1)
+    fi
+
+    if [[ "$result" == *"no new ancestor"* && "$result" == *"super-secret-password"* ]]; then
+        pass "[$shell] 'dse up' correctly skips already-loaded ancestors"
+    else
+        fail "[$shell] 'dse up' skip-already-loaded failed, got: $result"
+    fi
+}
+
+test_dse_up_no_ancestors() {
+    local shell="$1"
+    log "[$shell] Testing 'dse up' graceful when no ancestor .secenv exists..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_dse_up_none"
+    mkdir -p "$test_dir/project/src"
+
+    local config_dir="$TEMP_DIR/config_dse_up_none"
+    mkdir -p "$config_dir"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir/project/src'
+            _dotsecenv_chpwd_hook
+            dse up '$test_dir'
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir/project/src'
+            dse up '$test_dir'
+        " 2>&1)
+    fi
+
+    if [[ "$result" == *"no new ancestor .secenv files found"* ]]; then
+        pass "[$shell] 'dse up' gracefully reports no ancestors"
+    else
+        fail "[$shell] 'dse up' no-ancestors failed, got: $result"
+    fi
+}
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -995,6 +1192,10 @@ main() {
         test_tree_scope_sibling_navigation "bash"
         test_tree_scope_no_reload_from_subdir "bash"
         test_multiline_warning "bash"
+        test_dse_up_basic "bash"
+        test_dse_up_multiple_ancestors "bash"
+        test_dse_up_skips_already_loaded "bash"
+        test_dse_up_no_ancestors "bash"
     fi
 
     # Run zsh tests
@@ -1020,6 +1221,10 @@ main() {
             test_tree_scope_sibling_navigation "zsh"
             test_tree_scope_no_reload_from_subdir "zsh"
             test_multiline_warning "zsh"
+            test_dse_up_basic "zsh"
+            test_dse_up_multiple_ancestors "zsh"
+            test_dse_up_skips_already_loaded "zsh"
+            test_dse_up_no_ancestors "zsh"
         else
             warn "Zsh not found, skipping zsh tests"
         fi
