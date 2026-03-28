@@ -5,6 +5,7 @@ help:
 	@echo "  make clean          - Clean build artifacts"
 	@echo "  make update         - Update go dependencies"
 	@echo "  make build          - Build with FIPS 140-3 crypto (no CGO)"
+	@echo "  make build-link     - Build and symlink to ~/.local/bin/dotsecenv"
 	@echo "  make fmt            - Format Go code"
 	@echo "  make lint           - Run linting (vet + fmt check)"
 	@echo "  make test           - Run tests"
