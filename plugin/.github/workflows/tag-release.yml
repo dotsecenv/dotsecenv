@@ -27,6 +27,7 @@ jobs:
         with:
           ref: ${{ env.REF }}
           fetch-depth: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure git identity
         run: |
