@@ -21,7 +21,6 @@ help:
 	@echo "  make plugin         - Copy or clone shell plugin files for packaging"
 	@echo "  make hooks          - Install git hooks using lefthook"
 	@echo "  make release-test   - Test release build (snapshot)"
-	@echo "  make link           - Build and symlink to ~/.local/bin/dotsecenv"
 	@echo "  make install-tools  - Install all dev tools"
 
 .PHONY: all
