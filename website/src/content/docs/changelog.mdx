@@ -7,6 +7,28 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 ---
 
+## v0.5.0
+
+_March 28, 2026_
+
+### Features
+
+- Add `dse up` command to load ancestor `.secenv` files when jumping directly into a subdirectory (plugin#23)
+
+### Bug Fixes
+
+- Fix false non-interactive terminal warning when secrets are accessed via shell plugin command substitution (#90)
+- Fix zsh `local` declaration leaking secret values on re-entry (plugin#15)
+- Fix unnecessary vault calls when navigating back to parent directory (plugin#17)
+
+### Other
+
+- Add test coverage for `secret forget --ignore-not-found`, smart JSON marshaling, and `secret get --json`
+- Update Go to 1.26.1 and upgrade dependencies (go-crypto v1.4.1, gopenpgp v3.4.0, x/sys v0.42.0, x/term v0.41.0)
+- Update `actions/create-github-app-token` to v3 and `step-security/harden-runner` to v2.16.0
+
+---
+
 ## v0.4.8
 
 _March 6, 2026_
