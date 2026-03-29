@@ -37,4 +37,6 @@ jobs:
       - uses: releasetools/cli@v0
 
       - name: Create tag
-        run: releasetools git::release --major --push "$TAG"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: releasetools git::release --push "$TAG"
