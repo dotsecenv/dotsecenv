@@ -345,6 +345,7 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: |
             packages
+            plugin
             website
 
       - name: Trigger packages update
@@ -361,6 +362,14 @@ jobs:
           token: ${{ github.token }}
           repository: dotsecenv/dotsecenv
           event-type: trigger-action-e2e
+          client-payload: '{"version": "${{ github.ref_name }}"}'
+
+      - name: Tag plugin release
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          repository: dotsecenv/plugin
+          event-type: tag-release
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
       - name: Trigger website redeploy
