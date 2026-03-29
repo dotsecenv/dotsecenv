@@ -37,7 +37,7 @@ func (c *CLI) IdentityCreate(opts IdentityCreateOptions) *Error {
 		stdin:  c.stdin,
 	}
 
-	return identityCreateCore(opts, &c.config, io)
+	return identityCreateCore(opts, &c.config, io, true)
 }
 
 // IdentityCreateStandalone runs identity create without requiring full CLI initialization.
@@ -57,11 +57,12 @@ func IdentityCreateStandalone(opts IdentityCreateOptions, out *output.Handler) *
 	// Use default config for algorithm validation
 	cfg := config.DefaultConfig()
 
-	return identityCreateCore(opts, &cfg, io)
+	return identityCreateCore(opts, &cfg, io, false)
 }
 
 // identityCreateCore contains the shared logic for identity creation.
-func identityCreateCore(opts IdentityCreateOptions, cfg *config.Config, io *identityCreateIO) *Error {
+// hasConfig indicates whether a dotsecenv config file exists, which affects next-step guidance.
+func identityCreateCore(opts IdentityCreateOptions, cfg *config.Config, io *identityCreateIO, hasConfig bool) *Error {
 	// Parse and validate algorithm
 	algo, parseErr := gpg.ParseAlgorithm(opts.Algorithm)
 	if parseErr != nil {
@@ -142,7 +143,7 @@ func identityCreateCore(opts IdentityCreateOptions, cfg *config.Config, io *iden
 	}
 
 	// Print success output
-	printSuccessOutput(io.stdout, name, email, opts.Algorithm, fingerprint)
+	printSuccessOutput(io.stdout, name, email, opts.Algorithm, fingerprint, hasConfig)
 
 	return nil
 }
@@ -174,7 +175,8 @@ func printTemplateOutput(w io.Writer, algorithm, template string) {
 }
 
 // printSuccessOutput prints the success message and next steps.
-func printSuccessOutput(w io.Writer, name, email, algorithm, fingerprint string) {
+// hasConfig indicates whether a dotsecenv config file already exists.
+func printSuccessOutput(w io.Writer, name, email, algorithm, fingerprint string, hasConfig bool) {
 	_, _ = fmt.Fprintf(w, "\nKey generation successful!\n\n")
 	_, _ = fmt.Fprintf(w, "Created GPG key for %s <%s>\n", name, email)
 	_, _ = fmt.Fprintf(w, "  Algorithm:   %s\n", algorithm)
@@ -195,8 +197,16 @@ func printSuccessOutput(w io.Writer, name, email, algorithm, fingerprint string)
 	_, _ = fmt.Fprintf(w, "  gpg --armor --export-secret-keys %s\n", fingerprint)
 	_, _ = fmt.Fprintf(w, "  WARNING: Never share your secret key. Store it securely.\n\n")
 
-	_, _ = fmt.Fprintf(w, "Next step - login to dotsecenv:\n")
-	_, _ = fmt.Fprintf(w, "  dotsecenv login %s\n", fingerprint)
+	if !hasConfig {
+		_, _ = fmt.Fprintf(w, "Next steps:\n")
+		_, _ = fmt.Fprintf(w, "  1. Create a dotsecenv config:\n")
+		_, _ = fmt.Fprintf(w, "       dotsecenv init config\n")
+		_, _ = fmt.Fprintf(w, "  2. Review the created config, then login:\n")
+		_, _ = fmt.Fprintf(w, "       dotsecenv login %s\n", fingerprint)
+	} else {
+		_, _ = fmt.Fprintf(w, "Next step - login to dotsecenv:\n")
+		_, _ = fmt.Fprintf(w, "  dotsecenv login %s\n", fingerprint)
+	}
 }
 
 // generateGPGKeyWithTemplate generates a GPG key using the provided template.

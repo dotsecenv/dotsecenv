@@ -72,6 +72,65 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader
 	return newCLI(vaultPaths, configPath, silent, stdin, stdout, stderr, nil)
 }
 
+// NewCLIConfigOnly creates a CLI instance that only loads config and GPG,
+// without opening any vaults. This is used by commands like `login` that
+// operate purely on config and do not need vault access.
+func NewCLIConfigOnly(configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
+	xdgPaths, err := xdg.NewPaths()
+	if err != nil {
+		return nil, NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
+	}
+
+	configPath = ResolveConfigPath(configPath, silent, stderr)
+
+	// Ensure directories exist
+	if err := xdgPaths.EnsureDirs(); err != nil {
+		return nil, NewError(fmt.Sprintf("failed to create directories: %v", err), ExitConfigError)
+	}
+
+	// Load config (fail if missing or invalid)
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			var suggestion string
+			if isSUID() {
+				suggestion = fmt.Sprintf("config file not found: %s\nContact your system administrator to create this file.", configPath)
+			} else if os.Getuid() == 0 {
+				suggestion = fmt.Sprintf("config file not found: %s\nRun 'sudo dotsecenv init config' to create one", configPath)
+			} else {
+				suggestion = fmt.Sprintf("config file not found: %s\nRun 'dotsecenv init config' to create one", configPath)
+			}
+			return nil, NewError(suggestion, ExitConfigError)
+		}
+		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
+	}
+
+	// Deprecation warning for fingerprint field
+	if cfg.HasDeprecatedFingerprint() && !silent {
+		_, _ = fmt.Fprintf(stderr, "warning: 'fingerprint:' field is deprecated and will be removed in a future version\n")
+		_, _ = fmt.Fprintf(stderr, "         Run 'dotsecenv login %s' to migrate to signed login\n", cfg.Fingerprint)
+	}
+
+	// Validate and set GPG program path from config
+	if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program); err != nil {
+		return nil, NewError(fmt.Sprintf("failed: %v", err), ExitGPGError)
+	}
+
+	return &CLI{
+			configPath: configPath,
+			xdgPaths:   xdgPaths,
+			config:     cfg,
+			gpgClient:  &gpg.GPGClient{},
+			stdin:      stdin,
+			Silent:     silent,
+			output: output.NewHandler(stdout, stderr,
+				output.WithSilent(silent),
+			),
+			hasTTY: defaultHasTTY,
+		},
+		nil
+}
+
 // newCLI creates a CLI instance. If requireExplicitUpgradeOverride is non-nil, it overrides the config setting.
 func newCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer, requireExplicitUpgradeOverride *bool) (*CLI, error) {
 	xdgPaths, err := xdg.NewPaths()
