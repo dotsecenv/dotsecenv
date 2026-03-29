@@ -364,7 +364,7 @@ jobs:
           event-type: trigger-action-e2e
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
-      - name: Tag plugin release
+      - name: Tag plugin with current release's version
         uses: peter-evans/repository-dispatch@v4
         with:
           token: ${{ steps.app-token.outputs.token }}
