@@ -23,8 +23,8 @@ Options:
   --all  Add identity to all configured vaults
   -v     Target vault (path or 1-based index)
 
-When neither --all nor -v is specified and only one vault is configured,
-that vault is selected automatically.`,
+When neither --all nor -v is specified, the vault is auto-selected if only
+one is configured, or you are prompted to choose interactively.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		checkSUIDMode(cmd)

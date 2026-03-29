@@ -24,34 +24,17 @@ func (c *CLI) IdentityAdd(fingerprint string, addAll bool, vaultPath string, fro
 		for i := range entries {
 			indices = append(indices, i)
 		}
-	case fromIndex > 0:
-		idx := fromIndex - 1 // convert 1-based to 0-based
-		if idx >= len(entries) {
-			return NewError(fmt.Sprintf("vault index %d exceeds number of configured vaults (%d)", fromIndex, len(entries)), ExitGeneralError)
-		}
-		indices = []int{idx}
-	case vaultPath != "":
-		found := false
-		for i, entry := range entries {
-			if entry.Path == vaultPath {
-				indices = []int{i}
-				found = true
-				break
-			}
-		}
-		if !found {
-			return NewError(fmt.Sprintf("vault path not found in configuration: %s", vaultPath), ExitConfigError)
+		if len(indices) == 0 {
+			return NewError("no vaults configured", ExitConfigError)
 		}
 	default:
-		if len(entries) == 1 {
-			indices = []int{0}
-		} else {
-			return NewError("multiple vaults configured; use --all or -v to specify which vault(s)", ExitGeneralError)
+		// Single vault: use the shared resolver (handles -v path, -v index,
+		// auto-select for single vault, and interactive prompt for multiple)
+		idx, err := c.resolveWritableVaultIndex(vaultPath, fromIndex, "Select vault to add identity to:")
+		if err != nil {
+			return err
 		}
-	}
-
-	if len(indices) == 0 {
-		return NewError("no vaults configured", ExitConfigError)
+		indices = []int{idx}
 	}
 
 	var added, skipped, failed int

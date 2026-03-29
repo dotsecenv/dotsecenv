@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/config"
@@ -48,15 +50,31 @@ func newIdentityAddCLI(t *testing.T, vaultPaths []string) (*CLI, *MockVaultResol
 	return cli, mock, gpgMock, stdout, stderr
 }
 
+// createTempVaultFiles creates n temp files and returns their paths and a cleanup function.
+func createTempVaultFiles(t *testing.T, n int) []string {
+	t.Helper()
+	paths := make([]string, n)
+	for i := 0; i < n; i++ {
+		f, err := os.CreateTemp("", "testvault_*.jsonl")
+		if err != nil {
+			t.Fatalf("failed to create temp file: %v", err)
+		}
+		paths[i] = f.Name()
+		_ = f.Close()
+		t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	}
+	return paths
+}
+
 func TestIdentityAdd_All(t *testing.T) {
-	cli, mock, _, stdout, _ := newIdentityAddCLI(t, []string{"/v1.jsonl", "/v2.jsonl"})
+	paths := createTempVaultFiles(t, 2)
+	cli, mock, _, stdout, _ := newIdentityAddCLI(t, paths)
 
 	err := cli.IdentityAdd("AABBCCDD", true, "", 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Both vaults should have the identity
 	if !mock.IdentityExistsInVault("AABBCCDD", 0) {
 		t.Error("identity not added to vault 0")
 	}
@@ -65,19 +83,20 @@ func TestIdentityAdd_All(t *testing.T) {
 	}
 
 	out := stdout.String()
-	if !contains(out, "added: identity AABBCCDD to vault 1") {
+	if !strings.Contains(out, "added: identity AABBCCDD to vault 1") {
 		t.Errorf("expected added message for vault 1, got: %s", out)
 	}
-	if !contains(out, "added: identity AABBCCDD to vault 2") {
+	if !strings.Contains(out, "added: identity AABBCCDD to vault 2") {
 		t.Errorf("expected added message for vault 2, got: %s", out)
 	}
-	if !contains(out, "summary: added=2 skipped=0 failed=0") {
+	if !strings.Contains(out, "summary: added=2 skipped=0 failed=0") {
 		t.Errorf("expected summary, got: %s", out)
 	}
 }
 
 func TestIdentityAdd_SingleVaultByIndex(t *testing.T) {
-	cli, mock, _, stdout, _ := newIdentityAddCLI(t, []string{"/v1.jsonl", "/v2.jsonl"})
+	paths := createTempVaultFiles(t, 2)
+	cli, mock, _, stdout, _ := newIdentityAddCLI(t, paths)
 
 	err := cli.IdentityAdd("AABBCCDD", false, "", 2) // 1-based index
 	if err != nil {
@@ -92,15 +111,16 @@ func TestIdentityAdd_SingleVaultByIndex(t *testing.T) {
 	}
 
 	out := stdout.String()
-	if !contains(out, "added: identity AABBCCDD to vault 2") {
+	if !strings.Contains(out, "added: identity AABBCCDD to vault 2") {
 		t.Errorf("expected added message for vault 2, got: %s", out)
 	}
 }
 
 func TestIdentityAdd_SingleVaultByPath(t *testing.T) {
-	cli, mock, _, stdout, _ := newIdentityAddCLI(t, []string{"/v1.jsonl", "/v2.jsonl"})
+	paths := createTempVaultFiles(t, 2)
+	cli, mock, _, stdout, _ := newIdentityAddCLI(t, paths)
 
-	err := cli.IdentityAdd("AABBCCDD", false, "/v2.jsonl", 0)
+	err := cli.IdentityAdd("AABBCCDD", false, paths[1], 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -113,13 +133,14 @@ func TestIdentityAdd_SingleVaultByPath(t *testing.T) {
 	}
 
 	out := stdout.String()
-	if !contains(out, "added: identity AABBCCDD to vault 2") {
+	if !strings.Contains(out, "added: identity AABBCCDD to vault 2") {
 		t.Errorf("expected added message for vault 2, got: %s", out)
 	}
 }
 
 func TestIdentityAdd_AutoSelectSingleVault(t *testing.T) {
-	cli, mock, _, _, _ := newIdentityAddCLI(t, []string{"/only.jsonl"})
+	paths := createTempVaultFiles(t, 1)
+	cli, mock, _, _, _ := newIdentityAddCLI(t, paths)
 
 	err := cli.IdentityAdd("AABBCCDD", false, "", 0)
 	if err != nil {
@@ -131,20 +152,24 @@ func TestIdentityAdd_AutoSelectSingleVault(t *testing.T) {
 	}
 }
 
-func TestIdentityAdd_ErrorMultipleVaultsNoFlag(t *testing.T) {
-	cli, _, _, _, _ := newIdentityAddCLI(t, []string{"/v1.jsonl", "/v2.jsonl"})
+func TestIdentityAdd_MultipleVaultsNoTTY(t *testing.T) {
+	paths := createTempVaultFiles(t, 2)
+	cli, _, _, _, _ := newIdentityAddCLI(t, paths)
 
+	// Without a TTY, resolveWritableVaultIndex should error asking for -v
 	err := cli.IdentityAdd("AABBCCDD", false, "", 0)
 	if err == nil {
-		t.Fatal("expected error when multiple vaults and no --all or -v")
+		t.Fatal("expected error when multiple vaults and no TTY")
 	}
-	if !contains(err.Message, "multiple vaults configured") {
+	if !strings.Contains(err.Message, "specify target vault using -v") &&
+		!strings.Contains(err.Message, "no terminal available") {
 		t.Errorf("unexpected error message: %s", err.Message)
 	}
 }
 
 func TestIdentityAdd_SkipsExisting(t *testing.T) {
-	cli, mock, _, stdout, stderr := newIdentityAddCLI(t, []string{"/v1.jsonl", "/v2.jsonl"})
+	paths := createTempVaultFiles(t, 2)
+	cli, mock, _, stdout, stderr := newIdentityAddCLI(t, paths)
 
 	// Pre-add identity to vault 0
 	mock.IdentitiesByVault[0] = map[string]vault.Identity{
@@ -157,45 +182,49 @@ func TestIdentityAdd_SkipsExisting(t *testing.T) {
 	}
 
 	stderrStr := stderr.String()
-	if !contains(stderrStr, "skipped: identity AABBCCDD already in vault 1") {
+	if !strings.Contains(stderrStr, "skipped: identity AABBCCDD already in vault 1") {
 		t.Errorf("expected skipped message, got stderr: %s", stderrStr)
 	}
 
 	out := stdout.String()
-	if !contains(out, "added: identity AABBCCDD to vault 2") {
+	if !strings.Contains(out, "added: identity AABBCCDD to vault 2") {
 		t.Errorf("expected added message for vault 2, got: %s", out)
 	}
-	if !contains(out, "summary: added=1 skipped=1 failed=0") {
+	if !strings.Contains(out, "summary: added=1 skipped=1 failed=0") {
 		t.Errorf("expected summary, got: %s", out)
 	}
 }
 
 func TestIdentityAdd_IndexOutOfRange(t *testing.T) {
-	cli, _, _, _, _ := newIdentityAddCLI(t, []string{"/v1.jsonl"})
+	paths := createTempVaultFiles(t, 1)
+	cli, _, _, _, _ := newIdentityAddCLI(t, paths)
 
 	err := cli.IdentityAdd("AABBCCDD", false, "", 5) // only 1 vault
 	if err == nil {
 		t.Fatal("expected error for out-of-range index")
 	}
-	if !contains(err.Message, "exceeds number of configured vaults") {
+	if !strings.Contains(err.Message, "exceeds number of configured vaults") {
 		t.Errorf("unexpected error message: %s", err.Message)
 	}
 }
 
 func TestIdentityAdd_UnknownVaultPath(t *testing.T) {
-	cli, _, _, _, _ := newIdentityAddCLI(t, []string{"/v1.jsonl"})
+	paths := createTempVaultFiles(t, 1)
+	cli, _, _, _, _ := newIdentityAddCLI(t, paths)
 
 	err := cli.IdentityAdd("AABBCCDD", false, "/nonexistent.jsonl", 0)
 	if err == nil {
 		t.Fatal("expected error for unknown vault path")
 	}
-	if !contains(err.Message, "vault path not found") {
+	// resolveWritableVaultIndex checks os.Stat first
+	if !strings.Contains(err.Message, "does not exist") {
 		t.Errorf("unexpected error message: %s", err.Message)
 	}
 }
 
 func TestIdentityAdd_AlgorithmNotAllowed(t *testing.T) {
-	cli, _, gpgMock, _, _ := newIdentityAddCLI(t, []string{"/v1.jsonl"})
+	paths := createTempVaultFiles(t, 1)
+	cli, _, gpgMock, _, _ := newIdentityAddCLI(t, paths)
 
 	// Override config to only allow ED25519
 	cli.config.ApprovedAlgorithms = []config.ApprovedAlgorithm{
@@ -217,17 +246,4 @@ func TestIdentityAdd_AlgorithmNotAllowed(t *testing.T) {
 	if err.ExitCode != ExitAlgorithmNotAllowed {
 		t.Errorf("expected ExitAlgorithmNotAllowed, got %d", err.ExitCode)
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstring(s, substr))
-}
-
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
