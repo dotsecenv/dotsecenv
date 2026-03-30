@@ -7,6 +7,25 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 ---
 
+## v0.5.1
+
+_March 30, 2026_
+
+### Features
+
+- Re-add `identity add` command for explicitly adding GPG identities to vaults by fingerprint, useful for onboarding new team members and pre-authorizing keys (#97)
+- Make `dse reload` clear the secret stack and re-fetch all secrets (plugin#26)
+
+### Bug Fixes
+
+- Login no longer requires vault file access (#96)
+
+### Other
+
+- Defined a global Renovate configuration for the dotsecenv GitHub org
+
+---
+
 ## v0.5.0
 
 _March 28, 2026_
