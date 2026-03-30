@@ -587,9 +587,36 @@ function _dotsecenv_cd_hook --on-variable PWD
     _dotsecenv_on_cd "$old_dir" "$new_dir"
 end
 
+# Reload all .secenv files - clears stack and re-fetches everything fresh
+function _dotsecenv_reload
+    # Save current stack entries (ancestor → descendant order)
+    set -l dirs_to_reload $_DOTSECENV_SOURCE_STACK
+
+    # Clear the entire stack and unload all variables
+    while test (count $_DOTSECENV_SOURCE_STACK) -gt 0
+        set -l top $_DOTSECENV_SOURCE_STACK[-1]
+        _dotsecenv_stack_pop
+        _dotsecenv_unload_dir "$top"
+    end
+
+    # Re-load each directory in original order (ancestor → descendant)
+    for dir in $dirs_to_reload
+        if test -f "$dir/.secenv"
+            _dotsecenv_on_cd "" "$dir"
+        end
+    end
+
+    # Also pick up current dir if it now has .secenv and wasn't previously loaded
+    if test -f "$PWD/.secenv"
+        if not contains "$PWD" $dirs_to_reload
+            _dotsecenv_on_cd "" "$PWD"
+        end
+    end
+end
+
 # Reload secrets in current directory
 function reloadsecenv
-    _dotsecenv_on_cd "$PWD" "$PWD"
+    _dotsecenv_reload
 end
 
 # Clipboard helper - copies stdin to clipboard
@@ -632,7 +659,7 @@ function dse
 
     switch $argv[1]
         case reload
-            _dotsecenv_on_cd "$PWD" "$PWD"
+            _dotsecenv_reload
         case get
             dotsecenv secret get $argv[2..]
         case cp

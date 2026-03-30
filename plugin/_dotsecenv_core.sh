@@ -44,8 +44,17 @@ _dotsecenv_stack_push() {
 }
 
 _dotsecenv_stack_pop() {
-    # Remove last element from stack (works in both bash and zsh)
-    unset '_DOTSECENV_SOURCE_STACK[-1]'
+    # Remove last element from stack
+    # Note: zsh's unset 'arr[-1]' empties the element but doesn't shrink
+    # the array inside functions, so use slice reassignment instead
+    local len=${#_DOTSECENV_SOURCE_STACK[@]}
+    if [[ $len -eq 0 ]]; then
+        return
+    elif [[ -n "$ZSH_VERSION" ]]; then
+        _DOTSECENV_SOURCE_STACK=("${_DOTSECENV_SOURCE_STACK[@]:0:$((len - 1))}")
+    else
+        unset '_DOTSECENV_SOURCE_STACK[-1]'
+    fi
 }
 
 _dotsecenv_stack_top() {
@@ -656,11 +665,47 @@ _dotsecenv_clipboard_copy() {
     return 1
 }
 
+# Reload all .secenv files - clears stack and re-fetches everything fresh
+# Use when vault secrets have been updated and you want to refresh without cd-ing out
+_dotsecenv_reload() {
+    # Save current stack entries (ancestor → descendant order)
+    local -a dirs_to_reload=("${_DOTSECENV_SOURCE_STACK[@]}")
+
+    # Clear the entire stack and unload all variables
+    while [[ ${#_DOTSECENV_SOURCE_STACK[@]} -gt 0 ]]; do
+        local top="${_DOTSECENV_SOURCE_STACK[-1]}"
+        _dotsecenv_stack_pop
+        _dotsecenv_unload_dir "$top"
+    done
+
+    # Re-load each directory in original order (ancestor → descendant)
+    local dir
+    for dir in "${dirs_to_reload[@]}"; do
+        if [[ -f "$dir/.secenv" ]]; then
+            _dotsecenv_on_cd "" "$dir"
+        fi
+    done
+
+    # Also pick up current dir if it now has .secenv and wasn't previously loaded
+    if [[ -f "$PWD/.secenv" ]]; then
+        local already_loaded=0
+        for dir in "${dirs_to_reload[@]}"; do
+            [[ "$dir" == "$PWD" ]] && {
+                already_loaded=1
+                break
+            }
+        done
+        if [[ $already_loaded -eq 0 ]]; then
+            _dotsecenv_on_cd "" "$PWD"
+        fi
+    fi
+}
+
 # Aliases - defined as functions to work in both bash and zsh
 dse() {
     case "${1:-}" in
     reload)
-        _dotsecenv_chpwd_hook
+        _dotsecenv_reload
         ;;
     get)
         shift

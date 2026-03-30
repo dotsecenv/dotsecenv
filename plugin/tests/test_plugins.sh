@@ -1151,6 +1151,163 @@ test_dse_up_no_ancestors() {
 }
 
 # ============================================================================
+# dse reload Tests
+# ============================================================================
+
+test_dse_reload_refreshes_values() {
+    local shell="$1"
+    log "[$shell] Testing 'dse reload' refreshes secret values..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_dse_reload_refresh"
+    mkdir -p "$test_dir/project"
+
+    cat >"$test_dir/project/.secenv" <<'EOF'
+DB_PASSWORD={dotsecenv}
+APP_NAME=original
+EOF
+    chmod 644 "$test_dir/project/.secenv"
+
+    # Create a mock that changes its return value based on a flag file
+    local mock_dir="$TEMP_DIR/mock_bin_reload"
+    mkdir -p "$mock_dir"
+    cat >"$mock_dir/dotsecenv" <<MOCK_EOF
+#!/usr/bin/env bash
+if [[ "\$1" == "secret" && "\$2" == "get" ]]; then
+    if [[ -f "$test_dir/updated_flag" ]]; then
+        case "\$3" in
+            "DB_PASSWORD") echo "new-secret-password" ;;
+            *) exit 1 ;;
+        esac
+    else
+        case "\$3" in
+            "DB_PASSWORD") echo "old-secret-password" ;;
+            *) exit 1 ;;
+        esac
+    fi
+else
+    exit 1
+fi
+MOCK_EOF
+    chmod +x "$mock_dir/dotsecenv"
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$("$BASH_BIN" -c "
+            export PATH='$mock_dir:$PATH'
+            export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config_reload'
+            mkdir -p '$TEMP_DIR/config_reload'
+            echo '$test_dir/project' > '$TEMP_DIR/config_reload/trusted_dirs'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir/project'
+            _dotsecenv_chpwd_hook
+            local before_secret=\"\$DB_PASSWORD\"
+            local before_plain=\"\$APP_NAME\"
+            # Simulate vault update
+            touch '$test_dir/updated_flag'
+            # Also update the plain value
+            echo 'DB_PASSWORD={dotsecenv}' > '$test_dir/project/.secenv'
+            echo 'APP_NAME=updated' >> '$test_dir/project/.secenv'
+            dse reload
+            echo \"before_secret=\$before_secret|after_secret=\$DB_PASSWORD|before_plain=\$before_plain|after_plain=\$APP_NAME\"
+        " 2>/dev/null)
+    else
+        result=$(zsh -c "
+            export PATH='$mock_dir:$PATH'
+            export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config_reload'
+            mkdir -p '$TEMP_DIR/config_reload'
+            echo '$test_dir/project' > '$TEMP_DIR/config_reload/trusted_dirs'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir/project'
+            local before_secret=\"\$DB_PASSWORD\"
+            local before_plain=\"\$APP_NAME\"
+            # Simulate vault update
+            touch '$test_dir/updated_flag'
+            # Also update the plain value
+            echo 'DB_PASSWORD={dotsecenv}' > '$test_dir/project/.secenv'
+            echo 'APP_NAME=updated' >> '$test_dir/project/.secenv'
+            dse reload
+            echo \"before_secret=\$before_secret|after_secret=\$DB_PASSWORD|before_plain=\$before_plain|after_plain=\$APP_NAME\"
+        " 2>/dev/null)
+    fi
+
+    rm -f "$test_dir/updated_flag"
+
+    if [[ "$result" == *"after_secret=new-secret-password"* && "$result" == *"after_plain=updated"* ]]; then
+        pass "[$shell] 'dse reload' refreshes both secret and plain values"
+    else
+        fail "[$shell] 'dse reload' refresh failed, got: $result"
+    fi
+}
+
+test_dse_reload_clears_and_reloads_stack() {
+    local shell="$1"
+    log "[$shell] Testing 'dse reload' clears and reloads nested stack..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_dse_reload_stack"
+    mkdir -p "$test_dir/root/project"
+
+    cat >"$test_dir/root/.secenv" <<'EOF'
+APP_ENV=production
+EOF
+    chmod 644 "$test_dir/root/.secenv"
+
+    cat >"$test_dir/root/project/.secenv" <<'EOF'
+DB_PASSWORD={dotsecenv}
+EOF
+    chmod 644 "$test_dir/root/project/.secenv"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$("$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config_reload_stack'
+            mkdir -p '$TEMP_DIR/config_reload_stack'
+            echo '$test_dir/root' > '$TEMP_DIR/config_reload_stack/trusted_dirs'
+            echo '$test_dir/root/project' >> '$TEMP_DIR/config_reload_stack/trusted_dirs'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir/root'
+            _dotsecenv_chpwd_hook
+            cd '$test_dir/root/project'
+            _dotsecenv_chpwd_hook
+            # Both should be loaded now
+            local before_env=\"\$APP_ENV\"
+            local before_pw=\"\$DB_PASSWORD\"
+            # Run reload from the nested dir
+            dse reload
+            echo \"before_env=\$before_env|after_env=\$APP_ENV|before_pw=\$before_pw|after_pw=\$DB_PASSWORD|stack=\${_DOTSECENV_SOURCE_STACK[*]}\"
+        " 2>/dev/null)
+    else
+        result=$(zsh -c "
+            export PATH='$mock_path:$PATH'
+            export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config_reload_stack'
+            mkdir -p '$TEMP_DIR/config_reload_stack'
+            echo '$test_dir/root' > '$TEMP_DIR/config_reload_stack/trusted_dirs'
+            echo '$test_dir/root/project' >> '$TEMP_DIR/config_reload_stack/trusted_dirs'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir/root'
+            cd '$test_dir/root/project'
+            local before_env=\"\$APP_ENV\"
+            local before_pw=\"\$DB_PASSWORD\"
+            dse reload
+            echo \"before_env=\$before_env|after_env=\$APP_ENV|before_pw=\$before_pw|after_pw=\$DB_PASSWORD|stack=\${_DOTSECENV_SOURCE_STACK[*]}\"
+        " 2>/dev/null)
+    fi
+
+    if [[ "$result" == *"after_env=production"* && "$result" == *"after_pw=super-secret-password"* ]]; then
+        pass "[$shell] 'dse reload' reloads entire nested stack"
+    else
+        fail "[$shell] 'dse reload' nested stack reload failed, got: $result"
+    fi
+}
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -1196,6 +1353,8 @@ main() {
         test_dse_up_multiple_ancestors "bash"
         test_dse_up_skips_already_loaded "bash"
         test_dse_up_no_ancestors "bash"
+        test_dse_reload_refreshes_values "bash"
+        test_dse_reload_clears_and_reloads_stack "bash"
     fi
 
     # Run zsh tests
@@ -1225,6 +1384,8 @@ main() {
             test_dse_up_multiple_ancestors "zsh"
             test_dse_up_skips_already_loaded "zsh"
             test_dse_up_no_ancestors "zsh"
+            test_dse_reload_refreshes_values "zsh"
+            test_dse_reload_clears_and_reloads_stack "zsh"
         else
             warn "Zsh not found, skipping zsh tests"
         fi
