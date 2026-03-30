@@ -251,6 +251,53 @@ dotsecenv identity create --template --name "John Doe" --email "john@example.com
 dotsecenv identity create --name "CI Bot" --email "ci@example.com" --no-passphrase
 ```
 
+### identity add
+
+Add an existing GPG identity to one or more vaults by fingerprint.
+
+```bash
+dotsecenv identity add FINGERPRINT [flags]
+```
+
+This is useful for onboarding new team members or pre-authorizing keys before
+sharing secrets. If the identity already exists in a vault it is skipped.
+
+**Arguments:**
+
+- `FINGERPRINT` — GPG key fingerprint of the identity to add
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Add identity to all configured vaults |
+| `-v` | Target vault (path or 1-based index) |
+
+When neither `--all` nor `-v` is specified, the vault is auto-selected if only
+one is configured, or you are prompted to choose interactively.
+
+The identity's public key is fetched from GPG, validated against the
+configured `approved_algorithms`, and appended to the vault. The entry is
+signed by the current user's key (the person running the command), so you
+do not need the target's private key — only their public key in your GPG
+keyring.
+
+**Examples:**
+
+```bash
+# Add an identity to the only configured vault
+dotsecenv identity add E60A1740BAEF49284D22EA7D3C376348F0921C59
+
+# Add to all configured vaults
+dotsecenv identity add E60A1740BAEF49284D22EA7D3C376348F0921C59 --all
+
+# Add to a specific vault by index
+dotsecenv identity add E60A1740BAEF49284D22EA7D3C376348F0921C59 -v 2
+
+# Add to a specific vault by path
+dotsecenv identity add E60A1740BAEF49284D22EA7D3C376348F0921C59 -v ~/.config/dotsecenv/vault.jsonl
+```
+
 ---
 
 ## secret
