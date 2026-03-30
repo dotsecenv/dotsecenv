@@ -1,0 +1,116 @@
+---
+title: Migrate from .env
+description: Move sensitive values from plaintext .env files into your encrypted vault
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+## Goal
+
+Take an existing `.env` file, move the sensitive values into your dotsecenv vault, and set up `.secenv` so everything still loads automatically.
+
+## Prerequisites
+
+- [Quickstart](/tutorials/quickstart/) completed
+
+## Steps
+
+<Steps>
+
+1. **Start with your `.env` file**
+
+   A typical project `.env` looks like this:
+
+   ```bash
+   # .env
+   DATABASE_HOST=localhost
+   DATABASE_PORT=5432
+   DATABASE_NAME=myapp
+   DATABASE_PASSWORD=super-secret-password
+   API_KEY=sk-live-abc123xyz
+   ```
+
+   Three of these are non-sensitive configuration. Two are secrets you would not want in a public repo.
+
+2. **Identify the secrets**
+
+   Ask yourself: *would I panic if this value appeared on a public GitHub repo?* If yes, it belongs in the vault.
+
+   In this example: `DATABASE_PASSWORD` and `API_KEY`.
+
+3. **Store the secrets in your vault**
+
+   ```bash
+   echo "super-secret-password" | dotsecenv secret store DATABASE_PASSWORD
+   echo "sk-live-abc123xyz" | dotsecenv secret store API_KEY
+   ```
+
+4. **Create a `.secenv` file**
+
+   ```bash
+   cat > .secenv << 'EOF'
+   DATABASE_PASSWORD={dotsecenv}
+   API_KEY={dotsecenv}
+   EOF
+   ```
+
+   The `{dotsecenv}` syntax tells the shell plugin to fetch the secret with the same name as the variable.
+
+5. **Remove the secrets from `.env`**
+
+   Your `.env` now contains only non-sensitive values:
+
+   ```bash
+   # .env
+   DATABASE_HOST=localhost
+   DATABASE_PORT=5432
+   DATABASE_NAME=myapp
+   ```
+
+6. **Verify everything loads**
+
+   ```bash
+   cd ~
+   cd ~/my-project
+   # dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_PASSWORD, API_KEY
+
+   echo $DATABASE_HOST
+   # Output: localhost
+
+   echo $DATABASE_PASSWORD
+   # Output: super-secret-password
+
+   echo $API_KEY
+   # Output: sk-live-abc123xyz
+   ```
+
+   All five variables are available. Only three are on disk in plaintext.
+
+7. **Update version control**
+
+   ```bash
+   echo ".env" >> .gitignore
+   git add .secenv .gitignore
+   git commit -m "chore: move secrets to dotsecenv vault"
+   ```
+
+   <Aside type="tip">
+   `.secenv` is safe to commit -- it contains only variable names and `{dotsecenv}` references, never actual secret values.
+   </Aside>
+
+</Steps>
+
+## Expected result
+
+| Variable | Source | On disk in plaintext? |
+|----------|--------|-----------------------|
+| `DATABASE_HOST` | `.env` | Yes |
+| `DATABASE_PORT` | `.env` | Yes |
+| `DATABASE_NAME` | `.env` | Yes |
+| `DATABASE_PASSWORD` | vault via `.secenv` | No |
+| `API_KEY` | vault via `.secenv` | No |
+
+## Next steps
+
+- [Reloading Secrets](/tutorials/reload-secrets/) -- what to do when you rotate a secret
+- [Share a Secret](/tutorials/share-secret/) -- share the encrypted secrets with teammates

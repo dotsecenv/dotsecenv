@@ -101,10 +101,15 @@ export default defineConfig({
         {
           label: 'Tutorials',
           items: [
-            { label: 'Installation', slug: 'tutorials/installation' },
-            { label: 'Your First Secret', slug: 'tutorials/first-secret' },
+            { label: 'Quickstart', slug: 'tutorials/quickstart' },
+            { label: 'Reloading Secrets', slug: 'tutorials/reload-secrets' },
+            { label: 'Migrate from .env', slug: 'tutorials/migrate-from-dotenv' },
+            { label: 'Team Onboarding', slug: 'tutorials/team-onboarding' },
+            { label: 'CI/CD Secrets', slug: 'tutorials/ci-cd-secrets' },
             { label: 'Share a Secret', slug: 'tutorials/share-secret' },
             { label: 'Revoke Access', slug: 'tutorials/revoke-access' },
+            { label: 'Installation Reference', slug: 'tutorials/installation' },
+            { label: 'Your First Secret', slug: 'tutorials/first-secret' },
           ],
         },
         {

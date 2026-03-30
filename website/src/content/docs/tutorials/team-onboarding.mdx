@@ -1,0 +1,104 @@
+---
+title: Team Onboarding
+description: Get set up as a new team member to decrypt shared project secrets
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+## Goal
+
+As a new team member, get set up so you can decrypt the project's shared secrets.
+
+<Aside type="tip">
+For the team lead's perspective (adding you and sharing secrets), see [Share a Secret](/tutorials/share-secret/).
+</Aside>
+
+## Prerequisites
+
+- [dotsecenv installed](/tutorials/quickstart/) (steps 1-2)
+- A GPG key (run `dotsecenv identity create` if you do not have one)
+
+## Steps
+
+<Steps>
+
+1. **Export your public key**
+
+   ```bash
+   gpg --armor --export you@example.com > my-key.asc
+   ```
+
+   Send `my-key.asc` to your team lead. This file contains only your public key and is safe to share.
+
+2. **Wait for the team lead to share secrets with you**
+
+   The team lead will:
+   - Import your public key: `gpg --import my-key.asc`
+   - Add your identity to the vault: `dotsecenv identity add YOUR_FINGERPRINT --all`
+   - Share secrets with you: `dotsecenv secret share DATABASE_PASSWORD YOUR_FINGERPRINT`
+   - Push the updated vault to the repo
+
+   They will tell you when this is done.
+
+3. **Pull the updated vault**
+
+   ```bash
+   cd ~/project
+   git pull
+   ```
+
+4. **Initialize dotsecenv and log in**
+
+   ```bash
+   dotsecenv init config
+   dotsecenv login
+   # Select your GPG key when prompted
+   ```
+
+   <Aside type="tip">
+   If the project has a shared config, the team lead may provide a config file or instructions for vault paths. Check the project README.
+   </Aside>
+
+5. **Verify you can decrypt secrets**
+
+   ```bash
+   dotsecenv secret get DATABASE_PASSWORD
+   # Output: super-secret-password
+   ```
+
+   If this works, you have access.
+
+6. **Enter the project directory**
+
+   If the project has a `.secenv` file, secrets load automatically:
+
+   ```bash
+   cd ~/project
+   # dotsecenv: found .secenv in /home/you/project
+   # Load secrets? [y]es / [n]o / [a]lways: a
+   # dotsecenv: loaded 3 secret(s) from .secenv: DATABASE_PASSWORD, API_KEY, JWT_SECRET
+
+   echo $DATABASE_PASSWORD
+   # Output: super-secret-password
+   ```
+
+</Steps>
+
+## Troubleshooting
+
+**"secret not found" or "access denied"**
+
+The team lead may not have shared all secrets yet. Run `dotsecenv secret get` (with no arguments) to list the secrets you can access.
+
+**"identity not found"**
+
+The team lead has not added your identity to the vault. Send them your fingerprint:
+
+```bash
+gpg --list-keys --keyid-format long you@example.com
+```
+
+## Next steps
+
+- [Reloading Secrets](/tutorials/reload-secrets/) -- keep your shell in sync when secrets rotate
+- [Revoke Access](/tutorials/revoke-access/) -- what happens when someone leaves the team
