@@ -41,6 +41,7 @@ func newIdentityAddCLI(t *testing.T, vaultPaths []string) (*CLI, *MockVaultResol
 			ApprovedAlgorithms: []config.ApprovedAlgorithm{
 				{Algo: "RSA", MinBits: 2048},
 			},
+			Fingerprint: "MYFINGERPRINT", // current user's login
 		},
 		vaultResolver: mock,
 		gpgClient:     gpgMock,

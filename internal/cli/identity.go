@@ -14,6 +14,12 @@ import (
 // If fromIndex > 0, the vault at that 1-based index is targeted.
 // When none of the above are set and exactly one vault is configured, it is auto-selected.
 func (c *CLI) IdentityAdd(fingerprint string, addAll bool, vaultPath string, fromIndex int) *Error {
+	// The current user signs the new identity entry (vouching for it)
+	signerFP, fpErr := c.checkFingerprintRequired("identity add")
+	if fpErr != nil {
+		return fpErr
+	}
+
 	config := c.vaultResolver.GetConfig()
 	entries := config.Entries
 
@@ -48,7 +54,7 @@ func (c *CLI) IdentityAdd(fingerprint string, addAll bool, vaultPath string, fro
 			continue
 		}
 
-		if err := c.addIdentityToVault(fingerprint, idx); err != nil {
+		if err := c.addIdentityToVault(fingerprint, signerFP, idx); err != nil {
 			_, _ = fmt.Fprintf(c.output.Stderr(), "failed: vault %d (%s): %s\n", idx+1, vPath, err.Message)
 			lastErr = err
 			failed++
@@ -74,7 +80,8 @@ func (c *CLI) IdentityAdd(fingerprint string, addAll bool, vaultPath string, fro
 }
 
 // addIdentityToVault builds, signs, and adds an identity to the vault at the given index.
-func (c *CLI) addIdentityToVault(fingerprint string, index int) *Error {
+// signerFingerprint is the current user's key used to sign (vouch for) the new identity.
+func (c *CLI) addIdentityToVault(fingerprint string, signerFingerprint string, index int) *Error {
 	publicKeyInfo, pubKeyErr := c.gpgClient.GetPublicKeyInfo(fingerprint)
 	if pubKeyErr != nil {
 		return NewError(fmt.Sprintf("failed to get public key: %v", pubKeyErr), ExitGPGError)
@@ -101,12 +108,12 @@ func (c *CLI) addIdentityToVault(fingerprint string, index int) *Error {
 		CreatedAt:     c.gpgClient.GetKeyCreationTime(fingerprint),
 		ExpiresAt:     publicKeyInfo.ExpiresAt,
 		PublicKey:     publicKeyInfo.PublicKeyBase64,
-		SignedBy:      fingerprint,
+		SignedBy:      signerFingerprint,
 	}
 
 	newIdentity.Hash = identity.ComputeIdentityHash(&newIdentity)
 
-	signature, signErr := c.gpgClient.SignDataWithAgent(fingerprint, []byte(newIdentity.Hash))
+	signature, signErr := c.gpgClient.SignDataWithAgent(signerFingerprint, []byte(newIdentity.Hash))
 	if signErr != nil {
 		return NewError(fmt.Sprintf("failed to sign identity: %v", signErr), ExitGPGError)
 	}
@@ -123,11 +130,17 @@ func (c *CLI) addIdentityToVault(fingerprint string, index int) *Error {
 	return nil
 }
 
-// ensureIdentityInVault ensures the identity exists in the specified vault index
-// If the identity doesn't exist, it will be auto-added with a warning
+// ensureIdentityInVault ensures the identity exists in the specified vault index.
+// If the identity doesn't exist, it will be auto-added with a warning.
+// The current user's key is used to sign (vouch for) the new identity.
 func (c *CLI) ensureIdentityInVault(fingerprint string, index int) *Error {
 	if c.vaultResolver.IdentityExistsInVault(fingerprint, index) {
 		return nil
+	}
+
+	signerFP, fpErr := c.checkFingerprintRequired("identity auto-add")
+	if fpErr != nil {
+		return fpErr
 	}
 
 	// Auto-add with warning
@@ -162,12 +175,12 @@ func (c *CLI) ensureIdentityInVault(fingerprint string, index int) *Error {
 		CreatedAt:     c.gpgClient.GetKeyCreationTime(fingerprint),
 		ExpiresAt:     publicKeyInfo.ExpiresAt,
 		PublicKey:     publicKeyInfo.PublicKeyBase64,
-		SignedBy:      fingerprint,
+		SignedBy:      signerFP,
 	}
 
 	newIdentity.Hash = identity.ComputeIdentityHash(&newIdentity)
 
-	signature, signErr := c.gpgClient.SignDataWithAgent(fingerprint, []byte(newIdentity.Hash))
+	signature, signErr := c.gpgClient.SignDataWithAgent(signerFP, []byte(newIdentity.Hash))
 	if signErr != nil {
 		return NewError(fmt.Sprintf("failed to sign identity: %v", signErr), ExitGPGError)
 	}
