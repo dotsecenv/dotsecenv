@@ -87,7 +87,7 @@ export default defineConfig({
 
       tableOfContents: {
         minHeadingLevel: 2,
-        maxHeadingLevel: 3,
+        maxHeadingLevel: 4,
       },
 
       sidebar: [
