@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "dotsecenv",
-      "source": ".",
+      "source": "./",
       "description": "Manage GPG-encrypted environment secrets using the dotsecenv CLI",
       "version": "0.5.1",
       "author": {
