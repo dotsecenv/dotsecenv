@@ -1,0 +1,26 @@
+{
+  "name": "dotsecenv",
+  "owner": {
+    "name": "dotsecenv",
+    "email": "release@dotsecenv.com"
+  },
+  "metadata": {
+    "description": "Official dotsecenv plugin for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "dotsecenv",
+      "source": ".",
+      "description": "Manage GPG-encrypted environment secrets using the dotsecenv CLI",
+      "version": "0.5.1",
+      "author": {
+        "name": "dotsecenv"
+      },
+      "homepage": "https://dotsecenv.com",
+      "license": "Apache-2.0",
+      "category": "security",
+      "keywords": ["secrets", "gpg", "encryption", "environment", "vault"]
+    }
+  ]
+}

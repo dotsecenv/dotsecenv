@@ -1,0 +1,21 @@
+{
+  "name": "dotsecenv",
+  "version": "0.5.1",
+  "description": "Manage GPG-encrypted environment secrets using the dotsecenv CLI",
+  "author": {
+    "name": "dotsecenv",
+    "url": "https://dotsecenv.com"
+  },
+  "homepage": "https://dotsecenv.com",
+  "repository": "https://github.com/dotsecenv/dotsecenv",
+  "license": "Apache-2.0",
+  "keywords": [
+    "secrets",
+    "gpg",
+    "encryption",
+    "environment",
+    "dotenv",
+    "security",
+    "vault"
+  ]
+}
