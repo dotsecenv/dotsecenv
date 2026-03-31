@@ -131,6 +131,7 @@ export default defineConfig({
             { label: 'Shell Plugins', slug: 'guides/shell-plugins' },
             { label: 'GitHub Action', slug: 'guides/github-action' },
             { label: 'Terraform & OpenTofu', slug: 'guides/terraform-credentials-helper' },
+            { label: 'Claude Code', slug: 'guides/claude-code' },
             { label: 'How-To', slug: 'how-to' },
           ],
         },
