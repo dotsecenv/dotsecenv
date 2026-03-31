@@ -442,6 +442,17 @@ dotsecenv validate --fix  # Attempt to fix issues
 - **SUID Mode Support**: Restricted operations when running with elevated privileges
 - **JSON Output**: Machine-readable output format for scripting
 
+## Claude Code
+
+Install the dotsecenv plugin for [Claude Code](https://claude.ai/claude-code):
+
+```
+/plugin marketplace add dotsecenv/dotsecenv
+/plugin install dotsecenv@dotsecenv
+```
+
+See the [Claude Code guide](https://dotsecenv.com/guides/claude-code/) for details.
+
 ## Configuration
 
 ### Config File Resolution
