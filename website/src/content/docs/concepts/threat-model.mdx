@@ -3,7 +3,7 @@ title: Threat Model
 description: What dotsecenv protects against and its security boundaries
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
 
 This document describes what threats dotsecenv protects against and its security boundaries. For details on the cryptographic mechanisms, see the [Security Model](/concepts/security-model).
 
@@ -86,6 +86,134 @@ max-cache-ttl 0
 ```
 
 This forces manual passphrase entry for every decryption operation, which automated tools cannot provide without higher privileges (e.g., root access or window server access to inject keystrokes).
+
+#### AI Coding Agents and GPG
+
+AI coding agents (Claude Code, GitHub Copilot CLI, Cursor, etc.) run shell commands as subprocesses of your terminal session. This creates a specific threat surface for GPG-encrypted secrets:
+
+**How agents interact with GPG pinentry:**
+
+AI agent Bash tools typically spawn subprocesses with `stdin` connected to `/dev/null` and no controlling terminal. This means:
+
+| Pinentry Program | Agent Can Trigger Decryption? | Why |
+|------------------|-------------------------------|-----|
+| `pinentry-mac` (macOS) | **Yes**, if passphrase is cached in Keychain or gpg-agent | GUI-based; checks Keychain silently before showing any dialog |
+| `pinentry-gnome3` (Linux) | **Yes**, if passphrase is cached in GNOME Keyring or gpg-agent | GUI-based; checks keyring before showing dialog |
+| `pinentry-qt` (Linux) | **Yes**, if cached | GUI-based |
+| `pinentry-tty` | **No** | Requires terminal input; fails with "Operation cancelled" when there is no controlling terminal |
+| `pinentry-curses` | **No** | Requires terminal input; fails with "Inappropriate ioctl for device" |
+
+Terminal-based pinentry programs (`pinentry-tty`, `pinentry-curses`) fail because the agent's subprocess has no controlling terminal — `/dev/tty` returns "Device not configured". Even when `GPG_TTY` is set to the parent terminal, the agent's terminal renderer is already reading from that device, creating input contention.
+
+GUI-based pinentry programs work because they open their own window, independent of terminal state. When the passphrase is already cached (in gpg-agent memory, macOS Keychain, or GNOME Keyring), the GUI dialog never appears — the passphrase is returned silently.
+
+**The critical risk: once cached, any process can decrypt.** When a passphrase is cached in gpg-agent or an OS keychain, any process running as your user can invoke `gpg --decrypt` without interaction. This includes AI agents, build scripts, postinstall hooks, and malicious dependencies.
+
+#### OS Keychain Passphrase Extraction
+
+Beyond triggering GPG decryption indirectly, an attacker with code execution can extract the plaintext GPG passphrase directly from the OS keychain:
+
+**macOS (Login Keychain):**
+
+```bash
+# Extracts plaintext passphrase with zero user interaction
+security find-generic-password -s "GnuPG" -g
+```
+
+The macOS Login Keychain unlocks when the user logs in and remains accessible to all processes running as that user. While keychain ACLs can restrict which applications can use stored credentials for cryptographic operations, the `security` CLI (an Apple-signed system binary) can retrieve password values directly.
+
+**Linux (GNOME Keyring):**
+
+```bash
+# Extracts stored secrets via D-Bus
+secret-tool lookup xdg:schema org.gnupg.Passphrase
+```
+
+GNOME Keyring and KDE Wallet have similar session-scoped unlocking — once unlocked at login, any user process can query stored items via D-Bus.
+
+<Aside type="danger" title="Blast Radius">
+  Once a key's passphrase is extracted or cached, **all** files encrypted to that key become decryptable. In dotsecenv terms, every secret in every vault encrypted to your key is exposed — not just individual secrets.
+</Aside>
+
+#### Preventing Keychain Passphrase Storage
+
+Add `no-allow-external-cache` to your GPG agent configuration to prevent pinentry from storing passphrases in the OS keychain:
+
+```ini
+# ~/.gnupg/gpg-agent.conf
+no-allow-external-cache
+```
+
+This ensures that passphrases are only held in gpg-agent's in-memory cache (governed by `default-cache-ttl` and `max-cache-ttl`) and are never written to persistent storage that other processes can query.
+
+After adding this option, delete any existing keychain entries:
+
+<Tabs>
+  <TabItem label="macOS">
+    ```bash
+    # Repeat until "could not be found"
+    security delete-generic-password -s "GnuPG"
+    ```
+  </TabItem>
+  <TabItem label="Linux (GNOME)">
+    ```bash
+    secret-tool clear xdg:schema org.gnupg.Passphrase
+    ```
+  </TabItem>
+</Tabs>
+
+Then reload gpg-agent:
+
+```bash
+gpgconf --reload gpg-agent
+```
+
+#### Recommended GPG Agent Configuration
+
+For environments where AI agents or automated tools may run, balance security and usability:
+
+```ini
+# ~/.gnupg/gpg-agent.conf
+
+# Use a GUI pinentry appropriate for your platform:
+# macOS:  pinentry-program /opt/homebrew/opt/pinentry-mac/bin/pinentry-mac
+# Linux:  pinentry-program /usr/bin/pinentry-gnome3
+
+# Passphrase expires after 1 hour of inactivity
+default-cache-ttl 3600
+
+# Hard cap: passphrase must be re-entered after 4 hours regardless of activity
+max-cache-ttl 14400
+
+# Prevent pinentry from storing passphrases in OS keychain
+no-allow-external-cache
+```
+
+**For maximum security** (e.g., production secrets), set both TTLs to `0` to force passphrase entry on every operation.
+
+**For convenience** during development, the 1hr/4hr configuration above ensures that:
+
+- You enter your passphrase at most once per work session
+- The passphrase is never persisted to disk or OS keychain
+- An AI agent can only decrypt while the cache is warm (limited window)
+
+#### AI Agent Attack Vectors
+
+| Vector | Description | Mitigation |
+|--------|-------------|------------|
+| Direct decryption | Agent runs `dotsecenv secret get` or `gpg --decrypt` while passphrase is cached | Short cache TTLs; `no-allow-external-cache` |
+| Keychain extraction | Agent runs `security find-generic-password` (macOS) or `secret-tool lookup` (Linux) | `no-allow-external-cache`; delete existing keychain entries |
+| Prompt injection | Malicious content in repo files, issues, or fetched URLs instructs the agent to decrypt and exfiltrate | Agent-side guardrails; do not grant agents blanket tool permissions |
+| Supply chain | Malicious postinstall script in npm/pip/go dependency runs GPG commands | Short cache TTLs; audit dependencies; use hardware tokens |
+| Exfiltration | Agent pipes decrypted values to external URLs via curl/wget | Network monitoring; agent tool restrictions |
+
+#### Hardware Token Defense
+
+For keys protecting high-value secrets, use a hardware token (YubiKey, Nitrokey, etc.) configured to require **physical touch** for each cryptographic operation. This is the strongest defense against automated exfiltration because:
+
+- No passphrase is stored in software — the private key never leaves the hardware
+- Each operation requires physical presence (touch the device)
+- Software-only attacks cannot bypass the touch requirement
 
 ### Protecting .secenv Files
 
@@ -290,7 +418,9 @@ The vault is designed to be safe in public repositories:
 | Weak algorithms        | Yes        | Config-enforced minimums              |
 | PATH injection         | Yes        | Configure absolute `gpg.program` path |
 | Stealth network egress | Yes        | Hermetic e2e with dual verification   |
-| Automated exfiltration | Partial    | `pinentry` (disable gpg-agent cache)  |
+| Automated exfiltration | Partial    | `pinentry` + `no-allow-external-cache` + short cache TTLs |
+| AI agent decryption    | Partial    | GUI pinentry bypasses when cached; use hardware tokens    |
+| Keychain extraction    | Partial    | `no-allow-external-cache`; delete existing entries        |
 | Root access            | No         | OS-level compromise                   |
 | Key theft              | No         | Guard your private key                |
 | Env snooping           | No         | Post-decryption risk                  |
