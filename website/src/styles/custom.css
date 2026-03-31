@@ -22,10 +22,10 @@
   --sl-color-bg-sidebar: #0a0a0a;
   --sl-color-bg-inline-code: #1a1a1a;
 
-  /* Accent color for links and buttons */
-  --sl-color-accent: #60a5fa;
-  --sl-color-accent-low: #1e3a5f;
-  --sl-color-accent-high: #93c5fd;
+  /* Accent color for links and buttons - matches logo teal */
+  --sl-color-accent: #2a9d8f;
+  --sl-color-accent-low: #153d38;
+  --sl-color-accent-high: #5cc4b8;
 
   /* Text colors */
   --sl-color-text: #e5e5e5;
@@ -140,6 +140,12 @@ blockquote {
   margin-left: 0;
   color: var(--sl-color-gray-3);
   font-style: italic;
+}
+
+/* Heading anchor link icon - smaller, spaced, centered */
+.sl-heading-wrapper {
+  --sl-anchor-icon-size: 0.5em !important;
+  --sl-anchor-icon-gap: 0.4em !important;
 }
 
 /* Focus states for accessibility */
@@ -326,6 +332,27 @@ blockquote {
 /* Site header title color */
 .title-wrapper span {
   color: #42a26a;
+}
+
+/* Hero buttons - match logo colors */
+.hero a.sl-link-button[href="#install"] {
+  background: #2d8fb5;
+  border-color: #2d8fb5;
+}
+
+.hero a.sl-link-button[href="#install"]:hover {
+  background: #26799a;
+  border-color: #26799a;
+}
+
+.hero a.sl-link-button[href*="github.com"] {
+  background: #42a26a;
+  border-color: #42a26a;
+}
+
+.hero a.sl-link-button[href*="github.com"]:hover {
+  background: #358856;
+  border-color: #358856;
 }
 
 /* Collapsible details/summary */

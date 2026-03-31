@@ -101,7 +101,6 @@ export default defineConfig({
         {
           label: 'Tutorials',
           items: [
-            { label: 'Quickstart', slug: 'tutorials/quickstart' },
             { label: 'Reloading Secrets', slug: 'tutorials/reload-secrets' },
             { label: 'Migrate from .env', slug: 'tutorials/migrate-from-dotenv' },
             { label: 'Team Onboarding', slug: 'tutorials/team-onboarding' },

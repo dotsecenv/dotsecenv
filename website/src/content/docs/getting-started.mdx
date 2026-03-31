@@ -1,24 +1,20 @@
 ---
 title: Getting Started
-description: Get up and running with dotsecenv in 5 minutes
+description: Install dotsecenv and auto-load your first encrypted secret in under 5 minutes
 ---
 
-import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-This guide gets you from zero to encrypted secrets in about 5 minutes. By the end, you'll have:
-
-- dotsecenv installed
-- A vault configured with your GPG identity
-- Your first secret stored and retrieved
+This guide takes you from zero to an encrypted, auto-loading secret in about 5 minutes. By the end you will have dotsecenv installed, a vault with your identity, and a `.secenv` file that loads secrets automatically when you enter your project directory.
 
 ## Prerequisites
 
-You need a GPG key. Most developers already have one for signing git commits. If not, you have two options:
+You need a GPG key. Most developers already have one for signing git commits. If not:
 
 <Tabs>
   <TabItem label="Using dotsecenv (easier)">
     ```bash
-    # Generate a new GPG key with dotsecenv
+    # Generate a new GPG key with dotsecenv (after install below)
     dotsecenv identity create
     # Enter your name and email when prompted
     ```
@@ -26,7 +22,6 @@ You need a GPG key. Most developers already have one for signing git commits. If
   </TabItem>
   <TabItem label="Using GPG directly">
     ```bash
-    # Generate a new GPG key
     gpg --full-generate-key
     # Select: (1) RSA and RSA, 4096 bits, key does not expire
     # Enter your name and email
@@ -34,7 +29,7 @@ You need a GPG key. Most developers already have one for signing git commits. If
   </TabItem>
 </Tabs>
 
-## Quick Setup
+## Setup
 
 <Steps>
 
@@ -42,13 +37,11 @@ You need a GPG key. Most developers already have one for signing git commits. If
 
    <Tabs>
      <TabItem label="Install Script">
-       The fastest way to install on macOS or Linux:
-
        ```bash
        curl -fsSL https://get.dotsecenv.com/install.sh | bash
        ```
 
-       This auto-detects your platform, verifies checksums, and installs the binary, shell completions, man pages, and shell plugin to your home directory by default (no sudo needed). Use `--system` for system-wide paths. See the [installation tutorial](/tutorials/installation/) for all options.
+       The installer downloads the binary, verifies signatures, and installs the shell plugin, completions, and man pages. See the [installation reference](/tutorials/installation/) for all options.
      </TabItem>
      <TabItem label="macOS (Homebrew)">
        ```bash
@@ -58,7 +51,6 @@ You need a GPG key. Most developers already have one for signing git commits. If
      </TabItem>
      <TabItem label="Linux (apt)">
        ```bash
-       # Debian/Ubuntu
        curl -fsSL https://get.dotsecenv.com/key.asc | \
          sudo gpg --dearmor -o /etc/apt/keyrings/dotsecenv.gpg
        echo "deb [signed-by=/etc/apt/keyrings/dotsecenv.gpg] \
@@ -75,15 +67,47 @@ You need a GPG key. Most developers already have one for signing git commits. If
    dotsecenv version
    ```
 
-2. **Initialize configuration**
+2. **Activate the shell plugin**
 
-   Create a config file:
+   Add the source line the installer printed to your shell configuration:
+
+   <Tabs>
+     <TabItem label="Zsh">
+       ```bash
+       echo 'source ~/.local/share/dotsecenv/plugin/dotsecenv.plugin.zsh' >> ~/.zshrc
+       ```
+     </TabItem>
+     <TabItem label="Bash">
+       ```bash
+       echo 'source ~/.local/share/dotsecenv/plugin/dotsecenv.plugin.bash' >> ~/.bashrc
+       ```
+     </TabItem>
+     <TabItem label="Fish">
+       The installer links the plugin automatically for Fish. If it did not, run:
+
+       ```bash
+       ln -sf ~/.local/share/dotsecenv/plugin/conf.d/dotsecenv.fish ~/.config/fish/conf.d/dotsecenv.fish
+       ```
+     </TabItem>
+   </Tabs>
+
+   Reload your shell:
+
+   ```bash
+   exec $SHELL
+   ```
+
+   <Aside type="tip">
+   If you use Oh My Zsh, Zinit, Fisher, or Oh My Bash, the installer auto-links the plugin. Just add `dotsecenv` to your plugins list in your rc file.
+   </Aside>
+
+3. **Initialize and login**
 
    ```bash
    dotsecenv init config
+   dotsecenv init vault
+   dotsecenv login   # select your GPG key interactively
    ```
-
-   This creates `~/.config/dotsecenv/config` with default settings.
 
    :::tip[Shortcut: Init + Login in one step]
    You can combine initialization and login into one command:
@@ -94,74 +118,49 @@ You need a GPG key. Most developers already have one for signing git commits. If
 
    :::
 
-3. **Create a vault**
+4. **Store a secret**
 
    ```bash
-   dotsecenv init vault
+   echo "s3cr3t-db-pass" | dotsecenv secret store DATABASE_PASSWORD
    ```
 
-   This creates an encrypted vault file at `~/.config/dotsecenv/vault`.
-
-4. **Login with your GPG key**
+5. **Create a `.secenv` file**
 
    ```bash
-   dotsecenv login
+   mkdir -p ~/my-project
+   echo 'DATABASE_PASSWORD={dotsecenv}' > ~/my-project/.secenv
    ```
 
-   This lists your available GPG keys and prompts you to select one. You can also specify a fingerprint directly:
+   This tells the shell plugin to fetch `DATABASE_PASSWORD` from your vault whenever you enter the directory.
+
+6. **Watch it auto-load**
 
    ```bash
-   dotsecenv login YOUR_FINGERPRINT
-   ```
+   cd ~/my-project
+   # dotsecenv: found .secenv in /home/you/my-project
+   # Load secrets? [y]es / [n]o / [a]lways: a
+   # dotsecenv: loaded 1 secret(s) from .secenv: DATABASE_PASSWORD
 
-   The login creates a cryptographically signed proof that you control the secret key.
+   echo $DATABASE_PASSWORD
+   # Output: s3cr3t-db-pass
 
-5. **Store your first secret**
+   cd ~
+   # dotsecenv: unloaded 1 secret(s): DATABASE_PASSWORD
 
-   ```bash
-   echo "my-secret-database-password" | dotsecenv secret store DATABASE_PASSWORD
-   ```
-
-   The secret is now encrypted in your vault.
-
-6. **Retrieve the secret**
-
-   ```bash
-   dotsecenv secret get DATABASE_PASSWORD
-   # Output: my-secret-database-password
+   echo $DATABASE_PASSWORD
+   # Output: (empty)
    ```
 
 </Steps>
 
-## What Just Happened?
+## What just happened
 
-1. **Config file** (`~/.config/dotsecenv/config`) stores your settings and vault location
-2. **Vault file** (`~/.config/dotsecenv/vault`) is an encrypted JSONL file containing:
-   - Your identity (GPG public key fingerprint)
-   - Encrypted secrets
-3. **Login** associated your GPG key with dotsecenv so it knows which key to use for encryption/decryption
+- Your secret is **encrypted at rest** in the vault using your GPG key (AES-256-GCM)
+- The shell plugin **auto-loads** secrets when you `cd` into a directory with a `.secenv` file
+- Secrets are **auto-unloaded** when you leave the directory tree
+- The vault file is safe to commit to git — it's just encrypted JSONL
 
-## Next: Shell Integration
-
-The real power comes from automatic secret loading. Install the shell plugin:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
-```
-
-Then create a `.secenv` file in your project:
-
-```bash
-# .secenv - secrets loaded automatically when you cd into the directory
-DATABASE_PASSWORD={dotsecenv}
-API_KEY={dotsecenv/MY_API_KEY}
-```
-
-When you `cd` into the directory, dotsecenv prompts you to load the secrets.
-
----
-
-## Verification Checklist
+## Verification checklist
 
 Before moving on, verify:
 
@@ -169,9 +168,11 @@ Before moving on, verify:
 - `dotsecenv vault describe` shows your vault with your identity
 - `dotsecenv secret get DATABASE_PASSWORD` returns your secret
 
-## What's Next?
+## What's next
 
-- [Your First Secret](/tutorials/first-secret/) — Deeper dive into secrets and shell plugins
-- [Share a Secret](/tutorials/share-secret/) — Share secrets with teammates
+- [Reloading Secrets](/tutorials/reload-secrets/) — What to do when vault updates don't appear in your shell
+- [Migrate from .env](/tutorials/migrate-from-dotenv/) — Move existing secrets from plaintext `.env` files
+- [Share a Secret](/tutorials/share-secret/) — Share encrypted secrets with teammates
+- [Shell Plugins](/guides/shell-plugins/) — Trust system, `dse up`, nested `.secenv` files
 - [Security Model](/concepts/security-model/) — Understand how encryption works
 - [CLI Reference](/reference/) — Full command documentation
