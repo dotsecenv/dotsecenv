@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -331,5 +332,128 @@ func TestInitConfig_HasDefaultAlgorithms(t *testing.T) {
 	}
 	if !hasEdDSA {
 		t.Errorf("expected EdDSA in approved_algorithms")
+	}
+}
+
+// writeTestConfig writes a minimal config file with the given vault paths
+func writeTestConfig(t *testing.T, configPath string, vaultPaths []string) {
+	t.Helper()
+	var vaultYAML string
+	for _, v := range vaultPaths {
+		vaultYAML += fmt.Sprintf("  - %s\n", v)
+	}
+	content := fmt.Sprintf(`approved_algorithms:
+  - algo: RSA
+    min_bits: 2048
+vault:
+%sgpg:
+  program: PATH
+`, vaultYAML)
+	if err := os.WriteFile(configPath, []byte(content), 0600); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+}
+
+func TestInitVault_WithIndex(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	vault1Path := filepath.Join(tmpDir, "vault1.dsv")
+	vault2Path := filepath.Join(tmpDir, "vault2.dsv")
+
+	writeTestConfig(t, configPath, []string{vault1Path, vault2Path})
+
+	// Init vault using index 1 (should resolve to vault1Path)
+	_, stderr, err := runCmd("init", "vault", "-c", configPath, "-v", "1")
+	if err != nil {
+		t.Fatalf("init vault -v 1 failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify vault was created at the config path, not a file named "1"
+	if _, statErr := os.Stat(vault1Path); os.IsNotExist(statErr) {
+		t.Errorf("expected vault file at %s, but it does not exist", vault1Path)
+	}
+	if _, statErr := os.Stat(filepath.Join(tmpDir, "1")); statErr == nil {
+		t.Errorf("found file named '1' — index was not resolved to config path")
+	}
+
+	// Verify stderr mentions the resolved path
+	if !strings.Contains(stderr, vault1Path) {
+		t.Errorf("expected stderr to reference %s, got: %s", vault1Path, stderr)
+	}
+}
+
+func TestInitVault_WithIndex_SecondVault(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	vault1Path := filepath.Join(tmpDir, "vault1.dsv")
+	vault2Path := filepath.Join(tmpDir, "vault2.dsv")
+
+	writeTestConfig(t, configPath, []string{vault1Path, vault2Path})
+
+	// Init vault using index 2 (should resolve to vault2Path)
+	_, stderr, err := runCmd("init", "vault", "-c", configPath, "-v", "2")
+	if err != nil {
+		t.Fatalf("init vault -v 2 failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify vault was created at vault2Path
+	if _, statErr := os.Stat(vault2Path); os.IsNotExist(statErr) {
+		t.Errorf("expected vault file at %s, but it does not exist", vault2Path)
+	}
+	// vault1 should NOT have been created
+	if _, statErr := os.Stat(vault1Path); statErr == nil {
+		t.Errorf("vault1 should not have been created when initializing index 2")
+	}
+}
+
+func TestInitVault_InvalidIndex(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	vault1Path := filepath.Join(tmpDir, "vault1.dsv")
+
+	writeTestConfig(t, configPath, []string{vault1Path})
+
+	// Index 99 exceeds configured vaults (only 1)
+	_, stderr, err := runCmd("init", "vault", "-c", configPath, "-v", "99")
+	if err == nil {
+		t.Fatal("expected error for out-of-range vault index, but command succeeded")
+	}
+
+	if !strings.Contains(stderr, "exceeds number of configured vaults") {
+		t.Errorf("expected 'exceeds number of configured vaults' error, got: %s", stderr)
+	}
+}
+
+func TestInitVault_ZeroIndex(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	vault1Path := filepath.Join(tmpDir, "vault1.dsv")
+
+	writeTestConfig(t, configPath, []string{vault1Path})
+
+	// Index 0 is invalid (1-based indexing)
+	_, stderr, err := runCmd("init", "vault", "-c", configPath, "-v", "0")
+	if err == nil {
+		t.Fatal("expected error for zero vault index, but command succeeded")
+	}
+
+	if !strings.Contains(stderr, "index") {
+		t.Errorf("expected index-related error, got: %s", stderr)
+	}
+}
+
+func TestInitVault_PathStillWorks(t *testing.T) {
+	tmpDir := t.TempDir()
+	vaultPath := filepath.Join(tmpDir, "explicit-vault.dsv")
+
+	// Init vault using explicit path (no config needed for path mode)
+	_, stderr, err := runCmd("init", "vault", "-v", vaultPath)
+	if err != nil {
+		t.Fatalf("init vault -v PATH failed: %v\nSTDERR: %s", err, stderr)
+	}
+
+	// Verify vault was created at the explicit path
+	if _, statErr := os.Stat(vaultPath); os.IsNotExist(statErr) {
+		t.Errorf("expected vault file at %s, but it does not exist", vaultPath)
 	}
 }

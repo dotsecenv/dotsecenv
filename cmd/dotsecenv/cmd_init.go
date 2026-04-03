@@ -86,7 +86,7 @@ var initVaultCmd = &cobra.Command{
 	Long: `Initialize vault file(s).
 
 Two modes of operation:
-  1. With -v PATH: Initialize a specific vault file at the given path
+  1. With -v PATH or -v INDEX: Initialize a specific vault file (path or 1-based config index)
   2. Without -v: Interactive mode using vaults from configuration`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -94,13 +94,20 @@ Two modes of operation:
 		hasVaults := len(globalOpts.VaultPaths) > 0
 
 		if hasVaults {
-			// Validate vault paths against config (respects restrict_to_configured_vaults)
-			if err := clilib.ValidateVaultPathsAgainstConfig(globalOpts.ConfigPath, globalOpts.VaultPaths, out); err != nil {
+			// Resolve numeric vault indices to actual paths from config
+			resolvedPaths, resolveErr := resolveVaultPaths(globalOpts.ConfigPath, globalOpts.VaultPaths)
+			if resolveErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", resolveErr)
+				os.Exit(int(clilib.ExitGeneralError))
+			}
+
+			// Validate resolved vault paths against config (respects restrict_to_configured_vaults)
+			if err := clilib.ValidateVaultPathsAgainstConfig(globalOpts.ConfigPath, resolvedPaths, out); err != nil {
 				os.Exit(int(clilib.PrintError(os.Stderr, err)))
 			}
 
 			// Init specific vaults
-			for _, vPath := range globalOpts.VaultPaths {
+			for _, vPath := range resolvedPaths {
 				if err := clilib.InitVaultFile(vPath, out); err != nil {
 					os.Exit(int(clilib.PrintError(os.Stderr, err)))
 				}

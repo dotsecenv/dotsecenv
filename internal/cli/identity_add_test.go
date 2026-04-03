@@ -10,6 +10,7 @@ import (
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/output"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
+	"golang.org/x/term"
 )
 
 func newIdentityAddCLI(t *testing.T, vaultPaths []string) (*CLI, *MockVaultResolver, *MockGPGClient, *bytes.Buffer, *bytes.Buffer) {
@@ -154,6 +155,18 @@ func TestIdentityAdd_AutoSelectSingleVault(t *testing.T) {
 }
 
 func TestIdentityAdd_MultipleVaultsNoTTY(t *testing.T) {
+	// This test verifies behavior when no TTY is available.
+	// Skip when /dev/tty is a real terminal (e.g., running from a terminal
+	// session or git hook) since HandleInteractiveSelection opens /dev/tty
+	// directly and would hang waiting for input.
+	if tty, err := os.Open("/dev/tty"); err == nil {
+		isTerm := term.IsTerminal(int(tty.Fd()))
+		_ = tty.Close()
+		if isTerm {
+			t.Skip("skipping: /dev/tty is a real terminal; test requires no-TTY environment")
+		}
+	}
+
 	paths := createTempVaultFiles(t, 2)
 	cli, _, _, _, _ := newIdentityAddCLI(t, paths)
 
