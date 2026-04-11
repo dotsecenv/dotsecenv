@@ -24,6 +24,12 @@
     "sharp": "^0.34.0",
     "starlight-blog": "^0.26.1"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "@fontsource/inter": "^5.1.1",
