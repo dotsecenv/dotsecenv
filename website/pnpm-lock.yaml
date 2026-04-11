@@ -22,7 +22,7 @@ importers:
         version: 0.11.0(astro@6.1.5(@types/node@25.0.3)(rollup@4.60.1)(typescript@5.9.3)(yaml@2.8.2))
       canvaskit-wasm:
         specifier: ^0.41.0
-        version: 0.41.0
+        version: 0.41.1
       sharp:
         specifier: ^0.34.0
         version: 0.34.5
@@ -1054,8 +1054,8 @@ packages:
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
 
-  canvaskit-wasm@0.41.0:
-    resolution: {integrity: sha512-cnbL02NFB3yOYMF/MtxViZHgD1vh55Pvy+zR8q4JuFvyCPejZP3eClkt2GuZ0S7jOmGMCJXaHBasbMChbR9JZg==}
+  canvaskit-wasm@0.41.1:
+    resolution: {integrity: sha512-gO2rNMIE0lOQ8MaarM4qNeq2zZAEknAObKP2XAKidMSAY8P5sURGdFkrx1TSdHuBFqTf5w35JqjuUzjibqkD5g==}
 
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
@@ -3667,7 +3667,7 @@ snapshots:
   astro-og-canvas@0.11.0(astro@6.1.5(@types/node@25.0.3)(rollup@4.60.1)(typescript@5.9.3)(yaml@2.8.2)):
     dependencies:
       astro: 6.1.5(@types/node@25.0.3)(rollup@4.60.1)(typescript@5.9.3)(yaml@2.8.2)
-      canvaskit-wasm: 0.41.0
+      canvaskit-wasm: 0.41.1
       deterministic-object-hash: 2.0.2
       entities: 8.0.0
 
@@ -3806,7 +3806,7 @@ snapshots:
 
   buffer-from@1.1.2: {}
 
-  canvaskit-wasm@0.41.0:
+  canvaskit-wasm@0.41.1:
     dependencies:
       '@webgpu/types': 0.1.21
 
