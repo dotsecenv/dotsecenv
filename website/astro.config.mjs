@@ -85,6 +85,10 @@ export default defineConfig({
         },
       ],
 
+      components: {
+        Footer: './src/components/Footer.astro',
+      },
+
       tableOfContents: {
         minHeadingLevel: 2,
         maxHeadingLevel: 4,
