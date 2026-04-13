@@ -1733,3 +1733,168 @@ func TestSecretGet_JSONOutput_SmartMarshal(t *testing.T) {
 		t.Errorf("Expected port=5432, got: %v", valueObj["port"])
 	}
 }
+
+// TestSecretGet_FallbackToGPGAgent tests that secret get succeeds when the logged-in
+// fingerprint is NOT in AvailableTo but the GPG agent can still decrypt (different key in agent).
+func TestSecretGet_FallbackToGPGAgent(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	loggedInFP := "LOGGED_IN_FP"
+	otherFP := "OTHER_FP_IN_AGENT"
+
+	mockVaultResolver := NewMockVaultResolver()
+	// Secret is encrypted for otherFP, NOT the logged-in identity
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"HCLOUD_TOKEN": {
+			Key: "HCLOUD_TOKEN",
+			Values: []vault.SecretValue{
+				{AddedAt: time.Now().UTC(), Value: "c2VjcmV0", AvailableTo: []string{otherFP}},
+			},
+		},
+	}
+	mockVaultResolver.VaultPaths = []string{"/vault.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: "/vault.yaml"}}
+
+	mockGPGClient := &MockGPGClientWithDecrypt{
+		MockGPGClient: NewMockGPGClient(),
+		DecryptFunc: func(ciphertext []byte, fingerprint string) ([]byte, error) {
+			// GPG agent can decrypt with whatever key it has
+			return []byte("my_hcloud_token"), nil
+		},
+	}
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{{Algo: "RSA", MinBits: 2048}},
+		Fingerprint:        loggedInFP,
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	err := cli.SecretGet("HCLOUD_TOKEN", false, false, false, "", 0)
+	if err != nil {
+		t.Fatalf("SecretGet should succeed via GPG agent fallback, got: %v", err)
+	}
+
+	out := stdoutBuf.String()
+	if !strings.Contains(out, "my_hcloud_token") {
+		t.Errorf("Expected decrypted value 'my_hcloud_token', got: %s", out)
+	}
+}
+
+// TestSecretGet_FallbackToGPGAgent_AllMode tests --all mode decrypts values
+// even when the logged-in fingerprint is not in AvailableTo.
+func TestSecretGet_FallbackToGPGAgent_AllMode(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	loggedInFP := "LOGGED_IN_FP"
+	otherFP := "OTHER_FP_IN_AGENT"
+
+	now := time.Now().UTC()
+	older := now.Add(-1 * time.Hour)
+
+	mockVaultResolver := NewMockVaultResolver()
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"MY_SECRET": {
+			Key: "MY_SECRET",
+			Values: []vault.SecretValue{
+				{AddedAt: older, Value: "b2xk", AvailableTo: []string{loggedInFP}},
+				{AddedAt: now, Value: "bmV3", AvailableTo: []string{otherFP}},
+			},
+		},
+	}
+	mockVaultResolver.VaultPaths = []string{"/vault.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: "/vault.yaml"}}
+
+	decryptCalls := 0
+	mockGPGClient := &MockGPGClientWithDecrypt{
+		MockGPGClient: NewMockGPGClient(),
+		DecryptFunc: func(ciphertext []byte, fingerprint string) ([]byte, error) {
+			decryptCalls++
+			return []byte(fmt.Sprintf("decrypted_%d", decryptCalls)), nil
+		},
+	}
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{{Algo: "RSA", MinBits: 2048}},
+		Fingerprint:        loggedInFP,
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	err := cli.SecretGet("MY_SECRET", true, false, false, "", 0)
+	if err != nil {
+		t.Fatalf("SecretGet --all should succeed, got: %v", err)
+	}
+
+	// Both values should be decrypted (not just the one matching loggedInFP)
+	if decryptCalls != 2 {
+		t.Errorf("Expected 2 decrypt calls (both values), got %d", decryptCalls)
+	}
+}
+
+// TestSecretGet_FallbackNotFound tests that when a secret truly doesn't exist,
+// the error is "not found" rather than "access denied".
+func TestSecretGet_FallbackNotFound(t *testing.T) {
+	t.Setenv("DOTSECENV_FINGERPRINT", "")
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	mockVaultResolver := NewMockVaultResolver()
+	mockVaultResolver.VaultPaths = []string{"/vault.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: "/vault.yaml"}}
+	// No secrets stored
+
+	mockGPGClient := &MockGPGClientWithDecrypt{
+		MockGPGClient: NewMockGPGClient(),
+		DecryptFunc: func(ciphertext []byte, fingerprint string) ([]byte, error) {
+			t.Fatal("DecryptWithAgent should not be called for a non-existent secret")
+			return nil, nil
+		},
+	}
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{{Algo: "RSA", MinBits: 2048}},
+		Fingerprint:        "SOMEFP",
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	err := cli.SecretGet("NONEXISTENT", false, false, false, "", 0)
+	if err == nil {
+		t.Fatal("Expected error for non-existent secret")
+	}
+	if err.ExitCode != ExitVaultError {
+		t.Errorf("Expected ExitVaultError, got exit code: %d", err.ExitCode)
+	}
+	if !strings.Contains(err.Message, "not found") {
+		t.Errorf("Expected 'not found' in error message, got: %s", err.Message)
+	}
+}

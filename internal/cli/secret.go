@@ -369,17 +369,6 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		for _, item := range allValues {
 			val := item.Value
 
-			hasAccess := false
-			for _, authorizedFp := range val.AvailableTo {
-				if authorizedFp == fp {
-					hasAccess = true
-					break
-				}
-			}
-			if !hasAccess {
-				continue
-			}
-
 			encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
 			if decodeErr != nil {
 				// Always warn and try other values
@@ -387,6 +376,8 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 				continue
 			}
 
+			// Let GPG agent determine decryptability — the user may have a key
+			// in the agent that isn't the logged-in identity.
 			plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 			if decErr != nil {
 				// Always warn and try other values
@@ -412,12 +403,16 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 			}
 		}
 
-		// Use GetAccessibleSecretFromAnyVault to find a value THIS user can access
-		// Always allow fallback to older values if latest is not accessible
+		// Try fingerprint-matched access first (fast path), then fall back to
+		// any-vault lookup and let GPG agent determine decryptability.
+		// The user may have a different key in the agent than the logged-in identity.
 		var errGet error
 		secret, errGet = c.vaultResolver.GetAccessibleSecretFromAnyVault(secretKey, fp)
 		if errGet != nil {
-			return NewError(fmt.Sprintf("access denied: secret '%s' not found or not accessible", secretKey), ExitAccessDenied)
+			secret, errGet = c.vaultResolver.GetSecretFromAnyVault(secretKey, c.output.Stderr())
+			if errGet != nil {
+				return NewError(fmt.Sprintf("secret '%s' not found in any vault", secretKey), ExitVaultError)
+			}
 		}
 
 		// Find the vault path for this secret
@@ -508,17 +503,6 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 		for i := len(secretObj.Values) - 1; i >= 0; i-- {
 			val := secretObj.Values[i]
 
-			hasAccess := false
-			for _, authorizedFp := range val.AvailableTo {
-				if authorizedFp == fp {
-					hasAccess = true
-					break
-				}
-			}
-			if !hasAccess {
-				continue
-			}
-
 			encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
 			if decodeErr != nil {
 				// Always warn and try other values
@@ -526,6 +510,8 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 				continue
 			}
 
+			// Let GPG agent determine decryptability — the user may have a key
+			// in the agent that isn't the logged-in identity.
 			plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 			if decErr != nil {
 				// Always warn and try other values
@@ -552,10 +538,11 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 			return NewError(fmt.Sprintf("Vault %d (%s): not found", index+1, path), ExitVaultError)
 		}
 
-		// Always allow fallback to older values if latest is not accessible
+		// Try fingerprint-matched access first, fall back to latest value
+		// and let GPG agent determine if we can decrypt.
 		val := manager.GetAccessibleSecretValue(fp, key)
 		if val == nil {
-			return NewError(fmt.Sprintf("access denied: you do not have access to secret '%s'", key), ExitAccessDenied)
+			val = &secretObj.Values[len(secretObj.Values)-1]
 		}
 
 		encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
