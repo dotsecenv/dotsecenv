@@ -76,7 +76,7 @@ The Geomys validation (the organization pursuing FIPS 140-3 certification for Go
 Setting the `GOFIPS140` environment variable during build locks the binary to a specific cryptographic module version:
 
 ```bash
-GOFIPS140=v1.0.0 go build -o dotsecenv ./cmd/dotsecenv
+GOFIPS140=v1.26.0 go build -o dotsecenv ./cmd/dotsecenv
 ```
 
 Verify which module version was embedded in any binary:
@@ -85,24 +85,24 @@ Verify which module version was embedded in any binary:
 go version -m ./dotsecenv
 ```
 
-### Why v1.0.0 Specifically?
+### Module Version Selection
 
-The `v1.0.0` identifier is significant:
+The version identifier determines which cryptographic module snapshot is embedded:
 
 | Build Flag | Behavior |
 |------------|----------|
-| `GOFIPS140=v1.0.0` | Locks to the exact snapshot submitted to CAVP/CMVP |
+| `GOFIPS140=v1.26.0` | Locks to the module snapshot shipped with Go 1.26.x |
 | `GOFIPS140=latest` | Uses whatever module ships with your Go version |
 | `GOFIPS140=off` | Disables FIPS mode (default) |
 
-Using `v1.0.0` ensures:
+Pinning to a specific version ensures:
 
-- **Validated code path** — The binary uses the exact cryptographic implementation that was formally tested and awarded certificate A6650
-- **Deterministic behavior** — Runtime behavior matches what was audited by Trail of Bits
-- **Compliance evidence** — Auditors can verify the module version matches the NIST validation record
+- **Deterministic behavior** — Runtime behavior is reproducible across builds
+- **Compliance evidence** — Auditors can verify the exact module version used
+- **Validated code path** — The binary uses a cryptographic implementation derived from the Go FIPS module awarded certificate A6650
 
 <Aside type="tip">
-Without the `v1.0.0` lock, `GOFIPS140=latest` would use whatever module ships with your Go version—potentially code that has not yet been validated. For regulated environments, always specify the validated version explicitly.
+Without a version pin, `GOFIPS140=latest` would use whatever module ships with your Go version—potentially code that has not yet been validated. For regulated environments, always specify the version explicitly.
 </Aside>
 
 ### Build It Yourself
@@ -111,8 +111,8 @@ dotsecenv is open source, and we encourage security-conscious organizations to f
 
 | Requirement | Value |
 |-------------|-------|
-| Go version | 1.24 or later |
-| Build flag | `GOFIPS140=v1.0.0` |
+| Go version | 1.26 or later |
+| Build flag | `GOFIPS140=v1.26.0` |
 | Runtime | Listed Operating Environment |
 
 ---
@@ -398,5 +398,5 @@ These standards define the cryptographic primitives themselves:
 | FIPS 180-4 | SHA-2 hash family | SHA-256/SHA-512 for integrity and signatures |
 
 <Aside type="tip">
-For maximum compliance, build dotsecenv with Go 1.24+ and `GOFIPS140=v1.0.0`, deploy to a validated Operating Environment, and use Ed25519 or RSA-4096 keys.
+For maximum compliance, build dotsecenv with Go 1.26+ and `GOFIPS140=v1.26.0`, deploy to a validated Operating Environment, and use Ed25519 or RSA-4096 keys.
 </Aside>
