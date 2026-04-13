@@ -41,7 +41,7 @@ clean:
 .PHONY: build
 build:
 	@echo "Building dotsecenv with FIPS 140-3 crypto..."
-	CGO_ENABLED=0 GOFIPS140=v1.0.0 go build -mod=vendor -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
+	CGO_ENABLED=0 GOFIPS140=v1.26.0 go build -mod=vendor -ldflags "-s -w $(LDFLAGS)" -o bin/dotsecenv ./cmd/dotsecenv
 	@echo "Binary built at: bin/dotsecenv"
 
 .PHONY: build-link

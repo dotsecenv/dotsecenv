@@ -14,7 +14,7 @@ builds:
   - id: default
     env:
       - CGO_ENABLED=0
-      - GOFIPS140=v1.0.0
+      - GOFIPS140=v1.26.0
     goos:
       - linux
       - darwin
