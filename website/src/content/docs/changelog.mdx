@@ -7,6 +7,27 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 ---
 
+## v0.5.2
+
+_April 14, 2026_
+
+### Features
+
+- Claude Code plugin with two new skills: `/dotsecenv:secrets` for CLI operations and `/dotsecenv:secenv` for `.secenv` file interpretation (#98)
+
+### Bug Fixes
+
+- `init vault -v INDEX` now resolves numeric indices to config vault paths instead of creating a file named after the index (#100)
+- `secret get` no longer gates on `AvailableTo` metadata; GPG agent determines decryptability, allowing secrets encrypted by non-logged-in keys to be decrypted (#104)
+
+### Other
+
+- Update FIPS 140-3 cryptographic module from `GOFIPS140=v1.0.0` to `GOFIPS140=v1.26.0` (#105)
+- Update `golang.org/x/sys` to v0.43.0, `golang.org/x/term` to v0.42.0 (#101, #102)
+- Update `step-security/harden-runner` action to v2.17.0 (#99, #103)
+
+---
+
 ## v0.5.1
 
 _March 30, 2026_
