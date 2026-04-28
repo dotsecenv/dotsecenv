@@ -124,7 +124,6 @@ func TestGetDefaultVaultPaths(t *testing.T) {
 	expected := []string{
 		".dotsecenv/vault",
 		filepath.Join("/data", "dotsecenv", "vault"),
-		"/var/lib/dotsecenv/vault",
 	}
 
 	if len(paths) != len(expected) {
