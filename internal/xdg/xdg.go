@@ -71,12 +71,12 @@ func (p Paths) EnsureDirs() error {
 }
 
 // GetDefaultVaultPaths generates the default vault paths for `dotsecenv init config`:
-// the cwd-relative `.dotsecenv/vault`, the user's home vault (XDG_DATA_HOME-aware),
-// and the conventional system vault `/var/lib/dotsecenv/vault`.
+// the cwd-relative `.dotsecenv/vault` (typically committed alongside source) and
+// the user's home vault (XDG_DATA_HOME-aware). Multi-user / org-wide shared
+// vaults are an explicit admin choice and are not part of the defaults.
 func (p Paths) GetDefaultVaultPaths() []string {
 	return []string{
 		".dotsecenv/vault",
 		p.VaultPath(),
-		"/var/lib/dotsecenv/vault",
 	}
 }
