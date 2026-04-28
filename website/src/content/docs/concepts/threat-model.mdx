@@ -58,10 +58,6 @@ approved_algorithms:
 
 dotsecenv refuses to encrypt/decrypt with weaker algorithms.
 
-### SUID Privilege Escalation
-
-In SUID mode, dotsecenv blocks write operations to prevent privilege escalation attacks. Read operations only.
-
 ### Automated Secret Exfiltration
 
 AI coding assistants, build scripts, and other automated tools may attempt to read secrets programmatically. dotsecenv emits a **warning** when decrypting secrets in non-interactive terminals:
