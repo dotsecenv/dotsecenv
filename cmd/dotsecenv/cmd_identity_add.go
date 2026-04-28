@@ -27,8 +27,6 @@ When neither --all nor -v is specified, the vault is auto-selected if only
 one is configured, or you are prompted to choose interactively.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		checkSUIDMode(cmd)
-
 		fingerprint := args[0]
 		cli, err := createCLI()
 		if err != nil {

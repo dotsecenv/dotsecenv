@@ -439,7 +439,6 @@ dotsecenv validate --fix  # Attempt to fix issues
 - **Append-Only Design**: Cryptographic history is preserved for audit trails
 - **GPG Agent Integration**: Leverages gpg-agent for secure key management
 - **XDG Compliance**: Respects XDG Base Directory Specification for configuration files
-- **SUID Mode Support**: Restricted operations when running with elevated privileges
 - **JSON Output**: Machine-readable output format for scripting
 
 ## Claude Code
@@ -462,15 +461,12 @@ The configuration file location is determined in the following order of preceden
 1. **`-c` flag** (highest priority): Explicitly specify a config file path
 2. **`DOTSECENV_CONFIG` environment variable**: Override the default location
 3. **XDG default**: `$XDG_CONFIG_HOME/dotsecenv/config` (typically `~/.config/dotsecenv/config`)
-4. **SUID mode**: `/etc/dotsecenv/config` (when running with elevated privileges)
 
 When both `-c` and `DOTSECENV_CONFIG` are specified, the `-c` flag takes precedence and a warning is printed to stderr (unless `-s` silent mode is enabled):
 
 ```
 warning: DOTSECENV_CONFIG environment variable ignored because -c flag was specified
 ```
-
-In SUID mode, the `DOTSECENV_CONFIG` environment variable is ignored for security reasons.
 
 ### Config File Format
 
@@ -615,20 +611,8 @@ Each entry includes a hash and cryptographic signature to prevent against tamper
 - GPG agent integration for secure key management
 - Full secret encryption/decryption lifecycle
 - Validation logic with optional auto-fix
-- SUID mode restrictions for elevated privilege protection
 - [SLSA Build Level 3](https://slsa.dev/spec/v1.2/build-requirements): Release binaries include verifiable provenance attestations generated via GitHub's [attest-build-provenance](https://github.com/actions/attest-build-provenance) action on hardened GitHub-hosted runners
 - **Hermetic E2E Testing**: Every pull request runs e2e tests in a network-isolated Linux namespace with eBPF verification via [harden-runner](https://github.com/step-security/harden-runner), proving zero external network connections. See [Security Model](https://dotsecenv.com/concepts/security-model/#hermetic-testing).
-
-### SUID Mode Restrictions
-
-When running with SUID privileges, the following restrictions apply:
-
-- `-c` and `-v` flags are blocked
-- `DOTSECENV_CONFIG` environment variable is ignored
-- Config defaults to `/etc/dotsecenv/config`
-- Write operations are blocked: `login`, `init config`, `init vault`, `secret store`, `secret share`, `secret revoke`
-
-This prevents privilege escalation attacks when the binary is installed with elevated permissions.
 
 ## Exit Codes
 
@@ -649,7 +633,7 @@ This prevents privilege escalation attacks when the binary is installed with ele
 
 | Variable           | Description                                             |
 | ------------------ | ------------------------------------------------------- |
-| `DOTSECENV_CONFIG` | Override config file path (ignored in SUID mode)        |
+| `DOTSECENV_CONFIG` | Override config file path                               |
 | `XDG_CONFIG_HOME`  | Override config directory (defaults to: `~/.config`)    |
 | `XDG_DATA_HOME`    | Override data directory (defaults to: `~/.local/share`) |
 
@@ -787,7 +771,6 @@ This creates both `v0.1.2` and `v0` tags pointing to the same commit, signs them
 - Secrets stored in plaintext on disk
 - Access to secrets by unauthorized users without GPG keys
 - Tampering with vault entries (signature verification)
-- Privilege escalation via SUID binaries
 - Stealth network exfiltration of secrets during CI/CD (hermetic testing)
 
 ### What dotsecenv DOES NOT Protect Against

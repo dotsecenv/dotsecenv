@@ -11,7 +11,6 @@ import (
 	"github.com/dotsecenv/dotsecenv/internal/xdg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/config"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
-	"github.com/spf13/cobra"
 )
 
 // GlobalOptions holds the global configuration flags
@@ -19,56 +18,6 @@ type GlobalOptions struct {
 	ConfigPath string
 	VaultPaths []string
 	Silent     bool
-}
-
-// isSUID returns true if the binary is running with SUID privileges
-func isSUID() bool {
-	return os.Getuid() != os.Geteuid()
-}
-
-// suidDisallowedCommands lists commands that are completely blocked in SUID mode
-var suidDisallowedCommands = map[string]bool{
-	"login":         true,
-	"init config":   true,
-	"init vault":    true,
-	"secret store":  true,
-	"secret share":  true,
-	"secret revoke": true,
-}
-
-// getCommandPath returns the full command path (e.g., "secret store", "vault describe")
-func getCommandPath(cmd *cobra.Command) string {
-	var parts []string
-	for c := cmd; c != nil && c.Name() != "dotsecenv"; c = c.Parent() {
-		parts = append([]string{c.Name()}, parts...)
-	}
-	return strings.Join(parts, " ")
-}
-
-// checkSUIDMode enforces SUID restrictions at command execution time.
-// In SUID mode: -c and -v flags are always blocked, and certain commands are disallowed.
-func checkSUIDMode(cmd *cobra.Command) {
-	if !isSUID() {
-		return
-	}
-
-	cmdPath := getCommandPath(cmd)
-
-	// Check for disallowed commands
-	if suidDisallowedCommands[cmdPath] {
-		fmt.Fprintf(os.Stderr, "error: '%s' command is not allowed in SUID mode\n", cmdPath)
-		os.Exit(int(clilib.ExitGeneralError))
-	}
-
-	// Check for disallowed flags (applies to all commands in SUID mode)
-	if globalOpts.ConfigPath != "" {
-		fmt.Fprintf(os.Stderr, "error: -c flag is not allowed in SUID mode\n")
-		os.Exit(int(clilib.ExitGeneralError))
-	}
-	if len(globalOpts.VaultPaths) > 0 {
-		fmt.Fprintf(os.Stderr, "error: -v flag is not allowed in SUID mode\n")
-		os.Exit(int(clilib.ExitGeneralError))
-	}
 }
 
 // globalOpts is the shared global options instance

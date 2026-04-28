@@ -70,24 +70,13 @@ func (p Paths) EnsureDirs() error {
 	return nil
 }
 
-// GetDefaultVaultPaths generates default vault paths appropriate for the execution context
-// When isSUID is false (normal execution): returns [cwd, home, system] vaults
-// When isSUID is true (SUID execution): returns [system] vaults (home excluded for security)
-//
-// The home path uses XDG_DATA_HOME if set, otherwise defaults to ~/.local/share/dotsecenv/vault
-func (p Paths) GetDefaultVaultPaths(isSUID bool) []string {
-	var paths []string
-
-	// Include home vault unless running with SUID
-	// When SUID, we don't want to expose user's personal vault
-	if !isSUID {
-		paths = append(paths, ".dotsecenv/vault")
-		paths = append(paths, p.VaultPath())
+// GetDefaultVaultPaths generates the default vault paths for `dotsecenv init config`:
+// the cwd-relative `.dotsecenv/vault`, the user's home vault (XDG_DATA_HOME-aware),
+// and the conventional system vault `/var/lib/dotsecenv/vault`.
+func (p Paths) GetDefaultVaultPaths() []string {
+	return []string{
+		".dotsecenv/vault",
+		p.VaultPath(),
+		"/var/lib/dotsecenv/vault",
 	}
-
-	// Always include system vault
-	// in SUID mode, we only include the system vault
-	paths = append(paths, "/var/lib/dotsecenv/vault")
-
-	return paths
 }

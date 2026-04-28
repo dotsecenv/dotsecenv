@@ -15,9 +15,6 @@ var rootCmd = &cobra.Command{
 	Short:         "Safe environment secrets",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		checkSUIDMode(cmd)
-	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// If no subcommand, show help
 		_ = cmd.Help()

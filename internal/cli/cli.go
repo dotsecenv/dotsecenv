@@ -18,19 +18,15 @@ import (
 
 // ResolveConfigPath returns the effective config path considering:
 // 1. Explicit configPath argument (highest priority, e.g. -c flag)
-// 2. /etc/dotsecenv/config (if SUID mode)
-// 3. DOTSECENV_CONFIG env var (if not SUID mode)
-// 4. XDG default path
+// 2. DOTSECENV_CONFIG env var
+// 3. XDG default path
 // If configPath is specified and DOTSECENV_CONFIG is set, prints a warning to stderr (unless silent).
 func ResolveConfigPath(configPath string, silent bool, stderr io.Writer) string {
 	if configPath != "" {
-		if !silent && !isSUID() && os.Getenv("DOTSECENV_CONFIG") != "" {
+		if !silent && os.Getenv("DOTSECENV_CONFIG") != "" {
 			_, _ = fmt.Fprintf(stderr, "warning: DOTSECENV_CONFIG environment variable ignored because -c flag was specified\n")
 		}
 		return configPath
-	}
-	if isSUID() {
-		return "/etc/dotsecenv/config"
 	}
 	if envConfig := os.Getenv("DOTSECENV_CONFIG"); envConfig != "" {
 		return envConfig
@@ -64,10 +60,6 @@ func defaultHasTTY() bool {
 }
 
 // NewCLI creates a new CLI instance
-func isSUID() bool {
-	return os.Getuid() != os.Geteuid()
-}
-
 func NewCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
 	return newCLI(vaultPaths, configPath, silent, stdin, stdout, stderr, nil)
 }
@@ -99,12 +91,9 @@ func loadConfigAndPrepareGPG(configPath string, silent bool, stdin io.Reader, st
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			var suggestion string
-			switch {
-			case isSUID():
-				suggestion = fmt.Sprintf("config file not found: %s\nContact your system administrator to create this file.", configPath)
-			case os.Getuid() == 0:
+			if os.Getuid() == 0 {
 				suggestion = fmt.Sprintf("config file not found: %s\nRun 'sudo dotsecenv init config' to create one", configPath)
-			default:
+			} else {
 				suggestion = fmt.Sprintf("config file not found: %s\nRun 'dotsecenv init config' to create one", configPath)
 			}
 			return nil, NewError(suggestion, ExitConfigError)

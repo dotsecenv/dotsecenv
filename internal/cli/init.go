@@ -121,9 +121,7 @@ func InitConfig(configPath string, initialVaults []string, gpgProgram string, no
 	if len(initialVaults) > 0 {
 		vaultPaths = initialVaults
 	} else {
-		isSUID := os.Getuid() != os.Geteuid()
-		defaultVaults := xdgPaths.GetDefaultVaultPaths(isSUID)
-		vaultPaths = append(vaultPaths, defaultVaults...)
+		vaultPaths = append(vaultPaths, xdgPaths.GetDefaultVaultPaths()...)
 	}
 	cfg.Vault = vaultPaths
 
@@ -303,11 +301,7 @@ func InitVaultInteractiveStandalone(configPath string, out *output.Handler) *Err
 	if err != nil {
 		// Provide helpful suggestion based on execution context
 		var suggestion string
-		isSUID := os.Getuid() != os.Geteuid()
-		if isSUID {
-			// SUID mode: config at /etc/dotsecenv/config, init commands are blocked
-			suggestion = fmt.Sprintf("failed to load config: %v\nContact your system administrator to create this file.", err)
-		} else if os.Getuid() == 0 {
+		if os.Getuid() == 0 {
 			// Running as actual root (e.g., via sudo)
 			suggestion = fmt.Sprintf("failed to load config: %v\nRun 'sudo dotsecenv init config' first.", err)
 		} else {
