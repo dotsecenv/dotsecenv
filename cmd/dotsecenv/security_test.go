@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -93,47 +92,32 @@ func TestIssue_SelfRevokeAddsGPGKey(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(gpgHome) }()
 
-	// Create two users
-	fpA := generateKey(t, gpgHome, "User A", "usera@example.com")
-	fpB := generateKey(t, gpgHome, "User B", "userb@example.com")
+	vaultPath := filepath.Join(t.TempDir(), "vault")
+	env := []string{"GNUPGHOME=" + gpgHome}
 
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
-	vaultPath := filepath.Join(tmpDir, "vault")
+	// Each user gets their own config with a real signed Login proof.
+	// They share the same vaultPath so secret-sharing semantics still apply.
+	fpA, configPathA := setupTestUser(t, gpgHome, vaultPath, "User A", "usera@example.com")
+	fpB, _ := setupTestUser(t, gpgHome, vaultPath, "User B", "userb@example.com")
 
-	configContent := fmt.Sprintf(`
-approved_algorithms:
-  - algo: RSA
-    min_bits: 2048
-vault:
-  - "%s"
-gpg:
-  program: PATH
-`, vaultPath)
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
-		t.Fatal(err)
-	}
-
-	envA := []string{"GNUPGHOME=" + gpgHome, "DOTSECENV_FINGERPRINT=" + fpA}
-
-	// Init vault (identities are auto-added by secret store and secret share)
-	_, _, _ = runCmdWithEnv(envA, "init", "vault", "-v", vaultPath)
+	// Init vault once on the shared vault (identities are auto-added by secret store/share).
+	_, _, _ = runCmdWithEnv(env, "-c", configPathA, "init", "vault", "-v", vaultPath)
 
 	// 1. User A stores secret
-	cmd := exec.Command(binaryPath, "-c", configPath, "secret", "store", "SEC1")
-	cmd.Env = append(filteredEnv(), envA...)
+	cmd := exec.Command(binaryPath, "-c", configPathA, "secret", "store", "SEC1")
+	cmd.Env = append(filteredEnv(), env...)
 	cmd.Stdin = strings.NewReader("secret_value_1")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("secret store failed: %v\n%s", err, out)
 	}
 
 	// 2. User A shares with User B
-	if _, _, err := runCmdWithEnv(envA, "-c", configPath, "secret", "share", "SEC1", fpB); err != nil {
+	if _, _, err := runCmdWithEnv(env, "-c", configPathA, "secret", "share", "SEC1", fpB); err != nil {
 		t.Fatalf("secret share failed: %v", err)
 	}
 
 	// 3. User A revokes User A (Self)
-	stdoutRevoke, stderrRevoke, err := runCmdWithEnv(envA, "-c", configPath, "secret", "revoke", "SEC1", fpA)
+	stdoutRevoke, stderrRevoke, err := runCmdWithEnv(env, "-c", configPathA, "secret", "revoke", "SEC1", fpA)
 	if err != nil {
 		t.Fatalf("secret revoke failed: %v\nSTDERR: %s", err, stderrRevoke)
 	}
@@ -142,7 +126,7 @@ gpg:
 
 	// 4. Verify User A gets the older value via fallback (silently)
 	// Since A was revoked from latest, but had access to previous, it should return previous.
-	_, _, err = runCmdWithEnv(envA, "-c", configPath, "secret", "get", "SEC1")
+	_, _, err = runCmdWithEnv(env, "-c", configPathA, "secret", "get", "SEC1")
 	if err != nil {
 		t.Errorf("CLI failed to get secret (fallback expected): %v", err)
 	}
@@ -191,46 +175,31 @@ func TestIssue_RevokeWithoutAccess(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(gpgHome) }()
 
-	fpA := generateKey(t, gpgHome, "User A", "usera@example.com")
-	fpB := generateKey(t, gpgHome, "User B", "userb@example.com")
-	fpC := generateKey(t, gpgHome, "User C", "userc@example.com")
+	vaultPath := filepath.Join(t.TempDir(), "vault")
+	env := []string{"GNUPGHOME=" + gpgHome}
 
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
-	vaultPath := filepath.Join(tmpDir, "vault")
+	_, configPathA := setupTestUser(t, gpgHome, vaultPath, "User A", "usera@example.com")
+	fpB, configPathB := setupTestUser(t, gpgHome, vaultPath, "User B", "userb@example.com")
+	fpC, _ := setupTestUser(t, gpgHome, vaultPath, "User C", "userc@example.com")
 
-	configContent := fmt.Sprintf(`
-approved_algorithms:
-  - algo: RSA
-    min_bits: 2048
-vault:
-  - "%s"
-gpg:
-  program: PATH
-`, vaultPath)
-	_ = os.WriteFile(configPath, []byte(configContent), 0600)
-
-	envA := []string{"GNUPGHOME=" + gpgHome, "DOTSECENV_FINGERPRINT=" + fpA}
-	envB := []string{"GNUPGHOME=" + gpgHome, "DOTSECENV_FINGERPRINT=" + fpB}
-
-	// Init vault (identities are auto-added by secret store and secret share)
-	_, _, _ = runCmdWithEnv(envA, "init", "vault", "-v", vaultPath)
+	// Init vault once (identities are auto-added by secret store and secret share)
+	_, _, _ = runCmdWithEnv(env, "-c", configPathA, "init", "vault", "-v", vaultPath)
 
 	// 1. A creates secret (v1)
-	cmd := exec.Command(binaryPath, "-c", configPath, "secret", "store", "SEC1")
-	cmd.Env = append(filteredEnv(), envA...)
+	cmd := exec.Command(binaryPath, "-c", configPathA, "secret", "store", "SEC1")
+	cmd.Env = append(filteredEnv(), env...)
 	cmd.Stdin = strings.NewReader("v1")
 	_ = cmd.Run()
 
 	// 2. Share with B (v1 shared with A, B)
-	_, _, _ = runCmdWithEnv(envA, "-c", configPath, "secret", "share", "SEC1", fpB)
+	_, _, _ = runCmdWithEnv(env, "-c", configPathA, "secret", "share", "SEC1", fpB)
 
 	// 3. Share with C
-	_, _, _ = runCmdWithEnv(envA, "-c", configPath, "secret", "share", "SEC1", fpC)
+	_, _, _ = runCmdWithEnv(env, "-c", configPathA, "secret", "share", "SEC1", fpC)
 
 	// 4. A updates secret (v4) -> Only A has access
-	cmd = exec.Command(binaryPath, "-c", configPath, "secret", "store", "SEC1")
-	cmd.Env = append(filteredEnv(), envA...)
+	cmd = exec.Command(binaryPath, "-c", configPathA, "secret", "store", "SEC1")
+	cmd.Env = append(filteredEnv(), env...)
 	cmd.Stdin = strings.NewReader("v4")
 	_ = cmd.Run()
 
@@ -238,7 +207,7 @@ gpg:
 	// B has access to v2 and v3.
 	// B does NOT have access to v4 (latest).
 	// B tries to revoke C from SEC1.
-	_, stderr, err := runCmdWithEnv(envB, "-c", configPath, "secret", "revoke", "SEC1", fpC)
+	_, stderr, err := runCmdWithEnv(env, "-c", configPathB, "secret", "revoke", "SEC1", fpC)
 
 	if err == nil {
 		t.Errorf("SECURITY VULNERABILITY: User B revoked C from secret SEC1 despite not having access to latest value!")

@@ -27,9 +27,11 @@ type configForTest struct {
 		Curves  []string `yaml:"curves,omitempty"`
 		MinBits int      `yaml:"min_bits"`
 	} `yaml:"approved_algorithms"`
-	Fingerprint string   `yaml:"fingerprint,omitempty"`
-	Vault       []string `yaml:"vault"`
-	Behavior    struct {
+	Login *struct {
+		Fingerprint string `yaml:"fingerprint"`
+	} `yaml:"login,omitempty"`
+	Vault    []string `yaml:"vault"`
+	Behavior struct {
 		RequireExplicitVaultUpgrade *bool `yaml:"require_explicit_vault_upgrade,omitempty"`
 		RestrictToConfiguredVaults  *bool `yaml:"restrict_to_configured_vaults,omitempty"`
 	} `yaml:"behavior,omitempty"`
@@ -129,7 +131,7 @@ func TestInitConfig_NoStrictFieldInOutput(t *testing.T) {
 	}
 }
 
-func TestInitConfig_DefaultFingerprintIsEmpty(t *testing.T) {
+func TestInitConfig_DefaultLoginIsNil(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -139,10 +141,10 @@ func TestInitConfig_DefaultFingerprintIsEmpty(t *testing.T) {
 		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
 	}
 
-	// Verify fingerprint defaults to empty
+	// Verify login section is absent until the user runs `dotsecenv login`.
 	cfg := loadConfigForTest(t, configPath)
-	if cfg.Fingerprint != "" {
-		t.Errorf("expected fingerprint to be empty by default, got fingerprint=%q", cfg.Fingerprint)
+	if cfg.Login != nil {
+		t.Errorf("expected login section to be absent by default, got %+v", *cfg.Login)
 	}
 }
 

@@ -34,13 +34,14 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// filteredEnv returns os.Environ() without DOTSECENV_CONFIG and DOTSECENV_FINGERPRINT
-// to avoid test pollution
+// filteredEnv returns os.Environ() without DOTSECENV_CONFIG to avoid test pollution.
+// (DOTSECENV_FINGERPRINT was removed in favor of the signed Login section; if
+// it is still set in the inherited env it has no effect, so no filtering needed.)
 func filteredEnv() []string {
 	baseEnv := os.Environ()
 	filtered := make([]string, 0, len(baseEnv))
 	for _, e := range baseEnv {
-		if !strings.HasPrefix(e, "DOTSECENV_CONFIG=") && !strings.HasPrefix(e, "DOTSECENV_FINGERPRINT=") {
+		if !strings.HasPrefix(e, "DOTSECENV_CONFIG=") {
 			filtered = append(filtered, e)
 		}
 	}
@@ -65,6 +66,40 @@ func runCmdWithEnv(env []string, args ...string) (string, string, error) {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	return stdout.String(), stderr.String(), err
+}
+
+// setupTestUser creates a GPG identity ready to act as a dotsecenv user:
+// generates a key in gpgHome, writes a minimal config that points at vaultPath,
+// and runs `dotsecenv login` to populate a signed Login section. Tests can then
+// switch identity by passing different `-c configPath` values.
+//
+// `init vault` is per-vault, not per-user — call it once on the shared vaultPath
+// outside this helper.
+func setupTestUser(t *testing.T, gpgHome, vaultPath, name, email string) (fingerprint, configPath string) {
+	t.Helper()
+
+	fingerprint = generateKey(t, gpgHome, name, email)
+
+	configPath = filepath.Join(t.TempDir(), "config.yaml")
+	configContent := fmt.Sprintf(`
+approved_algorithms:
+  - algo: RSA
+    min_bits: 2048
+vault:
+  - "%s"
+gpg:
+  program: PATH
+`, vaultPath)
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+		t.Fatalf("setupTestUser(%s): write config: %v", name, err)
+	}
+
+	env := []string{"GNUPGHOME=" + gpgHome}
+	if _, stderr, err := runCmdWithEnv(env, "-c", configPath, "login", fingerprint); err != nil {
+		t.Fatalf("setupTestUser(%s): dotsecenv login %s failed: %v\nstderr: %s", name, fingerprint, err, stderr)
+	}
+
+	return fingerprint, configPath
 }
 
 func TestGlobalOptions_ConfigPath(t *testing.T) {
@@ -258,6 +293,55 @@ gpg:
 	}
 	if !strings.Contains(stdout, configPath) {
 		t.Errorf("expected to find config path in output")
+	}
+}
+
+// TestDOTSECENVFingerprint_Ignored guards against regressions in DOTSECENV_FINGERPRINT removal.
+// The env var was removed in favor of the signed Login section. If anything in
+// the binary, docs, or CI accidentally re-introduces a read of this var, this
+// test catches it: a stale value in env must NOT change behavior, and no
+// warning should be emitted about it.
+func TestDOTSECENVFingerprint_Ignored(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	vaultPath := filepath.Join(tmpDir, "vault")
+
+	err := os.WriteFile(configPath, []byte(fmt.Sprintf(`
+approved_algorithms:
+  - algo: RSA
+    min_bits: 2048
+vault:
+  - %s
+gpg:
+  program: PATH
+`, vaultPath)), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := runCmd("init", "vault", "-v", vaultPath); err != nil {
+		t.Fatalf("init vault failed: %v", err)
+	}
+
+	// Baseline: validate with no env override.
+	stdoutBaseline, stderrBaseline, errBaseline := runCmd("-c", configPath, "validate")
+
+	// With a stray DOTSECENV_FINGERPRINT set: behavior must be identical.
+	stdoutWithEnv, stderrWithEnv, errWithEnv := runCmdWithEnv(
+		[]string{"DOTSECENV_FINGERPRINT=ABCDEF1234567890ABCDEF1234567890ABCDEF12"},
+		"-c", configPath, "validate",
+	)
+
+	if (errBaseline == nil) != (errWithEnv == nil) {
+		t.Errorf("DOTSECENV_FINGERPRINT changed exit status: baseline err=%v, with-env err=%v", errBaseline, errWithEnv)
+	}
+	if stdoutBaseline != stdoutWithEnv {
+		t.Errorf("DOTSECENV_FINGERPRINT changed stdout. baseline:\n%s\nwith-env:\n%s", stdoutBaseline, stdoutWithEnv)
+	}
+	if stderrBaseline != stderrWithEnv {
+		t.Errorf("DOTSECENV_FINGERPRINT changed stderr. baseline:\n%s\nwith-env:\n%s", stderrBaseline, stderrWithEnv)
+	}
+	if strings.Contains(strings.ToLower(stderrWithEnv), "dotsecenv_fingerprint") {
+		t.Errorf("stderr mentions DOTSECENV_FINGERPRINT — env var should be silently ignored:\n%s", stderrWithEnv)
 	}
 }
 

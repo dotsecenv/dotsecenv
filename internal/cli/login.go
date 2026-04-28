@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/config"
@@ -93,11 +92,6 @@ func (c *CLI) Login(fingerprint string) *Error {
 		fingerprint = selectedFP
 	}
 
-	envFP := os.Getenv("DOTSECENV_FINGERPRINT")
-	if envFP != "" && c.config.GetFingerprint() != "" && c.config.GetFingerprint() != fingerprint {
-		c.Warnf("DOTSECENV_FINGERPRINT is set; new fingerprint will be cached but not used in this session")
-	}
-
 	publicKeyInfo, pubKeyErr := c.gpgClient.GetPublicKeyInfo(fingerprint)
 	if pubKeyErr != nil {
 		return NewError(fmt.Sprintf("failed to get public key for fingerprint '%s': %v\nMake sure your GPG key is available in gpg-agent", fingerprint, pubKeyErr), ExitGPGError)
@@ -119,9 +113,8 @@ func (c *CLI) Login(fingerprint string) *Error {
 		return NewError(fmt.Sprintf("failed to create signed login: %v", err), ExitGPGError)
 	}
 
-	// Update config with new login (and clear deprecated fingerprint field)
+	// Update config with new login
 	c.config.Login = login
-	c.config.Fingerprint = "" // Clear deprecated field
 
 	if err := config.Save(c.configPath, c.config); err != nil {
 		return NewError(fmt.Sprintf("failed to save config: %v", err), ExitConfigError)
