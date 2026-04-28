@@ -285,8 +285,12 @@ vault:
   - ~/.config/dotsecenv/vault
   - ~/work/project/secrets/vault
 
-# Active user fingerprint
-fingerprint: E60A1740BAEF49284D22EA7D3C376348F0921C59
+# Active user identity (signed login block, populated by `dotsecenv login <FP>`)
+login:
+  fingerprint: E60A1740BAEF49284D22EA7D3C376348F0921C59
+  added_at: "2026-04-25T12:00:00Z"
+  hash: "<sha-256 of 'login:<added_at>:<fingerprint>'>"
+  signature: "<hex-encoded detached GPG signature of hash>"
 
 # Approved algorithms (minimum strength)
 approved_algorithms:
