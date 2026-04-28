@@ -120,39 +120,19 @@ func TestGetDefaultVaultPaths(t *testing.T) {
 		DataHome: "/data",
 	}
 
-	t.Run("normal execution", func(t *testing.T) {
-		paths := p.GetDefaultVaultPaths(false)
-		expected := []string{
-			".dotsecenv/vault",
-			filepath.Join("/data", "dotsecenv", "vault"),
-			"/var/lib/dotsecenv/vault",
-		}
+	paths := p.GetDefaultVaultPaths()
+	expected := []string{
+		".dotsecenv/vault",
+		filepath.Join("/data", "dotsecenv", "vault"),
+		"/var/lib/dotsecenv/vault",
+	}
 
-		if len(paths) != len(expected) {
-			t.Errorf("expected %d paths, got %d", len(expected), len(paths))
+	if len(paths) != len(expected) {
+		t.Errorf("expected %d paths, got %d", len(expected), len(paths))
+	}
+	for i := range expected {
+		if paths[i] != expected[i] {
+			t.Errorf("path[%d]: expected %s, got %s", i, expected[i], paths[i])
 		}
-		for i := range expected {
-			if paths[i] != expected[i] {
-				t.Errorf("path[%d]: expected %s, got %s", i, expected[i], paths[i])
-			}
-		}
-	})
-
-	t.Run("suid execution", func(t *testing.T) {
-		paths := p.GetDefaultVaultPaths(true)
-		expected := []string{
-			"/var/lib/dotsecenv/vault",
-		}
-
-		if len(paths) != len(expected) {
-			t.Errorf("expected %d paths, got %d", len(expected), len(paths))
-		}
-		// Check that the user vault is NOT present
-		userVault := filepath.Join("/data", "dotsecenv", "vault")
-		for _, path := range paths {
-			if path == userVault {
-				t.Error("user vault found in SUID execution paths")
-			}
-		}
-	})
+	}
 }

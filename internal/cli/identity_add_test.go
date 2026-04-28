@@ -171,11 +171,11 @@ func TestIdentityAdd_MultipleVaultsNoTTY(t *testing.T) {
 
 	// Without a TTY, resolveWritableVaultIndex should error asking for -v
 	err := cli.IdentityAdd("AABBCCDD", false, "", 0)
-	if err == nil {
+	switch {
+	case err == nil:
 		t.Fatal("expected error when multiple vaults and no TTY")
-	}
-	if !strings.Contains(err.Message, "specify target vault using -v") &&
-		!strings.Contains(err.Message, "no terminal available") {
+	case !strings.Contains(err.Message, "specify target vault using -v") &&
+		!strings.Contains(err.Message, "no terminal available"):
 		t.Errorf("unexpected error message: %s", err.Message)
 	}
 }
@@ -213,10 +213,10 @@ func TestIdentityAdd_IndexOutOfRange(t *testing.T) {
 	cli, _, _, _, _ := newIdentityAddCLI(t, paths)
 
 	err := cli.IdentityAdd("AABBCCDD", false, "", 5) // only 1 vault
-	if err == nil {
+	switch {
+	case err == nil:
 		t.Fatal("expected error for out-of-range index")
-	}
-	if !strings.Contains(err.Message, "exceeds number of configured vaults") {
+	case !strings.Contains(err.Message, "exceeds number of configured vaults"):
 		t.Errorf("unexpected error message: %s", err.Message)
 	}
 }
@@ -226,11 +226,11 @@ func TestIdentityAdd_UnknownVaultPath(t *testing.T) {
 	cli, _, _, _, _ := newIdentityAddCLI(t, paths)
 
 	err := cli.IdentityAdd("AABBCCDD", false, "/nonexistent.jsonl", 0)
-	if err == nil {
+	switch {
+	case err == nil:
 		t.Fatal("expected error for unknown vault path")
-	}
-	// resolveWritableVaultIndex checks os.Stat first
-	if !strings.Contains(err.Message, "does not exist") {
+	case !strings.Contains(err.Message, "does not exist"):
+		// resolveWritableVaultIndex checks os.Stat first
 		t.Errorf("unexpected error message: %s", err.Message)
 	}
 }
@@ -253,10 +253,10 @@ func TestIdentityAdd_AlgorithmNotAllowed(t *testing.T) {
 	}
 
 	err := cli.IdentityAdd("AABBCCDD", false, "", 0)
-	if err == nil {
+	switch {
+	case err == nil:
 		t.Fatal("expected algorithm not allowed error")
-	}
-	if err.ExitCode != ExitAlgorithmNotAllowed {
+	case err.ExitCode != ExitAlgorithmNotAllowed:
 		t.Errorf("expected ExitAlgorithmNotAllowed, got %d", err.ExitCode)
 	}
 }

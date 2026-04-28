@@ -147,10 +147,10 @@ func TestManagerAddSecretValues(t *testing.T) {
 
 	// Verify
 	secret := m.GetSecretByKey("MY_SECRET")
-	if secret == nil {
+	switch {
+	case secret == nil:
 		t.Fatal("secret not found")
-	}
-	if len(secret.Values) != 2 {
+	case len(secret.Values) != 2:
 		t.Errorf("expected 2 values, got %d", len(secret.Values))
 	}
 }
@@ -179,19 +179,19 @@ func TestManagerGetAccessibleSecretValue(t *testing.T) {
 
 	// FP1 should get v1 (falls back to most recent they can access)
 	val := m.GetAccessibleSecretValue("FP1", "MY_SECRET")
-	if val == nil {
+	switch {
+	case val == nil:
 		t.Fatal("expected value for FP1")
-	}
-	if val.Value != "v1" {
+	case val.Value != "v1":
 		t.Errorf("expected v1, got %s", val.Value)
 	}
 
 	// FP2 can access latest (v2)
 	val = m.GetAccessibleSecretValue("FP2", "MY_SECRET")
-	if val == nil {
+	switch {
+	case val == nil:
 		t.Fatal("expected value for FP2")
-	}
-	if val.Value != "v2" {
+	case val.Value != "v2":
 		t.Errorf("expected v2, got %s", val.Value)
 	}
 

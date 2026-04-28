@@ -209,11 +209,10 @@ func TestSecretPut_FromIndexOutOfRange(t *testing.T) {
 
 	// Test -v 4 (out of range)
 	err := cli.SecretPut("MY_SECRET", "", 4, "")
-	if err == nil {
+	switch {
+	case err == nil:
 		t.Fatalf("Expected SecretPut with -v 4 to fail, but it succeeded")
-	}
-
-	if !strings.Contains(err.Message, "-v index 4 exceeds number of configured vaults") {
+	case !strings.Contains(err.Message, "-v index 4 exceeds number of configured vaults"):
 		t.Errorf("Expected error message to contain '-v index 4 exceeds number of configured vaults', got: %s", err.Message)
 	}
 }
@@ -478,11 +477,10 @@ func TestSecretForget_AlreadyDeleted(t *testing.T) {
 
 	// Try to forget the already-deleted secret
 	forgetErr := cli.SecretForget("MY_SECRET", vaultPath, 0, false)
-	if forgetErr == nil {
+	switch {
+	case forgetErr == nil:
 		t.Fatal("SecretForget should fail for already-deleted secret")
-	}
-
-	if !strings.Contains(forgetErr.Message, "already deleted") {
+	case !strings.Contains(forgetErr.Message, "already deleted"):
 		t.Errorf("Expected 'already deleted' error, got: %s", forgetErr.Message)
 	}
 }
@@ -531,11 +529,10 @@ func TestSecretForget_NotFound(t *testing.T) {
 
 	// Try to forget a non-existent secret
 	forgetErr := cli.SecretForget("NONEXISTENT", vaultPath, 0, false)
-	if forgetErr == nil {
+	switch {
+	case forgetErr == nil:
 		t.Fatal("SecretForget should fail for non-existent secret")
-	}
-
-	if !strings.Contains(forgetErr.Message, "not found") {
+	case !strings.Contains(forgetErr.Message, "not found"):
 		t.Errorf("Expected 'not found' error, got: %s", forgetErr.Message)
 	}
 }
@@ -609,11 +606,10 @@ func TestSecretPut_BlockedByDeleted(t *testing.T) {
 
 	// Try to put to a deleted secret
 	putErr := cli.SecretPut("DELETED_SECRET", vaultPath, 0, "")
-	if putErr == nil {
+	switch {
+	case putErr == nil:
 		t.Fatal("SecretPut should fail for deleted secret")
-	}
-
-	if !strings.Contains(putErr.Message, "has been deleted") {
+	case !strings.Contains(putErr.Message, "has been deleted"):
 		t.Errorf("Expected 'has been deleted' error, got: %s", putErr.Message)
 	}
 
@@ -678,11 +674,10 @@ func TestSecretForget_NoAccess(t *testing.T) {
 
 	// Try to forget a secret we don't have access to
 	forgetErr := cli.SecretForget("OTHER_SECRET", vaultPath, 0, false)
-	if forgetErr == nil {
+	switch {
+	case forgetErr == nil:
 		t.Fatal("SecretForget should fail without access")
-	}
-
-	if !strings.Contains(forgetErr.Message, "access denied") {
+	case !strings.Contains(forgetErr.Message, "access denied"):
 		t.Errorf("Expected 'access denied' error, got: %s", forgetErr.Message)
 	}
 }
@@ -1480,13 +1475,12 @@ func TestSecretGet_FallbackNotFound(t *testing.T) {
 	}
 
 	err := cli.SecretGet("NONEXISTENT", false, false, false, "", 0)
-	if err == nil {
+	switch {
+	case err == nil:
 		t.Fatal("Expected error for non-existent secret")
-	}
-	if err.ExitCode != ExitVaultError {
+	case err.ExitCode != ExitVaultError:
 		t.Errorf("Expected ExitVaultError, got exit code: %d", err.ExitCode)
-	}
-	if !strings.Contains(err.Message, "not found") {
+	case !strings.Contains(err.Message, "not found"):
 		t.Errorf("Expected 'not found' in error message, got: %s", err.Message)
 	}
 }
