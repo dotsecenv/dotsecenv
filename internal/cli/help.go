@@ -35,9 +35,9 @@ COMMANDS:
   version                       Show version information
 
 ENVIRONMENT:
-  DOTSECENV_FINGERPRINT         Override fingerprint from config
-  XDG_CONFIG_HOME              Override config directory
-  XDG_DATA_HOME                Override data directory
+  DOTSECENV_CONFIG              Override config file path
+  XDG_CONFIG_HOME               Override config directory
+  XDG_DATA_HOME                 Override data directory
 `
 	_, _ = fmt.Fprint(w, help)
 }

@@ -15,7 +15,6 @@ import (
 
 func newIdentityAddCLI(t *testing.T, vaultPaths []string) (*CLI, *MockVaultResolver, *MockGPGClient, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
-	t.Setenv("DOTSECENV_FINGERPRINT", "")
 	t.Setenv("DOTSECENV_CONFIG", "")
 
 	mock := NewMockVaultResolver()
@@ -42,7 +41,7 @@ func newIdentityAddCLI(t *testing.T, vaultPaths []string) (*CLI, *MockVaultResol
 			ApprovedAlgorithms: []config.ApprovedAlgorithm{
 				{Algo: "RSA", MinBits: 2048},
 			},
-			Fingerprint: "MYFINGERPRINT", // current user's login
+			Login: newTestSignedLogin(t, "MYFINGERPRINT"), // current user's login
 		},
 		vaultResolver: mock,
 		gpgClient:     gpgMock,

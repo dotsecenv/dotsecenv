@@ -160,16 +160,13 @@ func saveConfigWithComments(path string, cfg config.Config) error {
 		fmt.Fprintf(&sb, "    min_bits: %d\n", alg.MinBits)
 	}
 
-	// Login section (only if set) - preferred over deprecated fingerprint
+	// Login section (only if set)
 	if cfg.Login != nil && cfg.Login.Fingerprint != "" {
 		sb.WriteString("login:\n")
 		fmt.Fprintf(&sb, "  fingerprint: %s\n", cfg.Login.Fingerprint)
 		fmt.Fprintf(&sb, "  added_at: %s\n", cfg.Login.AddedAt.Format("2006-01-02T15:04:05Z07:00"))
 		fmt.Fprintf(&sb, "  hash: %s\n", cfg.Login.Hash)
 		fmt.Fprintf(&sb, "  signature: %s\n", cfg.Login.Signature)
-	} else if cfg.Fingerprint != "" {
-		// Deprecated fingerprint field (for backward compatibility)
-		fmt.Fprintf(&sb, "fingerprint: %s\n", cfg.Fingerprint)
 	}
 
 	// Vault paths
@@ -216,7 +213,7 @@ func ValidateVaultPathsAgainstConfig(configPath string, vaultPaths []string, out
 	effectiveConfigPath := ResolveConfigPath(configPath, true, out.Stderr()) // silent for resolution
 
 	// Load config (if it doesn't exist, no validation needed - allow creating vault anywhere)
-	cfg, err := config.Load(effectiveConfigPath)
+	cfg, _, err := config.Load(effectiveConfigPath)
 	if err != nil {
 		// Config doesn't exist or can't be read - allow vault creation
 		return nil
@@ -302,7 +299,7 @@ func InitVaultFile(vaultPath string, out *output.Handler) *Error {
 // InitVaultInteractiveStandalone allows user to select a vault from config to initialize
 // This runs without requiring the vaults to be openable (since they might not exist yet)
 func InitVaultInteractiveStandalone(configPath string, out *output.Handler) *Error {
-	cfg, err := config.Load(configPath)
+	cfg, warnings, err := config.Load(configPath)
 	if err != nil {
 		// Provide helpful suggestion based on execution context
 		var suggestion string
@@ -318,6 +315,12 @@ func InitVaultInteractiveStandalone(configPath string, out *output.Handler) *Err
 			suggestion = fmt.Sprintf("failed to load config: %v\nRun 'dotsecenv init config' first.", err)
 		}
 		return NewError(suggestion, ExitConfigError)
+	}
+
+	if !out.IsSilent() {
+		for _, w := range warnings {
+			_, _ = fmt.Fprintf(out.Stderr(), "warning: %s\n", w)
+		}
 	}
 
 	vaultCfg, err := vault.ParseVaultConfig(cfg.Vault)

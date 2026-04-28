@@ -624,7 +624,7 @@ Each entry includes a hash and cryptographic signature to prevent against tamper
 When running with SUID privileges, the following restrictions apply:
 
 - `-c` and `-v` flags are blocked
-- `DOTSECENV_CONFIG` and `DOTSECENV_FINGERPRINT` environment variables are ignored
+- `DOTSECENV_CONFIG` environment variable is ignored
 - Config defaults to `/etc/dotsecenv/config`
 - Write operations are blocked: `login`, `init config`, `init vault`, `secret store`, `secret share`, `secret revoke`
 
@@ -647,12 +647,11 @@ This prevents privilege escalation attacks when the binary is installed with ele
 
 ## Environment Variables
 
-| Variable                | Description                                             |
-| ----------------------- | ------------------------------------------------------- |
-| `DOTSECENV_CONFIG`      | Override config file path (ignored in SUID mode)        |
-| `DOTSECENV_FINGERPRINT` | Override fingerprint from config (ignored in SUID mode) |
-| `XDG_CONFIG_HOME`       | Override config directory (defaults to: `~/.config`)    |
-| `XDG_DATA_HOME`         | Override data directory (defaults to: `~/.local/share`) |
+| Variable           | Description                                             |
+| ------------------ | ------------------------------------------------------- |
+| `DOTSECENV_CONFIG` | Override config file path (ignored in SUID mode)        |
+| `XDG_CONFIG_HOME`  | Override config directory (defaults to: `~/.config`)    |
+| `XDG_DATA_HOME`    | Override data directory (defaults to: `~/.local/share`) |
 
 ## Known Limitations
 

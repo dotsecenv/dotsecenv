@@ -88,7 +88,7 @@ func resolveVaultPaths(configPath string, vaultPaths []string) ([]string, error)
 				cfgPath = xdgPaths.ConfigPath()
 			}
 
-			cfg, configErr := config.Load(cfgPath)
+			cfg, _, configErr := config.Load(cfgPath)
 			if configErr != nil {
 				return nil, fmt.Errorf("failed to load config for vault index %d: %v", idx, configErr)
 			}
@@ -151,7 +151,7 @@ func parseVaultSpec(configPath string, vaultPaths []string) (vaultPath string, f
 			cfgPath = xdgPaths.ConfigPath()
 		}
 
-		cfg, configErr := config.Load(cfgPath)
+		cfg, _, configErr := config.Load(cfgPath)
 		if configErr != nil {
 			return "", 0, fmt.Errorf("failed to load config: %v", configErr)
 		}
@@ -181,7 +181,7 @@ func printVaultList(configPath string, w io.Writer) {
 		cfgPath = xdgPaths.ConfigPath()
 	}
 
-	cfg, configErr := config.Load(cfgPath)
+	cfg, _, configErr := config.Load(cfgPath)
 	if configErr != nil {
 		return
 	}

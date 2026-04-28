@@ -46,11 +46,10 @@ type Login struct {
 // Config represents the dotsecenv configuration
 type Config struct {
 	ApprovedAlgorithms []ApprovedAlgorithm `yaml:"approved_algorithms"`
-	Login              *Login              `yaml:"login,omitempty"`       // Authenticated login with cryptographic proof
-	Fingerprint        string              `yaml:"fingerprint,omitempty"` // DEPRECATED: use login section instead
-	Vault              []string            `yaml:"vault"`                 // List of vault paths
-	Behavior           BehaviorConfig      `yaml:"behavior,omitempty"`    // Granular behavior settings
-	GPG                GPGConfig           `yaml:"gpg,omitempty"`         // GPG configuration
+	Login              *Login              `yaml:"login,omitempty"`    // Authenticated login with cryptographic proof
+	Vault              []string            `yaml:"vault"`              // List of vault paths
+	Behavior           BehaviorConfig      `yaml:"behavior,omitempty"` // Granular behavior settings
+	GPG                GPGConfig           `yaml:"gpg,omitempty"`      // GPG configuration
 }
 
 // UnmarshalYAML provides custom YAML unmarshaling with better error messages for vault configuration
@@ -102,21 +101,6 @@ func (c *Config) ShouldRestrictToConfiguredVaults() bool {
 	return false
 }
 
-// GetFingerprint returns the active fingerprint, preferring login.fingerprint over the deprecated field.
-// This method provides backward compatibility during the migration from the old fingerprint field.
-func (c *Config) GetFingerprint() string {
-	if c.Login != nil && c.Login.Fingerprint != "" {
-		return c.Login.Fingerprint
-	}
-	return c.Fingerprint // fallback to deprecated field
-}
-
-// HasDeprecatedFingerprint returns true if the config uses the deprecated fingerprint field
-// without a login section. Used to emit deprecation warnings.
-func (c *Config) HasDeprecatedFingerprint() bool {
-	return c.Fingerprint != "" && (c.Login == nil || c.Login.Fingerprint == "")
-}
-
 // DefaultConfig returns a new Config with FIPS 186-5 compliant algorithm defaults.
 // Algorithm minimums are set per the Digital Signature Standard:
 //   - RSA: 2048 bits minimum (FIPS 186-5)
@@ -146,30 +130,55 @@ func DefaultConfig() Config {
 				MinBits: 2048,
 			},
 		},
-		Fingerprint: "",
-		Vault:       []string{},                 // No default vaults from library; caller must populate
-		GPG:         GPGConfig{Program: "PATH"}, // Default to PATH inference
+		Vault: []string{},                 // No default vaults from library; caller must populate
+		GPG:   GPGConfig{Program: "PATH"}, // Default to PATH inference
 	}
 }
 
-// Load reads the config from the specified path
-// If the file doesn't exist or is empty, it returns an error
-func Load(path string) (Config, error) {
+// Load reads the config from the specified path. Returns the parsed Config,
+// any human-readable warnings about deprecated/removed fields detected in the
+// file (callers should print these to stderr unless silent), and an error.
+// If the file doesn't exist or is empty, it returns an error.
+func Load(path string) (Config, []string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Config{}, fmt.Errorf("failed to read config: %w", err)
+		return Config{}, nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
 	if len(data) == 0 {
-		return Config{}, fmt.Errorf("config file is empty")
+		return Config{}, nil, fmt.Errorf("config file is empty")
 	}
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return Config{}, fmt.Errorf("failed to parse config: %w", err)
+		return Config{}, nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	return cfg, nil
+	return cfg, detectLegacyFields(data, path), nil
+}
+
+// detectLegacyFields scans the raw YAML for top-level keys that have been
+// removed or renamed in this version of dotsecenv and returns human-readable
+// warnings for each one detected. It never errors — unmarshal failures are
+// surfaced by Load's primary parse.
+//
+// The scan operates on the raw bytes (not the parsed Config) so that warnings
+// fire even after the corresponding struct field has been deleted: yaml.v3
+// silently drops unknown keys, which would otherwise hide the deprecation.
+func detectLegacyFields(data []byte, path string) []string {
+	var raw map[string]yaml.Node
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return nil
+	}
+
+	var warnings []string
+	if node, ok := raw["fingerprint"]; ok && node.Kind == yaml.ScalarNode && node.Value != "" {
+		warnings = append(warnings, fmt.Sprintf(
+			"deprecated 'fingerprint:' field detected in %s and ignored. Run 'dotsecenv login %s' to migrate to a signed login.",
+			path, node.Value,
+		))
+	}
+	return warnings
 }
 
 // Save writes the config to the specified path with proper formatting
@@ -246,14 +255,6 @@ func isCurveAllowed(curve string, allowedCurves []string) bool {
 		}
 	}
 	return false
-}
-
-// GetFingerprintFromEnv gets fingerprint from environment variable or config
-func GetFingerprintFromEnv(envFingerprint, cfgFingerprint string) string {
-	if envFingerprint != "" {
-		return envFingerprint
-	}
-	return cfgFingerprint
 }
 
 // GetAllowedAlgorithmsString returns a human-readable string of approved algorithms

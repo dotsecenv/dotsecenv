@@ -76,6 +76,14 @@ func NewCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader
 // without opening any vaults. This is used by commands like `login` that
 // operate purely on config and do not need vault access.
 func NewCLIConfigOnly(configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
+	return loadConfigAndPrepareGPG(configPath, silent, stdin, stdout, stderr)
+}
+
+// loadConfigAndPrepareGPG returns a CLI populated with everything except
+// vaultResolver and vaultPaths. Both NewCLI and NewCLIConfigOnly use this as
+// their prelude — the only difference between them is whether vaults are
+// opened afterward.
+func loadConfigAndPrepareGPG(configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
 		return nil, NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
@@ -83,21 +91,20 @@ func NewCLIConfigOnly(configPath string, silent bool, stdin io.Reader, stdout, s
 
 	configPath = ResolveConfigPath(configPath, silent, stderr)
 
-	// Ensure directories exist
 	if err := xdgPaths.EnsureDirs(); err != nil {
 		return nil, NewError(fmt.Sprintf("failed to create directories: %v", err), ExitConfigError)
 	}
 
-	// Load config (fail if missing or invalid)
-	cfg, err := config.Load(configPath)
+	cfg, warnings, err := config.Load(configPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			var suggestion string
-			if isSUID() {
+			switch {
+			case isSUID():
 				suggestion = fmt.Sprintf("config file not found: %s\nContact your system administrator to create this file.", configPath)
-			} else if os.Getuid() == 0 {
+			case os.Getuid() == 0:
 				suggestion = fmt.Sprintf("config file not found: %s\nRun 'sudo dotsecenv init config' to create one", configPath)
-			} else {
+			default:
 				suggestion = fmt.Sprintf("config file not found: %s\nRun 'dotsecenv init config' to create one", configPath)
 			}
 			return nil, NewError(suggestion, ExitConfigError)
@@ -105,86 +112,45 @@ func NewCLIConfigOnly(configPath string, silent bool, stdin io.Reader, stdout, s
 		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
 	}
 
-	// Deprecation warning for fingerprint field
-	if cfg.HasDeprecatedFingerprint() && !silent {
-		_, _ = fmt.Fprintf(stderr, "warning: 'fingerprint:' field is deprecated and will be removed in a future version\n")
-		_, _ = fmt.Fprintf(stderr, "         Run 'dotsecenv login %s' to migrate to signed login\n", cfg.Fingerprint)
+	if !silent {
+		for _, w := range warnings {
+			_, _ = fmt.Fprintf(stderr, "warning: %s\n", w)
+		}
 	}
 
-	// Validate and set GPG program path from config
 	if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program); err != nil {
 		return nil, NewError(fmt.Sprintf("failed: %v", err), ExitGPGError)
 	}
 
 	return &CLI{
-			configPath: configPath,
-			xdgPaths:   xdgPaths,
-			config:     cfg,
-			gpgClient:  &gpg.GPGClient{},
-			stdin:      stdin,
-			Silent:     silent,
-			output: output.NewHandler(stdout, stderr,
-				output.WithSilent(silent),
-			),
-			hasTTY: defaultHasTTY,
-		},
-		nil
+		configPath: configPath,
+		xdgPaths:   xdgPaths,
+		config:     cfg,
+		gpgClient:  &gpg.GPGClient{},
+		stdin:      stdin,
+		Silent:     silent,
+		output: output.NewHandler(stdout, stderr,
+			output.WithSilent(silent),
+		),
+		hasTTY: defaultHasTTY,
+	}, nil
 }
 
 // newCLI creates a CLI instance. If requireExplicitUpgradeOverride is non-nil, it overrides the config setting.
 func newCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer, requireExplicitUpgradeOverride *bool) (*CLI, error) {
-	xdgPaths, err := xdg.NewPaths()
+	cli, err := loadConfigAndPrepareGPG(configPath, silent, stdin, stdout, stderr)
 	if err != nil {
-		return nil, NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
+		return nil, err
 	}
-
-	configPath = ResolveConfigPath(configPath, silent, stderr)
-
-	// Ensure directories exist
-	if err := xdgPaths.EnsureDirs(); err != nil {
-		return nil, NewError(fmt.Sprintf("failed to create directories: %v", err), ExitConfigError)
-	}
-
-	// Load config (fail if missing or invalid)
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			// Provide helpful suggestion based on execution context
-			var suggestion string
-			if isSUID() {
-				// SUID mode: config at /etc/dotsecenv/config, init commands are blocked
-				suggestion = fmt.Sprintf("config file not found: %s\nContact your system administrator to create this file.", configPath)
-			} else if os.Getuid() == 0 {
-				// Running as actual root (e.g., via sudo)
-				suggestion = fmt.Sprintf("config file not found: %s\nRun 'sudo dotsecenv init config' to create one", configPath)
-			} else {
-				// Normal user
-				suggestion = fmt.Sprintf("config file not found: %s\nRun 'dotsecenv init config' to create one", configPath)
-			}
-			return nil, NewError(suggestion, ExitConfigError)
-		}
-		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
-	}
-
-	// Deprecation warning for fingerprint field (use login section instead)
-	if cfg.HasDeprecatedFingerprint() && !silent {
-		_, _ = fmt.Fprintf(stderr, "warning: 'fingerprint:' field is deprecated and will be removed in a future version\n")
-		_, _ = fmt.Fprintf(stderr, "         Run 'dotsecenv login %s' to migrate to signed login\n", cfg.Fingerprint)
-	}
-
-	// Validate and set GPG program path from config
-	if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program); err != nil {
-		return nil, NewError(fmt.Sprintf("failed: %v", err), ExitGPGError)
-	}
-
-	// Create vault resolver
-	var vaultResolver *vault.VaultResolver
+	cfg := cli.config
 
 	// Determine output writer for warnings
 	warnWriter := stderr
 	if silent {
 		warnWriter = io.Discard
 	}
+
+	var vaultResolver *vault.VaultResolver
 
 	// If -v flags were provided, use those paths directly
 	if len(vaultPaths) > 0 {
@@ -195,7 +161,7 @@ func newCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader
 			configPaths := make(map[string]bool)
 			for _, p := range cfg.Vault {
 				expanded := vault.ExpandPath(p)
-				if abs, err := filepath.Abs(expanded); err == nil {
+				if abs, absErr := filepath.Abs(expanded); absErr == nil {
 					configPaths[abs] = true
 				} else {
 					configPaths[expanded] = true
@@ -205,9 +171,9 @@ func newCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader
 			// Check if any specified path is NOT in config
 			for _, p := range vaultPaths {
 				expanded := vault.ExpandPath(p)
-				abs, err := filepath.Abs(expanded)
+				abs, absErr := filepath.Abs(expanded)
 				target := expanded
-				if err == nil {
+				if absErr == nil {
 					target = abs
 				}
 
@@ -265,21 +231,9 @@ func newCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader
 		}
 	}
 
-	return &CLI{
-			vaultPaths:    vaultPaths,
-			configPath:    configPath,
-			xdgPaths:      xdgPaths,
-			config:        cfg,
-			vaultResolver: vaultResolver,
-			gpgClient:     &gpg.GPGClient{},
-			stdin:         stdin,
-			Silent:        silent,
-			output: output.NewHandler(stdout, stderr,
-				output.WithSilent(silent),
-			),
-			hasTTY: defaultHasTTY,
-		},
-		nil
+	cli.vaultPaths = vaultPaths
+	cli.vaultResolver = vaultResolver
+	return cli, nil
 }
 
 // Warnf prints a warning message to stderr unless silent mode is enabled.
@@ -315,22 +269,18 @@ func (c *CLI) Close() error {
 	return nil
 }
 
-// getFingerprintFromEnv gets the current fingerprint to use.
-// In SUID mode, DOTSECENV_FINGERPRINT is ignored for security.
-// Prefers Login.Fingerprint over the deprecated Fingerprint field.
-func (c *CLI) getFingerprintFromEnv() string {
-	if !isSUID() {
-		envFP := os.Getenv("DOTSECENV_FINGERPRINT")
-		if envFP != "" {
-			return envFP
-		}
+// activeFingerprint returns the configured login fingerprint, or "" if no
+// signed Login proof is present in the config.
+func (c *CLI) activeFingerprint() string {
+	if c.config.Login == nil {
+		return ""
 	}
-	return c.config.GetFingerprint()
+	return c.config.Login.Fingerprint
 }
 
 // checkFingerprintRequired ensures a fingerprint is configured
 func (c *CLI) checkFingerprintRequired(operation string) (string, *Error) {
-	fp := c.getFingerprintFromEnv()
+	fp := c.activeFingerprint()
 	if fp == "" {
 		msg := fmt.Sprintf("select a user identity before running '%s'\n  run: `dotsecenv login FINGERPRINT`", operation)
 		return "", NewError(msg, ExitFingerprintRequired)

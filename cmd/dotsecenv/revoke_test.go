@@ -181,44 +181,26 @@ func TestSecretRevoke_Self(t *testing.T) {
 		t.Fatalf("failed to generate key for User B: %v", err)
 	}
 
-	tmpDir := t.TempDir()
-	vaultPath := filepath.Join(tmpDir, "vault")
+	vaultPath := filepath.Join(t.TempDir(), "vault")
+	env := []string{"GNUPGHOME=" + gpgHome}
 
-	configPath := filepath.Join(tmpDir, "config.yaml")
+	// Each user gets their own config file with a real signed Login proof.
+	// They share vaultPath so multi-recipient sharing semantics still apply.
+	// setupTestUser internally calls generateKey, but we already generated keys
+	// above (under a timeout); pass them explicitly via a per-user config.
+	configPathA := writeUserConfig(t, vaultPath)
+	configPathB := writeUserConfig(t, vaultPath)
+	loginUser(t, env, configPathA, fpA)
+	loginUser(t, env, configPathB, fpB)
 
-	configContent := fmt.Sprintf(`
-approved_algorithms:
-  - algo: RSA
-    min_bits: 2048
-vault:
-  - "%s"
-gpg:
-  program: PATH
-`, vaultPath)
-
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
-		t.Fatal(err)
-	}
-
-	// Environment for User A
-	envA := []string{
-		"GNUPGHOME=" + gpgHome,
-		"DOTSECENV_FINGERPRINT=" + fpA,
-	}
-	// Environment for User B
-	envB := []string{
-		"GNUPGHOME=" + gpgHome,
-		"DOTSECENV_FINGERPRINT=" + fpB,
-	}
-
-	// Init vault
-	_, _, _ = runCmdWithEnv(envA, "init", "vault", "-v", vaultPath)
+	// Init vault once on the shared vault.
+	_, _, _ = runCmdWithEnv(env, "-c", configPathA, "init", "vault", "-v", vaultPath)
 
 	// Identities are auto-added by secret store (for User A) and secret share (for User B)
 
 	// 1. Store secret SEC1 (User A)
-	cmd := exec.Command(binaryPath, "-c", configPath, "secret", "store", "SEC1")
-	cmd.Env = append(filteredEnv(), envA...)
+	cmd := exec.Command(binaryPath, "-c", configPathA, "secret", "store", "SEC1")
+	cmd.Env = append(filteredEnv(), env...)
 	cmd.Stdin = strings.NewReader("secret_value_1")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -226,13 +208,13 @@ gpg:
 	}
 
 	// 2. Share with User B (User A)
-	_, _, err = runCmdWithEnv(envA, "-c", configPath, "secret", "share", "SEC1", fpB)
+	_, _, err = runCmdWithEnv(env, "-c", configPathA, "secret", "share", "SEC1", fpB)
 	if err != nil {
 		t.Fatalf("secret share failed: %v", err)
 	}
 
 	// Verify User B can access
-	stdout, _, err := runCmdWithEnv(envB, "-c", configPath, "secret", "get", "SEC1")
+	stdout, _, err := runCmdWithEnv(env, "-c", configPathB, "secret", "get", "SEC1")
 	if err != nil {
 		t.Fatalf("secret get (B) failed: %v", err)
 	}
@@ -242,7 +224,7 @@ gpg:
 
 	// 3. Revoke User A (Self Revocation)
 	// User A revokes themselves.
-	_, _, err = runCmdWithEnv(envA, "-c", configPath, "secret", "revoke", "SEC1", fpA)
+	_, _, err = runCmdWithEnv(env, "-c", configPathA, "secret", "revoke", "SEC1", fpA)
 	if err != nil {
 		t.Fatalf("secret revoke (self) failed: %v", err)
 	}
@@ -250,7 +232,7 @@ gpg:
 	// 4. Verify User A can still access older value after self-revocation
 	// After self-revocation, User A can still decrypt their original value
 	// (Fallback to older values is always allowed silently)
-	stdout, _, err = runCmdWithEnv(envA, "-c", configPath, "secret", "get", "SEC1")
+	stdout, _, err = runCmdWithEnv(env, "-c", configPathA, "secret", "get", "SEC1")
 	if err != nil {
 		t.Errorf("expected secret get (A) to succeed with older value after self-revocation, got error: %v", err)
 	}
@@ -260,11 +242,41 @@ gpg:
 	}
 
 	// 5. Verify User B CAN still access (with either config)
-	stdout, _, err = runCmdWithEnv(envB, "-c", configPath, "secret", "get", "SEC1")
+	stdout, _, err = runCmdWithEnv(env, "-c", configPathB, "secret", "get", "SEC1")
 	if err != nil {
 		t.Errorf("secret get (B) failed after A revoked self: %v", err)
 	}
 	if strings.TrimSpace(stdout) != "secret_value_1" {
 		t.Errorf("unexpected secret value for B after A revoked self: %s", stdout)
+	}
+}
+
+// writeUserConfig writes a minimal per-user dotsecenv config pointing at vaultPath.
+// Used by tests that generate keys under a timeout (and so can't use setupTestUser).
+func writeUserConfig(t *testing.T, vaultPath string) string {
+	t.Helper()
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	content := fmt.Sprintf(`
+approved_algorithms:
+  - algo: RSA
+    min_bits: 2048
+vault:
+  - "%s"
+gpg:
+  program: PATH
+`, vaultPath)
+	if err := os.WriteFile(configPath, []byte(content), 0600); err != nil {
+		t.Fatalf("writeUserConfig: %v", err)
+	}
+	return configPath
+}
+
+// loginUser runs `dotsecenv login fp` against configPath to populate a signed
+// Login section. Used in conjunction with writeUserConfig when keys are
+// generated separately (e.g., under a timeout context).
+func loginUser(t *testing.T, env []string, configPath, fingerprint string) {
+	t.Helper()
+	if _, stderr, err := runCmdWithEnv(env, "-c", configPath, "login", fingerprint); err != nil {
+		t.Fatalf("loginUser(%s): %v\nstderr: %s", fingerprint, err, stderr)
 	}
 }
