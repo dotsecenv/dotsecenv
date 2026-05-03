@@ -36,6 +36,7 @@ Secrets are stored in vault files and can be shared between team members.`
 	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(identityCmd)
+	rootCmd.AddCommand(policyCmd)
 	rootCmd.AddCommand(secretCmd)
 	rootCmd.AddCommand(vaultCmd)
 	rootCmd.AddCommand(validateCmd)

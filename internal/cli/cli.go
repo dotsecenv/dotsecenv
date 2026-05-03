@@ -13,6 +13,7 @@ import (
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/config"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/output"
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/policy"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
@@ -41,6 +42,7 @@ type CLI struct {
 	configPath    string
 	xdgPaths      xdg.Paths
 	config        config.Config
+	policy        policy.Policy // System policy (empty when none enforced)
 	vaultResolver VaultResolver // Multiple vaults
 	gpgClient     gpg.Client
 	stdin         io.Reader
@@ -48,6 +50,9 @@ type CLI struct {
 	output        *output.Handler // Unified output handler
 	hasTTY        func() bool     // Returns true if a controlling terminal is present
 }
+
+// Policy returns the loaded system policy. Empty Policy means no policy is enforced.
+func (c *CLI) Policy() policy.Policy { return c.policy }
 
 // defaultHasTTY checks for a controlling terminal via /dev/tty.
 func defaultHasTTY() bool {
@@ -101,8 +106,22 @@ func loadConfigAndPrepareGPG(configPath string, silent bool, stdin io.Reader, st
 		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
 	}
 
+	pol, polLoadWarnings, polLoadErr := policy.Load()
+	if polLoadErr != nil {
+		return nil, NewError(fmt.Sprintf("failed to load policy: %v", polLoadErr), ExitConfigError)
+	}
+
+	var polApplyWarnings []string
+	cfg, polApplyWarnings = policy.Apply(cfg, pol)
+
 	if !silent {
 		for _, w := range warnings {
+			_, _ = fmt.Fprintf(stderr, "warning: %s\n", w)
+		}
+		for _, w := range polLoadWarnings {
+			_, _ = fmt.Fprintf(stderr, "warning: %s\n", w)
+		}
+		for _, w := range polApplyWarnings {
 			_, _ = fmt.Fprintf(stderr, "warning: %s\n", w)
 		}
 	}
@@ -115,6 +134,7 @@ func loadConfigAndPrepareGPG(configPath string, silent bool, stdin io.Reader, st
 		configPath: configPath,
 		xdgPaths:   xdgPaths,
 		config:     cfg,
+		policy:     pol,
 		gpgClient:  &gpg.GPGClient{},
 		stdin:      stdin,
 		Silent:     silent,

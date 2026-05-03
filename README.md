@@ -526,6 +526,87 @@ gpg:
 - When GPG is installed in a non-standard location
 - In CI/CD environments where PATH may vary
 
+## Policy Directory
+
+System administrators can drop YAML policy fragments into `/etc/dotsecenv/policy.d/`
+to constrain every user of the binary. User configs keep full local autonomy
+for fields that policy doesn't touch.
+
+When the policy directory does not exist, no policy is enforced and the binary
+behaves exactly as before (today's behavior is preserved). When the directory
+exists, fragments are loaded in lexical filename order and merged into an
+effective policy that constrains every user.
+
+### Phase 1 supports one allow-list field
+
+```yaml
+# /etc/dotsecenv/policy.d/00-corp-baseline.yaml
+approved_algorithms:
+  - algo: ECC
+    curves: [P-384, P-521]
+    min_bits: 384
+  - algo: EdDSA
+    curves: [Ed25519, Ed448]
+    min_bits: 255
+```
+
+Cross-fragment merge: the union of all fragments' entries, with same-`algo`
+entries collapsed (curves union; `min_bits` takes the minimum — most-permissive
+reconciliation).
+
+User vs policy: the user's `approved_algorithms` is **intersected** with the
+policy's effective allow-list. Policy is a ceiling; users can be stricter
+locally; users cannot exceed policy. Algorithms or curves dropped by the
+intersection emit a stderr warning explaining what changed.
+
+### Forbidden keys in policy fragments
+
+Hard-rejected at load with an explicit error citing the offending fragment:
+
+- `login` — identity is per-user, not org-wide
+- `vault` — would erase user vaults; future phases add `approved_vault_paths`
+  for vault filtering
+- `behavior`, `gpg` — reserved for future phases
+
+### Permissions
+
+The policy directory and each fragment must be:
+
+- Owned by `root` (uid 0)
+- Mode `0644` or stricter (no group/other write bits)
+
+dotsecenv refuses to load any fragment that fails this check. Linux/macOS
+only — Windows uses ACLs and policy is not yet supported there.
+
+### Inspecting policy
+
+```bash
+# Print the effective policy with per-field origin attribution
+dotsecenv policy list
+dotsecenv policy list --json
+
+# Validate fragment structure (useful in CI for ops repos shipping policy)
+dotsecenv policy validate
+```
+
+`policy validate` exits with distinct codes per error category:
+
+| Code | Meaning |
+|------|---------|
+| 0    | No policy enforced or all fragments structurally valid |
+| 2    | Malformed YAML or forbidden key |
+| 8    | Insecure permissions on directory or any fragment |
+| 1    | Empty allow-list field (omit the field instead) |
+
+### Out of scope (current phase)
+
+- `approved_vault_paths` — coming in PR #2
+- `behavior.*` and `gpg.program` policy fields — coming in PR #3
+- Project-level `.dotsecenv/policy.yaml`
+- Remote/centralized policy distribution
+- Encrypted/signed policy fragments
+- Windows policy support
+
 ## Vault File Format
 
 Default vault location: `$XDG_DATA_HOME/dotsecenv/vault`
