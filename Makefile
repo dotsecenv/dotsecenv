@@ -238,7 +238,12 @@ install-lefthook:
 		go install github.com/evilmartians/lefthook/v2@v2.0.13; \
 	fi
 
-GOLANGCI_LINT_VERSION := latest
+# Pinned to v2.11.4: v2.12.0 and v2.12.1 have a SHA-256 mismatch between the
+# published tarball and the corresponding _checksums.txt in the GitHub release,
+# causing install.sh to abort. v2.11.4 is the latest known-good release.
+# Bump back to `latest` (or a known-good v2.12.x) once the upstream release
+# pipeline is fixed.
+GOLANGCI_LINT_VERSION := v2.11.4
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
 .PHONY: install-lint
