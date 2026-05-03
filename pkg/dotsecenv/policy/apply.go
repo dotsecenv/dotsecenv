@@ -8,10 +8,21 @@ import (
 )
 
 // Apply intersects the user's config with the policy's effective allow-lists
-// and returns the constrained Config plus warnings describing what changed.
+// and overrides the user's scalar fields with policy's effective scalars.
+// Returns the constrained Config plus warnings describing what changed.
 // Returns cfg unchanged when p is empty (no policy enforced).
 //
-// PR #3 will add scalar overrides (behavior.*, gpg.program).
+// Allow-list semantics (intersection): user's `approved_algorithms` is
+// narrowed by policy; user's `vault` list is filtered by `approved_vault_paths`.
+//
+// Scalar semantics (policy overrides user): if policy sets `gpg.program` or
+// any `behavior.*` field, that value replaces the user's. Same value across
+// user and policy is silently honored (no warning); different value emits a
+// "policy overrides user X" warning so users know their config was overridden.
+//
+// Cross-fragment scalar conflicts (later fragment changes a value set by an
+// earlier one) are surfaced separately as `policy conflict` warnings —
+// independent of whether the policy overrides any user value.
 func Apply(cfg config.Config, p Policy) (config.Config, []string) {
 	if p.Empty() {
 		return cfg, nil
@@ -33,7 +44,48 @@ func Apply(cfg config.Config, p Policy) (config.Config, []string) {
 		warnings = append(warnings, w...)
 	}
 
+	// Scalar overrides (policy wins over user). Cross-fragment conflict
+	// warnings come from MergedBehavior/MergedGPGProgram; user-override
+	// warnings come from the merging step below.
+	polBehavior, behaviorOrigins, behaviorConflicts := p.MergedBehavior()
+	warnings = append(warnings, behaviorConflicts...)
+	cfg.Behavior, warnings = applyBehaviorOverride(cfg.Behavior, polBehavior, behaviorOrigins, warnings)
+
+	polGPGProgram, polGPGOrigin, gpgConflicts := p.MergedGPGProgram()
+	warnings = append(warnings, gpgConflicts...)
+	if polGPGProgram != "" {
+		if cfg.GPG.Program != "" && cfg.GPG.Program != polGPGProgram {
+			warnings = append(warnings, fmt.Sprintf(
+				"policy overrides user gpg.program: user value %q replaced by %q from %s",
+				cfg.GPG.Program, polGPGProgram, polGPGOrigin,
+			))
+		}
+		cfg.GPG.Program = polGPGProgram
+	}
+
 	return cfg, warnings
+}
+
+// applyBehaviorOverride applies each policy-set behavior.* sub-field to cfg.
+// When the user previously had a different value, appends a
+// "policy overrides user behavior.X" warning so the silent change is visible.
+// Returns the updated BehaviorConfig and warnings slice.
+func applyBehaviorOverride(user, pol config.BehaviorConfig, polOrigins map[string]string, warnings []string) (config.BehaviorConfig, []string) {
+	for _, fld := range behaviorFields {
+		polVal := fld.get(pol)
+		if polVal == nil {
+			continue // policy doesn't constrain this field
+		}
+		userVal := fld.get(user)
+		if userVal != nil && *userVal != *polVal {
+			warnings = append(warnings, fmt.Sprintf(
+				"policy overrides user %s: user value %v replaced by %v from %s",
+				fld.name, *userVal, *polVal, polOrigins[fld.name],
+			))
+		}
+		fld.set(&user, polVal)
+	}
+	return user, warnings
 }
 
 // intersectApprovedAlgorithms narrows the user's allow-list to entries also
