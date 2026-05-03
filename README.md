@@ -537,7 +537,7 @@ behaves exactly as before (today's behavior is preserved). When the directory
 exists, fragments are loaded in lexical filename order and merged into an
 effective policy that constrains every user.
 
-### Phase 1 supports one allow-list field
+### Supported allow-list fields
 
 ```yaml
 # /etc/dotsecenv/policy.d/00-corp-baseline.yaml
@@ -548,24 +548,45 @@ approved_algorithms:
   - algo: EdDSA
     curves: [Ed25519, Ed448]
     min_bits: 255
+
+approved_vault_paths:
+  - /var/lib/dotsecenv/vault
+  - ~/.local/share/dotsecenv/vault
+  - ~/work/*/.dotsecenv/vault
 ```
 
-Cross-fragment merge: the union of all fragments' entries, with same-`algo`
-entries collapsed (curves union; `min_bits` takes the minimum — most-permissive
-reconciliation).
+**Cross-fragment merge** (allow-lists): union of all fragments' entries.
+For `approved_algorithms`, same-`algo` entries collapse — curves union and
+`min_bits` takes the minimum (most-permissive reconciliation). For
+`approved_vault_paths`, the merged result is the deduped union of patterns.
 
-User vs policy: the user's `approved_algorithms` is **intersected** with the
-policy's effective allow-list. Policy is a ceiling; users can be stricter
-locally; users cannot exceed policy. Algorithms or curves dropped by the
-intersection emit a stderr warning explaining what changed.
+**User vs policy** (intersection): the user's `approved_algorithms` is
+intersected with the policy's; the user's `cfg.Vault` is filtered to entries
+matching at least one `approved_vault_paths` pattern. Policy is a ceiling;
+users can be stricter locally; users cannot exceed policy. Dropped entries
+emit stderr warnings explaining what changed (suppressed by `-s`).
+
+**Vault path matching** uses `path/filepath.Match` (single-segment globs:
+`*`, `?`, `[abc]`); `~` expands to the user's home. There is no `**`
+recursive globbing — admins enumerate explicitly or use single-segment
+patterns. Explicit `-v` flags are subject to the same filter and are
+*rejected* (not silently dropped) when not allowed by policy.
+
+### Fail-closed on broken policy
+
+Any error loading policy aborts startup. A partially-readable or malformed
+policy directory is indistinguishable from tampering, so the only safe
+behavior is to refuse to run. The error is classified by category and
+returned with the matching exit code (see `policy validate` table below);
+`dotsecenv policy validate` and `dotsecenv policy list` continue to work
+even when policy is broken (so admins can diagnose).
 
 ### Forbidden keys in policy fragments
 
 Hard-rejected at load with an explicit error citing the offending fragment:
 
 - `login` — identity is per-user, not org-wide
-- `vault` — would erase user vaults; future phases add `approved_vault_paths`
-  for vault filtering
+- `vault` — would erase user vaults; use `approved_vault_paths` instead
 - `behavior`, `gpg` — reserved for future phases
 
 ### Permissions
@@ -587,6 +608,7 @@ dotsecenv policy list --json
 
 # Validate fragment structure (useful in CI for ops repos shipping policy)
 dotsecenv policy validate
+dotsecenv policy validate --json   # error embedded in JSON object
 ```
 
 `policy validate` exits with distinct codes per error category:
@@ -595,17 +617,17 @@ dotsecenv policy validate
 |------|---------|
 | 0    | No policy enforced or all fragments structurally valid |
 | 2    | Malformed YAML or forbidden key |
-| 8    | Insecure permissions on directory or any fragment |
+| 8    | Insecure permissions or unreadable fragment |
 | 1    | Empty allow-list field (omit the field instead) |
 
 ### Out of scope (current phase)
 
-- `approved_vault_paths` — coming in PR #2
-- `behavior.*` and `gpg.program` policy fields — coming in PR #3
+- `behavior.*` and `gpg.program` policy fields — coming in a follow-on PR
 - Project-level `.dotsecenv/policy.yaml`
 - Remote/centralized policy distribution
 - Encrypted/signed policy fragments
 - Windows policy support
+- `**` recursive glob support in `approved_vault_paths`
 
 ## Vault File Format
 

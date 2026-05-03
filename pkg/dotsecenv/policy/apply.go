@@ -11,7 +11,6 @@ import (
 // and returns the constrained Config plus warnings describing what changed.
 // Returns cfg unchanged when p is empty (no policy enforced).
 //
-// Phase 1 only intersects approved_algorithms. PR #2 will add vault filtering.
 // PR #3 will add scalar overrides (behavior.*, gpg.program).
 func Apply(cfg config.Config, p Policy) (config.Config, []string) {
 	if p.Empty() {
@@ -24,6 +23,13 @@ func Apply(cfg config.Config, p Policy) (config.Config, []string) {
 	if len(polAlgos) > 0 {
 		intersected, w := intersectApprovedAlgorithms(cfg.ApprovedAlgorithms, polAlgos)
 		cfg.ApprovedAlgorithms = intersected
+		warnings = append(warnings, w...)
+	}
+
+	polVaultPatterns, _ := p.MergedApprovedVaultPaths()
+	if len(polVaultPatterns) > 0 {
+		filtered, w := filterApprovedVaults(cfg.Vault, p)
+		cfg.Vault = filtered
 		warnings = append(warnings, w...)
 	}
 
@@ -107,4 +113,26 @@ func maxInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// filterApprovedVaults retains only the user vault paths that match at least
+// one of the policy's approved_vault_paths patterns. Dropped paths produce
+// warnings explaining the policy attribution.
+func filterApprovedVaults(userVaults []string, p Policy) ([]string, []string) {
+	var (
+		out      []string
+		warnings []string
+	)
+	for _, v := range userVaults {
+		if p.IsVaultPathAllowed(v) {
+			out = append(out, v)
+			continue
+		}
+		patterns, _ := p.MergedApprovedVaultPaths()
+		warnings = append(warnings, fmt.Sprintf(
+			"policy filters vault path %s (not matched by approved_vault_paths: %v)",
+			v, patterns,
+		))
+	}
+	return out, warnings
 }

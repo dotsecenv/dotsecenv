@@ -33,6 +33,8 @@ Options:
 	},
 }
 
+var policyValidateJSON bool
+
 var policyValidateCmd = &cobra.Command{
 	Use:   "validate",
 	Short: "Validate policy fragment structure",
@@ -41,16 +43,21 @@ var policyValidateCmd = &cobra.Command{
 Exit codes:
   0  No policy enforced, or all fragments structurally valid
   2  Malformed YAML or forbidden key (use 'login:', 'vault:', 'behavior:', or 'gpg:')
-  8  Insecure permissions on directory or any fragment
-  1  Empty allow-list field (omit the field instead of setting an empty list)`,
+  8  Insecure permissions or unreadable fragment
+  1  Empty allow-list field (omit the field instead of setting an empty list)
+
+Options:
+  --json  Output as JSON (errors are embedded in the JSON object as well as
+          surfaced via the exit code)`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		exitWithError(clilib.PolicyValidate(globalOpts.Silent, os.Stdout, os.Stderr))
+		exitWithError(clilib.PolicyValidate(policyValidateJSON, globalOpts.Silent, os.Stdout, os.Stderr))
 	},
 }
 
 func init() {
 	policyListCmd.Flags().BoolVar(&policyListJSON, "json", false, "Output as JSON")
+	policyValidateCmd.Flags().BoolVar(&policyValidateJSON, "json", false, "Output as JSON")
 
 	policyCmd.AddCommand(policyListCmd)
 	policyCmd.AddCommand(policyValidateCmd)
