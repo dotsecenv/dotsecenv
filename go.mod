@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/ProtonMail/go-crypto v1.4.1
-	github.com/ProtonMail/gopenpgp/v3 v3.4.0
+	github.com/ProtonMail/gopenpgp/v3 v3.4.1
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/sys v0.43.0
 	golang.org/x/term v0.42.0
