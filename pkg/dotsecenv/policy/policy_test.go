@@ -265,6 +265,35 @@ func TestLoadFromDir_MalformedYAML(t *testing.T) {
 	}
 }
 
+// TestLoadFromDir_UnreadableFragment guards the "fail closed when a fragment
+// is in the directory listing but cannot be read" case. statFn fakes secure
+// permissions (so checkSecure passes), but the file's actual mode 0000
+// causes os.ReadFile to fail. Skipped when running as root (root bypasses
+// POSIX read bits).
+func TestLoadFromDir_UnreadableFragment(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root — POSIX read bits are bypassed; cannot exercise unreadable fragment path")
+	}
+
+	dir := t.TempDir()
+	p := writeFragment(t, dir, "00.yaml", "approved_algorithms: [{algo: RSA, min_bits: 2048}]")
+	if err := os.Chmod(p, 0o000); err != nil {
+		t.Fatalf("chmod 0000: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(p, 0o644) })
+
+	_, _, err := loadFromDir(dir, secureStat(0))
+	if err == nil {
+		t.Fatal("expected error for unreadable fragment, got nil")
+	}
+	if !errors.Is(err, ErrUnreadableFragment) {
+		t.Errorf("expected ErrUnreadableFragment, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "00.yaml") {
+		t.Errorf("error should cite fragment path, got: %v", err)
+	}
+}
+
 // --- MergedApprovedAlgorithms tests ---
 
 func TestMerged_EmptyPolicy(t *testing.T) {
@@ -489,5 +518,200 @@ func TestApply_PolicyHasNoCurves_UserCurvesRetained(t *testing.T) {
 	got := out.ApprovedAlgorithms[0]
 	if len(got.Curves) != 1 || got.Curves[0] != "P-384" {
 		t.Errorf("expected user curves retained, got: %v", got.Curves)
+	}
+}
+
+// --- approved_vault_paths tests ---
+
+func TestLoadFromDir_ApprovedVaultPaths_Parses(t *testing.T) {
+	dir := t.TempDir()
+	writeFragment(t, dir, "00.yaml", `
+approved_vault_paths:
+  - /var/lib/dotsecenv/vault
+  - ~/.local/share/dotsecenv/vault
+  - ~/work/*/.dotsecenv/vault
+`)
+	pol, _, err := loadFromDir(dir, secureStat(0))
+	if err != nil {
+		t.Fatalf("loadFromDir: %v", err)
+	}
+	if len(pol.Fragments) != 1 {
+		t.Fatalf("expected 1 fragment, got %d", len(pol.Fragments))
+	}
+	want := []string{
+		"/var/lib/dotsecenv/vault",
+		"~/.local/share/dotsecenv/vault",
+		"~/work/*/.dotsecenv/vault",
+	}
+	got := pol.Fragments[0].ApprovedVaultPaths
+	if len(got) != len(want) {
+		t.Fatalf("expected %d patterns, got %d: %v", len(want), len(got), got)
+	}
+	for i, p := range want {
+		if got[i] != p {
+			t.Errorf("pattern[%d]: expected %s, got %s", i, p, got[i])
+		}
+	}
+}
+
+func TestLoadFromDir_ApprovedVaultPaths_EmptyRejected(t *testing.T) {
+	dir := t.TempDir()
+	writeFragment(t, dir, "00.yaml", "approved_vault_paths: []")
+
+	_, _, err := loadFromDir(dir, secureStat(0))
+	if err == nil {
+		t.Fatal("expected error for empty approved_vault_paths, got nil")
+	}
+	if !errors.Is(err, ErrEmptyAllowList) {
+		t.Errorf("expected ErrEmptyAllowList, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "approved_vault_paths") {
+		t.Errorf("error should cite the field name, got: %v", err)
+	}
+}
+
+func TestMergedApprovedVaultPaths_DedupedUnion(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", ApprovedVaultPaths: []string{
+			"/var/lib/dotsecenv/vault",
+			"~/.local/share/dotsecenv/vault",
+		}},
+		{Path: "99.yaml", ApprovedVaultPaths: []string{
+			"~/.local/share/dotsecenv/vault", // duplicate
+			"~/work/*/.dotsecenv/vault",
+		}},
+	}}
+	patterns, origins := p.MergedApprovedVaultPaths()
+	want := []string{
+		"/var/lib/dotsecenv/vault",
+		"~/.local/share/dotsecenv/vault",
+		"~/work/*/.dotsecenv/vault",
+	}
+	if len(patterns) != len(want) {
+		t.Fatalf("expected %d patterns, got %d: %v", len(want), len(patterns), patterns)
+	}
+	for i, p := range want {
+		if patterns[i] != p {
+			t.Errorf("pattern[%d]: expected %s, got %s", i, p, patterns[i])
+		}
+	}
+	// Duplicate pattern should list both fragments.
+	dup := "~/.local/share/dotsecenv/vault"
+	if len(origins[dup]) != 2 {
+		t.Errorf("expected 2 origins for duplicated pattern, got: %v", origins[dup])
+	}
+}
+
+func TestIsVaultPathAllowed_NoPatterns_AllAllowed(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml"}, // no approved_vault_paths
+	}}
+	if !p.IsVaultPathAllowed("/anything/goes") {
+		t.Error("expected unconstrained policy to allow any path")
+	}
+}
+
+func TestIsVaultPathAllowed_LiteralMatch(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", ApprovedVaultPaths: []string{
+			"/var/lib/dotsecenv/vault",
+		}},
+	}}
+	if !p.IsVaultPathAllowed("/var/lib/dotsecenv/vault") {
+		t.Error("expected literal path to match itself")
+	}
+	if p.IsVaultPathAllowed("/tmp/foo") {
+		t.Error("expected unrelated path to be rejected")
+	}
+}
+
+func TestIsVaultPathAllowed_SingleSegmentGlob(t *testing.T) {
+	// Use an absolute test root so we don't depend on the test runner's HOME
+	// or the OS-specific resolution that vault.ExpandPath performs (which
+	// consults user.Current(), not $HOME).
+	root := t.TempDir()
+
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", ApprovedVaultPaths: []string{
+			filepath.Join(root, "work/*/.dotsecenv/vault"),
+		}},
+	}}
+	cases := []struct {
+		path    string
+		allowed bool
+	}{
+		{filepath.Join(root, "work/projA/.dotsecenv/vault"), true},
+		{filepath.Join(root, "work/projB/.dotsecenv/vault"), true},
+		// Deep path: filepath.Match `*` does NOT cross / boundaries.
+		{filepath.Join(root, "work/team-a/projB/.dotsecenv/vault"), false},
+		// Different prefix.
+		{filepath.Join(root, "personal/.dotsecenv/vault"), false},
+	}
+	for _, tc := range cases {
+		if got := p.IsVaultPathAllowed(tc.path); got != tc.allowed {
+			t.Errorf("IsVaultPathAllowed(%q) = %v, want %v", tc.path, got, tc.allowed)
+		}
+	}
+}
+
+func TestApply_FilterApprovedVaults(t *testing.T) {
+	root := t.TempDir()
+	allowedVault := filepath.Join(root, "share/dotsecenv/vault")
+
+	cfg := config.Config{
+		Vault: []string{
+			allowedVault,
+			"/tmp/foo",
+		},
+	}
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", ApprovedVaultPaths: []string{allowedVault}},
+	}}
+	out, warnings := Apply(cfg, p)
+	if len(out.Vault) != 1 {
+		t.Fatalf("expected 1 vault retained, got %d: %v", len(out.Vault), out.Vault)
+	}
+	if out.Vault[0] != allowedVault {
+		t.Errorf("expected %s retained, got %s", allowedVault, out.Vault[0])
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "/tmp/foo") {
+		t.Errorf("expected warning citing /tmp/foo, got: %v", warnings)
+	}
+}
+
+// TestIsVaultPathAllowed_TildeExpansion exercises the ~ -> $HOME expansion
+// path against the real current user's home directory (since vault.ExpandPath
+// uses user.Current(), not $HOME). Skipped when user.Current() fails (e.g.
+// in containers without a passwd entry).
+func TestIsVaultPathAllowed_TildeExpansion(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skipf("cannot resolve home: %v", err)
+	}
+
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", ApprovedVaultPaths: []string{
+			"~/.local/share/dotsecenv/vault",
+		}},
+	}}
+	target := filepath.Join(home, ".local/share/dotsecenv/vault")
+	if !p.IsVaultPathAllowed(target) {
+		t.Errorf("expected %s to match ~/.local/share/dotsecenv/vault pattern", target)
+	}
+}
+
+func TestApply_NoVaultPolicy_VaultsUnchanged(t *testing.T) {
+	cfg := config.Config{
+		Vault: []string{"/tmp/foo", "/tmp/bar"},
+	}
+	// Policy has approved_algorithms but no approved_vault_paths.
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		}},
+	}}
+	out, _ := Apply(cfg, p)
+	if len(out.Vault) != 2 {
+		t.Errorf("expected vaults unchanged when policy has no vault constraint, got %v", out.Vault)
 	}
 }

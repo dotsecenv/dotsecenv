@@ -17,26 +17,6 @@ import (
 // attribution. Operates standalone (does not require a loaded user config),
 // so admins can introspect policy without being dotsecenv users themselves.
 func PolicyList(jsonMode, silent bool, stdout, stderr io.Writer) *Error {
-	out := output.NewHandler(stdout, stderr,
-		output.WithSilent(silent),
-		output.WithJSON(jsonMode),
-	)
-
-	pol, _, err := policy.Load()
-	if err != nil {
-		return classifyPolicyError(err)
-	}
-
-	if jsonMode {
-		return writePolicyListJSON(out, pol)
-	}
-	return writePolicyListText(out, pol)
-}
-
-// PolicyValidate parses all fragments and reports structural errors.
-// Returns nil on success (no policy enforced OR all fragments structurally
-// valid). Otherwise returns *Error with a distinct ExitCode per category.
-func PolicyValidate(silent bool, stdout, stderr io.Writer) *Error {
 	out := output.NewHandler(stdout, stderr, output.WithSilent(silent))
 
 	pol, _, err := policy.Load()
@@ -44,11 +24,49 @@ func PolicyValidate(silent bool, stdout, stderr io.Writer) *Error {
 		return classifyPolicyError(err)
 	}
 
+	if jsonMode {
+		return writePolicyListJSON(stdout, pol)
+	}
+	return writePolicyListText(out, pol)
+}
+
+// PolicyValidate parses all fragments and reports structural errors.
+// In text mode (default), prints a short status line. In JSON mode, emits a
+// structured object compatible with the convention from `vault doctor --json`
+// (raw json.NewEncoder output to stdout, no envelope; errors surface via the
+// returned *Error which the caller reports to stderr with the appropriate
+// non-zero exit code).
+//
+// Returns nil on success (no policy enforced OR all fragments structurally
+// valid). Otherwise returns *Error with a distinct ExitCode per category.
+func PolicyValidate(jsonMode, silent bool, stdout, stderr io.Writer) *Error {
+	out := output.NewHandler(stdout, stderr, output.WithSilent(silent))
+
+	pol, _, err := policy.Load()
+	if err != nil {
+		if jsonMode {
+			cliErr := classifyPolicyError(err)
+			_ = writePolicyValidateJSON(stdout, policy.DefaultDir, false, 0, cliErr)
+			return cliErr
+		}
+		return classifyPolicyError(err)
+	}
+
+	if jsonMode {
+		dir := pol.Dir
+		if dir == "" {
+			dir = policy.DefaultDir
+		}
+		if writeErr := writePolicyValidateJSON(stdout, dir, true, len(pol.Fragments), nil); writeErr != nil {
+			return NewError(fmt.Sprintf("failed to encode json: %v", writeErr), ExitGeneralError)
+		}
+		return nil
+	}
+
 	if pol.Empty() {
 		out.Successf("no policy in effect (%s does not exist)", policy.DefaultDir)
 		return nil
 	}
-
 	out.Successf("policy valid (%d fragment(s) in %s)", len(pol.Fragments), pol.Dir)
 	return nil
 }
@@ -57,7 +75,8 @@ func PolicyValidate(silent bool, stdout, stderr io.Writer) *Error {
 // exit code per category, matching the convention of other dotsecenv commands.
 func classifyPolicyError(err error) *Error {
 	switch {
-	case errors.Is(err, policy.ErrInsecurePermissions):
+	case errors.Is(err, policy.ErrInsecurePermissions),
+		errors.Is(err, policy.ErrUnreadableFragment):
 		return NewError(err.Error(), ExitAccessDenied)
 	case errors.Is(err, policy.ErrEmptyAllowList):
 		return NewError(err.Error(), ExitGeneralError)
@@ -78,13 +97,24 @@ func writePolicyListText(out *output.Handler, p policy.Policy) *Error {
 
 	out.WriteLine(fmt.Sprintf("Policy directory: %s (%d fragment(s))", p.Dir, len(p.Fragments)))
 
-	algos, origins := p.MergedApprovedAlgorithms()
+	algos, algoOrigins := p.MergedApprovedAlgorithms()
 	if len(algos) > 0 {
 		out.WriteLine("  approved_algorithms:")
 		for i, a := range algos {
 			out.WriteLine(fmt.Sprintf("    - %s  %s",
 				formatAlgo(a),
-				formatOrigins(origins[i]),
+				formatOrigins(algoOrigins[i]),
+			))
+		}
+	}
+
+	vaultPatterns, vaultOrigins := p.MergedApprovedVaultPaths()
+	if len(vaultPatterns) > 0 {
+		out.WriteLine("  approved_vault_paths:")
+		for _, pat := range vaultPatterns {
+			out.WriteLine(fmt.Sprintf("    - %s  %s",
+				pat,
+				formatOrigins(vaultOrigins[pat]),
 			))
 		}
 	}
@@ -92,16 +122,23 @@ func writePolicyListText(out *output.Handler, p policy.Policy) *Error {
 	return nil
 }
 
-// writePolicyListJSON emits the effective policy as a JSON envelope.
-func writePolicyListJSON(out *output.Handler, p policy.Policy) *Error {
+// writePolicyListJSON emits the effective policy as raw JSON to stdout,
+// matching the convention from `vault describe --json` and `vault doctor --json`
+// (json.NewEncoder direct emission, no envelope wrapper).
+func writePolicyListJSON(stdout io.Writer, p policy.Policy) *Error {
 	type algoEntry struct {
 		Entry   config.ApprovedAlgorithm `json:"entry"`
 		Origins []string                 `json:"origins"`
 	}
+	type vaultEntry struct {
+		Pattern string   `json:"pattern"`
+		Origins []string `json:"origins"`
+	}
 	type listOutput struct {
-		Dir                string      `json:"dir,omitempty"`
-		Fragments          []string    `json:"fragments,omitempty"`
-		ApprovedAlgorithms []algoEntry `json:"approved_algorithms,omitempty"`
+		Dir                string       `json:"dir,omitempty"`
+		Fragments          []string     `json:"fragments,omitempty"`
+		ApprovedAlgorithms []algoEntry  `json:"approved_algorithms,omitempty"`
+		ApprovedVaultPaths []vaultEntry `json:"approved_vault_paths,omitempty"`
 	}
 
 	data := listOutput{}
@@ -112,19 +149,63 @@ func writePolicyListJSON(out *output.Handler, p policy.Policy) *Error {
 		for _, f := range p.Fragments {
 			data.Fragments = append(data.Fragments, filepath.Base(f.Path))
 		}
-		algos, origins := p.MergedApprovedAlgorithms()
+		algos, algoOrigins := p.MergedApprovedAlgorithms()
 		for i, a := range algos {
 			data.ApprovedAlgorithms = append(data.ApprovedAlgorithms, algoEntry{
 				Entry:   a,
-				Origins: basenames(origins[i]),
+				Origins: basenames(algoOrigins[i]),
+			})
+		}
+		vaultPatterns, vaultOrigins := p.MergedApprovedVaultPaths()
+		for _, pat := range vaultPatterns {
+			data.ApprovedVaultPaths = append(data.ApprovedVaultPaths, vaultEntry{
+				Pattern: pat,
+				Origins: basenames(vaultOrigins[pat]),
 			})
 		}
 	}
 
-	if err := out.WriteJSON(data, nil); err != nil {
-		return NewError(fmt.Sprintf("failed to write json: %v", err), ExitGeneralError)
+	encoder := json.NewEncoder(stdout)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(data); err != nil {
+		return NewError(fmt.Sprintf("failed to encode json: %v", err), ExitGeneralError)
 	}
 	return nil
+}
+
+// validateOutput is the JSON shape for `dotsecenv policy validate --json`.
+// Mirrors the vault-doctor pattern: a flat object on stdout, no envelope.
+// On failure, error.{code,message} is populated and `valid` is false.
+type validateOutput struct {
+	Dir           string         `json:"dir"`
+	Valid         bool           `json:"valid"`
+	FragmentCount int            `json:"fragment_count"`
+	Error         *validateError `json:"error,omitempty"`
+}
+
+type validateError struct {
+	ExitCode int    `json:"exit_code"`
+	Message  string `json:"message"`
+}
+
+// writePolicyValidateJSON emits the validate result as raw JSON to stdout.
+// When cliErr is non-nil, the error block is populated; valid is forced false.
+func writePolicyValidateJSON(stdout io.Writer, dir string, valid bool, fragmentCount int, cliErr *Error) error {
+	out := validateOutput{
+		Dir:           dir,
+		Valid:         valid,
+		FragmentCount: fragmentCount,
+	}
+	if cliErr != nil {
+		out.Valid = false
+		out.Error = &validateError{
+			ExitCode: int(cliErr.ExitCode),
+			Message:  cliErr.Message,
+		}
+	}
+	encoder := json.NewEncoder(stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(out)
 }
 
 func formatAlgo(a config.ApprovedAlgorithm) string {
@@ -147,6 +228,3 @@ func basenames(paths []string) []string {
 	}
 	return out
 }
-
-// Compile-time check: encoding/json must remain imported (used by WriteJSON envelope).
-var _ = json.Marshal

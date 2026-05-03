@@ -31,7 +31,10 @@ import (
 var DefaultDir = "/etc/dotsecenv/policy.d"
 
 // Sentinel errors returned by Load. Callers (e.g. dotsecenv policy validate)
-// use errors.Is to map these to distinct exit codes.
+// use errors.Is to map these to distinct exit codes. Any of these errors
+// from Load() is fatal: dotsecenv refuses to start until the offending
+// fragment is fixed or removed. Failing closed is the only safe behavior
+// when admin policy can't be parsed.
 var (
 	// ErrInsecurePermissions indicates a fragment file or the directory has
 	// group/other write bits set, or is owned by a non-root user.
@@ -49,6 +52,12 @@ var (
 	// ErrMalformedFragment indicates a fragment file could not be parsed as
 	// YAML.
 	ErrMalformedFragment = errors.New("malformed policy fragment")
+
+	// ErrUnreadableFragment indicates a fragment file could not be read
+	// (e.g. permission denied at open time, even though the directory
+	// listing exposed the file). Fail closed: a partially-readable policy
+	// directory is indistinguishable from tampering, so refuse to start.
+	ErrUnreadableFragment = errors.New("unreadable policy fragment")
 )
 
 // Policy is the loaded set of policy fragments. Fragments are stored raw so
@@ -65,7 +74,7 @@ func (p Policy) Empty() bool { return len(p.Fragments) == 0 }
 type Fragment struct {
 	Path               string                     `yaml:"-"` // populated by loader
 	ApprovedAlgorithms []config.ApprovedAlgorithm `yaml:"approved_algorithms,omitempty"`
-	// PR #2 will add: ApprovedVaultPaths []string
+	ApprovedVaultPaths []string                   `yaml:"approved_vault_paths,omitempty"`
 	// PR #3 will add: Behavior config.BehaviorConfig and GPG config.GPGConfig
 }
 
@@ -122,7 +131,7 @@ func loadFromDir(dir string, statFn func(string) (os.FileInfo, error)) (Policy, 
 
 		data, readErr := os.ReadFile(p)
 		if readErr != nil {
-			return Policy{}, nil, fmt.Errorf("read policy fragment %s: %w", p, readErr)
+			return Policy{}, nil, fmt.Errorf("%w: %s: %v", ErrUnreadableFragment, p, readErr)
 		}
 
 		if err := rejectForbiddenKeys(p, data); err != nil {
@@ -161,11 +170,15 @@ func rejectForbiddenKeys(path string, data []byte) error {
 	return nil
 }
 
-// rejectEmptyAllowLists guards against `approved_algorithms: []` (the
-// empty-list authoring bug). Omit the field or set actual entries.
+// rejectEmptyAllowLists guards against `approved_algorithms: []` and
+// `approved_vault_paths: []` (the empty-list authoring bug). Omit the
+// field or set actual entries.
 func rejectEmptyAllowLists(path string, f Fragment) error {
 	if f.ApprovedAlgorithms != nil && len(f.ApprovedAlgorithms) == 0 {
 		return fmt.Errorf("%w: %s sets approved_algorithms: [] (omit the field instead of setting an empty list)", ErrEmptyAllowList, path)
+	}
+	if f.ApprovedVaultPaths != nil && len(f.ApprovedVaultPaths) == 0 {
+		return fmt.Errorf("%w: %s sets approved_vault_paths: [] (omit the field instead of setting an empty list)", ErrEmptyAllowList, path)
 	}
 	return nil
 }

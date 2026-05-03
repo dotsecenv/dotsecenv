@@ -106,9 +106,16 @@ func loadConfigAndPrepareGPG(configPath string, silent bool, stdin io.Reader, st
 		return nil, NewError(fmt.Sprintf("failed to load config: %v", err), ExitConfigError)
 	}
 
+	// Fail closed: any error loading policy aborts startup. A partially
+	// readable or malformed policy directory is indistinguishable from
+	// tampering; the only safe behavior is to refuse to run. Use the same
+	// classification as `dotsecenv policy validate` so users see consistent
+	// exit codes (e.g. ExitAccessDenied for unreadable / insecure perms,
+	// ExitConfigError for malformed / forbidden, ExitGeneralError for
+	// empty allow-list).
 	pol, polLoadWarnings, polLoadErr := policy.Load()
 	if polLoadErr != nil {
-		return nil, NewError(fmt.Sprintf("failed to load policy: %v", polLoadErr), ExitConfigError)
+		return nil, classifyPolicyError(polLoadErr)
 	}
 
 	var polApplyWarnings []string
@@ -163,6 +170,21 @@ func newCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader
 
 	// If -v flags were provided, use those paths directly
 	if len(vaultPaths) > 0 {
+		// Policy filter: explicit -v paths must match approved_vault_paths
+		// (when policy constrains them). Reject — don't silently drop —
+		// since the user explicitly asked for these paths.
+		if !cli.policy.Empty() {
+			for _, vp := range vaultPaths {
+				if !cli.policy.IsVaultPathAllowed(vp) {
+					polPatterns, _ := cli.policy.MergedApprovedVaultPaths()
+					return nil, NewError(fmt.Sprintf(
+						"vault path %s is not allowed by policy. Allowed patterns: %v",
+						vp, polPatterns,
+					), ExitAccessDenied)
+				}
+			}
+		}
+
 		// Check if overriding config vaults with NEW vaults
 		shouldWarnOrError := false
 		if len(cfg.Vault) > 0 {
