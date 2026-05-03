@@ -32,6 +32,8 @@ COMMANDS:
   vault describe [--json]       Describe vaults with identities and secrets
   vault doctor [--json] [--fix] Run health checks and fix issues
   validate                      Validate vault and config
+  policy list [--json]          Print the effective system policy
+  policy validate               Validate policy fragments under /etc/dotsecenv/policy.d/
   version                       Show version information
 
 ENVIRONMENT:
