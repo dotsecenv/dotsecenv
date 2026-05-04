@@ -69,23 +69,20 @@ The default configuration uses FIPS 186-5 compliant algorithm minimums: RSA 2048
 
 | Flag | Description |
 |------|-------------|
-| `--gpg-program PATH` | Set gpg.program to this path (without validation) |
-| `--no-gpg-program` | Skip GPG detection (leave gpg.program empty) |
+| `--gpg-program PATH` | Set `gpg.program` to this absolute path (without validation). Defaults to `PATH`, which resolves the gpg binary from the system `PATH` at runtime. |
 | `--login FINGERPRINT` | Initialize config with specified fingerprint |
 
 **Examples:**
 
 ```bash
-# Create default config (FIPS-compliant by default)
+# Create default config (FIPS-compliant by default).
+# gpg.program is set to "PATH" (resolved from system PATH at runtime).
 dotsecenv init config
 
 # Create config at custom location
 dotsecenv init config -c ~/my-project/dotsecenv.yaml
 
-# Skip GPG detection (for systems without GPG)
-dotsecenv init config --no-gpg-program
-
-# Set GPG path explicitly
+# Pin GPG to an absolute path (skips runtime PATH lookup)
 dotsecenv init config --gpg-program /usr/local/bin/gpg
 
 # Initialize with login fingerprint
