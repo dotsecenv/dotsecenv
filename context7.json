@@ -1,0 +1,34 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "dotsecenv",
+  "description": "Go CLI for securely managing environment secrets with GPG-based encryption, multi-user support, and FIPS 186-5 compliant defaults.",
+  "folders": [],
+  "excludeFolders": [
+    "vendor",
+    "internal",
+    "cmd",
+    "pkg",
+    "scripts",
+    ".github",
+    ".vscode",
+    ".claude-plugin"
+  ],
+  "excludeFiles": [
+    "go.mod",
+    "go.sum",
+    ".goreleaser.yaml",
+    "lefthook.yml",
+    "renovate.json",
+    "Makefile",
+    ".mise.toml",
+    ".mise.local.toml"
+  ],
+  "rules": [
+    "Vault files use the .secenv extension and are GPG-encrypted",
+    "Use the dotsecenv CLI to init, store, retrieve, share, and revoke secrets",
+    "Recipients are GPG public keys; users must hold the corresponding secret key in gpg-agent to decrypt",
+    "Policy fragments live in /etc/dotsecenv/policy.d/*.yaml and load in lexical order (00-base, 50-team, 99-overrides)",
+    "FIPS 186-5 compliant algorithms are the default; review approved_algorithms policy when integrating in regulated environments"
+  ],
+  "previousVersions": []
+}
