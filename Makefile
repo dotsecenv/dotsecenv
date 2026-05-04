@@ -161,9 +161,18 @@ demo: build
 	fi && \
 	echo "Generating GPG key for demo (via dotsecenv identity create)..." && \
 	HOME="$$DEMO_HOME" GNUPGHOME="$$DEMO_HOME/.gnupg" "$$DEMO_HOME/bin/dotsecenv" identity create --no-passphrase --name "Demo User" --email "demo@dotsecenv" && \
+	if [ -d ../website/public ]; then \
+		DEMO_OUT="$$(cd ../website/public && pwd)/demo.cast"; \
+	else \
+		DEMO_OUT="$$(pwd)/demo.cast"; \
+	fi && \
 	echo "" && \
-	echo "Demo environment ready at: $$DEMO_HOME" && \
-	echo "To record (asciinema v3+): asciinema rec -c 'HOME=$$DEMO_HOME bash $$DEMO_HOME/demos/demo.sh' --overwrite <output.cast>" && \
+	echo "Demo environment ready at:   $$DEMO_HOME" && \
+	echo "Recording will be saved to:  $$DEMO_OUT" && \
+	echo "                             (outside the sandbox so it survives cleanup)" && \
+	echo "" && \
+	echo "To record (asciinema v3+), paste:" && \
+	echo "  asciinema rec -c 'HOME=$$DEMO_HOME bash $$DEMO_HOME/demos/demo.sh' --overwrite '$$DEMO_OUT'" && \
 	echo "" && \
 	echo "Entering demo shell (type 'exit' when done)..." && \
 	cd "$$DEMO_HOME" && \
@@ -174,6 +183,7 @@ demo: build
 	XDG_DATA_HOME="$$DEMO_HOME/.local/share" \
 	XDG_STATE_HOME="$$DEMO_HOME/.local/state" \
 	XDG_CACHE_HOME="$$DEMO_HOME/.cache" \
+	DEMO_OUT="$$DEMO_OUT" \
 	bash -i && \
 	echo "Cleaning up $$DEMO_HOME" && \
 	rm -rf "$$DEMO_HOME"
