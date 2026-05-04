@@ -1,0 +1,69 @@
+# /etc/dotsecenv/policy.d/00-corp-baseline.yaml
+#
+# Org-wide baseline policy. Every dotsecenv user on this machine is
+# constrained by the union of the fragments in /etc/dotsecenv/policy.d/.
+# Lower-numbered files load first; for scalar fields ("last fragment to set
+# wins" — see 99-team-overrides.yaml) higher-numbered files override them.
+#
+# Required permissions for this file (and the parent directory):
+#   - Owned by root:root
+#   - Mode 0644 (or 0640) for files; 0755 for /etc/dotsecenv/policy.d/
+#   - NOT group-writable, NOT other-writable
+# dotsecenv refuses to start if the policy directory has insecure perms.
+
+# --- Allow-listed crypto algorithms ----------------------------------------
+#
+# Cross-fragment merge: union (most-permissive). Same-`algo` entries collapse:
+# curves take the union, min_bits takes the minimum.
+#
+# User vs policy: intersection. The user's `approved_algorithms` is narrowed
+# to the entries that also pass policy. Users can be stricter locally; users
+# cannot exceed the policy.
+#
+# This baseline matches FIPS 186-5: P-384/P-521 ECC, Ed25519/Ed448 EdDSA,
+# RSA >= 3072. Notably stricter than the dotsecenv default (RSA >= 2048).
+approved_algorithms:
+  - algo: ECC
+    curves:
+      - P-384
+      - P-521
+    min_bits: 384
+  - algo: EdDSA
+    curves:
+      - Ed25519
+      - Ed448
+    min_bits: 255
+  - algo: RSA
+    min_bits: 3072
+
+# --- Allow-listed vault locations ------------------------------------------
+#
+# Cross-fragment merge: deduped union of patterns.
+#
+# User vs policy: intersection. The user's `vault:` entries are filtered to
+# those matching at least one pattern below. Explicit `-v` flags pointing at
+# unmatched paths are REJECTED (not silently dropped).
+#
+# Pattern syntax: path/filepath.Match (single-segment globs `*`, `?`,
+# `[abc]`); `~` expands to the invoking user's home. There is no recursive
+# `**` glob; enumerate or use single-segment patterns.
+approved_vault_paths:
+  - ~/.local/share/dotsecenv/vault   # the install.sh default
+  - ~/work/*/.dotsecenv/vault         # one project per top-level work dir
+
+# --- Behaviour flags -------------------------------------------------------
+#
+# `behavior.*` is a set of independent scalar booleans. Cross-fragment merge:
+# last-set-wins per sub-field, in lexical filename order. A later fragment
+# can override one sub-field without disturbing the others.
+#
+# User vs policy: policy wins. If policy sets a behavior, the user's value
+# is replaced (and a stderr warning is emitted unless -s).
+behavior:
+  # Forbid CLI -v paths outside `vault:` in the user config.
+  # Combined with `approved_vault_paths` above this gives admins a tight
+  # leash on where vaults can live.
+  restrict_to_configured_vaults: true
+  # Require a one-time `dotsecenv vault doctor` to upgrade vault format
+  # rather than upgrading silently on first read.
+  require_explicit_vault_upgrade: true

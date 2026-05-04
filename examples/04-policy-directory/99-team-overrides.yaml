@@ -1,0 +1,26 @@
+# /etc/dotsecenv/policy.d/99-team-overrides.yaml
+#
+# Late-loading fragment that overrides the corporate baseline's scalar
+# settings for this team. Naming convention follows /etc/sudoers.d,
+# /etc/systemd/system/<unit>.d/, /etc/nginx/conf.d/ etc.: `00-` for
+# org-wide baselines, `50-` for team policy, `99-` for last-mile overrides.
+#
+# Allow-list fields (approved_algorithms, approved_vault_paths) merge across
+# fragments by UNION; you cannot remove an entry the baseline added. Scalar
+# fields (gpg.program, behavior.*) merge by LAST-FRAGMENT-WINS in lexical
+# filename order — `99-` outranks `00-`.
+
+# --- Pin GPG to the team's known-good binary -------------------------------
+#
+# `gpg.program` is a scalar. With this fragment present, every dotsecenv
+# command on the machine resolves `gpg` through this exact path, regardless
+# of what the user has in their config or PATH. That gives admins one place
+# to flip when patching CVEs in GnuPG.
+gpg:
+  program: /usr/bin/gpg
+
+# Allow-list additions stack onto whatever 00-corp-baseline.yaml declared:
+# users can use vaults on a personal-projects path in addition to
+# the corporate `~/work/...` glob.
+approved_vault_paths:
+  - ~/personal/dotsecenv/vault

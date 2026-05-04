@@ -1,0 +1,114 @@
+# =============================================================================
+# .secenv — reference example
+#
+# A `.secenv` file lives in a project directory and is loaded by the
+# dotsecenv shell plugin (zsh, bash, fish) when you `cd` into that
+# directory. It looks like a `.env` file with one extension: a value can be
+# a `{dotsecenv...}` placeholder that the plugin replaces with a decrypted
+# secret from a dotsecenv vault.
+#
+# Lines fall into one of three buckets:
+#   - `KEY=value`          plain export, exactly like `.env`
+#   - `KEY={dotsecenv...}` secret reference, resolved at load time via
+#                          `dotsecenv secret get`
+#   - blank / `# ...`      ignored
+#
+# Loading is two-phase:
+#   1. All plain `KEY=value` lines export first (so they're available to any
+#      tool that reads env on `cd`).
+#   2. All `{dotsecenv...}` placeholders resolve via the CLI in a second pass.
+#
+# Ancestor `.secenv` files load too: if `/project/.secenv` and
+# `/project/services/api/.secenv` both exist, entering
+# `/project/services/api/` loads both, with child values shadowing parents.
+#
+# This file demonstrates every supported syntax. Copy what you need into
+# your real `.secenv`; chmod the result to 600 so the plugin trusts it.
+#
+# Reference: skills/secenv/SKILL.md in this repo, and
+#            https://dotsecenv.com/guides/shell-plugins/
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. Plain values. Exported first, before any secret resolution. Suitable
+#    for non-sensitive config that everyone on the team agrees on.
+# -----------------------------------------------------------------------------
+
+APP_NAME=my-application
+APP_ENV=development
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+
+# Quoted strings: the surrounding " or ' is stripped on load. Use quotes
+# when the value contains spaces or characters the shell would otherwise
+# interpret.
+DESCRIPTION="My Application — runs on the dev box"
+SINGLE_QUOTED='Has spaces and a literal $variable that wont expand'
+
+
+# -----------------------------------------------------------------------------
+# 2. Secret references. Phase-2 placeholders that the plugin resolves by
+#    calling the dotsecenv CLI.
+#
+#    Syntax:                            Means:
+#      KEY={dotsecenv}                  Fetch the secret named KEY (same name
+#                                       as the env var)
+#      KEY={dotsecenv/}                 Same as above (empty after the slash)
+#      KEY={dotsecenv/SECRET_NAME}      Fetch the secret named SECRET_NAME and
+#                                       export it as KEY
+#      KEY={dotsecenv/ns::SECRET_NAME}  Namespaced lookup (`ns::SECRET_NAME` is
+#                                       the canonical secret key)
+#
+#    Constraints:
+#      - Only ONE `/` is allowed inside `{dotsecenv/...}`. A second `/` is
+#        a parse error.
+#      - Variable names must match `^[A-Za-z_][A-Za-z0-9_]*$`.
+#      - Secret keys are namespace::KEY_NAME; namespace lowercases, key
+#        UPPERCASES on store.
+# -----------------------------------------------------------------------------
+
+# 2a. Same-name reference (most common). Both forms below are equivalent.
+DATABASE_PASSWORD={dotsecenv}
+SLACK_WEBHOOK_URL={dotsecenv/}
+
+# 2b. Explicit-name reference. The env var name and the secret key differ.
+#     This is what you use when one secret is reused under different env
+#     names, e.g. `STRIPE_SECRET_KEY` in dev where the variable the SDK
+#     wants is `STRIPE_API_KEY`.
+STRIPE_API_KEY={dotsecenv/STRIPE_SECRET_KEY}
+
+# 2c. Namespaced reference. Use when one project has multiple environments
+#     in the same vault. Stored as `prod::DB_PASSWORD`, exported here as
+#     a named-after-it variable.
+PROD_DB_PASSWORD={dotsecenv/prod::DB_PASSWORD}
+
+# 2d. Combine: plain values that depend on a secret can use `${VAR}` AFTER
+#     phase-2 resolves. dotsecenv does NOT do this expansion for you — the
+#     shell does, when something downstream (your tool) reads the env. If
+#     you need shell expansion at load time, set it in your shell rc, not
+#     here.
+# DATABASE_URL=postgres://app:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT}/app
+
+
+# -----------------------------------------------------------------------------
+# 3. Comments and blank lines. Lines starting with `#` are skipped. Blank
+#    lines are skipped. Inline `# trailing` comments are NOT supported —
+#    everything after the `=` is part of the value.
+# -----------------------------------------------------------------------------
+
+
+# -----------------------------------------------------------------------------
+# 4. File permissions. The plugin refuses to load a `.secenv` that:
+#      - is not owned by you (or root), or
+#      - is world-writable (`other` write bit set), or
+#      - lives in a directory you have not trusted.
+#
+#    First load in a directory prompts you to trust it. Set permissions
+#    explicitly:
+#
+#      chmod 600 .secenv
+#
+#    The plugin's stricter `set -e`-on-untrusted behaviour is documented at
+#    https://dotsecenv.com/guides/shell-plugins/#trust-model .
+# -----------------------------------------------------------------------------
