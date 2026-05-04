@@ -742,10 +742,10 @@ dotsecenv validate -v ./project/vault
 Inspect and validate the system-wide policy directory at `/etc/dotsecenv/policy.d/`. See [Policy Directory](/concepts/policy-directory/) for the full design.
 
 <Aside type="note" title="Available in v0.6.0+">
-  Introduced in **v0.6.0**. Not available on earlier versions.
+  Introduced in v0.6.0.
 </Aside>
 
-Both subcommands are standalone — they don't load the user config or open vaults, so they keep working when policy is broken (which is exactly when you need them).
+Both subcommands are standalone. They don't load the user config or open vaults, so they keep working when the policy itself is broken, which is when you most need to inspect it.
 
 ```bash
 dotsecenv policy <subcommand> [flags]
