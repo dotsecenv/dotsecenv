@@ -151,8 +151,6 @@ making changes that look like they might violate them.
   `pkg/dotsecenv/vault/integration_test.go` and
   `cmd/dotsecenv/security_test.go` lock these in — if your change requires
   changing those tests, surface that explicitly in the PR.
-- **Don't run `make demo` unattended.** It generates a real GPG key in a
-  temp HOME and starts an interactive shell.
 - **Don't alter the hermetic E2E harness so it can reach the network.** The
   whole point is the strace assertion in `.github/workflows/hermetic-e2e.yml`
   proving zero external `connect()` calls.
