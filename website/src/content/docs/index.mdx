@@ -30,6 +30,7 @@ import {
   Steps,
   Aside,
 } from "@astrojs/starlight/components";
+import AsciinemaPlayer from "../../components/AsciinemaPlayer.astro";
 
 ## Why dotsecenv?
 
@@ -180,6 +181,14 @@ Once installed, you're three commands away from your first encrypted secret.
 </Steps>
 
 **That's it!** Your secret is encrypted at rest and can travel safely in version control.
+
+---
+
+## See it in action
+
+The end-to-end flow: initialize dotsecenv, store a secret, define a `.secenv` file with a `{dotsecenv}` placeholder, and watch the shell plugin load the decrypted value into your environment as you `cd` in.
+
+<AsciinemaPlayer src="/demo.cast" idleTimeLimit={1.5} />
 
 ---
 
