@@ -24,11 +24,16 @@
     ".mise.local.toml"
   ],
   "rules": [
-    "Vault files use the .secenv extension and are GPG-encrypted",
-    "Use the dotsecenv CLI to init, store, retrieve, share, and revoke secrets",
-    "Recipients are GPG public keys; users must hold the corresponding secret key in gpg-agent to decrypt",
-    "Policy fragments live in /etc/dotsecenv/policy.d/*.yaml and load in lexical order (00-base, 50-team, 99-overrides)",
-    "FIPS 186-5 compliant algorithms are the default; review approved_algorithms policy when integrating in regulated environments"
+    "Vault files have the .secenv extension and are GPG-encrypted, append-only signed JSONL. Each line is one entry; old entries are never mutated.",
+    "Add or update a secret with: echo VALUE | dotsecenv secret store NAME. There is no separate add/update command; store is the only write.",
+    "Inspect history with: dotsecenv vault describe (or --json). Read the latest value with secret get NAME, all historical values with secret get NAME --all.",
+    "Symmetric encryption is AES-256-GCM (RFC 9580 / NIST SP 800-38D) by default — FIPS-compliant out of the box. Enforce specific algorithms via /etc/dotsecenv/policy.d/*.yaml approved_algorithms (lexical load order: 00-base, 50-team, 99-overrides; allow-list fields union).",
+    "Recipients are GPG public-key fingerprints. Users must hold the matching private key in gpg-agent to decrypt.",
+    "Add a recipient with: dotsecenv secret share NAME FINGERPRINT [--all]. Remove with: dotsecenv secret revoke NAME FINGERPRINT [--all]. --all spans every vault that already contains NAME. Both operations affect FUTURE writes only — past entries are unchanged.",
+    "Rotate a compromised GPG key: revoke the compromised fingerprint per affected secret, share to a replacement fingerprint, then ROTATE THE UNDERLYING SECRET AT ITS SOURCE (new DB password, new API key, etc.) and re-store. The leaked key still decrypts past entries in the vault file and git history; only upstream rotation makes the old value safe.",
+    "There is no .env file import. Migrate by running secret store per key, then load values at runtime via the shell plugin: a .secenv file with KEY=value lines and {dotsecenv} or {dotsecenv/EXPLICIT_NAME} placeholders, chmod 600.",
+    "CI/CD: install via the official GitHub Action (action.yml in this repo) or the install.sh script; import a CI-only GPG key, dotsecenv login, then dotsecenv secret get NAME. Grant CI keys the minimum recipient set with secret share --all.",
+    "Vaults are designed to be committed to git. The threat model assumes the encrypted file is public; security comes from controlling who holds the GPG private keys."
   ],
   "previousVersions": []
 }
