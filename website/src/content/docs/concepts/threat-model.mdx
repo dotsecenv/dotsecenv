@@ -14,7 +14,7 @@ This document describes what threats dotsecenv protects against and its security
 The primary threat model. Secrets are encrypted in the vault file, so committing it doesn't expose plaintext.
 
 ```bash
-git add vault   # Safe—secrets are encrypted
+git add vault   # Safe: secrets are encrypted
 git push        # Only encrypted blobs pushed
 ```
 
@@ -67,7 +67,7 @@ warning: decrypting in non-interactive terminal; for better security, configure 
 ```
 
 <Aside type="caution" title="Not a Security Boundary">
-  This warning is for **awareness only**—dotsecenv does not block non-TTY access. TTY detection is trivially bypassed by attackers with code execution (e.g., using `script`, `unbuffer`, or allocating a PTY programmatically).
+  This warning is for awareness only. dotsecenv does not block non-TTY access. TTY detection is trivially bypassed by attackers with code execution (e.g., using `script`, `unbuffer`, or allocating a PTY programmatically).
 
 An attacker can also bypass dotsecenv entirely by discovering your GPG key fingerprint from the vault and calling GPG directly.
 
@@ -99,9 +99,9 @@ AI agent Bash tools typically spawn subprocesses with `stdin` connected to `/dev
 | `pinentry-tty` | **No** | Requires terminal input; fails with "Operation cancelled" when there is no controlling terminal |
 | `pinentry-curses` | **No** | Requires terminal input; fails with "Inappropriate ioctl for device" |
 
-Terminal-based pinentry programs (`pinentry-tty`, `pinentry-curses`) fail because the agent's subprocess has no controlling terminal — `/dev/tty` returns "Device not configured". Even when `GPG_TTY` is set to the parent terminal, the agent's terminal renderer is already reading from that device, creating input contention.
+Terminal-based pinentry programs (`pinentry-tty`, `pinentry-curses`) fail because the agent's subprocess has no controlling terminal. `/dev/tty` returns "Device not configured". Even when `GPG_TTY` is set to the parent terminal, the agent's terminal renderer is already reading from that device, creating input contention.
 
-GUI-based pinentry programs work because they open their own window, independent of terminal state. When the passphrase is already cached (in gpg-agent memory, macOS Keychain, or GNOME Keyring), the GUI dialog never appears — the passphrase is returned silently.
+GUI-based pinentry programs work because they open their own window, independent of terminal state. When the passphrase is already cached (in gpg-agent memory, the macOS Keychain, or GNOME Keyring), the GUI dialog never appears. The passphrase is returned silently.
 
 **The critical risk: once cached, any process can decrypt.** When a passphrase is cached in gpg-agent or an OS keychain, any process running as your user can invoke `gpg --decrypt` without interaction. This includes AI agents, build scripts, postinstall hooks, and malicious dependencies.
 
@@ -125,10 +125,10 @@ The macOS Login Keychain unlocks when the user logs in and remains accessible to
 secret-tool lookup xdg:schema org.gnupg.Passphrase
 ```
 
-GNOME Keyring and KDE Wallet have similar session-scoped unlocking — once unlocked at login, any user process can query stored items via D-Bus.
+GNOME Keyring and KDE Wallet have similar session-scoped unlocking. Once unlocked at login, any user process can query stored items via D-Bus.
 
 <Aside type="danger" title="Blast Radius">
-  Once a key's passphrase is extracted or cached, **all** files encrypted to that key become decryptable. In dotsecenv terms, every secret in every vault encrypted to your key is exposed — not just individual secrets.
+  Once a key's passphrase is extracted or cached, **all** files encrypted to that key become decryptable. In dotsecenv terms, every secret in every vault encrypted to your key is exposed, not just individual secrets.
 </Aside>
 
 #### Preventing Keychain Passphrase Storage
@@ -205,11 +205,11 @@ no-allow-external-cache
 
 #### Hardware Token Defense
 
-For keys protecting high-value secrets, use a hardware token (YubiKey, Nitrokey, etc.) configured to require **physical touch** for each cryptographic operation. This is the strongest defense against automated exfiltration because:
+For keys protecting high-value secrets, use a hardware token (YubiKey, Nitrokey, etc.) configured to require **physical touch** for each cryptographic operation. This is the strongest defense against automated exfiltration:
 
-- No passphrase is stored in software — the private key never leaves the hardware
-- Each operation requires physical presence (touch the device)
-- Software-only attacks cannot bypass the touch requirement
+- No passphrase is stored in software. The private key never leaves the hardware.
+- Each operation requires physical presence (a touch on the device).
+- Software-only attacks cannot bypass the touch requirement.
 
 ### Protecting .secenv Files
 

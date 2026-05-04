@@ -7,12 +7,7 @@ import { Aside } from '@astrojs/starlight/components';
 
 ## Vault Structure
 
-The vault is a JSONL (JSON Lines) file where each line is a self-contained JSON entry. This append-only format enables:
-
-- Safe concurrent git merges
-- Efficient incremental updates
-- Complete audit trail
-- Simple conflict resolution
+The vault is a JSONL (JSON Lines) file where each line is a self-contained JSON entry. The append-only format gives you safe concurrent git merges, efficient incremental updates, a complete audit trail, and simple conflict resolution.
 
 ### File Format
 
@@ -129,18 +124,11 @@ An identity represents a user who can access secrets. Each identity is:
 
 ## Secret Model
 
-A secret has two components:
+A secret has two components: a definition (name, creator, timestamps) and one or more values (encrypted versions of the actual value).
 
-1. **Secret Definition** — Name, creator, timestamps
-2. **Secret Values** — Encrypted versions of the actual value
+### Why split definition from value?
 
-### Why Separate?
-
-This separation enables:
-
-- Multiple values per secret (version history)
-- Different access per value (sharing/revoking)
-- Audit trail of who changed what when
+The split lets you keep multiple values per secret (version history), grant or revoke access on a per-value basis, and reconstruct who changed what when from the audit trail.
 
 ### Namespaces
 
@@ -152,11 +140,7 @@ staging::DATABASE_URL   → Staging database URL
 api::JWT_SECRET         → API service JWT secret
 ```
 
-Benefits:
-
-- Environment isolation
-- Organizational clarity
-- Bulk operations (`prod::*`)
+Namespaces give you environment isolation, organizational clarity, and bulk operations like `prod::*`.
 
 ---
 
@@ -237,7 +221,7 @@ The old entry remains in the vault. The revoked user can still decrypt the **old
 
 ## Append-Only Design
 
-The vault never modifies existing entries—only appends:
+The vault never modifies existing entries. Every operation appends:
 
 | Operation | Action |
 |-----------|--------|
@@ -249,25 +233,21 @@ The vault never modifies existing entries—only appends:
 
 ### Benefits
 
-1. **Audit trail** — Full history preserved
-2. **Git-friendly** — No conflicts from concurrent edits
-3. **Crash-safe** — Partial writes don't corrupt existing data
-4. **Simple merge** — Just concatenate and dedupe
+- Full history is preserved as an audit trail
+- Concurrent edits don't conflict in git (each operation is its own line)
+- A partial write can't corrupt existing data
+- Merging two vaults is concatenate-and-dedupe
 
 ### Defragmentation
 
 Over time, the vault accumulates obsolete entries. The `vault doctor` command checks vault health and can defragment it:
 
 ```bash
-dotsecenv vault doctor        # interactive — prompts before fixing
+dotsecenv vault doctor        # interactive, prompts before fixing
 dotsecenv vault doctor --fix  # auto-fix without prompting
 ```
 
-After displaying health checks, doctor offers to defragment if needed (or applies fixes automatically with `--fix`). This removes:
-
-- Old value entries (keeps latest per recipient set)
-- Obsolete entries
-- Duplicate entries
+After displaying health checks, `doctor` offers to defragment (or applies fixes automatically with `--fix`). Defragmentation removes old value entries (keeping the latest per recipient set), obsolete entries, and duplicates.
 
 <Aside type="note">
 Defragmentation loses historical values. Run only when you're sure you don't need the history.

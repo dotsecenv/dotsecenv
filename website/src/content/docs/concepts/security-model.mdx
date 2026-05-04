@@ -47,12 +47,12 @@ key strength.
 
 Asymmetric encryption (RSA/ECC) is slow for large data. Symmetric encryption (AES) is fast but requires secure key exchange.
 
-Hybrid encryption gets the best of both:
+Hybrid encryption combines the two:
 
-1. Generate a random **session key** (fast)
-2. Encrypt data with **AES-256-GCM** using session key (fast, authenticated)
-3. Encrypt session key with each **recipient's public key** (slow, but small data)
-4. Sign the result with **originator's private key** (authenticity)
+1. Generate a random session key (fast)
+2. Encrypt the data with AES-256-GCM under the session key (fast, authenticated)
+3. Encrypt the session key with each recipient's public key (slow, but the payload is small)
+4. Sign the result with the originator's private key (authenticity)
 
 ### Multi-Recipient Efficiency
 
@@ -88,7 +88,7 @@ dotsecenv cryptographic operations align with the following NIST and IETF standa
 
 ### Symmetric Encryption
 
-**[RFC 9580](https://www.rfc-editor.org/rfc/rfc9580.html)** — OpenPGP (2024 revision)
+**[RFC 9580](https://www.rfc-editor.org/rfc/rfc9580.html)** (OpenPGP, 2024 revision)
 
 - Mandates AEAD (Authenticated Encryption with Associated Data)
 - AES-256-GCM as the default symmetric cipher
@@ -104,7 +104,7 @@ dotsecenv cryptographic operations align with the following NIST and IETF standa
   may be encountered.
 </Aside>
 
-**[NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final)** — GCM Mode
+**[NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final)** (GCM Mode)
 
 - Specifies Galois/Counter Mode for AES
 - Provides both confidentiality and authenticity
@@ -112,7 +112,7 @@ dotsecenv cryptographic operations align with the following NIST and IETF standa
 
 ### Digital Signatures
 
-**[FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final)** — Digital Signature Standard (2023)
+**[FIPS 186-5](https://csrc.nist.gov/pubs/fips/186-5/final)** (Digital Signature Standard, 2023)
 
 - Approves RSA, ECDSA, and EdDSA for digital signatures
 - Deprecates DSA (removed from dotsecenv's approved algorithms)
@@ -120,13 +120,13 @@ dotsecenv cryptographic operations align with the following NIST and IETF standa
 
 Vault entries are signed using FIPS 186-5 compliant algorithms:
 
-- **RSA** — RSASSA-PKCS1-v1_5 or RSASSA-PSS (2048-bit minimum)
-- **ECDSA** — P-384, P-521 curves
-- **EdDSA** — Ed25519 for performance, Ed448 for higher security
+- RSA: RSASSA-PKCS1-v1_5 or RSASSA-PSS (2048-bit minimum)
+- ECDSA: P-384 or P-521 curves
+- EdDSA: Ed25519 for performance, Ed448 for higher security
 
 ### Cryptographic Modules
 
-**[FIPS 140-3](https://csrc.nist.gov/pubs/fips/140-3/final)** — Security Requirements for Cryptographic Modules
+**[FIPS 140-3](https://csrc.nist.gov/pubs/fips/140-3/final)** (Security Requirements for Cryptographic Modules)
 
 - Default configuration enforces FIPS-compliant algorithm minimums
 - Actual compliance depends on underlying GPG/libgcrypt installation
@@ -197,15 +197,15 @@ dotsecenv validate
 
 ### Why Hermetic Testing Matters
 
-A secrets management tool that "phones home" or makes unexpected network connections poses a severe security risk. To address this concern, dotsecenv's CI pipeline includes **hermetic e2e testing** with dual independent verification:
+A secrets management tool that "phones home" or makes unexpected network connections is a severe risk. dotsecenv's CI pipeline includes hermetic e2e testing with two independent verifications:
 
-1. **Vendored Dependencies**: Go modules are vendored, eliminating network requirements during build
-2. **Dual Verification**: Two independent parallel jobs verify zero network connections:
-   - [step-security/harden-runner](https://github.com/step-security/harden-runner) - blocks egress at kernel level
-   - Network namespace + strace - traces all network syscalls in isolated namespace
-3. **Defense in Depth**: If one method has a bug, the other catches any violations
-4. **Auditable Artifacts**: Job summaries AND downloadable syscall traces
-5. **Release Gate**: Releases are blocked if hermetic tests fail
+1. Vendored dependencies. Go modules are vendored, so the build needs no network.
+2. Dual verification. Two parallel jobs check that zero network connections happen:
+   - [step-security/harden-runner](https://github.com/step-security/harden-runner) blocks egress at the kernel level
+   - A network namespace plus `strace` traces every network syscall in isolation
+3. Defense in depth. If one method has a bug, the other still catches violations.
+4. Auditable artifacts. Job summaries and downloadable syscall traces.
+5. Release gate. Releases are blocked if hermetic tests fail.
 
 ### How It Works
 
