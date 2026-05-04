@@ -16,13 +16,13 @@ dotsecenv works seamlessly alongside `.env` files. Use `.env` for non-sensitive 
 ### Recommended Setup
 
 ```bash
-# .env — Non-sensitive configuration
+# .env: non-sensitive configuration
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_NAME=myapp
 LOG_LEVEL=debug
 
-# .secenv — Encrypted secrets from vault
+# .secenv: encrypted secrets from vault
 DATABASE_PASSWORD={dotsecenv}
 API_KEY={dotsecenv/prod::API_KEY}
 ```
@@ -88,7 +88,7 @@ Move sensitive values from a plaintext `.env` to encrypted storage.
    echo ".env" >> .gitignore
    ```
 
-6. **Commit .secenv** (safe—it contains no secrets)
+6. **Commit .secenv** (safe to commit; it contains no secrets)
 
    ```bash
    git add .secenv
@@ -258,7 +258,7 @@ v0.4 changed the hash computation format to improve security (prevents value tra
 
 1. **Re-sign your secret values**
 
-   Each user must re-sign their own values—you cannot edit another user's secret values:
+   Each user must re-sign their own values. You cannot edit another user's secret values:
 
    ```bash
    # List all secrets
@@ -272,7 +272,7 @@ v0.4 changed the hash computation format to improve security (prevents value tra
 
 2. **Remove old values from the vault file**
 
-   Edit the vault file manually and delete the old value entries that no longer validate. Each secret may have multiple values—keep only the newly signed ones.
+   Edit the vault file manually and delete the old value entries that no longer validate. Each secret may have multiple values; keep only the newly signed ones.
 
 3. **Commit the updated vault**
 
@@ -486,9 +486,9 @@ All vaults are up to date.
 
 The `doctor` command performs these checks:
 
-- **GPG agent availability** — verifies gpg-agent is running
-- **Vault format version** — checks if vaults need upgrading
-- **Vault fragmentation** — checks if defragmentation is needed
+- GPG agent availability: verifies that gpg-agent is running
+- Vault format version: checks whether vaults need upgrading
+- Vault fragmentation: checks whether defragmentation is needed
 
 After displaying health check results, doctor offers to fix any issues found (upgrade outdated vaults, defragment fragmented vaults).
 

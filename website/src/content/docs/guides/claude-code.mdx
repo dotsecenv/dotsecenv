@@ -35,8 +35,8 @@ Install the dotsecenv plugin for [Claude Code](https://claude.ai/claude-code) so
 
    This registers two skills:
 
-   - `/dotsecenv:secrets` — manages secrets via the dotsecenv CLI (store, get, share, revoke)
-   - `/dotsecenv:secenv` — interprets `.secenv` files, resolves vault references, and debugs loading issues
+   - `/dotsecenv:secrets`: manages secrets via the dotsecenv CLI (store, get, share, revoke)
+   - `/dotsecenv:secenv`: interprets `.secenv` files, resolves vault references, and debugs loading issues
 
 3. **Verify GPG is ready**
 
@@ -52,12 +52,12 @@ Install the dotsecenv plugin for [Claude Code](https://claude.ai/claude-code) so
 
    Ask Claude to work with your secrets naturally:
 
-   - *"List my secrets"* — lists secret keys without decrypting values
-   - *"Show me the value of myapp::API\_KEY"* — decrypts a specific secret
-   - *"Store a new secret called myapp::DB\_PASSWORD"* — encrypts and stores a value
-   - *"Share myapp::API\_KEY with fingerprint ABC123"* — re-encrypts for another team member
-   - *"Create a .secenv file for this project"* — generates a `.secenv` with the right references
-   - *"Why isn't my secret loading?"* — debugs vault paths and `.secenv` references
+   - *"List my secrets"*: lists secret keys without decrypting values
+   - *"Show me the value of myapp::API\_KEY"*: decrypts a specific secret
+   - *"Store a new secret called myapp::DB\_PASSWORD"*: encrypts and stores a value
+   - *"Share myapp::API\_KEY with fingerprint ABC123"*: re-encrypts for another team member
+   - *"Create a .secenv file for this project"*: generates a `.secenv` with the right references
+   - *"Why isn't my secret loading?"*: debugs vault paths and `.secenv` references
 
 </Steps>
 
@@ -81,22 +81,18 @@ You have 3 secrets across 1 vault.
 
 The plugin provides two skills:
 
-### `/dotsecenv:secrets` — CLI Operations
+### `/dotsecenv:secrets`: CLI Operations
 
-Teaches Claude how to use the dotsecenv CLI safely:
+Teaches Claude how to use the dotsecenv CLI safely. It knows which commands are safe (listing secrets, describing vaults, and running health checks never trigger GPG decryption), when to ask first (decryption and mutation require your explicit request), and how to detect problems (if your GPG pinentry is terminal-based or your passphrase is not cached, Claude warns you upfront instead of failing silently).
 
-- **Which commands are safe** — listing secrets, describing vaults, and running health checks never trigger GPG decryption
-- **When to ask first** — decryption and mutation require your explicit request
-- **How to detect problems** — if your GPG pinentry is terminal-based or your passphrase is not cached, Claude warns you upfront instead of failing silently
-
-### `/dotsecenv:secenv` — File Interpretation
+### `/dotsecenv:secenv`: File Interpretation
 
 Teaches Claude how to work with `.secenv` files:
 
-- **Parse `.secenv` syntax** — plain variables (`KEY=value`), secret references (`KEY={dotsecenv}`, `KEY={dotsecenv/prod::SECRET}`), and quoted values
-- **Resolve vault paths** — reads your dotsecenv config to find vaults, understanding that relative paths like `.dotsecenv/vault` resolve relative to the `.secenv` file's directory
-- **Debug loading issues** — checks if referenced secrets exist in reachable vaults, verifies file ownership/permissions, and explains ancestor loading behavior
-- **Create `.secenv` files** — generates files with the correct syntax after verifying secrets exist
+- Parse `.secenv` syntax: plain variables (`KEY=value`), secret references (`KEY={dotsecenv}`, `KEY={dotsecenv/prod::SECRET}`), and quoted values
+- Resolve vault paths: reads your dotsecenv config to find vaults and understands that relative paths like `.dotsecenv/vault` resolve against the `.secenv` file's directory
+- Debug loading issues: checks if referenced secrets exist in reachable vaults, verifies file ownership and permissions, and explains ancestor loading behavior
+- Create `.secenv` files: generates them with the correct syntax after verifying secrets exist
 
 ### GPG Pinentry Compatibility
 
@@ -112,8 +108,8 @@ Claude Code runs shell commands without a terminal, which affects how GPG passph
 
 If you use a terminal-based pinentry, you have two options:
 
-1. **Switch to a GUI pinentry** — set `pinentry-program` in `~/.gnupg/gpg-agent.conf`
-2. **Pre-cache your passphrase** before asking Claude to decrypt:
+1. Switch to a GUI pinentry by setting `pinentry-program` in `~/.gnupg/gpg-agent.conf`.
+2. Pre-cache your passphrase before asking Claude to decrypt:
 
    ```bash
    ! gpg --sign --local-user YOUR_FINGERPRINT </dev/null
@@ -131,7 +127,7 @@ The plugin enforces four tiers of operations:
 | Prohibited | Keychain extraction, exfiltration, init/login | Never executed |
 
 <Aside type="caution" title="GPG Agent Security">
-  When your GPG passphrase is cached, any process running as your user can trigger decryption — including AI agents. For stronger protection, see the [recommended GPG agent hardening](/concepts/threat-model/#recommended-gpg-agent-configuration) in the threat model.
+  When your GPG passphrase is cached, any process running as your user can trigger decryption, including AI agents. For stronger protection, see the [recommended GPG agent hardening](/concepts/threat-model/#recommended-gpg-agent-configuration) in the threat model.
 </Aside>
 
 ## Variations
@@ -155,6 +151,6 @@ claude --plugin-dir /path/to/dotsecenv
 
 ## Next Steps
 
-- [Threat Model — AI Agent Security](/concepts/threat-model/#ai-coding-agents-and-gpg) — understand the security implications
-- [Your First Secret](/tutorials/first-secret/) — get started with dotsecenv
-- [Shell Plugins](/guides/shell-plugins/) — auto-load secrets when entering directories
+- [Threat Model: AI Agent Security](/concepts/threat-model/#ai-coding-agents-and-gpg): understand the security implications
+- [Your First Secret](/tutorials/first-secret/): get started with dotsecenv
+- [Shell Plugins](/guides/shell-plugins/): auto-load secrets when entering directories

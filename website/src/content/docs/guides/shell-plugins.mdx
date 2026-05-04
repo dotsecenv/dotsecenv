@@ -5,15 +5,15 @@ description: Automatic secret loading with shell plugins for Bash, Zsh, and Fish
 
 import { Tabs, TabItem, Aside, Steps } from "@astrojs/starlight/components";
 
-The dotsecenv shell plugins automatically load secrets from `.secenv` files when you `cd` into a directory. When you leave, they are automatically unloaded—keeping your environment clean and secure.
+The dotsecenv shell plugins automatically load secrets from `.secenv` files when you `cd` into a directory. When you leave, they unload automatically, keeping your environment clean.
 
 ## How It Works
 
-1. **On `cd` into a directory**: The plugin checks for a `.secenv` file
-2. **Security check**: The file must be owned by you (or root) and not world-writable
-3. **Trust prompt**: You're prompted to allow loading (can be remembered)
-4. **Auto-load**: Plain variables are loaded first, then secrets are fetched from your vault
-5. **Tree-scoped persistence**: Secrets remain loaded in subdirectories, only unloading when you leave the tree entirely
+1. On `cd` into a directory, the plugin checks for a `.secenv` file.
+2. It runs a security check: the file must be owned by you (or root) and not world-writable.
+3. You're prompted to allow loading (your choice can be remembered).
+4. Plain variables are loaded first, then secrets are fetched from your vault.
+5. Secrets are tree-scoped: they remain loaded in subdirectories and only unload when you leave the tree entirely.
 
 ```text
 ~/project $ cd myapp/
@@ -66,7 +66,7 @@ If you `cd` into the directory containing `.secenv` first, secrets auto-load and
 ~ $ cd myapp/                # .secenv loads here
 dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
 
-~/myapp $ cd terraform/      # Secrets persist — still in the myapp tree
+~/myapp $ cd terraform/      # Secrets persist; still in the myapp tree
 ~/myapp/terraform $ echo $DATABASE_URL
 postgres://...               # Available!
 ```
@@ -76,9 +76,9 @@ postgres://...               # Available!
 If you open a terminal directly in a subdirectory (or jump there with `cd`), the parent's `.secenv` was never traversed, so secrets aren't loaded. Use `dse up` to walk up the directory tree and load ancestor `.secenv` files:
 
 ```text
-~ $ cd myapp/terraform/      # Jumped directly — parent .secenv not loaded
+~ $ cd myapp/terraform/      # Jumped directly; parent .secenv not loaded
 ~/myapp/terraform $ echo $DATABASE_URL
-                              # Empty — secrets not loaded
+                              # Empty; secrets not loaded
 
 ~/myapp/terraform $ dse up    # Walk up, find and load ancestor .secenv files
 dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
@@ -203,7 +203,7 @@ dotsecenv vault describe
 dse vault describe
 ```
 
-### `dse get` — Quick Secret Retrieval
+### `dse get`: quick secret retrieval
 
 Retrieve a secret with minimal typing:
 
@@ -215,7 +215,7 @@ dotsecenv secret get DATABASE_PASSWORD
 dse get DATABASE_PASSWORD
 ```
 
-### `dse cp` — Copy to Clipboard
+### `dse cp`: copy to clipboard
 
 Copy a secret directly to your clipboard without displaying it:
 
@@ -235,7 +235,7 @@ Clipboard support:
 - **Wayland**: Uses `wl-copy`
 - **X11**: Uses `xclip` or `xsel`
 
-### `dse reload` — Reload Current Directory
+### `dse reload`: reload current directory
 
 Re-trigger secret loading for the current directory without leaving and re-entering:
 
@@ -249,7 +249,7 @@ This is useful when:
 - You've modified the `.secenv` file
 - A secret fetch failed and you want to retry
 
-### `dse up` — Load Ancestor Secrets
+### `dse up`: load ancestor secrets
 
 When you jump directly into a subdirectory, parent `.secenv` files aren't loaded because the plugin only auto-loads on `cd` into the exact directory containing the file. `dse up` fixes this by walking up the directory tree, finding all ancestor `.secenv` files, and loading them root-first:
 
@@ -352,7 +352,7 @@ See [Your First Secret](/tutorials/first-secret/) for more details on file synta
 
 ### `.env` vs `.secenv`
 
-The dotsecenv plugin **only** handles `.secenv` files. This is intentional—we don't reinvent the wheel.
+The dotsecenv plugin **only** handles `.secenv` files. This is intentional. We don't reinvent the wheel.
 
 Tools like [direnv](https://direnv.net/), [autoenv](https://github.com/hyperupcall/autoenv), and [zsh-autoenv](https://github.com/Tarrasch/zsh-autoenv) have been managing `.env` files for years. They're mature, battle-tested, and do their job well. There's no reason for dotsecenv to duplicate that functionality or force you to learn subtle differences in behavior.
 
@@ -367,12 +367,12 @@ Tools like [direnv](https://direnv.net/), [autoenv](https://github.com/hyperupca
 Install both [direnv](https://direnv.net/) and dotsecenv. Let each tool do what it does best:
 
 ```bash
-# .env — handled by direnv
+# .env: handled by direnv
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 LOG_LEVEL=debug
 
-# .secenv — handled by dotsecenv
+# .secenv: handled by dotsecenv
 DATABASE_PASSWORD={dotsecenv}
 API_KEY={dotsecenv/production::API_KEY}
 ```
@@ -447,6 +447,6 @@ Common causes:
 
 ## Next Steps
 
-- [Your First Secret](/tutorials/first-secret/) — Learn `.secenv` file syntax
-- [CLI Reference](/reference/) — Full command documentation
-- [Threat Model](/concepts/threat-model/) — Understand the trust model
+- [Your First Secret](/tutorials/first-secret/): learn `.secenv` file syntax
+- [CLI Reference](/reference/): full command documentation
+- [Threat Model](/concepts/threat-model/): understand the trust model
