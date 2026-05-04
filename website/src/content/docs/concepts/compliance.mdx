@@ -7,26 +7,26 @@ import { Aside } from '@astrojs/starlight/components';
 
 ## Overview
 
-dotsecenv aligns with several NIST and IETF standards for cryptographic operations. This page documents:
+dotsecenv aligns with several NIST and IETF standards for cryptographic operations. This page documents two groups.
 
-**Compliance Standards** — specify how to use cryptographic primitives securely:
+Compliance standards (how to use cryptographic primitives securely):
 
-- **FIPS 140-3** — Security requirements for cryptographic modules
-- **FIPS 186-5** — Digital Signature Standard (approved algorithms)
-- **RFC 9580** — OpenPGP with mandatory AEAD encryption
+- FIPS 140-3: security requirements for cryptographic modules
+- FIPS 186-5: Digital Signature Standard (approved algorithms)
+- RFC 9580: OpenPGP with mandatory AEAD encryption
 
-**Foundational Standards** — define the cryptographic primitives themselves:
+Foundational standards (definitions of the primitives themselves):
 
-- **FIPS 197** — Advanced Encryption Standard (AES)
-- **FIPS 180-4** — Secure Hash Standard (SHA-2 family)
+- FIPS 197: Advanced Encryption Standard (AES)
+- FIPS 180-4: Secure Hash Standard (SHA-2 family)
 
-Understanding these standards helps organizations deploy dotsecenv in regulated environments.
+If you deploy in a regulated environment, the rest of this page covers exactly which versions, algorithms, and configurations dotsecenv uses.
 
 ---
 
 ## FIPS 140-3: Cryptographic Module
 
-[FIPS 140-3](https://csrc.nist.gov/pubs/fips/140-3/final) defines security requirements for cryptographic modules. dotsecenv leverages Go's native FIPS 140-3 cryptographic module, introduced in Go 1.24.
+[FIPS 140-3](https://csrc.nist.gov/pubs/fips/140-3/final) defines security requirements for cryptographic modules. dotsecenv uses Go's native FIPS 140-3 cryptographic module, introduced in Go 1.24.
 
 ### CAVP Validation
 
@@ -42,15 +42,11 @@ The module is currently on the CMVP Modules In Process list with status "Review 
 
 ### Native Go Implementation
 
-This module is built directly into Go's standard library and requires no external C dependencies or cgo bindings. The validated module provides:
-
-- **Mandatory self-tests** — Module integrity verification at startup
-- **NIST SP 800-90A DRBG** — Approved deterministic random bit generator
-- **Approved algorithms** — All cryptographic operations use FIPS-approved algorithms
+This module is built directly into Go's standard library. It requires no external C dependencies and no cgo bindings. The validated module provides mandatory self-tests for module integrity at startup, an approved deterministic random bit generator (NIST SP 800-90A DRBG), and FIPS-approved implementations for every cryptographic operation.
 
 ### Build vs. Runtime Environment
 
-FIPS 140-3 validation applies to the **runtime Operating Environment**—not the build environment. Because Go compiles to standalone, statically-linked binaries with no foreign function interface overhead, the resulting executable is portable and deterministic regardless of where it was compiled.
+FIPS 140-3 validation applies to the runtime Operating Environment, not the build environment. Because Go compiles to standalone, statically-linked binaries with no foreign function interface overhead, the resulting executable is portable and deterministic regardless of where it was compiled.
 
 Our official releases are built on GitHub Actions runners (Ubuntu-based), but the cryptographic operations execute within your deployment environment.
 
@@ -69,7 +65,7 @@ When you run dotsecenv on a NIST-listed Operating Environment, the Go Cryptograp
 | Windows Server | 2016–2025 |
 | FreeBSD | 12–14 |
 
-The Geomys validation (the organization pursuing FIPS 140-3 certification for Go's crypto module) also includes **Vendor Affirmed** coverage for generic Linux 3.10+ on x86-64 and ARM architectures, providing broad compatibility across modern Linux distributions.
+The Geomys validation (the organization pursuing FIPS 140-3 certification for Go's crypto module) also includes Vendor Affirmed coverage for generic Linux 3.10+ on x86-64 and ARM, which gives you broad compatibility across modern Linux distributions.
 
 ### Module Locking
 
@@ -95,19 +91,15 @@ The version identifier determines which cryptographic module snapshot is embedde
 | `GOFIPS140=latest` | Uses whatever module ships with your Go version |
 | `GOFIPS140=off` | Disables FIPS mode (default) |
 
-Pinning to a specific version ensures:
-
-- **Deterministic behavior** — Runtime behavior is reproducible across builds
-- **Compliance evidence** — Auditors can verify the exact module version used
-- **Validated code path** — The binary uses a cryptographic implementation derived from the Go FIPS module awarded certificate A6650
+Pinning to a specific version gives you deterministic behavior (reproducible across builds), evidence for auditors (the exact module version is recorded in the binary), and a validated code path (the binary uses the cryptographic implementation derived from the Go FIPS module awarded certificate A6650).
 
 <Aside type="tip">
-Without a version pin, `GOFIPS140=latest` would use whatever module ships with your Go version—potentially code that has not yet been validated. For regulated environments, always specify the version explicitly.
+Without a version pin, `GOFIPS140=latest` would use whatever module ships with your Go version, potentially code that has not yet been validated. For regulated environments, always specify the version explicitly.
 </Aside>
 
 ### Build It Yourself
 
-dotsecenv is open source, and we encourage security-conscious organizations to fork and build the project on infrastructure under their direct control—whether air-gapped systems, internal CI/CD pipelines, or hardened build servers.
+dotsecenv is open source, and we encourage security-conscious organizations to fork and build the project on infrastructure under their direct control, whether that is air-gapped systems, internal CI/CD pipelines, or hardened build servers.
 
 | Requirement | Value |
 |-------------|-------|
@@ -146,14 +138,14 @@ While OpenPGP supports AES-128, AES-192, and AES-256, dotsecenv's RFC 9580 profi
 
 #### Adaptive Hash Selection
 
-dotsecenv automatically selects the appropriate hash strength based on key parameters:
+dotsecenv selects the appropriate hash strength based on key parameters:
 
 ```text
 Key strength ≥ 256 bits (RSA-4096, ECC P-521) → SHA-512
 Key strength < 256 bits (RSA-3072, ECC P-384) → SHA-256
 ```
 
-This follows security best practices for matching hash strength to key strength.
+This matches hash strength to key strength, following standard practice.
 
 #### Hash Usage
 
@@ -211,7 +203,7 @@ Entry signature covers:
 └── Originator fingerprint
 ```
 
-Modifications to any field cause signature verification to fail:
+Modifying any field causes signature verification to fail:
 
 ```bash
 dotsecenv validate
@@ -230,14 +222,14 @@ dotsecenv validate
 | EdDSA | Ed25519 | Ed25519 or Ed448 |
 
 <Aside type="caution">
-For new key generation, use Ed25519 (fast, secure, small signatures) or RSA-4096 (broad compatibility). Avoid P-256 ECDSA for new deployments—while approved, Ed25519 offers better security properties.
+For new key generation, use Ed25519 (fast, secure, small signatures) or RSA-4096 (broad compatibility). Avoid P-256 ECDSA for new deployments. P-256 is approved, but Ed25519 has better security properties.
 </Aside>
 
 ---
 
 ## RFC 9580: OpenPGP with AEAD
 
-[RFC 9580](https://www.rfc-editor.org/rfc/rfc9580.html) (2024) is the updated OpenPGP standard, replacing RFC 4880. dotsecenv uses the RFC 9580 profile which enforces authenticated encryption.
+[RFC 9580](https://www.rfc-editor.org/rfc/rfc9580.html) (2024) is the updated OpenPGP standard, replacing RFC 4880. dotsecenv uses the RFC 9580 profile, which enforces authenticated encryption.
 
 ### AEAD Encryption
 
@@ -258,12 +250,7 @@ RFC 9580 mandates Authenticated Encryption with Associated Data (AEAD) for all s
 
 ### Why AES-256-GCM?
 
-GCM mode provides both confidentiality and integrity in a single operation:
-
-- **Authenticated** — Tampering is detected via the 128-bit authentication tag
-- **Efficient** — Hardware-accelerated on modern CPUs (AES-NI)
-- **Parallelizable** — GCM allows parallel encryption/decryption
-- **FIPS-approved** — Compliant with NIST SP 800-38D
+GCM mode provides both confidentiality and integrity in a single operation. The 128-bit authentication tag detects tampering, modern CPUs accelerate AES via AES-NI, and GCM allows parallel encryption and decryption. It is also FIPS-approved (NIST SP 800-38D).
 
 <Aside type="note" title="Cipher negotiation">
 OpenPGP performs cipher negotiation based on recipient key preferences. The actual cipher used depends on what the recipient's public key advertises it supports. RFC 9580-compliant keys must support AES-256-GCM, so messages between modern keys will use it.
@@ -288,13 +275,9 @@ dotsecenv explicitly disables compression to prevent CRIME/BREACH-style side-cha
 encHandle, err := pgp.Encryption().Recipients(recipients).CompressWith(constants.NoCompression).New()
 ```
 
-#### Why Disable Compression?
+#### Why disable compression?
 
-When data is compressed before encryption, the ciphertext length varies based on plaintext content. Attackers can exploit this:
-
-1. **CRIME attack** — Inject known strings into plaintext
-2. **Observe ciphertext length** — Compressed duplicates are shorter
-3. **Iterate** — Guess secrets character by character
+When data is compressed before encryption, the ciphertext length varies based on plaintext content. The CRIME attack exploits this in three steps: inject a known string into the plaintext, observe whether the resulting ciphertext got shorter (a duplicate compresses), then iterate to guess secrets character by character.
 
 | Compression | Ratio | Speed | Security Risk |
 |-------------|-------|-------|---------------|
@@ -341,7 +324,7 @@ dotsecenv uses hybrid encryption combining symmetric and asymmetric cryptography
 └─────────────────────────────────────────────────────────────┘
 ```
 
-#### Why Hybrid Encryption?
+#### Why hybrid encryption?
 
 Hybrid encryption enables efficient multi-recipient encryption:
 
@@ -350,12 +333,7 @@ Hybrid encryption enables efficient multi-recipient encryption:
 | Session key | 256 bits | Encrypted once per recipient (fast, tiny payload) |
 | Secret data | Variable | Encrypted once total with AES (fast) |
 
-For 10 recipients, this means:
-
-- **1** AES encryption of the full payload
-- **10** RSA/ECC encryptions of the 256-bit session key
-
-Without hybrid encryption, you would need 10 full asymmetric encryptions—orders of magnitude slower for large secrets.
+For 10 recipients, this means one AES encryption of the full payload plus 10 RSA or ECC encryptions of the 256-bit session key. Without hybrid encryption, you would need 10 full asymmetric encryptions of the entire secret. That is orders of magnitude slower for anything larger than a few bytes.
 
 ### Encrypted Value Structure
 
