@@ -1,0 +1,130 @@
+# examples/03-ci-cd-github-action/workflow.yml
+#
+# A complete, copy-pasteable GitHub Actions workflow that:
+#   1. Installs dotsecenv from a verified release using the dotsecenv/dotsecenv
+#      composite action.
+#   2. Imports a CI-only GPG private key from a repository secret.
+#   3. Decrypts secrets out of the project's checked-in vault into job-scoped
+#      environment variables (and `$GITHUB_ENV` for downstream steps).
+#   4. Hands the decrypted secrets to a deploy step.
+#
+# Save this file at: .github/workflows/deploy.yml in your application repo.
+#
+# Required GitHub repository secrets:
+#   - DOTSECENV_GPG_PRIVATE_KEY  : ASCII-armored private key for the CI
+#                                  identity. Generated once on a developer
+#                                  machine and added as a sealed repo secret.
+#                                  See README.md for the bootstrap procedure.
+#
+# Required vault state in the repo:
+#   - .dotsecenv/vault           : the encrypted vault file, committed to git.
+#   - The CI identity's public key must be on the vault's recipient list for
+#     every secret this workflow needs (use `dotsecenv secret share` from a
+#     developer machine to grant CI access).
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    # All steps in this job inherit the GNUPGHOME the import step sets up.
+    env:
+      GNUPGHOME: ${{ runner.temp }}/gnupg
+
+    steps:
+      # ---------------------------------------------------------------------
+      # 1. Get the source (vault file lives at .dotsecenv/vault in the repo).
+      # ---------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------------------------
+      # 2. Install dotsecenv from a verified release.
+      #
+      #    The composite action verifies SHA-256 checksums, GPG signatures on
+      #    `checksums.txt`, and the GitHub Actions attestation on the archive
+      #    (Sigstore). Set `version: 'v1.2.3'` to pin a specific release; the
+      #    default `latest` resolves the most recent published tag.
+      # ---------------------------------------------------------------------
+      - name: Install dotsecenv
+        uses: dotsecenv/dotsecenv@v0
+        with:
+          version: latest
+          # Set to false only if you fully trust the network path (you should
+          # not). Default is true.
+          verify-provenance: true
+
+      # ---------------------------------------------------------------------
+      # 3. Import the CI identity's private key and warm up gpg-agent.
+      #
+      #    The private key is generated ONCE on a developer machine with
+      #    `dotsecenv identity create --no-passphrase` (CI-only mode), then
+      #    added to the repo as a sealed secret called
+      #    DOTSECENV_GPG_PRIVATE_KEY. The "no-passphrase" choice is what makes
+      #    decryption non-interactive; protect the secret accordingly.
+      # ---------------------------------------------------------------------
+      - name: Import GPG private key
+        env:
+          DOTSECENV_GPG_PRIVATE_KEY: ${{ secrets.DOTSECENV_GPG_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+          echo "$DOTSECENV_GPG_PRIVATE_KEY" | gpg --batch --import
+          # Capture the fingerprint of the freshly-imported key for `login`.
+          FP=$(gpg --list-secret-keys --with-colons \
+            | awk -F: '/^fpr:/ { print $10; exit }')
+          echo "DOTSECENV_FP=$FP" >> "$GITHUB_ENV"
+
+      # ---------------------------------------------------------------------
+      # 4. Initialise dotsecenv against the project-local vault, then login.
+      # ---------------------------------------------------------------------
+      - name: Initialise dotsecenv
+        run: |
+          dotsecenv init config -v .dotsecenv/vault
+          dotsecenv login "$DOTSECENV_FP"
+
+      # ---------------------------------------------------------------------
+      # 5. Decrypt secrets and surface them to downstream steps.
+      #
+      #    Two patterns are shown:
+      #      a) ::add-mask::  to scrub the value from logs immediately.
+      #      b) >> $GITHUB_ENV  to make the value available as an env var to
+      #         every subsequent step (still automatically masked because we
+      #         called add-mask first).
+      #
+      #    NEVER `echo` a decrypted value to stdout without masking it first.
+      # ---------------------------------------------------------------------
+      - name: Decrypt secrets
+        run: |
+          set -euo pipefail
+          # Each secret you need: pull the value, mask it, then export it.
+          for SECRET in DATABASE_URL DEPLOY_TOKEN; do
+            VALUE=$(dotsecenv secret get "$SECRET")
+            echo "::add-mask::$VALUE"
+            # Use the heredoc form so values containing newlines or '=' are safe.
+            {
+              echo "$SECRET<<__DOTSECENV_EOF__"
+              echo "$VALUE"
+              echo "__DOTSECENV_EOF__"
+            } >> "$GITHUB_ENV"
+          done
+
+      # ---------------------------------------------------------------------
+      # 6. Use the secrets. They are present as $DATABASE_URL and
+      #    $DEPLOY_TOKEN, masked in logs by the add-mask calls above.
+      # ---------------------------------------------------------------------
+      - name: Run deploy
+        run: |
+          # Replace this with whatever your real deploy looks like.
+          echo "DATABASE_URL is set: ${DATABASE_URL:+yes}"
+          echo "DEPLOY_TOKEN is set: ${DEPLOY_TOKEN:+yes}"
+          # ./scripts/deploy.sh
