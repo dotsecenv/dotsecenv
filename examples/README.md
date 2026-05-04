@@ -1,12 +1,12 @@
 # dotsecenv examples
 
 Self-contained, copy-pasteable scenarios that exercise the dotsecenv CLI end to
-end. Each example lives in its own subdirectory and is designed to be read,
-copied, and adapted by humans and AI coding agents alike.
+end. Each example lives in its own subdirectory. The audience is humans and AI
+coding agents in roughly equal measure: both copy from these.
 
-The examples favour **runnability and correctness** over breadth: every command
-shown is a real `dotsecenv` invocation that has been verified against the CLI
-help surface and (where possible) executed in an isolated environment.
+The examples favour runnability over breadth. Every command shown is a real
+`dotsecenv` invocation, verified against the CLI help surface and, where
+possible, executed in an isolated environment.
 
 For narrative documentation see <https://dotsecenv.com>. For the canonical CLI
 reference see `dotsecenv --help` or the man pages installed by
@@ -33,23 +33,20 @@ is nothing to "run".
 Every runnable script in this directory follows the same isolation pattern,
 borrowed from `scripts/sandbox.sh` and `demos/demo.sh`:
 
-- **Ephemeral working directory.** `TMP=$(mktemp -d)` holds the config, the
-  vault, and a private GPG home. No file outside `$TMP` is touched.
-- **Isolated `GNUPGHOME`.** Every script sets `GNUPGHOME=$TMP/gnupg` before
-  invoking `gpg` or `dotsecenv`. **Your real keyring is never touched.**
-- **Explicit config and vault paths.** Scripts pass `-c "$TMP/config"` and
-  `-v "$TMP/vault"` to every command rather than relying on the XDG default
-  location.
-- **Cleanup on exit.** A `trap 'rm -rf "$TMP"; gpgconf --kill all || true'
-  EXIT` guarantees the tempdir is removed and the per-tempdir gpg-agent is
-  shut down even if the script fails partway through.
-- **`set -euo pipefail`.** Errors abort immediately so partial state is never
-  reported as success.
-- **Unattended GPG operations.** The example keys are generated with
-  `--no-passphrase` (CI-only mode) so the scripts do not block on a pinentry
-  prompt. **Do not use `--no-passphrase` for real keys.** See
-  <https://dotsecenv.com/concepts/threat-model/> for the threat model
-  motivating passphrase-protected keys.
+- `TMP=$(mktemp -d)` holds the config, vault, and a private GPG home. No
+  file outside `$TMP` is touched.
+- `GNUPGHOME=$TMP/gnupg` for every `gpg` and `dotsecenv` invocation, so your
+  real keyring stays untouched.
+- Scripts pass `-c "$TMP/config"` and `-v "$TMP/vault"` to every command
+  rather than relying on the XDG default location.
+- `trap 'rm -rf "$TMP"; gpgconf --kill all || true' EXIT` removes the tempdir
+  and shuts down the per-tempdir gpg-agent on every exit path, including
+  Ctrl-C and partial failures.
+- `set -euo pipefail` aborts on the first error so partial state cannot
+  masquerade as success.
+- Example keys use `--no-passphrase` (CI-only mode) so the scripts do not
+  block on a pinentry prompt. Do not use `--no-passphrase` for real keys —
+  see <https://dotsecenv.com/concepts/threat-model/> for why.
 
 ## Running an example
 

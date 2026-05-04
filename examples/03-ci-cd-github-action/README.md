@@ -19,14 +19,15 @@ secrets in GitHub repository secrets.
 
 Two reasons:
 
-1. **One private key in GitHub, many secrets in your repo.** With dotsecenv,
-   the private key is your CI identity; the actual secret values live in
-   the encrypted vault file inside the repo. Adding a new secret is a
+1. One private key in GitHub, many secrets in your repo. With dotsecenv the
+   private key is your CI identity; the actual secret values live in the
+   encrypted vault file inside the repo. Adding a new secret is a
    developer-machine `secret store` + `secret share` + commit — no GitHub
    repo-secret edit needed. Rotation is a developer-machine `secret store`
-   + commit. The list of secrets is visible to the team in the vault file.
-2. **Provenance.** Vault writes are signed by the identity that produced
-   them; you can audit who added or rotated each value.
+   + commit. The list of secret names is visible to the team in the vault
+   file.
+2. Provenance. Vault writes are signed by the identity that produced them,
+   so you can audit who added or rotated each value.
 
 If you need a single secret, use a GitHub repo secret directly. If you
 already manage many secrets and want them version-controlled and
@@ -123,18 +124,16 @@ piped through `::add-mask::` before `$GITHUB_ENV`.
 
 ## Threat model notes
 
-- **`--no-passphrase` keys are sensitive.** Anyone who can read the GitHub
-  repo secret can decrypt every vault entry the key is a recipient of.
-  Keep the secret tightly scoped (per repo, per environment), and rotate
-  periodically.
-- **Use environment-scoped secrets for production.** GitHub's "deployment
+- `--no-passphrase` keys are sensitive. Anyone who can read the GitHub repo
+  secret can decrypt every vault entry the key is a recipient of. Keep the
+  secret tightly scoped (per repo, per environment) and rotate periodically.
+- Use environment-scoped secrets for production. GitHub's "deployment
   environments" let you put `DOTSECENV_GPG_PRIVATE_KEY` behind a manual
   approval gate before it is exposed to the deploy job.
-- **Grant minimum recipient set.** Only `secret share` to the CI key the
-  secrets that CI actually needs. Everything else stays encrypted to humans
-  only.
-- **Verify provenance is on.** `verify-provenance: true` is the default and
-  gates installation on a Sigstore attestation match. Don't turn it off.
+- Grant the minimum recipient set. Only `secret share` to the CI key for the
+  secrets CI actually needs; everything else stays encrypted to humans only.
+- Keep provenance verification on. `verify-provenance: true` is the default
+  and gates installation on a Sigstore attestation match. Don't turn it off.
 
 ## Related
 

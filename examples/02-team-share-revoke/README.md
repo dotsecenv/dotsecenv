@@ -1,25 +1,25 @@
 # Example 02 — Team share + revoke + rotate
 
-How dotsecenv's multi-recipient encryption and revocation actually work in
-practice, with two ephemeral identities sharing a single vault and an honest
-demonstration of the append-only history semantics.
+How dotsecenv's multi-recipient encryption and revocation work in practice.
+Two ephemeral identities share a vault, then walk through the append-only
+history semantics that make `revoke` a forward-looking operation rather than
+a delete.
 
 ## What this demonstrates
 
-- **Multi-recipient encryption.** Alice stores `API_KEY` and shares it with
-  Bob; both can decrypt it independently with their own private keys.
-- **Independent keyrings.** The script uses two separate `GNUPGHOME`
-  directories — one per identity — to keep each user's secret key isolated
-  from the other (matching the production model of one-key-per-machine).
-  Public keys are exported and imported between them, exactly as you would
-  do over email or chat.
-- **Revoke is forward-looking.** `secret revoke FP` removes a fingerprint
-  from the recipient set for *future* writes; it does not rewrite history.
-- **Rotation is what hides a secret.** After Alice revokes Bob she rotates
-  the value with `secret store`; the new entry is encrypted only to her.
-  Bob's `secret get` falls back to the most recent entry he was a recipient
-  of (the old v1 value), and `secret get --all` shows decryption errors for
-  the rotated entry he is no longer a recipient of.
+- Multi-recipient encryption: Alice stores `API_KEY` and shares it with Bob;
+  both can decrypt it independently with their own private keys.
+- Independent keyrings: the script uses two separate `GNUPGHOME` directories,
+  one per identity, to keep each user's secret key isolated from the other.
+  This matches production (one key per machine). Public keys move between
+  them just as they would over email or chat.
+- Revoke is forward-looking: `secret revoke FP` removes a fingerprint from
+  the recipient set for *future* writes. It does not rewrite history.
+- Rotation is what actually hides a value. After Alice revokes Bob she
+  rotates the secret with `secret store`; the new entry is encrypted only
+  to her. Bob's `secret get` falls back to the most recent entry he was a
+  recipient of (the old v1), and `secret get --all` produces decryption
+  errors for the rotated entry he is no longer a recipient of.
 
 ## Run it
 
@@ -76,17 +76,17 @@ keeps them strictly partitioned via `GNUPGHOME=...` on every command.
 
 ## Operational guidance
 
-- **Revoke before rotating, not after.** If you forget to revoke, the next
-  write still encrypts to the old recipient set. The order in this example
+- Revoke before rotating, not after. If you forget to revoke, the next write
+  still encrypts to the old recipient set. The order in this example
   (`revoke`, then `store` to rotate) is the right one.
-- **Bob's old plaintext still leaks if he saved it.** Revocation is about
-  ciphertext access, not memory: a former teammate who already decrypted
-  v1 still knows v1. Rotation requires a value change at the source
-  (database password rotation, new API key, etc.).
-- **`secret share --all`** does the same encryption to all vaults where the
-  secret already exists; useful when you have prod/staging vaults
-  side-by-side. See `dotsecenv secret share --help`.
-- **`secret revoke --all`** does the symmetric operation for revocation.
+- Bob's old plaintext still leaks if he saved it anywhere. Revocation is
+  about ciphertext access, not memory: a former teammate who already
+  decrypted v1 still knows v1. Hiding the value for real requires changing
+  it at the source (rotate the database password, issue a new API key, etc.).
+- `secret share --all` shares to every vault where the secret already
+  exists, which is useful when you keep prod/staging vaults side by side.
+  See `dotsecenv secret share --help`.
+- `secret revoke --all` is the symmetric operation for revocation.
 
 ## Files
 

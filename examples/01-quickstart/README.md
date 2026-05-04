@@ -64,8 +64,8 @@ Vault 1 (/tmp/tmp.XXXXXXXX/vault):
 You will also see a "decrypting in non-interactive terminal" warning printed
 to stderr by `secret get`. That warning is correct: real-world workflows
 should run inside a TTY (or behind the shell plugin) so the GPG agent can
-prompt for the passphrase. The script suppresses it would defeat the purpose
-of the warning, so we leave it visible.
+prompt for the passphrase. The script could suppress the warning, but doing
+so would defeat its purpose, so we leave it visible.
 
 ## Files
 
@@ -83,15 +83,15 @@ nothing to clean up by hand.
 
 Three things change when you run dotsecenv outside a script:
 
-1. **Use your real GPG key** instead of generating one. Drop the
-   `identity create` block; capture the fingerprint with
+1. Use your real GPG key instead of generating one. Drop the
+   `identity create` block and capture the fingerprint with
    `gpg --list-keys --with-colons | awk -F: '/^fpr/ {print $10; exit}'`
    (or whichever key you prefer).
-2. **Drop the `-c "$CONFIG"` flags.** dotsecenv uses
+2. Drop the `-c "$CONFIG"` flags. dotsecenv uses
    `$XDG_CONFIG_HOME/dotsecenv/config` (typically
-   `~/.config/dotsecenv/config`) by default — that is the right place for
+   `~/.config/dotsecenv/config`) by default, which is the right place for
    your real config to live.
-3. **Pick a real vault location.** `~/.local/share/dotsecenv/vault` is the
+3. Pick a real vault location. `~/.local/share/dotsecenv/vault` is the
    convention used by `install.sh`; project-local vaults live at
    `./.dotsecenv/vault` and are picked up by the shell plugin.
 
