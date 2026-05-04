@@ -137,10 +137,11 @@ piped through `::add-mask::` before `$GITHUB_ENV`.
 
 ## Related
 
+- Tutorial: <https://dotsecenv.com/tutorials/ci-cd-secrets/>
+- Guide: <https://dotsecenv.com/guides/github-action/>
 - Action source and inputs reference: [`action.yml`](../../action.yml) at
   the repo root, plus
   <https://github.com/marketplace/actions/setup-dotsecenv>.
-- CI/CD guide (full reference): <https://dotsecenv.com/guides/ci-cd/>
 - Threat model: <https://dotsecenv.com/concepts/threat-model/>
 - Example 02 (the `secret share` mechanics this relies on):
   [../02-team-share-revoke/](../02-team-share-revoke/)

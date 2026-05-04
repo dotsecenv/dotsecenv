@@ -105,6 +105,7 @@ canonical reference (and is what the dotsecenv Claude Code plugin uses).
 
 ## Related
 
+- Tutorial: <https://dotsecenv.com/tutorials/reload-secrets/>
 - Shell plugins guide: <https://dotsecenv.com/guides/shell-plugins/>
 - The canonical syntax reference: `skills/secenv/SKILL.md` in this repo.
 - Plugin source: <https://github.com/dotsecenv/plugin>

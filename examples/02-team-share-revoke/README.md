@@ -100,6 +100,10 @@ gpg-agents on every exit path.
 
 ## Related
 
-- Concepts (append-only vault, threat model): <https://dotsecenv.com/concepts/>
-- Guide: <https://dotsecenv.com/guides/team-collaboration/>
-- Example 01 (the basic vault flow this builds on): [../01-quickstart/](../01-quickstart/)
+- Tutorial: <https://dotsecenv.com/tutorials/share-secret/>
+- Tutorial: <https://dotsecenv.com/tutorials/revoke-access/>
+- Tutorial: <https://dotsecenv.com/tutorials/team-onboarding/>
+- Concepts (append-only vault, threat model):
+  <https://dotsecenv.com/concepts/threat-model/>
+- Example 01 (the basic vault flow this builds on):
+  [../01-quickstart/](../01-quickstart/)
