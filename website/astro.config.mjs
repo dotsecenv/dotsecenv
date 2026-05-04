@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightBlog from 'starlight-blog';
+import starlightContextualMenu from 'starlight-contextual-menu';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import { SITE_TITLE } from './src/consts';
 
@@ -56,6 +57,16 @@ export default defineConfig({
               paths: ['reference', 'changelog'],
             },
           ],
+        }),
+        // Per-page dropdown ("Copy page", "View as Markdown", "Open in
+        // ChatGPT", "Open in Claude") next to the page title. The plugin
+        // fetches `<page>/index.md` for copy/view actions and, with
+        // `injectMarkdownRoutes: true` (default), auto-emits those routes
+        // via its bundled `starlight-markdown` integration. PR #136 ships a
+        // separate `<page>.md` endpoint for direct LLM/RAG consumption;
+        // both URL conventions coexist intentionally.
+        starlightContextualMenu({
+          actions: ['copy', 'view', 'chatgpt', 'claude'],
         }),
       ],
       title: SITE_TITLE,
