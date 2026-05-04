@@ -154,14 +154,19 @@ demo: build
 		cp ../plugin/_dotsecenv_core.sh "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
 		cp ../plugin/dotsecenv.plugin.bash "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
 		cp ../plugin/dotsecenv.plugin.zsh "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
+		printf '%s\n' \
+			'# dotsecenv demo bashrc' \
+			'[ -f "$$XDG_DATA_HOME/dotsecenv/dotsecenv.plugin.bash" ] && source "$$XDG_DATA_HOME/dotsecenv/dotsecenv.plugin.bash"' \
+			> "$$DEMO_HOME/.bashrc"; \
 	fi && \
-	echo "Generating GPG key for demo..." && \
-	GNUPGHOME="$$DEMO_HOME/.gnupg" gpg --batch --gen-key <<< $$'Key-Type: EDDSA\nKey-Curve: ed25519\nName-Real: Demo User\nName-Email: demo@dotsecenv\n%no-protection\n%commit' && \
+	echo "Generating GPG key for demo (via dotsecenv identity create)..." && \
+	HOME="$$DEMO_HOME" GNUPGHOME="$$DEMO_HOME/.gnupg" "$$DEMO_HOME/bin/dotsecenv" identity create --no-passphrase --name "Demo User" --email "demo@dotsecenv" && \
 	echo "" && \
 	echo "Demo environment ready at: $$DEMO_HOME" && \
-	echo "To record: asciinema rec -c 'HOME=$$DEMO_HOME bash $$DEMO_HOME/demos/demo.sh'" && \
+	echo "To record (asciinema v3+): asciinema rec -c 'HOME=$$DEMO_HOME bash $$DEMO_HOME/demos/demo.sh' --overwrite <output.cast>" && \
 	echo "" && \
 	echo "Entering demo shell (type 'exit' when done)..." && \
+	cd "$$DEMO_HOME" && \
 	HOME="$$DEMO_HOME" \
 	PATH="$$DEMO_HOME/bin:$$PATH" \
 	GNUPGHOME="$$DEMO_HOME/.gnupg" \
