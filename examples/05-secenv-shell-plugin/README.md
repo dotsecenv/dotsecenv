@@ -92,13 +92,15 @@ for you on `cd`; only manual sourcing trips on it.
 
 ## Debugging
 
-| Symptom                                       | Likely cause                                    | Fix                                                                          |
-| --------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------- |
-| Plugin doesn't activate on `cd`               | Plugin not installed or not sourced             | Reinstall via `install.sh`; restart shell                                    |
-| "refusing to load .secenv: insecure perms"    | World-writable file                             | `chmod 600 .secenv`                                                          |
-| "refusing to load .secenv: untrusted dir"     | First time loading from this dir                | Run the trust prompt or `dotsecenv ...` whatever the plugin suggests          |
-| "secret X not found in any configured vault"  | Vault path mismatch or secret key not in vault  | `dotsecenv vault describe` to inspect; `dotsecenv secret get` to list keys   |
-| "secret X failed to decrypt"                  | Your fingerprint isn't a recipient              | Have a teammate run `dotsecenv secret share X $YOUR_FINGERPRINT`             |
+| Symptom                                                         | Likely cause                                    | Fix                                                                        |
+| --------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------- |
+| Plugin doesn't activate on `cd`                                 | Plugin not installed or not sourced             | Reinstall via `install.sh`; restart shell                                  |
+| `refusing to load <file> - world-writable`                      | `.secenv` mode has the world-write bit set      | `chmod go-w .secenv` (`chmod 600` also works)                              |
+| `refusing to load <file> - not owned by current user or root`   | File belongs to another non-root user           | `chown $(id -u) .secenv`                                                   |
+| `skipping <dir>/.secenv - no TTY for trust prompt`              | Running in CI or a non-interactive shell        | Skip the plugin in CI; call `dotsecenv secret get` directly                |
+| Trust prompt asks every new shell                               | Answered `y` (session) instead of `a` (always)  | Re-enter the directory and answer `a` to persist trust                     |
+| `secret X not found in any configured vault`                    | Vault path mismatch or secret key not in vault  | `dotsecenv vault describe` to inspect; `dotsecenv secret get` to list keys |
+| `secret X failed to decrypt`                                    | Your GPG fingerprint isn't a recipient          | Have a teammate run `dotsecenv secret share X $YOUR_FINGERPRINT`           |
 
 For deeper debugging the in-repo skill `skills/secenv/SKILL.md` is the
 canonical reference (and is what the dotsecenv Claude Code plugin uses).
