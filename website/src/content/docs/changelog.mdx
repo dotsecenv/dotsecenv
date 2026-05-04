@@ -7,6 +7,27 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 ---
 
+## v0.6.0
+
+_May 4, 2026_
+
+### Features
+
+- New trusted policy directory at `/etc/dotsecenv/policy.d/` lets administrators pin organization-wide rules: allow-listed key algorithms (`approved_algorithms`), allow-listed vault paths (`approved_vault_paths`), and scalar overrides for `behavior.*` and `gpg.program`. Allow-lists intersect with user config; scalars override with last-fragment-wins ordering. Adds `dotsecenv policy list` and `dotsecenv policy validate` commands (both with `--json`). Fail-closed: any policy load error aborts startup with a distinct exit code per error category. See [Policy Directory](/concepts/policy-directory/) for the full design. (#114, #115, #116)
+
+### Bug Fixes
+
+- Update `github.com/protonmail/gopenpgp/v3` to v3.4.1 (#112)
+
+### Other
+
+- **Breaking**: Drop SUID mode. Installation no longer needs root to set up SUID bits; the new policy directory at `/etc/dotsecenv/policy.d/` is the supported way to enforce admin policy across users. (#110)
+- **Breaking**: Remove deprecated `Config.Fingerprint` YAML field and `DOTSECENV_FINGERPRINT` environment variable. Use `dotsecenv login <FP>` to populate the signed `login:` block instead. (#109)
+- Drop `/var/lib/dotsecenv/vault` from the default vault path list (#111)
+- Update `step-security/harden-runner` action to v2.19.1 (#107, #108, #113)
+
+---
+
 ## v0.5.2
 
 _April 14, 2026_
