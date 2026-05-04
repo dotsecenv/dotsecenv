@@ -97,7 +97,11 @@ Three things change when you run dotsecenv outside a script:
 
 ## Related
 
-- Tutorial: <https://dotsecenv.com/tutorials/quickstart/>
-- Concepts (vault format, append-only history): <https://dotsecenv.com/concepts/>
+- Tutorial: <https://dotsecenv.com/tutorials/first-secret/> (narrative
+  walkthrough of this same flow)
+- Tutorial: <https://dotsecenv.com/tutorials/installation/> (installer
+  reference: `install.sh`, package managers, `mise`)
+- Concepts (vault format, append-only history):
+  <https://dotsecenv.com/concepts/vault-format/>
 - The `demos/demo.sh` recording in this repo is the asciinema source for the
   homepage demo and follows the same flow.
