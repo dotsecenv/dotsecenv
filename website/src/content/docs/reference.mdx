@@ -264,7 +264,7 @@ sharing secrets. If the identity already exists in a vault it is skipped.
 
 **Arguments:**
 
-- `FINGERPRINT` — GPG key fingerprint of the identity to add
+- `FINGERPRINT`: GPG key fingerprint of the identity to add
 
 **Options:**
 
@@ -279,8 +279,8 @@ one is configured, or you are prompted to choose interactively.
 The identity's public key is fetched from GPG, validated against the
 configured `approved_algorithms`, and appended to the vault. The entry is
 signed by the current user's key (the person running the command), so you
-do not need the target's private key — only their public key in your GPG
-keyring.
+do not need the target's private key. Their public key in your GPG keyring is
+enough.
 
 **Examples:**
 
@@ -498,7 +498,7 @@ dotsecenv secret forget SECRET [flags]
 This adds a deletion marker to the secret. The secret will no longer be returned by `secret get` and will be shown as deleted in `vault describe`.
 
 <Aside type="note">
-The deletion is a soft delete — the secret's history is preserved in the vault file. Use `vault doctor` (which offers defragmentation) to permanently remove deleted secrets.
+The deletion is a soft delete. The secret's history is preserved in the vault file. Use `vault doctor` (which offers defragmentation) to permanently remove deleted secrets.
 </Aside>
 
 **Examples:**
@@ -516,10 +516,10 @@ dotsecenv secret forget -v ./project/vault SECRET_NAME
 
 **Behavior after deletion:**
 
-- `secret get SECRET` — Returns error: "secret has been deleted"
-- `secret get --all` — Skips values from vaults where the secret is deleted
-- `secret get --last` — Does not consider deleted secrets
-- `vault describe` — Shows `(deleted)` next to the secret name
+- `secret get SECRET` returns the error "secret has been deleted"
+- `secret get --all` skips values from vaults where the secret is deleted
+- `secret get --last` does not consider deleted secrets
+- `vault describe` shows `(deleted)` next to the secret name
 
 ---
 
@@ -1050,9 +1050,9 @@ gpg:
 
 ## See Also
 
-- [Getting Started](/getting-started/) — Quick setup guide
-- [First Secret Tutorial](/tutorials/first-secret/) — Store your first secret
-- [Share a Secret](/tutorials/share-secret/) — Team sharing workflow
-- [Behavior Settings](/concepts/behavior-settings/) — Granular behavior configuration
-- [Policy Directory](/concepts/policy-directory/) — Admin-pinned organization-wide rules
-- [How-To Guides](/how-to/) — Common tasks
+- [Getting Started](/getting-started/): quick setup guide
+- [First Secret Tutorial](/tutorials/first-secret/): store your first secret
+- [Share a Secret](/tutorials/share-secret/): team sharing workflow
+- [Behavior Settings](/concepts/behavior-settings/): granular behavior configuration
+- [Policy Directory](/concepts/policy-directory/): admin-pinned organization-wide rules
+- [How-To Guides](/how-to/): common tasks
