@@ -1,0 +1,302 @@
+---
+title: Policy Directory
+description: How admins pin organization-wide rules for dotsecenv via /etc/dotsecenv/policy.d/
+---
+
+import { Aside, Badge, Tabs, TabItem } from "@astrojs/starlight/components";
+
+<Aside type="note" title="Available in v0.6.0+">
+  The policy directory and the `dotsecenv policy` subcommand were introduced in **v0.6.0**. On earlier versions, `/etc/dotsecenv/policy.d/` is ignored and `dotsecenv policy` is not available.
+</Aside>
+
+User config is per-user — and that's the right default. But on a shared workstation, a CI runner, or a fleet of laptops where security has opinions, "per-user" stops being enough. Someone needs to say *the floor for RSA is 4096, not 2048*, or *vaults live under `/srv/secrets/` and nowhere else*, and have that survive any user editing their `~/.config/dotsecenv/config.yaml`.
+
+That's what the policy directory does. It's a flat tree of YAML fragments under `/etc/dotsecenv/policy.d/` that an administrator drops in, and dotsecenv enforces every time it starts. There's no separate daemon, no API, no DB. Just files — owned by root, mode `0644` or stricter — that get unioned and overlaid on top of whatever the user wrote.
+
+If you've worked with `sudoers.d`, `systemd` drop-ins, or `nginx`'s `conf.d`, the model will feel familiar. If you haven't: stick with us, the rules are short.
+
+## How it works
+
+When dotsecenv starts, it reads three things in order:
+
+1. The user's config (`~/.config/dotsecenv/config.yaml` or `-c <path>`).
+2. Every `*.yaml` file in `/etc/dotsecenv/policy.d/`, lexically sorted.
+3. Anything passed on the command line (e.g. `-v <vault>`).
+
+Then it merges:
+
+- **Allow-lists** (algorithms, vault paths) get **intersected**: a thing is allowed only if both the user *and* the policy say it is.
+- **Scalars** (gpg path, behavior toggles) get **overridden**: if any policy fragment sets one, the policy value wins over the user's.
+
+The user is told what changed. Anything filtered out by policy emits a warning to stderr — never silently dropped. If you'd rather not see them on every command, `-s` (silent) suppresses warnings.
+
+A minimal example. Let's say the user wrote:
+
+```yaml
+# ~/.config/dotsecenv/config.yaml
+approved_algorithms:
+  - algo: RSA
+    min_bits: 2048
+  - algo: ECC
+    curves: [P-256, P-384]
+    min_bits: 256
+vault:
+  - ~/personal-secrets/vault
+  - /srv/secrets/team-a/vault
+```
+
+And the admin dropped this into the policy directory:
+
+```yaml
+# /etc/dotsecenv/policy.d/50-org-baseline.yaml
+approved_algorithms:
+  - algo: ECC
+    curves: [P-384, P-521]
+    min_bits: 384
+approved_vault_paths:
+  - /srv/secrets/*/vault
+behavior:
+  restrict_to_configured_vaults: true
+```
+
+The user runs `dotsecenv vault describe` and sees:
+
+```text
+warning: policy excludes RSA from your approved_algorithms
+warning: policy raises min_bits for ECC from 256 to 384
+warning: policy and your approved_algorithms have no common curves for ECC; this algorithm is now unusable
+warning: policy filters vault path /home/alice/personal-secrets/vault (not matched by approved_vault_paths: [/srv/secrets/*/vault])
+```
+
+RSA is gone. P-256 is gone. The personal vault is gone. Whatever's left runs.
+
+## Two shapes of policy
+
+Policy fields fall into two categories, and they merge differently. Knowing which is which makes the rest of the page make sense.
+
+### Allow-lists (intersected, union across fragments)
+
+These describe what the user is *permitted* to do. Multiple fragments are unioned (most permissive wins between fragments), then intersected with the user's own allow-list (least permissive wins).
+
+| Field | What it controls |
+|---|---|
+| `approved_algorithms` | Which key algorithms, curves, and minimum bit-sizes the user may use |
+| `approved_vault_paths` | Which paths the user's `vault:` entries (and `-v` flags) may resolve to |
+
+The intersection is what makes them safe. A user can never *gain* capability by writing something the policy didn't allow — only lose it.
+
+### Scalars (last-fragment-to-set wins, overrides user)
+
+These describe how dotsecenv *behaves*. Multiple fragments are merged by lexical order — the last fragment that sets a field wins. The result then overrides whatever the user wrote.
+
+| Field | What it controls |
+|---|---|
+| `behavior.require_explicit_vault_upgrade` | Force users to run `vault upgrade` rather than auto-upgrading |
+| `behavior.restrict_to_configured_vaults` | Reject `-v` flags; only honor vaults from config |
+| `gpg.program` | Pin the GPG binary path (e.g. `/usr/bin/gpg`) |
+
+Cross-fragment conflicts on scalars are surfaced as `policy conflict` warnings so admins notice when two fragments fight. The conflict still resolves — last-fragment-to-set wins — but the warning is the breadcrumb.
+
+<Aside type="note">
+  See [Behavior Settings](/concepts/behavior-settings/) for what the `behavior.*` fields actually do at runtime. Policy just decides who gets to set them.
+</Aside>
+
+## A word on "set"
+
+For behavior toggles, *unset* and *set to `false`* are different things. A fragment that omits `restrict_to_configured_vaults` doesn't constrain it. A fragment that writes `restrict_to_configured_vaults: false` is actively saying "the answer is false," and that wins over an earlier fragment that said `true`.
+
+This matters when you compose fragments. `99-overrides.yaml` can relax a setting back to `false`, but only if you write it explicitly. Silence is not opinion.
+
+## Writing fragments
+
+Drop a `.yaml` file in `/etc/dotsecenv/policy.d/`. That's it. There's no registration step.
+
+A few conventions and one hard rule:
+
+- **Filename ordering matches Unix `*.d`**: files load lexically. The community convention is `00-base`, `50-team`, `99-overrides` — leave room between names so future fragments can slot in.
+- **Filename order doesn't matter for allow-lists** (they union), but it *does* matter for scalars (last-set-wins).
+- **Owner must be root, mode must be `0644` or stricter**. World-writable, group-writable, or non-root-owned policy files are rejected at load time. This is the hard rule — see "When policy goes wrong" below.
+
+A fragment may set:
+
+```yaml
+approved_algorithms:    # allow-list
+approved_vault_paths:   # allow-list
+behavior:               # scalars
+  require_explicit_vault_upgrade:
+  restrict_to_configured_vaults:
+gpg:                    # scalar
+  program:
+```
+
+A fragment may **not** set `login:` or `vault:`. Those are user identity and user paths — they don't belong in admin policy. Setting them in a fragment is a hard error at load time (`ExitConfigError`).
+
+Empty allow-lists are also an error. Writing `approved_algorithms: []` — meaning "no algorithm is approved" — would lock everyone out, so dotsecenv refuses. Omit the field entirely if you mean "I don't constrain this."
+
+## When policy goes wrong
+
+Policy is fail-closed. If dotsecenv can't load the policy directory cleanly, it doesn't fall back to "no policy" — it refuses to start. The whole point of admin policy is that users can't sidestep it; degrading silently to user-only would defeat that.
+
+Errors map to distinct exit codes so CI can tell them apart:
+
+| Condition | Exit code |
+|---|---|
+| Insecure permissions on `policy.d/` or a fragment | `8` (Access denied) |
+| Unreadable fragment (I/O error, broken symlink) | `8` (Access denied) |
+| Forbidden key in a fragment (`login`, `vault`) | `2` (Configuration error) |
+| Malformed YAML | `2` (Configuration error) |
+| Empty allow-list (`approved_algorithms: []`) | `1` (General error) |
+
+The two CLI commands below — `policy list` and `policy validate` — are deliberately standalone. They work even when the policy is broken, because that's exactly when you want to inspect it. They don't load the user config or open vaults; they only read `policy.d/`.
+
+If `/etc/dotsecenv/policy.d/` doesn't exist at all, that's not an error — it just means no policy is in effect, and dotsecenv runs as if none was configured.
+
+## Inspecting policy
+
+Two commands. Both are safe to run as any user; neither needs root.
+
+### `dotsecenv policy list`
+
+Print the effective merged policy with per-field origin attribution.
+
+```text
+$ dotsecenv policy list
+Policy directory: /etc/dotsecenv/policy.d (2 fragment(s))
+  approved_algorithms:
+    - algo: ECC, curves: [P-384, P-521], min_bits: 384  [50-org-baseline.yaml]
+  approved_vault_paths:
+    - /srv/secrets/*/vault  [50-org-baseline.yaml]
+  behavior:
+    restrict_to_configured_vaults: true  [50-org-baseline.yaml]
+  gpg.program: /usr/bin/gpg  [99-overrides.yaml]
+```
+
+Each entry is annotated with the fragment(s) it came from. For allow-lists, multiple origins mean the entry was contributed by more than one fragment. For scalars, the origin is the last fragment that set the value.
+
+`--json` returns a structured object — same shape but parseable:
+
+```bash
+dotsecenv policy list --json
+```
+
+### `dotsecenv policy validate`
+
+Parse all fragments, check structure, report. Designed for CI on the ops repo that ships policy:
+
+```text
+$ dotsecenv policy validate
+✓ policy valid (2 fragment(s) in /etc/dotsecenv/policy.d)
+```
+
+`--json` produces a flat object compatible with the convention used by `vault doctor --json`:
+
+```json
+{
+  "dir": "/etc/dotsecenv/policy.d",
+  "valid": true,
+  "fragment_count": 2
+}
+```
+
+On failure, `valid: false` and an `error` block with the matching exit code:
+
+```json
+{
+  "dir": "/etc/dotsecenv/policy.d",
+  "valid": false,
+  "fragment_count": 0,
+  "error": {
+    "exit_code": 8,
+    "message": "policy fragment /etc/dotsecenv/policy.d/50-org.yaml has insecure permissions: mode 0666"
+  }
+}
+```
+
+## Path matching
+
+`approved_vault_paths` uses Go's `filepath.Match` glob — single-segment matching, like a shell glob without `**`:
+
+| Pattern | Matches | Doesn't match |
+|---|---|---|
+| `/srv/secrets/*/vault` | `/srv/secrets/team-a/vault` | `/srv/secrets/a/b/vault` |
+| `/srv/secrets/*` | `/srv/secrets/vault` | `/srv/secrets/team-a/vault` |
+| `~/secrets/*` | `/home/alice/secrets/vault` (after `~` expansion) | |
+| `/srv/secrets/team-?/vault` | `/srv/secrets/team-a/vault` | `/srv/secrets/team-ab/vault` |
+
+`~` is expanded to the running user's home directory before matching. Relative paths in user config (e.g. `vault: [./project/vault]`) are normalized to absolute paths before checking.
+
+Choose patterns conservatively. If you write `*`, you've allowed anything — which may be fine for a permissive baseline, but defeats the point if you meant to restrict.
+
+## Real-world patterns
+
+A handful of fragments that show how the pieces compose.
+
+### Pin an organization baseline
+
+```yaml
+# /etc/dotsecenv/policy.d/00-baseline.yaml
+approved_algorithms:
+  - algo: ECC
+    curves: [P-384, P-521]
+    min_bits: 384
+  - algo: EdDSA
+    curves: [Ed25519]
+    min_bits: 255
+gpg:
+  program: /usr/bin/gpg
+```
+
+### Layer team-specific vault paths
+
+```yaml
+# /etc/dotsecenv/policy.d/50-team-paths.yaml
+approved_vault_paths:
+  - /srv/secrets/shared/vault
+  - /srv/secrets/team-*/vault
+```
+
+Allow-lists union, so this *adds* to whatever earlier fragments contributed; it doesn't replace them.
+
+### Lock down a CI image
+
+```yaml
+# /etc/dotsecenv/policy.d/99-ci.yaml
+approved_vault_paths:
+  - /workspace/vault
+behavior:
+  restrict_to_configured_vaults: true
+  require_explicit_vault_upgrade: true
+```
+
+Combined with the baseline above: CI images get a single permitted vault path, no `-v` overrides, and no implicit format upgrades during a build.
+
+### Override a baseline value
+
+```yaml
+# /etc/dotsecenv/policy.d/99-mac.yaml
+gpg:
+  program: /opt/homebrew/bin/gpg
+```
+
+Last-set-wins — `99-mac.yaml` loads after `00-baseline.yaml`, so on Macs the Homebrew GPG path takes effect. The user sees a `policy conflict on gpg.program` warning explaining where the value came from.
+
+## Quieting warnings
+
+Every policy effect emits a warning to stderr. Most of the time that's what you want — the user should know their config was filtered. In scripts and CI where the warnings are noise, pass `-s` (silent):
+
+```bash
+dotsecenv -s secret get DATABASE_URL
+```
+
+`-s` only suppresses warnings; errors still print and exit codes are unchanged.
+
+## Out of scope
+
+A few things the policy directory is *not*:
+
+- **Per-user policy.** All users on the host get the same policy. If you want per-user rules, that's what user config is for — pinned by what admin policy allows.
+- **Remote policy.** No HTTP fetch, no signed URL, no central server. Configuration management (Ansible, Chef, MDM, image bake) is the right tool for distribution.
+- **Policy on `login:` or `vault:`.** Identity and vault paths belong to the user. Use `approved_vault_paths` to constrain *where* vaults may live; the user still chooses which to use.
+- **Windows.** Not yet supported. The permission check assumes POSIX semantics; on Windows the policy loader returns an error.
+
+If `/etc/dotsecenv/policy.d/` doesn't exist, none of this is in effect — dotsecenv runs entirely from user config, exactly as before.

@@ -124,6 +124,7 @@ export default defineConfig({
             { label: 'Architecture', slug: 'concepts/architecture' },
             { label: 'Vault Format', slug: 'concepts/vault-format' },
             { label: 'Behavior Settings', slug: 'concepts/behavior-settings' },
+            { label: 'Policy Directory', slug: 'concepts/policy-directory' },
             { label: 'Standards Compliance', slug: 'concepts/compliance' },
             { label: 'Comparison', slug: 'concepts/comparison' },
           ],

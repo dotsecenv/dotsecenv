@@ -737,6 +737,137 @@ dotsecenv validate -v ./project/vault
 
 ---
 
+## policy
+
+Inspect and validate the system-wide policy directory at `/etc/dotsecenv/policy.d/`. See [Policy Directory](/concepts/policy-directory/) for the full design.
+
+<Aside type="note" title="Available in v0.6.0+">
+  Introduced in **v0.6.0**. Not available on earlier versions.
+</Aside>
+
+Both subcommands are standalone — they don't load the user config or open vaults, so they keep working when policy is broken (which is exactly when you need them).
+
+```bash
+dotsecenv policy <subcommand> [flags]
+```
+
+### policy list
+
+Print the effective merged policy with per-field origin attribution.
+
+```bash
+dotsecenv policy list [--json]
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Emit a structured JSON object instead of human-readable text |
+
+**Text output:**
+
+```text
+$ dotsecenv policy list
+Policy directory: /etc/dotsecenv/policy.d (2 fragment(s))
+  approved_algorithms:
+    - algo: ECC, curves: [P-384, P-521], min_bits: 384  [50-org-baseline.yaml]
+  approved_vault_paths:
+    - /srv/secrets/*/vault  [50-org-baseline.yaml]
+  behavior:
+    restrict_to_configured_vaults: true  [50-org-baseline.yaml]
+  gpg.program: /usr/bin/gpg  [99-overrides.yaml]
+```
+
+When no policy is configured (`/etc/dotsecenv/policy.d/` doesn't exist):
+
+```text
+$ dotsecenv policy list
+no policy in effect (/etc/dotsecenv/policy.d does not exist)
+```
+
+**JSON output:**
+
+```bash
+dotsecenv policy list --json
+```
+
+```json
+{
+  "dir": "/etc/dotsecenv/policy.d",
+  "fragments": ["50-org-baseline.yaml", "99-overrides.yaml"],
+  "approved_algorithms": [
+    {
+      "entry": { "algo": "ECC", "curves": ["P-384", "P-521"], "min_bits": 384 },
+      "origins": ["50-org-baseline.yaml"]
+    }
+  ],
+  "approved_vault_paths": [
+    { "pattern": "/srv/secrets/*/vault", "origins": ["50-org-baseline.yaml"] }
+  ],
+  "behavior": [
+    { "field": "restrict_to_configured_vaults", "value": true, "origin": "50-org-baseline.yaml" }
+  ],
+  "gpg": { "program": "/usr/bin/gpg", "origin": "99-overrides.yaml" }
+}
+```
+
+### policy validate
+
+Parse all fragments and report structural errors. Designed for CI on the ops repo that ships your policy.
+
+```bash
+dotsecenv policy validate [--json]
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Emit a structured JSON object on stdout (errors still affect exit code) |
+
+**Text output:**
+
+```text
+$ dotsecenv policy validate
+✓ policy valid (2 fragment(s) in /etc/dotsecenv/policy.d)
+```
+
+**JSON output (success):**
+
+```json
+{
+  "dir": "/etc/dotsecenv/policy.d",
+  "valid": true,
+  "fragment_count": 2
+}
+```
+
+**JSON output (failure):**
+
+```json
+{
+  "dir": "/etc/dotsecenv/policy.d",
+  "valid": false,
+  "fragment_count": 0,
+  "error": {
+    "exit_code": 8,
+    "message": "policy fragment /etc/dotsecenv/policy.d/50-org.yaml has insecure permissions: mode 0666"
+  }
+}
+```
+
+**Exit codes:**
+
+| Code | Condition |
+|------|-----------|
+| `0` | Policy valid (or no policy in effect) |
+| `1` | Empty allow-list (e.g., `approved_algorithms: []`) |
+| `2` | Forbidden key (`login`, `vault`) or malformed YAML |
+| `8` | Insecure permissions or unreadable fragment |
+
+---
+
 ## completion
 
 Generate shell completion scripts for dotsecenv.
@@ -923,4 +1054,5 @@ gpg:
 - [First Secret Tutorial](/tutorials/first-secret/) — Store your first secret
 - [Share a Secret](/tutorials/share-secret/) — Team sharing workflow
 - [Behavior Settings](/concepts/behavior-settings/) — Granular behavior configuration
+- [Policy Directory](/concepts/policy-directory/) — Admin-pinned organization-wide rules
 - [How-To Guides](/how-to/) — Common tasks

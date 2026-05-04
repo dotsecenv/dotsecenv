@@ -19,6 +19,10 @@ behavior:
   restrict_to_configured_vaults: false
 ```
 
+<Aside type="note">
+  On shared hosts and CI, an administrator can pin any of these settings system-wide via the [policy directory](/concepts/policy-directory/) at `/etc/dotsecenv/policy.d/` (available in v0.6.0+). Policy values override whatever the user wrote here, with a warning to stderr explaining what changed.
+</Aside>
+
 ## Available Settings
 
 ### `require_explicit_vault_upgrade`
@@ -96,6 +100,10 @@ gpg:
 
 <Aside type="note">
   An empty or missing `gpg.program` value will cause an error. You must explicitly set it to `PATH` or provide an absolute path.
+</Aside>
+
+<Aside type="note">
+  `gpg.program` can also be pinned by the [policy directory](/concepts/policy-directory/) (v0.6.0+), which is useful when admins want to force a specific GPG binary across an entire fleet.
 </Aside>
 
 ## Example Configurations
