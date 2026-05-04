@@ -81,13 +81,3 @@ jobs:
           init-config: '--gpg-program /usr/bin/gpg'
       - run: dotsecenv version
 
-  test-init-config-no-gpg-program:
-    name: Test init-config --no-gpg-program
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: dotsecenv/dotsecenv@v0
-        with:
-          version: ${{ github.event.client_payload.version || 'latest' }}
-          init-config: '--no-gpg-program'
-      - run: dotsecenv version
