@@ -1,30 +1,35 @@
 # Rotate a compromised GPG key
 
-How to remove a compromised private key's access from your dotsecenv
-vaults — and what the append-only design means for the keys that
-already saw past secrets.
+How to remove a compromised private key from your dotsecenv vaults,
+and what the append-only design means for the entries that key
+already saw.
 
 The same workflow applies whether the compromised key is yours or a
 teammate's.
 
+> **Looking for the canonical version?** A consolidated walkthrough
+> lives in the [Recover from a Compromised GPG Key how-to](https://dotsecenv.com/how-to/#recover-from-a-compromised-gpg-key)
+> on dotsecenv.com. Background reading: the
+> [Threat Model](https://dotsecenv.com/concepts/threat-model/) and
+> [Revoke Access tutorial](https://dotsecenv.com/tutorials/revoke-access/).
+
 ## Mental model first
 
-dotsecenv vaults are **append-only** and entries are encrypted to
-GPG public keys. This has two consequences for rotation:
+dotsecenv vaults are append-only and entries are encrypted to GPG
+public keys. Two consequences for rotation:
 
 1. **You cannot edit the past.** Old vault entries remain in the
    file and in `git` history, encrypted to whoever held the
    recipient list at the time. The compromised private key still
-   decrypts those entries — and any clone of the repo retains them.
+   decrypts those entries, and any clone of the repo retains them.
 2. **Revoking a recipient only affects future writes.** After
    `secret revoke`, new `secret store` entries are no longer
    encrypted to the revoked recipient. Past entries are unchanged.
 
-The durable mitigation is therefore to **rotate the underlying
-secret at its source** (issue a new database password, regenerate
-the API key, etc.) and then store the new value. The leaked key can
-still decrypt the old value, but the old value no longer
-authenticates to anything.
+The durable mitigation is to rotate the underlying secret at its
+source (issue a new database password, reissue the API key) and
+then store the new value. The leaked key can still decrypt the old
+value, but the old value no longer authenticates to anything.
 
 ## Runbook
 
@@ -65,9 +70,9 @@ store it:
 echo "<new-value>" | dotsecenv secret store <SECRET_NAME>
 ```
 
-This is the step that actually neutralizes the compromise. The
-leaked key can still decrypt every entry written before this point,
-but those entries hold values that no longer work.
+This is the step that neutralizes the compromise. The leaked key
+can still decrypt every entry written before this point, but those
+entries hold values that no longer work.
 
 ### 5. Verify
 
@@ -78,7 +83,7 @@ dotsecenv vault describe               # confirm recipient lists
 
 Every current secret should now list the replacement key as a
 recipient and **not** the compromised key. Past entries still show
-the compromised key — that is expected and unavoidable.
+the compromised key, which is expected and unavoidable.
 
 ### 6. Commit and push
 
@@ -99,8 +104,10 @@ trail.
 
 ## See also
 
-- [Add a secret](add-secret.md)
-- [Migrate from .env](migrate-from-dotenv.md)
-- [Team share + revoke + rotate example](../examples/02-team-share-revoke/)
-- [SECURITY.md](../SECURITY.md)
-- [Threat model](https://dotsecenv.com/concepts/threat-model/)
+- How-to: [Recover from a Compromised GPG Key](https://dotsecenv.com/how-to/#recover-from-a-compromised-gpg-key)
+- Tutorial: [Revoke Access](https://dotsecenv.com/tutorials/revoke-access/)
+- Concept: [Threat Model](https://dotsecenv.com/concepts/threat-model/)
+- Concept: [Vault Format](https://dotsecenv.com/concepts/vault-format/)
+- Runnable example: [`examples/02-team-share-revoke/`](../examples/02-team-share-revoke/)
+- Recipe: [Add a secret](add-secret.md)
+- Repo: [SECURITY.md](../SECURITY.md)

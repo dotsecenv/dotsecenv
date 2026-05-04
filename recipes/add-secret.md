@@ -1,7 +1,15 @@
 # Add a secret to a vault
 
-How to add (or update) a secret while preserving the append-only audit
-trail that dotsecenv vaults provide.
+Add or update a secret in a dotsecenv vault. Every `secret store`
+call appends a new entry, so the vault keeps a full history of
+prior values.
+
+> **Looking for a step-by-step walkthrough?** The canonical
+> long-form versions live on dotsecenv.com:
+> [First Secret tutorial](https://dotsecenv.com/tutorials/first-secret/)
+> for the guided path, and
+> [Create a Secret how-to](https://dotsecenv.com/how-to/#create-a-secret)
+> for short reference snippets (stdin, file, namespace, specific vault).
 
 ## Command
 
@@ -10,19 +18,19 @@ echo "<value>" | dotsecenv secret store <NAME>
 ```
 
 `secret store` reads the value from stdin and appends a new entry to
-the active vault. There is no `secret add` or `secret update` —
-storing a value is the single operation, whether the name exists or
+the active vault. There is no `secret add` or `secret update`.
+Storing a value is the single operation, whether the name exists or
 not.
 
 ## How append-only works
 
 Each call to `secret store` writes a new line to the vault. Vaults
-are **append-only signed JSONL files**: every prior version of every
+are append-only signed JSONL files: every prior version of every
 secret remains in the file as its own line, encrypted to whichever
 recipients were valid at the time it was written.
 
-When you read with `secret get`, the latest entry wins. When you
-inspect with `vault describe`, you see the full history.
+When you read with `secret get`, the latest entry wins. `vault
+describe` shows the full history.
 
 ## Inspect the audit trail
 
@@ -59,7 +67,8 @@ rotate the underlying secret at its source.
 
 ## See also
 
-- [Quickstart example](../examples/01-quickstart/)
-- [Team share + revoke + rotate example](../examples/02-team-share-revoke/)
-- [Rotate a compromised key](rotate-compromised-key.md)
-- [Concepts: append-only vault](https://dotsecenv.com/concepts/)
+- Tutorial: [First Secret](https://dotsecenv.com/tutorials/first-secret/)
+- How-to: [Create a Secret](https://dotsecenv.com/how-to/#create-a-secret)
+- Concept: [Vault Format](https://dotsecenv.com/concepts/vault-format/)
+- Runnable example: [`examples/01-quickstart/`](../examples/01-quickstart/)
+- Recipe: [Rotate a compromised key](rotate-compromised-key.md)
