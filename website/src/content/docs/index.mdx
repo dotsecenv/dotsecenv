@@ -200,7 +200,7 @@ Now that you have dotsecenv running, here's what you can do with it.
   />
   <LinkCard
     title="Share secrets with your team"
-    description="Use GPG multi-recipient encryption to share secrets with teammates - no Slack DMs required."
+    description="Use GPG multi-recipient encryption to share secrets with teammates. No Slack DMs required."
     href="/tutorials/share-secret/"
   />
   <LinkCard
@@ -210,12 +210,12 @@ Now that you have dotsecenv running, here's what you can do with it.
   />
   <LinkCard
     title="GitHub Actions"
-    description="Install dotsecenv in CI/CD pipelines with the official GitHub Action - with signature and provenance verification."
+    description="Install dotsecenv in CI/CD pipelines with the official GitHub Action, including signature and provenance verification."
     href="/guides/github-action/"
   />
   <LinkCard
     title="Security model & compliance"
-    description="AES-256-GCM, FIPS 186-5 signatures, hermetic testing, SLSA Build Level 3 - understand the security guarantees."
+    description="AES-256-GCM, FIPS 186-5 signatures, hermetic testing, SLSA Build Level 3. Understand the security guarantees."
     href="/concepts/security-model/"
   />
 </CardGrid>
@@ -224,12 +224,12 @@ Now that you have dotsecenv running, here's what you can do with it.
 
 ## How it works, briefly
 
-dotsecenv uses **hybrid encryption**: secrets are encrypted with AES-256-GCM (fast, symmetric), and the encryption key is wrapped with your GPG key (asymmetric). This means:
+dotsecenv uses hybrid encryption. Secrets are encrypted with AES-256-GCM (fast, symmetric), and the encryption key is wrapped with your GPG key (asymmetric). That means:
 
-- **Only you** (and anyone you explicitly share with) can decrypt your secrets
-- **No cloud service** is involved; your GPG keyring is the only trust anchor
-- **The vault is append-only**; every operation is cryptographically signed, giving you a built-in audit trail
-- **Safe to commit** - the vault file is just encrypted JSONL, safe to push to any git remote
+- Only you (and anyone you explicitly share with) can decrypt your secrets.
+- No cloud service is involved. Your GPG keyring is the only trust anchor.
+- The vault is append-only. Every operation is cryptographically signed, which gives you a built-in audit trail.
+- The vault file is encrypted JSONL, so it's safe to commit to any git remote.
 
 <CardGrid>
   <Card title="Open source" icon="open-book">

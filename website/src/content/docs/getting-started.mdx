@@ -158,7 +158,7 @@ You need a GPG key. Most developers already have one for signing git commits. If
 - Your secret is **encrypted at rest** in the vault using your GPG key (AES-256-GCM)
 - The shell plugin **auto-loads** secrets when you `cd` into a directory with a `.secenv` file
 - Secrets are **auto-unloaded** when you leave the directory tree
-- The vault file is safe to commit to git — it's just encrypted JSONL
+- The vault file is safe to commit to git. It's just encrypted JSONL.
 
 ## Verification checklist
 
@@ -170,9 +170,9 @@ Before moving on, verify:
 
 ## What's next
 
-- [Reloading Secrets](/tutorials/reload-secrets/) — What to do when vault updates don't appear in your shell
-- [Migrate from .env](/tutorials/migrate-from-dotenv/) — Move existing secrets from plaintext `.env` files
-- [Share a Secret](/tutorials/share-secret/) — Share encrypted secrets with teammates
-- [Shell Plugins](/guides/shell-plugins/) — Trust system, `dse up`, nested `.secenv` files
-- [Security Model](/concepts/security-model/) — Understand how encryption works
-- [CLI Reference](/reference/) — Full command documentation
+- [Reloading Secrets](/tutorials/reload-secrets/): what to do when vault updates don't appear in your shell
+- [Migrate from .env](/tutorials/migrate-from-dotenv/): move existing secrets from plaintext `.env` files
+- [Share a Secret](/tutorials/share-secret/): share encrypted secrets with teammates
+- [Shell Plugins](/guides/shell-plugins/): trust system, `dse up`, nested `.secenv` files
+- [Security Model](/concepts/security-model/): understand how encryption works
+- [CLI Reference](/reference/): full command documentation
