@@ -75,12 +75,14 @@ type Fragment struct {
 	Path               string                     `yaml:"-"` // populated by loader
 	ApprovedAlgorithms []config.ApprovedAlgorithm `yaml:"approved_algorithms,omitempty"`
 	ApprovedVaultPaths []string                   `yaml:"approved_vault_paths,omitempty"`
-	// PR #3 will add: Behavior config.BehaviorConfig and GPG config.GPGConfig
+	Behavior           config.BehaviorConfig      `yaml:"behavior,omitempty"`
+	GPG                config.GPGConfig           `yaml:"gpg,omitempty"`
 }
 
-// forbiddenKeysPhase1 are top-level YAML keys rejected at fragment load.
-// PR #3 will lift "behavior" and "gpg" from this list.
-var forbiddenKeysPhase1 = []string{"login", "vault", "behavior", "gpg"}
+// forbiddenKeys are top-level YAML keys rejected at fragment load.
+// `login` is per-user (cryptographically bound to a private key); `vault`
+// would erase user vaults wholesale (use `approved_vault_paths` instead).
+var forbiddenKeys = []string{"login", "vault"}
 
 // Load enumerates *.yaml in DefaultDir (lexical order), validates each
 // fragment, and returns the assembled Policy plus per-fragment warnings.
@@ -162,7 +164,7 @@ func rejectForbiddenKeys(path string, data []byte) error {
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return nil // primary parse will surface this as ErrMalformedFragment
 	}
-	for _, key := range forbiddenKeysPhase1 {
+	for _, key := range forbiddenKeys {
 		if _, ok := raw[key]; ok {
 			return fmt.Errorf("%w: %s contains '%s:' (not allowed in policy fragments)", ErrForbiddenKey, path, key)
 		}

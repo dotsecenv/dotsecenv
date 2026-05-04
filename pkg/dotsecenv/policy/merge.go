@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"fmt"
 	"path/filepath"
 	"sort"
 
@@ -122,4 +123,91 @@ func normalizePath(p string) string {
 		return abs
 	}
 	return expanded
+}
+
+// MergedGPGProgram returns the cross-fragment merged gpg.program scalar.
+// Last-fragment-to-set wins (lexical filename order; matches sudoers.d/systemd
+// drop-in convention). Empty string in a fragment = "not set". Returns the
+// merged value, the origin path of the winning fragment (or "" if no fragment
+// set it), and conflict warnings — one per chained override where a later
+// fragment changed the value to something different from the previous setter.
+//
+// Same value across fragments emits no warning (it's redundant, not a
+// conflict). Different values emit "policy conflict on gpg.program: …".
+func (p Policy) MergedGPGProgram() (program string, origin string, conflicts []string) {
+	for _, f := range p.Fragments {
+		if f.GPG.Program == "" {
+			continue
+		}
+		if origin != "" && f.GPG.Program != program {
+			conflicts = append(conflicts, fmt.Sprintf(
+				"policy conflict on gpg.program: overridden to %q by %s; previous value %q from %s",
+				f.GPG.Program, f.Path, program, origin,
+			))
+		}
+		program = f.GPG.Program
+		origin = f.Path
+	}
+	return program, origin, conflicts
+}
+
+// behaviorField is one settable sub-field of config.BehaviorConfig. The
+// closure-based accessor pattern keeps MergedBehavior independent of how
+// many sub-fields the BehaviorConfig type has — adding a new behavior
+// field is a one-line append here, no merge-engine changes.
+type behaviorField struct {
+	name string
+	get  func(config.BehaviorConfig) *bool
+	set  func(*config.BehaviorConfig, *bool)
+}
+
+var behaviorFields = []behaviorField{
+	{
+		name: "behavior.require_explicit_vault_upgrade",
+		get:  func(b config.BehaviorConfig) *bool { return b.RequireExplicitVaultUpgrade },
+		set:  func(b *config.BehaviorConfig, v *bool) { b.RequireExplicitVaultUpgrade = v },
+	},
+	{
+		name: "behavior.restrict_to_configured_vaults",
+		get:  func(b config.BehaviorConfig) *bool { return b.RestrictToConfiguredVaults },
+		set:  func(b *config.BehaviorConfig, v *bool) { b.RestrictToConfiguredVaults = v },
+	},
+}
+
+// MergedBehavior returns the cross-fragment merged behavior.* fields.
+// Each sub-field independently uses last-fragment-to-set wins; nil = not set.
+// Returns the merged BehaviorConfig, per-field-name origin (which fragment
+// set the final value), and conflict warnings — one per chained override
+// per sub-field where a later fragment changed the value.
+//
+// Sub-fields are independent: behavior.A set by fragment 1 and behavior.B
+// set by fragment 2 produces no conflicts (they touch different fields).
+func (p Policy) MergedBehavior() (b config.BehaviorConfig, origins map[string]string, conflicts []string) {
+	origins = map[string]string{}
+
+	for _, fld := range behaviorFields {
+		var (
+			currentValue  *bool
+			currentOrigin string
+		)
+		for _, frag := range p.Fragments {
+			v := fld.get(frag.Behavior)
+			if v == nil {
+				continue
+			}
+			if currentValue != nil && *v != *currentValue {
+				conflicts = append(conflicts, fmt.Sprintf(
+					"policy conflict on %s: overridden to %v by %s; previous value %v from %s",
+					fld.name, *v, frag.Path, *currentValue, currentOrigin,
+				))
+			}
+			currentValue = v
+			currentOrigin = frag.Path
+		}
+		if currentValue != nil {
+			fld.set(&b, currentValue)
+			origins[fld.name] = currentOrigin
+		}
+	}
+	return b, origins, conflicts
 }

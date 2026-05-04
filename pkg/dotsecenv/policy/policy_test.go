@@ -155,14 +155,14 @@ func TestLoadFromDir_NonYamlFilesIgnored(t *testing.T) {
 }
 
 func TestLoadFromDir_ForbiddenKey(t *testing.T) {
+	// `behavior` and `gpg` were forbidden in PR #1 but became legitimate
+	// policy keys in PR #3; only `login` and `vault` remain forbidden.
 	cases := []struct {
 		key  string
 		body string
 	}{
 		{"login", "login:\n  fingerprint: ABCD\n"},
 		{"vault", "vault:\n  - /tmp/v\n"},
-		{"behavior", "behavior:\n  restrict_to_configured_vaults: true\n"},
-		{"gpg", "gpg:\n  program: /usr/bin/gpg\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.key, func(t *testing.T) {
@@ -183,6 +183,32 @@ func TestLoadFromDir_ForbiddenKey(t *testing.T) {
 				t.Errorf("error should cite fragment path, got: %v", err)
 			}
 		})
+	}
+}
+
+// TestLoadFromDir_BehaviorAndGPGAccepted proves PR #3 lifted these keys
+// from the forbidden list — they're now valid policy fields.
+func TestLoadFromDir_BehaviorAndGPGAccepted(t *testing.T) {
+	dir := t.TempDir()
+	writeFragment(t, dir, "00.yaml", `
+behavior:
+  restrict_to_configured_vaults: true
+gpg:
+  program: /usr/bin/gpg
+`)
+	pol, _, err := loadFromDir(dir, secureStat(0))
+	if err != nil {
+		t.Fatalf("loadFromDir: %v", err)
+	}
+	if len(pol.Fragments) != 1 {
+		t.Fatalf("expected 1 fragment, got %d", len(pol.Fragments))
+	}
+	f := pol.Fragments[0]
+	if f.Behavior.RestrictToConfiguredVaults == nil || !*f.Behavior.RestrictToConfiguredVaults {
+		t.Errorf("expected RestrictToConfiguredVaults=&true, got %v", f.Behavior.RestrictToConfiguredVaults)
+	}
+	if f.GPG.Program != "/usr/bin/gpg" {
+		t.Errorf("expected GPG.Program=/usr/bin/gpg, got %q", f.GPG.Program)
 	}
 }
 
@@ -697,6 +723,330 @@ func TestIsVaultPathAllowed_TildeExpansion(t *testing.T) {
 	target := filepath.Join(home, ".local/share/dotsecenv/vault")
 	if !p.IsVaultPathAllowed(target) {
 		t.Errorf("expected %s to match ~/.local/share/dotsecenv/vault pattern", target)
+	}
+}
+
+// --- MergedGPGProgram tests ---
+
+func TestMergedGPGProgram_NoFragmentsSet(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml"}, // GPG omitted entirely
+		{Path: "50.yaml", GPG: config.GPGConfig{Program: ""}}, // empty = not set
+	}}
+	prog, origin, conflicts := p.MergedGPGProgram()
+	if prog != "" || origin != "" || len(conflicts) != 0 {
+		t.Errorf("expected empty result with no conflicts, got prog=%q origin=%q conflicts=%v", prog, origin, conflicts)
+	}
+}
+
+func TestMergedGPGProgram_SingleFragment(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", GPG: config.GPGConfig{Program: "/usr/bin/gpg"}},
+	}}
+	prog, origin, conflicts := p.MergedGPGProgram()
+	if prog != "/usr/bin/gpg" {
+		t.Errorf("expected /usr/bin/gpg, got %q", prog)
+	}
+	if origin != "00.yaml" {
+		t.Errorf("expected origin 00.yaml, got %q", origin)
+	}
+	if len(conflicts) != 0 {
+		t.Errorf("expected no conflicts, got: %v", conflicts)
+	}
+}
+
+func TestMergedGPGProgram_SameValueAcrossFragments_NoConflict(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", GPG: config.GPGConfig{Program: "/usr/bin/gpg"}},
+		{Path: "99.yaml", GPG: config.GPGConfig{Program: "/usr/bin/gpg"}}, // same value
+	}}
+	prog, origin, conflicts := p.MergedGPGProgram()
+	if prog != "/usr/bin/gpg" {
+		t.Errorf("expected /usr/bin/gpg, got %q", prog)
+	}
+	if origin != "99.yaml" {
+		t.Errorf("expected last-set origin 99.yaml, got %q", origin)
+	}
+	if len(conflicts) != 0 {
+		t.Errorf("same value across fragments should not produce a conflict, got: %v", conflicts)
+	}
+}
+
+func TestMergedGPGProgram_DifferentValues_LastWinsWithConflict(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00-corp.yaml", GPG: config.GPGConfig{Program: "/opt/homebrew/bin/gpg"}},
+		{Path: "99-team.yaml", GPG: config.GPGConfig{Program: "/usr/bin/gpg"}},
+	}}
+	prog, origin, conflicts := p.MergedGPGProgram()
+	if prog != "/usr/bin/gpg" {
+		t.Errorf("expected last-wins /usr/bin/gpg, got %q", prog)
+	}
+	if origin != "99-team.yaml" {
+		t.Errorf("expected origin 99-team.yaml, got %q", origin)
+	}
+	if len(conflicts) != 1 {
+		t.Fatalf("expected 1 conflict warning, got %d: %v", len(conflicts), conflicts)
+	}
+	wantSubstrs := []string{
+		"policy conflict on gpg.program",
+		"overridden to \"/usr/bin/gpg\" by 99-team.yaml",
+		"previous value \"/opt/homebrew/bin/gpg\" from 00-corp.yaml",
+	}
+	for _, s := range wantSubstrs {
+		if !strings.Contains(conflicts[0], s) {
+			t.Errorf("conflict warning missing %q\ngot: %s", s, conflicts[0])
+		}
+	}
+}
+
+func TestMergedGPGProgram_ChainOfDifferingFragments_NWarnings(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", GPG: config.GPGConfig{Program: "/a"}},
+		{Path: "50.yaml", GPG: config.GPGConfig{Program: "/b"}},
+		{Path: "99.yaml", GPG: config.GPGConfig{Program: "/c"}},
+	}}
+	prog, _, conflicts := p.MergedGPGProgram()
+	if prog != "/c" {
+		t.Errorf("expected last-wins /c, got %q", prog)
+	}
+	if len(conflicts) != 2 {
+		t.Fatalf("expected 2 conflicts (a→b, b→c), got %d: %v", len(conflicts), conflicts)
+	}
+}
+
+// --- MergedBehavior tests ---
+
+func ptrBool(v bool) *bool { return &v }
+
+func TestMergedBehavior_NoFragmentsSet(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml"},
+	}}
+	b, origins, conflicts := p.MergedBehavior()
+	if b.RequireExplicitVaultUpgrade != nil || b.RestrictToConfiguredVaults != nil {
+		t.Errorf("expected zero behavior, got %+v", b)
+	}
+	if len(origins) != 0 || len(conflicts) != 0 {
+		t.Errorf("expected no origins/conflicts, got origins=%v conflicts=%v", origins, conflicts)
+	}
+}
+
+func TestMergedBehavior_SingleFragment_OneField(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", Behavior: config.BehaviorConfig{
+			RestrictToConfiguredVaults: ptrBool(true),
+		}},
+	}}
+	b, origins, conflicts := p.MergedBehavior()
+	if b.RestrictToConfiguredVaults == nil || !*b.RestrictToConfiguredVaults {
+		t.Errorf("expected RestrictToConfiguredVaults=true, got %v", b.RestrictToConfiguredVaults)
+	}
+	if b.RequireExplicitVaultUpgrade != nil {
+		t.Errorf("expected RequireExplicitVaultUpgrade=nil, got %v", b.RequireExplicitVaultUpgrade)
+	}
+	if origins["behavior.restrict_to_configured_vaults"] != "00.yaml" {
+		t.Errorf("expected origin 00.yaml, got %v", origins)
+	}
+	if len(conflicts) != 0 {
+		t.Errorf("expected no conflicts, got: %v", conflicts)
+	}
+}
+
+func TestMergedBehavior_PerFieldIndependence(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", Behavior: config.BehaviorConfig{
+			RequireExplicitVaultUpgrade: ptrBool(true),
+		}},
+		{Path: "99.yaml", Behavior: config.BehaviorConfig{
+			RestrictToConfiguredVaults: ptrBool(true),
+		}},
+	}}
+	b, origins, conflicts := p.MergedBehavior()
+	if b.RequireExplicitVaultUpgrade == nil || !*b.RequireExplicitVaultUpgrade {
+		t.Errorf("expected RequireExplicitVaultUpgrade=true, got %v", b.RequireExplicitVaultUpgrade)
+	}
+	if b.RestrictToConfiguredVaults == nil || !*b.RestrictToConfiguredVaults {
+		t.Errorf("expected RestrictToConfiguredVaults=true, got %v", b.RestrictToConfiguredVaults)
+	}
+	if origins["behavior.require_explicit_vault_upgrade"] != "00.yaml" {
+		t.Errorf("expected require_explicit origin 00.yaml, got %v", origins)
+	}
+	if origins["behavior.restrict_to_configured_vaults"] != "99.yaml" {
+		t.Errorf("expected restrict_to origin 99.yaml, got %v", origins)
+	}
+	if len(conflicts) != 0 {
+		t.Errorf("per-field independence should produce no conflicts, got: %v", conflicts)
+	}
+}
+
+func TestMergedBehavior_SameField_DifferentValues_LastWinsWithConflict(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00-corp.yaml", Behavior: config.BehaviorConfig{
+			RestrictToConfiguredVaults: ptrBool(false),
+		}},
+		{Path: "99-team.yaml", Behavior: config.BehaviorConfig{
+			RestrictToConfiguredVaults: ptrBool(true),
+		}},
+	}}
+	b, origins, conflicts := p.MergedBehavior()
+	if b.RestrictToConfiguredVaults == nil || !*b.RestrictToConfiguredVaults {
+		t.Errorf("expected last-wins true, got %v", b.RestrictToConfiguredVaults)
+	}
+	if origins["behavior.restrict_to_configured_vaults"] != "99-team.yaml" {
+		t.Errorf("expected origin 99-team.yaml, got %v", origins)
+	}
+	if len(conflicts) != 1 {
+		t.Fatalf("expected 1 conflict, got %d: %v", len(conflicts), conflicts)
+	}
+	if !strings.Contains(conflicts[0], "behavior.restrict_to_configured_vaults") ||
+		!strings.Contains(conflicts[0], "99-team.yaml") ||
+		!strings.Contains(conflicts[0], "00-corp.yaml") {
+		t.Errorf("conflict missing expected substrings: %s", conflicts[0])
+	}
+}
+
+func TestMergedBehavior_SameField_SameValue_NoConflict(t *testing.T) {
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", Behavior: config.BehaviorConfig{
+			RestrictToConfiguredVaults: ptrBool(true),
+		}},
+		{Path: "99.yaml", Behavior: config.BehaviorConfig{
+			RestrictToConfiguredVaults: ptrBool(true),
+		}},
+	}}
+	_, _, conflicts := p.MergedBehavior()
+	if len(conflicts) != 0 {
+		t.Errorf("same value across fragments should not produce a conflict, got: %v", conflicts)
+	}
+}
+
+// --- Apply scalar override tests ---
+
+func TestApply_GPGProgram_PolicySetUserUnset_NoWarning(t *testing.T) {
+	cfg := config.Config{GPG: config.GPGConfig{Program: ""}}
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", GPG: config.GPGConfig{Program: "/usr/bin/gpg"}},
+	}}
+	out, warnings := Apply(cfg, p)
+	if out.GPG.Program != "/usr/bin/gpg" {
+		t.Errorf("expected policy value /usr/bin/gpg, got %q", out.GPG.Program)
+	}
+	for _, w := range warnings {
+		if strings.Contains(w, "policy overrides user gpg.program") {
+			t.Errorf("did not expect override warning when user had no value, got: %s", w)
+		}
+	}
+}
+
+func TestApply_GPGProgram_PolicyOverridesUserDifferentValue_Warning(t *testing.T) {
+	cfg := config.Config{GPG: config.GPGConfig{Program: "/opt/homebrew/bin/gpg"}}
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", GPG: config.GPGConfig{Program: "/usr/bin/gpg"}},
+	}}
+	out, warnings := Apply(cfg, p)
+	if out.GPG.Program != "/usr/bin/gpg" {
+		t.Errorf("expected policy value /usr/bin/gpg, got %q", out.GPG.Program)
+	}
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w, "policy overrides user gpg.program") &&
+			strings.Contains(w, "/opt/homebrew/bin/gpg") &&
+			strings.Contains(w, "/usr/bin/gpg") &&
+			strings.Contains(w, "00.yaml") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected user-override warning, got: %v", warnings)
+	}
+}
+
+func TestApply_GPGProgram_PolicySameAsUser_NoWarning(t *testing.T) {
+	cfg := config.Config{GPG: config.GPGConfig{Program: "/usr/bin/gpg"}}
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", GPG: config.GPGConfig{Program: "/usr/bin/gpg"}},
+	}}
+	out, warnings := Apply(cfg, p)
+	if out.GPG.Program != "/usr/bin/gpg" {
+		t.Errorf("expected unchanged value, got %q", out.GPG.Program)
+	}
+	for _, w := range warnings {
+		if strings.Contains(w, "overrides user") {
+			t.Errorf("matched values should not produce override warning, got: %s", w)
+		}
+	}
+}
+
+func TestApply_Behavior_PolicyOverridesUserDifferentValue_Warning(t *testing.T) {
+	cfg := config.Config{Behavior: config.BehaviorConfig{
+		RestrictToConfiguredVaults: ptrBool(false),
+	}}
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", Behavior: config.BehaviorConfig{
+			RestrictToConfiguredVaults: ptrBool(true),
+		}},
+	}}
+	out, warnings := Apply(cfg, p)
+	if out.Behavior.RestrictToConfiguredVaults == nil || !*out.Behavior.RestrictToConfiguredVaults {
+		t.Errorf("expected policy value true, got %v", out.Behavior.RestrictToConfiguredVaults)
+	}
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w, "policy overrides user behavior.restrict_to_configured_vaults") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected user-override warning, got: %v", warnings)
+	}
+}
+
+func TestApply_Behavior_NoPolicyConstraint_UserValueRetained(t *testing.T) {
+	cfg := config.Config{Behavior: config.BehaviorConfig{
+		RestrictToConfiguredVaults: ptrBool(true),
+	}}
+	// Policy has approved_algorithms but no behavior fields — just to make
+	// the policy non-empty; user behavior should be untouched.
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", ApprovedAlgorithms: []config.ApprovedAlgorithm{
+			{Algo: "RSA", MinBits: 2048},
+		}},
+	}}
+	out, _ := Apply(cfg, p)
+	if out.Behavior.RestrictToConfiguredVaults == nil || !*out.Behavior.RestrictToConfiguredVaults {
+		t.Errorf("expected user value retained when policy has no behavior constraint, got %v", out.Behavior.RestrictToConfiguredVaults)
+	}
+}
+
+func TestApply_ConflictWarningsAlsoSurfaceForUser(t *testing.T) {
+	// Two fragments disagree on gpg.program. The conflict should surface in
+	// Apply's warnings (in addition to the user-override warning).
+	cfg := config.Config{GPG: config.GPGConfig{Program: "/x/gpg"}}
+	p := Policy{Fragments: []Fragment{
+		{Path: "00.yaml", GPG: config.GPGConfig{Program: "/a/gpg"}},
+		{Path: "99.yaml", GPG: config.GPGConfig{Program: "/b/gpg"}},
+	}}
+	out, warnings := Apply(cfg, p)
+	if out.GPG.Program != "/b/gpg" {
+		t.Errorf("expected last-wins /b/gpg, got %q", out.GPG.Program)
+	}
+	var (
+		sawConflict bool
+		sawOverride bool
+	)
+	for _, w := range warnings {
+		if strings.Contains(w, "policy conflict on gpg.program") {
+			sawConflict = true
+		}
+		if strings.Contains(w, "policy overrides user gpg.program") {
+			sawOverride = true
+		}
+	}
+	if !sawConflict {
+		t.Errorf("expected cross-fragment conflict warning, got: %v", warnings)
+	}
+	if !sawOverride {
+		t.Errorf("expected user-override warning, got: %v", warnings)
 	}
 }
 

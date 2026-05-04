@@ -537,10 +537,12 @@ behaves exactly as before (today's behavior is preserved). When the directory
 exists, fragments are loaded in lexical filename order and merged into an
 effective policy that constrains every user.
 
-### Supported allow-list fields
+### Supported policy fields
 
 ```yaml
 # /etc/dotsecenv/policy.d/00-corp-baseline.yaml
+
+# Allow-list fields: cross-fragment union; user vs policy is intersection.
 approved_algorithms:
   - algo: ECC
     curves: [P-384, P-521]
@@ -553,24 +555,64 @@ approved_vault_paths:
   - /var/lib/dotsecenv/vault
   - ~/.local/share/dotsecenv/vault
   - ~/work/*/.dotsecenv/vault
+
+# Scalar fields: cross-fragment last-wins; policy overrides user.
+behavior:
+  restrict_to_configured_vaults: true
+  require_explicit_vault_upgrade: true
+
+gpg:
+  program: /usr/bin/gpg
 ```
 
-**Cross-fragment merge** (allow-lists): union of all fragments' entries.
-For `approved_algorithms`, same-`algo` entries collapse — curves union and
+**Allow-list cross-fragment merge** (`approved_algorithms`,
+`approved_vault_paths`): union of all fragments' entries. For
+`approved_algorithms`, same-`algo` entries collapse — curves union and
 `min_bits` takes the minimum (most-permissive reconciliation). For
-`approved_vault_paths`, the merged result is the deduped union of patterns.
+`approved_vault_paths`, deduped union of patterns.
 
-**User vs policy** (intersection): the user's `approved_algorithms` is
-intersected with the policy's; the user's `cfg.Vault` is filtered to entries
-matching at least one `approved_vault_paths` pattern. Policy is a ceiling;
-users can be stricter locally; users cannot exceed policy. Dropped entries
-emit stderr warnings explaining what changed (suppressed by `-s`).
+**Allow-list user vs policy** (intersection): the user's `approved_algorithms`
+is intersected with the policy's; the user's `cfg.Vault` is filtered to
+entries matching at least one `approved_vault_paths` pattern. Policy is a
+ceiling; users can be stricter locally; users cannot exceed policy. Dropped
+entries emit stderr warnings explaining what changed (suppressed by `-s`).
 
 **Vault path matching** uses `path/filepath.Match` (single-segment globs:
 `*`, `?`, `[abc]`); `~` expands to the user's home. There is no `**`
 recursive globbing — admins enumerate explicitly or use single-segment
 patterns. Explicit `-v` flags are subject to the same filter and are
 *rejected* (not silently dropped) when not allowed by policy.
+
+**Scalar cross-fragment merge** (`behavior.*` per sub-field, `gpg.program`):
+**last-fragment-to-set wins** in lexical filename order, matching the Unix
+`*.d` drop-in convention used by `sudoers.d`, `systemd unit drop-ins`,
+`nginx conf.d`, etc. Naming: `00-base, 50-team, 99-overrides` — `99-`
+outranks `00-` for scalars. When a later fragment overrides an earlier
+*different* value, dotsecenv emits a stderr warning citing both:
+
+```
+warning: policy conflict on gpg.program: overridden to "/usr/bin/gpg" by /etc/dotsecenv/policy.d/99-team.yaml; previous value "/opt/homebrew/bin/gpg" from /etc/dotsecenv/policy.d/00-corp-baseline.yaml
+```
+
+Same value across fragments emits no warning (it's redundant, not a
+conflict). For `behavior.*`, sub-fields are independent — fragment A
+setting `behavior.X` and fragment B setting `behavior.Y` do not conflict.
+
+**Scalar user vs policy** (policy overrides user): if policy sets a scalar,
+that value replaces the user's. When the user had a *different* value, a
+stderr warning surfaces the override:
+
+```
+warning: policy overrides user gpg.program: user value "/opt/homebrew/bin/gpg" replaced by "/usr/bin/gpg" from /etc/dotsecenv/policy.d/00-corp-baseline.yaml
+```
+
+For `behavior.*`, "set" detection uses pointer nil-ness (`*bool`): an
+omitted field is "no opinion"; `false` is a real value distinct from
+omitted. For `gpg.program`, empty string is "no opinion"; the `"PATH"`
+sentinel is a real value distinct from empty.
+
+Conflict warnings and user-override warnings both respect the `-s` silent
+flag.
 
 ### Fail-closed on broken policy
 
@@ -585,9 +627,8 @@ even when policy is broken (so admins can diagnose).
 
 Hard-rejected at load with an explicit error citing the offending fragment:
 
-- `login` — identity is per-user, not org-wide
+- `login` — identity is per-user (cryptographically bound to a private key)
 - `vault` — would erase user vaults; use `approved_vault_paths` instead
-- `behavior`, `gpg` — reserved for future phases
 
 ### Permissions
 
@@ -620,14 +661,14 @@ dotsecenv policy validate --json   # error embedded in JSON object
 | 8    | Insecure permissions or unreadable fragment |
 | 1    | Empty allow-list field (omit the field instead) |
 
-### Out of scope (current phase)
+### Out of scope
 
-- `behavior.*` and `gpg.program` policy fields — coming in a follow-on PR
 - Project-level `.dotsecenv/policy.yaml`
 - Remote/centralized policy distribution
 - Encrypted/signed policy fragments
-- Windows policy support
+- Windows policy support (Linux/macOS only)
 - `**` recursive glob support in `approved_vault_paths`
+- Per-command policy re-evaluation for stale logins
 
 ## Vault File Format
 

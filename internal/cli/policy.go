@@ -119,7 +119,36 @@ func writePolicyListText(out *output.Handler, p policy.Policy) *Error {
 		}
 	}
 
+	behavior, behaviorOrigins, _ := p.MergedBehavior()
+	if hasBehaviorSet(behavior) {
+		out.WriteLine("  behavior:")
+		if behavior.RequireExplicitVaultUpgrade != nil {
+			out.WriteLine(fmt.Sprintf("    require_explicit_vault_upgrade: %v  [%s]",
+				*behavior.RequireExplicitVaultUpgrade,
+				filepath.Base(behaviorOrigins["behavior.require_explicit_vault_upgrade"]),
+			))
+		}
+		if behavior.RestrictToConfiguredVaults != nil {
+			out.WriteLine(fmt.Sprintf("    restrict_to_configured_vaults: %v  [%s]",
+				*behavior.RestrictToConfiguredVaults,
+				filepath.Base(behaviorOrigins["behavior.restrict_to_configured_vaults"]),
+			))
+		}
+	}
+
+	gpgProgram, gpgOrigin, _ := p.MergedGPGProgram()
+	if gpgProgram != "" {
+		out.WriteLine(fmt.Sprintf("  gpg.program: %s  [%s]",
+			gpgProgram, filepath.Base(gpgOrigin),
+		))
+	}
+
 	return nil
+}
+
+// hasBehaviorSet reports whether at least one BehaviorConfig sub-field is set.
+func hasBehaviorSet(b config.BehaviorConfig) bool {
+	return b.RequireExplicitVaultUpgrade != nil || b.RestrictToConfiguredVaults != nil
 }
 
 // writePolicyListJSON emits the effective policy as raw JSON to stdout,
@@ -134,11 +163,22 @@ func writePolicyListJSON(stdout io.Writer, p policy.Policy) *Error {
 		Pattern string   `json:"pattern"`
 		Origins []string `json:"origins"`
 	}
+	type behaviorEntry struct {
+		Field  string `json:"field"`
+		Value  bool   `json:"value"`
+		Origin string `json:"origin"`
+	}
+	type gpgEntry struct {
+		Program string `json:"program"`
+		Origin  string `json:"origin"`
+	}
 	type listOutput struct {
-		Dir                string       `json:"dir,omitempty"`
-		Fragments          []string     `json:"fragments,omitempty"`
-		ApprovedAlgorithms []algoEntry  `json:"approved_algorithms,omitempty"`
-		ApprovedVaultPaths []vaultEntry `json:"approved_vault_paths,omitempty"`
+		Dir                string          `json:"dir,omitempty"`
+		Fragments          []string        `json:"fragments,omitempty"`
+		ApprovedAlgorithms []algoEntry     `json:"approved_algorithms,omitempty"`
+		ApprovedVaultPaths []vaultEntry    `json:"approved_vault_paths,omitempty"`
+		Behavior           []behaviorEntry `json:"behavior,omitempty"`
+		GPG                *gpgEntry       `json:"gpg,omitempty"`
 	}
 
 	data := listOutput{}
@@ -162,6 +202,28 @@ func writePolicyListJSON(stdout io.Writer, p policy.Policy) *Error {
 				Pattern: pat,
 				Origins: basenames(vaultOrigins[pat]),
 			})
+		}
+		behavior, behaviorOrigins, _ := p.MergedBehavior()
+		if behavior.RequireExplicitVaultUpgrade != nil {
+			data.Behavior = append(data.Behavior, behaviorEntry{
+				Field:  "require_explicit_vault_upgrade",
+				Value:  *behavior.RequireExplicitVaultUpgrade,
+				Origin: filepath.Base(behaviorOrigins["behavior.require_explicit_vault_upgrade"]),
+			})
+		}
+		if behavior.RestrictToConfiguredVaults != nil {
+			data.Behavior = append(data.Behavior, behaviorEntry{
+				Field:  "restrict_to_configured_vaults",
+				Value:  *behavior.RestrictToConfiguredVaults,
+				Origin: filepath.Base(behaviorOrigins["behavior.restrict_to_configured_vaults"]),
+			})
+		}
+		gpgProgram, gpgOrigin, _ := p.MergedGPGProgram()
+		if gpgProgram != "" {
+			data.GPG = &gpgEntry{
+				Program: gpgProgram,
+				Origin:  filepath.Base(gpgOrigin),
+			}
 		}
 	}
 
