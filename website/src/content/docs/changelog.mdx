@@ -13,7 +13,7 @@ _May 4, 2026_
 
 ### Features
 
-- New trusted policy directory at `/etc/dotsecenv/policy.d/` lets administrators pin organization-wide rules: allow-listed key algorithms (`approved_algorithms`), allow-listed vault paths (`approved_vault_paths`), and scalar overrides for `behavior.*` and `gpg.program`. Allow-lists intersect with user config; scalars override with last-fragment-wins ordering. Adds `dotsecenv policy list` and `dotsecenv policy validate` commands (both with `--json`). Fail-closed: any policy load error aborts startup with a distinct exit code per error category. See [Policy Directory](/concepts/policy-directory/) for the full design. (#114, #115, #116)
+- Trusted policy directory at `/etc/dotsecenv/policy.d/` for system-wide admin rules. Fragments can pin allow-lists (`approved_algorithms`, `approved_vault_paths`) and scalars (`behavior.*`, `gpg.program`). Allow-lists intersect with user config; scalars override the user. Two new commands ship with it: `dotsecenv policy list` and `dotsecenv policy validate`, both with `--json`. Policy loads fail-closed, with a distinct exit code per error category. Full design at [Policy Directory](/concepts/policy-directory/). (#114, #115, #116)
 
 ### Bug Fixes
 
@@ -21,8 +21,8 @@ _May 4, 2026_
 
 ### Other
 
-- **Breaking**: Drop SUID mode. Installation no longer needs root to set up SUID bits; the new policy directory at `/etc/dotsecenv/policy.d/` is the supported way to enforce admin policy across users. (#110)
-- **Breaking**: Remove deprecated `Config.Fingerprint` YAML field and `DOTSECENV_FINGERPRINT` environment variable. Use `dotsecenv login <FP>` to populate the signed `login:` block instead. (#109)
+- **Breaking**: SUID mode is gone. Installation no longer needs root to set up SUID bits. To enforce admin policy across users, use the new `/etc/dotsecenv/policy.d/` instead. (#110)
+- **Breaking**: The deprecated `Config.Fingerprint` YAML field and `DOTSECENV_FINGERPRINT` environment variable are removed. Use `dotsecenv login <FP>` to populate the signed `login:` block. (#109)
 - Drop `/var/lib/dotsecenv/vault` from the default vault path list (#111)
 - Update `step-security/harden-runner` action to v2.19.1 (#107, #108, #113)
 
