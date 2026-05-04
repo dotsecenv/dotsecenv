@@ -81,7 +81,15 @@ pe "echo 'DATABASE_PASSWORD={dotsecenv}' > .secenv"
 p ""
 p "# Since we have previously installed the shell plugin from <https://github.com/dotsecenv/plugin>,"
 p "# cd-ing into a directory with a .secenv file will use dotsecenv to define the env secret automatically."
-pe "cd ."
+pe "cd \"\$PWD\""
+# demo-magic uses eval, so bash never redraws its prompt between commands and
+# PROMPT_COMMAND-based hooks don't fire. In a real interactive shell the cd
+# above would trigger this automatically; here we invoke the hook directly so
+# the recording reflects real-world behavior.
+# Pre-trust the dir for the session so the plugin's first-time trust prompt
+# (read -r) doesn't hang the recorded shell, which has a TTY but no typist.
+_dotsecenv_trust_session "$PWD" 2>/dev/null || true
+_dotsecenv_chpwd_hook 2>/dev/null || true
 p "# DATABASE_PASSWORD is now available as an env var:"
 pe "echo \$DATABASE_PASSWORD"
 
