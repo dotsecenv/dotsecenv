@@ -50,7 +50,6 @@ var initCmd = &cobra.Command{
 // initConfigOpts holds flags specific to init config command
 var initConfigOpts struct {
 	GPGProgram       string
-	NoGPGProgram     bool
 	LoginFingerprint string
 }
 
@@ -60,19 +59,15 @@ var initConfigCmd = &cobra.Command{
 	Long: `Initialize a new dotsecenv configuration file.
 
 By default, creates a configuration file at the XDG config location.
-Use -c to specify a custom path.`,
+Use -c to specify a custom path.
+
+The config defaults to gpg.program: PATH, which resolves the gpg binary
+from the system PATH at runtime. Use --gpg-program to pin an absolute path.`,
 	Args: cobra.NoArgs,
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		// Validate mutually exclusive flags
-		if initConfigOpts.NoGPGProgram && initConfigOpts.GPGProgram != "" {
-			return fmt.Errorf("--no-gpg-program and --gpg-program cannot be used together")
-		}
-		return nil
-	},
 	Run: func(cmd *cobra.Command, args []string) {
 		out := defaultOutput()
 		targetConfig := clilib.ResolveConfigPath(globalOpts.ConfigPath, globalOpts.Silent, out.Stderr())
-		err := clilib.InitConfig(targetConfig, globalOpts.VaultPaths, initConfigOpts.GPGProgram, initConfigOpts.NoGPGProgram, initConfigOpts.LoginFingerprint, out)
+		err := clilib.InitConfig(targetConfig, globalOpts.VaultPaths, initConfigOpts.GPGProgram, initConfigOpts.LoginFingerprint, out)
 		if err != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, err)))
 		}
@@ -128,8 +123,7 @@ Two modes of operation:
 func init() {
 	// Flags for init config
 	// Use custom pathValue to reject flag-like values during parsing (before Cobra's subcommand resolution)
-	initConfigCmd.Flags().Var(&pathValue{value: &initConfigOpts.GPGProgram}, "gpg-program", "Set gpg.program to this path (without validation)")
-	initConfigCmd.Flags().BoolVar(&initConfigOpts.NoGPGProgram, "no-gpg-program", false, "Skip GPG detection (leave gpg.program empty)")
+	initConfigCmd.Flags().Var(&pathValue{value: &initConfigOpts.GPGProgram}, "gpg-program", "Set gpg.program to this absolute path (default: PATH, resolved at runtime)")
 	initConfigCmd.Flags().StringVar(&initConfigOpts.LoginFingerprint, "login", "", "Initialize config with specified fingerprint")
 
 	initCmd.AddCommand(initConfigCmd)

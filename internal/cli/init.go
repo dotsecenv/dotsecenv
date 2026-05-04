@@ -14,10 +14,10 @@ import (
 )
 
 // InitConfig initializes a configuration file with FIPS-compliant defaults.
-// gpgProgram: if non-empty, use this value for gpg.program (without validation)
-// noGPGProgram: if true, skip GPG detection entirely and leave gpg.program empty
-// loginFingerprint: if non-empty, creates a signed login proof for this fingerprint
-func InitConfig(configPath string, initialVaults []string, gpgProgram string, noGPGProgram bool, loginFingerprint string, out *output.Handler) *Error {
+// gpgProgram: if non-empty, set gpg.program to this value (without validation).
+// Otherwise gpg.program defaults to "PATH" (resolved at runtime).
+// loginFingerprint: if non-empty, creates a signed login proof for this fingerprint.
+func InitConfig(configPath string, initialVaults []string, gpgProgram string, loginFingerprint string, out *output.Handler) *Error {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
 		return NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
@@ -33,67 +33,24 @@ func InitConfig(configPath string, initialVaults []string, gpgProgram string, no
 		return NewError(fmt.Sprintf("failed to create config directory: %v", err), ExitConfigError)
 	}
 
-	// Use FIPS-compliant default configuration
+	// Use FIPS-compliant default configuration. DefaultConfig() seeds gpg.program
+	// to "PATH", which resolves the gpg binary from the system PATH at runtime.
 	cfg := config.DefaultConfig()
 
-	// Handle GPG program configuration FIRST (before login handling needs it)
-	var detectedGPGProgram string
-	switch {
-	case gpgProgram != "":
-		// Explicit path provided via --gpg-program (no validation)
-		detectedGPGProgram = gpgProgram
+	// Override gpg.program only if --gpg-program was explicitly provided.
+	if gpgProgram != "" {
 		cfg.GPG.Program = gpgProgram
 		_, _ = fmt.Fprintf(out.Stderr(), "Using GPG program: %s\n", gpgProgram)
-
-	case noGPGProgram:
-		// Skip GPG detection entirely
-		detectedGPGProgram = ""
-		cfg.GPG.Program = ""
-		_, _ = fmt.Fprintf(out.Stderr(), "Skipping GPG program detection (gpg.program will be empty)\n")
-
-	default:
-		// Auto-detect GPG paths and let user choose if multiple are found
-		gpgPaths := gpg.DetectAllGPGPaths()
-
-		switch len(gpgPaths) {
-		case 0:
-			// Fail to generate the config
-			return NewError("GPG not found. Please install GPG and ensure it's in your PATH, then try again.\n  Use --no-gpg-program to skip GPG detection, or --gpg-program to specify a path.", ExitConfigError)
-		case 1:
-			// Single GPG found - always set it explicitly
-			detectedGPGProgram = gpgPaths[0]
-			cfg.GPG.Program = gpgPaths[0]
-			_, _ = fmt.Fprintf(out.Stderr(), "Using GPG: %s\n", gpgPaths[0])
-		default:
-			// Multiple GPG installations found, let user choose
-			_, _ = fmt.Fprintf(out.Stderr(), "Multiple GPG installations found:\n")
-
-			// Try interactive selection
-			idx, selectErr := HandleInteractiveSelection(gpgPaths, "Select GPG to use (Arrow Up/Down, Enter to select):", out.Stderr())
-			if selectErr != nil {
-				// Interactive selection failed (no terminal, Windows, etc.)
-				// Fall back to first detected path
-				detectedGPGProgram = gpgPaths[0]
-				cfg.GPG.Program = gpgPaths[0]
-				_, _ = fmt.Fprintf(out.Stderr(), "Could not prompt for selection, using first detected: %s\n", gpgPaths[0])
-			} else {
-				detectedGPGProgram = gpgPaths[idx]
-				cfg.GPG.Program = gpgPaths[idx]
-				_, _ = fmt.Fprintf(out.Stderr(), "Selected GPG: %s\n", gpgPaths[idx])
-			}
-		}
+	} else {
+		_, _ = fmt.Fprintf(out.Stderr(), "Using GPG program: PATH (resolved at runtime)\n")
 	}
 
-	// Apply signed login if fingerprint is provided via --login
-	// (now GPG program is already detected/configured)
+	// Apply signed login if fingerprint is provided via --login.
 	if loginFingerprint != "" {
-		if detectedGPGProgram == "" {
-			return NewError("--login requires GPG but no GPG program is configured.\n  Use --gpg-program to specify a path, or ensure GPG is installed.", ExitGPGError)
-		}
-
-		// Validate and set the GPG program path for the GPG client to use
-		if err := gpg.ValidateAndSetGPGProgram(detectedGPGProgram); err != nil {
-			return NewError(fmt.Sprintf("failed to validate GPG program: %v", err), ExitGPGError)
+		// Validate and set the GPG program path for the GPG client to use.
+		// This resolves "PATH" via exec.LookPath, or validates an absolute path.
+		if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program); err != nil {
+			return NewError(fmt.Sprintf("--login requires a working GPG program: %v", err), ExitGPGError)
 		}
 
 		// Create a GPG client (uses the validated program path)
@@ -185,6 +142,8 @@ func saveConfigWithComments(path string, cfg config.Config) error {
 
 	// GPG section
 	sb.WriteString("\ngpg:\n")
+	sb.WriteString("  # 'PATH' resolves gpg from the system PATH at runtime.\n")
+	sb.WriteString("  # Set to an absolute path (e.g. /usr/bin/gpg) to pin a specific binary.\n")
 	if cfg.GPG.Program != "" {
 		fmt.Fprintf(&sb, "  program: %s\n", cfg.GPG.Program)
 	} else {

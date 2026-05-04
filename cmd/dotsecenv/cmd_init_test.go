@@ -58,7 +58,7 @@ func TestInitConfig_HasBehaviorSection(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
 	// Run init config
-	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	_, stderr, err := runCmd("init", "config", "-c", configPath)
 	if err != nil {
 		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
 	}
@@ -94,7 +94,7 @@ func TestInitConfig_BehaviorCommentsExist(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
 	// Run init config
-	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	_, stderr, err := runCmd("init", "config", "-c", configPath)
 	if err != nil {
 		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
 	}
@@ -111,6 +111,7 @@ func TestInitConfig_BehaviorCommentsExist(t *testing.T) {
 		"# Behavior settings control how dotsecenv handles edge cases",
 		"# Prevent automatic vault format upgrades",
 		"# Ignore CLI -v flags",
+		"# 'PATH' resolves gpg from the system PATH at runtime.",
 	}
 
 	for _, comment := range expectedComments {
@@ -125,7 +126,7 @@ func TestInitConfig_NoStrictFieldInOutput(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
 	// Run init config
-	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	_, stderr, err := runCmd("init", "config", "-c", configPath)
 	if err != nil {
 		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
 	}
@@ -136,7 +137,7 @@ func TestInitConfig_DefaultLoginIsNil(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
 	// Run init config without --login flag
-	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	_, stderr, err := runCmd("init", "config", "-c", configPath)
 	if err != nil {
 		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
 	}
@@ -148,25 +149,25 @@ func TestInitConfig_DefaultLoginIsNil(t *testing.T) {
 	}
 }
 
-func TestInitConfig_NoGPGProgram(t *testing.T) {
+func TestInitConfig_DefaultsGPGProgramToPATH(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
-	// Run init config with --no-gpg-program
-	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	// Run init config with no GPG-related flags.
+	_, stderr, err := runCmd("init", "config", "-c", configPath)
 	if err != nil {
-		t.Fatalf("init config --no-gpg-program failed: %v\nSTDERR: %s", err, stderr)
+		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
 	}
 
-	// Verify gpg.program is empty
+	// Verify gpg.program is the literal "PATH" sentinel.
 	cfg := loadConfigForTest(t, configPath)
-	if cfg.GPG.Program != "" {
-		t.Errorf("expected gpg.program to be empty, got %q", cfg.GPG.Program)
+	if cfg.GPG.Program != "PATH" {
+		t.Errorf("expected gpg.program=%q, got %q", "PATH", cfg.GPG.Program)
 	}
 
-	// Verify stderr contains the skip message
-	if !strings.Contains(stderr, "Skipping GPG program detection") {
-		t.Errorf("expected stderr to contain skip message, got: %s", stderr)
+	// Verify stderr surfaces the runtime-resolution intent.
+	if !strings.Contains(stderr, "Using GPG program: PATH (resolved at runtime)") {
+		t.Errorf("expected stderr to mention runtime PATH resolution, got: %s", stderr)
 	}
 }
 
@@ -189,34 +190,18 @@ func TestInitConfig_GPGProgram(t *testing.T) {
 	}
 }
 
-func TestInitConfig_MutuallyExclusiveGPGFlags(t *testing.T) {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
-
-	// Run init config with both --gpg-program and --no-gpg-program (should fail)
-	_, stderr, err := runCmd("init", "config", "-c", configPath, "--gpg-program", "/path/to/gpg", "--no-gpg-program")
-	if err == nil {
-		t.Fatalf("expected init config to fail with mutually exclusive flags, but it succeeded")
-	}
-
-	// Verify error message
-	if !strings.Contains(stderr, "--no-gpg-program and --gpg-program cannot be used together") {
-		t.Errorf("expected mutual exclusion error message, got: %s", stderr)
-	}
-}
-
 func TestInitConfig_ConfigAlreadyExists(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
 	// Create a config file first
-	_, _, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	_, _, err := runCmd("init", "config", "-c", configPath)
 	if err != nil {
 		t.Fatalf("first init config failed: %v", err)
 	}
 
 	// Try to init again (should fail)
-	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	_, stderr, err := runCmd("init", "config", "-c", configPath)
 	if err == nil {
 		t.Fatalf("expected second init config to fail, but it succeeded")
 	}
@@ -234,7 +219,7 @@ func TestInitConfig_WithVaultPaths(t *testing.T) {
 	vaultPath2 := filepath.Join(tmpDir, "vault2.yaml")
 
 	// Run init config with -v flags
-	_, stderr, err := runCmd("init", "config", "-c", configPath, "-v", vaultPath1, "-v", vaultPath2, "--no-gpg-program")
+	_, stderr, err := runCmd("init", "config", "-c", configPath, "-v", vaultPath1, "-v", vaultPath2)
 	if err != nil {
 		t.Fatalf("init config with vaults failed: %v\nSTDERR: %s", err, stderr)
 	}
@@ -300,7 +285,7 @@ func TestInitConfig_HasDefaultAlgorithms(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
 	// Run init config
-	_, stderr, err := runCmd("init", "config", "-c", configPath, "--no-gpg-program")
+	_, stderr, err := runCmd("init", "config", "-c", configPath)
 	if err != nil {
 		t.Fatalf("init config failed: %v\nSTDERR: %s", err, stderr)
 	}

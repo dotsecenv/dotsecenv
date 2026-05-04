@@ -360,9 +360,7 @@ dotsecenv init config -c /path/to/config
 dotsecenv init config -v /path/to/vault
 ## Customize both the config and the vault location
 dotsecenv init config -c ... -v ...
-## Skip GPG detection (for systems without GPG installed)
-dotsecenv init config --no-gpg-program
-## Set GPG program path explicitly (without validation)
+## Pin GPG to an absolute path (default: gpg.program=PATH, resolved at runtime)
 dotsecenv init config --gpg-program /usr/local/bin/gpg
 
 # Initialize a vault
@@ -416,7 +414,7 @@ dotsecenv validate --fix  # Attempt to fix issues
 
 | Command                                         | Description                                  |
 | ----------------------------------------------- | -------------------------------------------- |
-| `init config [--gpg-program\|--no-gpg-program]` | Initialize configuration file                |
+| `init config [--gpg-program PATH]`              | Initialize configuration file                |
 | `init vault`                                    | Initialize vault file(s)                     |
 | `login FINGERPRINT`                             | Initialize user identity                     |
 | `secret store SECRET`                           | Store an encrypted secret (reads from stdin) |
