@@ -9,7 +9,7 @@ Shell plugins for [dotsecenv](https://github.com/dotsecenv/dotsecenv) that autom
 - Automatically loads `.env` and `.secenv` files when you `cd` into a directory
 - Unsets environment variables when you leave the directory
 - Fetches secrets from your dotsecenv vault using the `{dotsecenv}` or `{dotsecenv/KEY}` syntax
-- Security checks: refuses to load world-writable files or files not owned by you
+- Security checks: refuses to load world-writable files or files not owned by you (or root)
 - Trust system: prompts before loading `.secenv` files from untrusted directories
 - Convenient aliases: `dse`, `secret`, `copysecret`
 
@@ -180,11 +180,14 @@ The plugins perform security checks before loading files:
 1. **Ownership**: Files must be owned by the current user or root
 2. **Permissions**: Files must not be world-writable
 
-If a file fails these checks, it will be refused with a warning:
+If a file fails these checks, the plugin refuses to source it and prints one of:
 
 ```shell
 dotsecenv: refusing to load /path/.secenv - world-writable
+dotsecenv: refusing to load /path/.secenv - not owned by current user or root
 ```
+
+`chmod go-w .secenv` is enough to satisfy the permissions check; `chmod 600` works too. The ownership check accepts files owned by either the current user (`id -u`) or root (UID 0).
 
 ## Configuration
 

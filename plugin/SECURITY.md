@@ -37,8 +37,8 @@ Please provide:
 
 The shell plugins include several security measures:
 
-- **File ownership checks**: Refuses to load files not owned by you
-- **Permission checks**: Refuses to load world-writable files
+- **File ownership checks**: Refuses to load files not owned by the current user or root (UID 0)
+- **Permission checks**: Refuses to load world-writable files (any mode with the `o+w` bit set)
 - **Trust system**: Prompts before loading `.secenv` files from untrusted directories
 - **No eval of untrusted content**: Values are not executed as shell commands
 
