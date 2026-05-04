@@ -9,6 +9,10 @@ import { Aside, Badge } from "@astrojs/starlight/components";
   The policy directory and the `dotsecenv policy` subcommand were introduced in v0.6.0. On earlier versions, `/etc/dotsecenv/policy.d/` is ignored and `dotsecenv policy` does not exist.
 </Aside>
 
+<Aside type="tip" title="Runnable example">
+A two-fragment baseline (`00-corp-baseline.yaml` + `99-team-overrides.yaml`) plus install commands and merge-rule walkthrough ships at [`examples/04-policy-directory/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/04-policy-directory) on the CLI repo.
+</Aside>
+
 User config is per-user, which is the sensible default for most setups. On a shared workstation, in CI, or on a managed fleet, that stops being enough. Someone has to be able to say "the floor for RSA is 4096" or "vaults live under `/srv/secrets/` and nowhere else", and have that survive any user editing their own `~/.config/dotsecenv/config.yaml`.
 
 That is what the policy directory is for. It's a flat tree of YAML fragments under `/etc/dotsecenv/policy.d/` that an administrator drops in. dotsecenv reads it on every startup, no daemon involved. The fragments are owned by root, mode `0644` or stricter, and they get unioned and overlaid on top of whatever the user wrote.

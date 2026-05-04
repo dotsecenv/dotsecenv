@@ -5,6 +5,10 @@ description: Get set up as a new team member to decrypt shared project secrets
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
+<Aside type="tip" title="Runnable example">
+A two-identity share + revoke flow runs end-to-end in [`examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/02-team-share-revoke) on the CLI repo. Useful for seeing the keyring-isolation pattern that mirrors the production "one key per machine" model.
+</Aside>
+
 ## Goal
 
 As a new team member, get set up so you can decrypt the project's shared secrets.
