@@ -1,0 +1,7 @@
+# https://mise.jdx.dev
+#
+# Pins the Node major matching `engines.node` in package.json. Kept in
+# sync via the lefthook pre-commit hook in lefthook.yml.
+
+[tools]
+node = "25"
