@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightBlog from 'starlight-blog';
+import starlightLlmsTxt from 'starlight-llms-txt';
 import { SITE_TITLE } from './src/consts';
 
 export default defineConfig({
@@ -17,6 +18,44 @@ export default defineConfig({
               url: 'https://dotsecenv.com',
             },
           },
+        }),
+        starlightLlmsTxt({
+          projectName: 'dotsecenv',
+          description:
+            'Secure secrets management CLI that encrypts environment variables at rest using GPG, making them safe to commit to version control.',
+          details:
+            'dotsecenv encrypts environment variables at rest using GPG and AES-256-GCM, storing them in vault files that are safe to commit to git. Documentation follows the Diataxis framework: Tutorials walk through tasks, Concepts explain the security model and architecture, Guides cover integrations (shell plugins, GitHub Actions, Terraform, Claude Code), and Reference documents the CLI surface.',
+          // Surface index, getting-started, and the CLI reference at the top of llms.txt.
+          promote: ['index*', 'getting-started*', 'reference*'],
+          // Keep the blog out of the small/full bundles to save context budget.
+          exclude: ['blog/**', 'privacy*'],
+          // Diataxis grouping: emit one llms-<set>.txt per category, listed in llms.txt.
+          customSets: [
+            {
+              label: 'Tutorials',
+              description:
+                'Task-oriented walkthroughs: install, first secret, sharing, revocation, CI/CD, migration from .env.',
+              paths: ['tutorials/**'],
+            },
+            {
+              label: 'Concepts',
+              description:
+                'Explanations of the security model, threat model, architecture, vault format, and compliance posture.',
+              paths: ['concepts/**'],
+            },
+            {
+              label: 'Guides',
+              description:
+                'Integration guides: shell plugins, GitHub Action, Terraform credentials helper, Claude Code, plus the how-to recipe book.',
+              paths: ['guides/**', 'how-to'],
+            },
+            {
+              label: 'Reference',
+              description:
+                'CLI reference and changelog.',
+              paths: ['reference', 'changelog'],
+            },
+          ],
         }),
       ],
       title: SITE_TITLE,
