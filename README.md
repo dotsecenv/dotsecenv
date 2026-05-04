@@ -29,8 +29,8 @@ dotsecenv secret get TEST_SECRET # should output "xyz"
 
 > **Encryption defaults.** Vaults use **AES-256-GCM** symmetric
 > encryption (RFC 9580 / NIST SP 800-38D) wrapped in GPG
-> multi-recipient asymmetric encryption, with FIPS-compliant
-> defaults out of the box — no extra flags needed at `init` time.
+> multi-recipient asymmetric encryption. FIPS-compliant defaults are
+> applied out of the box, with no extra flags at `init` time.
 > To enforce specific algorithms across a team (or narrow them
 > further), drop a `policy.d/*.yaml` fragment with
 > `approved_algorithms`; see [example 04](./examples/04-policy-directory/).
