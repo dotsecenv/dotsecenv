@@ -112,7 +112,7 @@ test.
   rt git::release --major --sign --push vX.Y.Z
   ```
 
-  This creates both `vX.Y.Z` and `v0` tags, signs them, and pushes. The
+  This creates both `vX.Y.Z` and `vX` tags, signs them, and pushes. The
   `release.yml` workflow runs hermetic e2e first, then GoReleaser, then
   notarizes Darwin archives, then re-signs checksums, then triggers downstream
   repos (`packages`, `homebrew-tap`, `plugin`, `website`).
