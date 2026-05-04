@@ -1,9 +1,15 @@
 # Migrate from `.env` to dotsecenv
 
-Coming from a `.env` file? dotsecenv replaces it but with a different
-mental model: secrets are stored **per key**, not as a `.env` blob.
-There is no bulk-import command for a `.env` file because the unit of
-encryption and audit is the individual secret.
+dotsecenv replaces a `.env` file with one important difference: it
+stores secrets one key at a time, not as a single text blob. There is
+no bulk-import command, because the unit of encryption and audit is
+the individual secret.
+
+> **Looking for a step-by-step walkthrough?** The canonical version
+> is the [Migrate from .env tutorial](https://dotsecenv.com/tutorials/migrate-from-dotenv/)
+> on dotsecenv.com. The [.env how-to section](https://dotsecenv.com/how-to/#work-with-env-files)
+> has additional patterns (`.env` for non-sensitive config alongside
+> `.secenv` for secrets).
 
 ## Mental model
 
@@ -71,8 +77,8 @@ SENTRY_DSN={dotsecenv}
 The `{dotsecenv}` placeholder fetches a secret with the same name
 as the variable. Other supported forms:
 
-- `{dotsecenv/EXPLICIT_NAME}` — fetch a differently-named secret.
-- `{dotsecenv/namespace::KEY}` — namespaced lookup.
+- `{dotsecenv/EXPLICIT_NAME}`: fetch a differently-named secret.
+- `{dotsecenv/namespace::KEY}`: namespaced lookup.
 
 When you `cd` in, the plugin exports plain `KEY=value` lines as
 environment variables and shells out to `dotsecenv secret get` to
@@ -85,18 +91,20 @@ per-directory trust).
 
 - **Editing values.** Instead of editing a line in `.env`, run
   `echo NEW | dotsecenv secret store NAME`. The old value is
-  preserved in the vault for audit — see
-  [add a secret](add-secret.md).
+  preserved in the vault for audit (see
+  [add a secret](add-secret.md)).
 - **Sharing values.** Instead of pasting `.env` over Slack, add a
   teammate as a recipient with
   `dotsecenv secret share NAME <THEIR_FINGERPRINT> --all`.
 - **Rotating values.** Instead of "rotate everything when someone
-  leaves", revoke and rotate the affected secrets — see
+  leaves", revoke and rotate the affected secrets. See
   [rotate a compromised key](rotate-compromised-key.md).
 
 ## See also
 
-- [Quickstart example](../examples/01-quickstart/)
-- [Shell plugin example](../examples/05-secenv-shell-plugin/)
-- [Add a secret](add-secret.md)
-- [Rotate a compromised key](rotate-compromised-key.md)
+- Tutorial: [Migrate from .env](https://dotsecenv.com/tutorials/migrate-from-dotenv/)
+- How-to: [Work with .env Files](https://dotsecenv.com/how-to/#work-with-env-files)
+- Guide: [Shell Plugins](https://dotsecenv.com/guides/shell-plugins/)
+- Runnable example: [`examples/05-secenv-shell-plugin/`](../examples/05-secenv-shell-plugin/)
+- Recipe: [Add a secret](add-secret.md)
+- Recipe: [Rotate a compromised key](rotate-compromised-key.md)

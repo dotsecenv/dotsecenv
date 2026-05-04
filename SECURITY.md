@@ -115,7 +115,7 @@ This is a deliberate trade-off: append-only preserves a verifiable
 audit trail at the cost of being unable to "unsay" past
 ciphertext. If you need ciphertext to be unrecoverable from the
 vault file itself, the only option is to rewrite git history (e.g.
-`git filter-repo`) and force every consumer to re-clone — and even
+`git filter-repo`) and force every consumer to re-clone. Even
 then, anyone who already cloned the old history retains the old
 encrypted entries.
 
