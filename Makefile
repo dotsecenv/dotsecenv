@@ -147,6 +147,7 @@ demo: build
 	chmod 700 "$$DEMO_HOME/.gnupg" && \
 	cp bin/dotsecenv "$$DEMO_HOME/bin/" && \
 	cp demos/demo.sh "$$DEMO_HOME/demos/" && \
+	chmod +x "$$DEMO_HOME/demos/demo.sh" && \
 	echo "Downloading demo-magic..." && \
 	curl -fsSL https://raw.githubusercontent.com/paxtonhare/demo-magic/master/demo-magic.sh -o "$$DEMO_HOME/demos/_demo-magic.sh" && \
 	if [ -d ../plugin ]; then \
@@ -172,7 +173,7 @@ demo: build
 	echo "                             (outside the sandbox so it survives cleanup)" && \
 	echo "" && \
 	echo "To record (asciinema v3+), paste:" && \
-	echo "  asciinema record -c 'HOME=$$DEMO_HOME bash demos/demo.sh' --title 'DotSecEnv demo' --overwrite '$$DEMO_OUT'" && \
+	echo "  asciinema record -c 'demos/demo.sh' --title 'DotSecEnv demo' --overwrite '$$DEMO_OUT'" && \
 	echo "" && \
 	echo "Entering demo shell (type 'exit' when done)..." && \
 	cd "$$DEMO_HOME" && \
