@@ -172,7 +172,7 @@ demo: build
 	echo "                             (outside the sandbox so it survives cleanup)" && \
 	echo "" && \
 	echo "To record (asciinema v3+), paste:" && \
-	echo "  asciinema rec -c 'HOME=$$DEMO_HOME bash $$DEMO_HOME/demos/demo.sh' --overwrite '$$DEMO_OUT'" && \
+	echo "  asciinema record -c 'HOME=$$DEMO_HOME bash demos/demo.sh' --title 'DotSecEnv demo' --overwrite '$$DEMO_OUT'" && \
 	echo "" && \
 	echo "Entering demo shell (type 'exit' when done)..." && \
 	cd "$$DEMO_HOME" && \
