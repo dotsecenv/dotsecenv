@@ -280,15 +280,15 @@ Every setting can be configured via a CLI flag or an environment variable. CLI f
 
 #### What the Installer Does
 
-1. **Detects your platform** — OS (Linux or macOS) and architecture (x86_64 or arm64)
-2. **Resolves the version** — Queries the GitHub API for the latest release, or uses the version you specified
-3. **Downloads the release archive** — From GitHub Releases
-4. **Verifies integrity** — SHA-256 checksum verification and GPG signature verification (when `gpg` is available)
-5. **Installs the binary** — To `~/.local/bin` by default (or `/usr/local/bin` with `--system`)
-6. **Installs shell completions** — For bash, zsh, and fish, placed in `~/.local/share/` by default (or system directories with `--system`)
-7. **Installs man pages** — To `~/.local/share/man/man1/` by default (or system man directories with `--system`)
-8. **Installs the shell plugin** — Clones to `~/.local/share/dotsecenv/plugin/` by default (or system share path with `--system`). Additionally integrates with detected plugin managers (Oh My Zsh, Zinit, Antidote, Oh My Bash, Fisher, Oh My Fish). Fish `conf.d` is linked automatically if fish is present.
-9. **Installs the Terraform credentials helper** — To `~/.terraform.d/plugins/` by default (or system share path with `--system`). Skip with `--no-install-tf-credentials-helper`
+1. Detects your platform (Linux or macOS, x86_64 or arm64)
+2. Resolves the version: queries the GitHub API for the latest release, or uses the version you specified
+3. Downloads the release archive from GitHub Releases
+4. Verifies integrity via SHA-256 checksum and GPG signature (when `gpg` is available)
+5. Installs the binary to `~/.local/bin` by default (or `/usr/local/bin` with `--system`)
+6. Installs shell completions for bash, zsh, and fish under `~/.local/share/` by default (or system directories with `--system`)
+7. Installs man pages under `~/.local/share/man/man1/` by default (or system man directories with `--system`)
+8. Installs the shell plugin: clones to `~/.local/share/dotsecenv/plugin/` by default (or system share path with `--system`), and also integrates with detected plugin managers (Oh My Zsh, Zinit, Antidote, Oh My Bash, Fisher, Oh My Fish). Fish `conf.d` is linked automatically if fish is present.
+9. Installs the Terraform credentials helper to `~/.terraform.d/plugins/` by default (or system share path with `--system`). Skip with `--no-install-tf-credentials-helper`.
 
 #### Install Paths
 
@@ -430,5 +430,5 @@ rm -rf ~/.config/dotsecenv
 
 ## Next Steps
 
-- [First Secret](/tutorials/first-secret/) — Store and use your first secret
-- [Getting Started](/getting-started/) — Complete initial setup
+- [First Secret](/tutorials/first-secret/): store and use your first secret
+- [Getting Started](/getting-started/): complete initial setup

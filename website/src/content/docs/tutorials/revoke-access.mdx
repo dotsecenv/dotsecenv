@@ -118,15 +118,15 @@ dotsecenv vault describe
 
 ### Why is this the case?
 
-1. **GPG is asymmetric encryption** — once encrypted for a key, only that key can decrypt
-2. **Append-only vault** — old entries remain readable to original recipients
-3. **No time travel** — you can't retroactively change who could decrypt something
+1. GPG is asymmetric encryption: once a value is encrypted for a key, only that key can decrypt it.
+2. The vault is append-only: old entries remain readable to the original recipients.
+3. There is no time travel: you can't retroactively change who could decrypt a past value.
 
 ### What to do about it
 
-1. **Always rotate** secrets after revoking access
-2. **Treat revocation as notice** that you need to change the value
-3. **Update downstream systems** with new credentials
+1. Always rotate secrets after revoking access.
+2. Treat revocation as a signal that you need to change the value.
+3. Update downstream systems with the new credentials.
 
 ## Variations
 
@@ -223,5 +223,5 @@ The doctor command checks vault health and offers to defragment if needed.
 
 ## Next Steps
 
-- [Threat Model](/concepts/threat-model/) — Understand what dotsecenv protects against
-- [Architecture](/concepts/architecture/) — How the vault and encryption work
+- [Threat Model](/concepts/threat-model/): understand what dotsecenv protects against
+- [Architecture](/concepts/architecture/): how the vault and encryption work
