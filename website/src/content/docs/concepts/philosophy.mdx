@@ -46,7 +46,7 @@ GPG does all the heavy lifting for encryption and web-of-trust. But using GPG di
 
 **dotsecenv makes GPG easy.**
 
-You likely already have a GPG key—GitHub and GitLab require them for [commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits). `dotsecenv` builds on that existing premise.
+You likely already have a GPG key. GitHub and GitLab require one for [commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits). `dotsecenv` builds on that existing premise.
 
 ---
 
@@ -67,13 +67,7 @@ dotsecenv follows the [UNIX philosophy](https://en.wikipedia.org/wiki/Unix_philo
 
 ### Standing on Giants
 
-Some problems are already solved well:
-
-- **GPG** — Encryption and key management
-- **Git** — Version control and distribution
-- **Shell** — Environment variable loading
-
-dotsecenv adds a minimal layer of usability and relies on these vetted, stable tools.
+Some problems are already solved well: GPG handles encryption and key management, git handles version control and distribution, and your shell handles environment variable loading. dotsecenv adds a minimal layer of usability and relies on those vetted, stable tools.
 
 ---
 
@@ -99,9 +93,9 @@ dotsecenv needs **signatures for trust**. Without cryptographic signatures:
 GPG's signing capability lets dotsecenv verify that each vault entry was created by the identity it claims to be from.
 
 <Aside type="note">
-  age is an excellent tool for its use case (simple file encryption). It's not a
-  criticism—it's a deliberate design choice by age's creators to omit signing
-  for simplicity.
+  age is an excellent tool for its use case (simple file encryption). The lack
+  of signing is not a criticism. It's a deliberate design choice by age's
+  creators to keep the tool simple.
 </Aside>
 
 ---
@@ -127,15 +121,11 @@ GPG's signing capability lets dotsecenv verify that each vault entry was created
 | **Audit trail**         | Append-only vault     | Git history           |
 | **Multi-user UX**       | Share/revoke commands | Manual key management |
 
-**Simply put: UX**
+The short answer is UX.
 
-SOPS's real power comes from cloud KMS integration—AWS KMS, GCP KMS, Azure Key Vault. These are centralized, managed services. Powerful, but:
+SOPS's real power comes from cloud KMS integration (AWS KMS, GCP KMS, Azure Key Vault). These are centralized, managed services. Powerful, but they require cloud accounts, they're not free, and they're not fully offline.
 
-- Require cloud accounts
-- Not free
-- Not fully offline
-
-dotsecenv takes a **decentralized, offline approach**. Your GPG keys, your control.
+dotsecenv takes a decentralized, offline approach. Your GPG keys, your control.
 
 <Aside type="note">
   SOPS can use GPG alone, but the multi-identity workflow requires manual key
@@ -151,7 +141,7 @@ dotsecenv deliberately **does not** aim to:
 
 ### Manage Production Secrets
 
-dotsecenv is for the **development lifecycle (SDLC)**—bringing simple encryption to developers' daily operations.
+dotsecenv is for the development lifecycle (SDLC). It brings simple encryption to developers' daily operations.
 
 For production, consider:
 
@@ -167,7 +157,7 @@ No key servers. No cloud dependencies. Everything works offline with local GPG k
 
 dotsecenv trusts the system clock. If you set your clock to the past before storing a secret, that timestamp will be recorded.
 
-This is intentional: an attacker with write access can't modify existing entries anyway—each entry includes the originating fingerprint and a signature by the corresponding secret key.
+This is intentional. An attacker with write access can't modify existing entries anyway, since each entry includes the originating fingerprint and a signature by the corresponding secret key.
 
 ### Protect against History Erasure
 

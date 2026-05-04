@@ -13,10 +13,10 @@ dotsecenv vaults use a versioned JSONL format. The format includes a version fie
 
 The vault file consists of:
 
-1. **Header marker line** - Identifies the file as a dotsecenv vault
-2. **Header JSON** - Index for efficient lookups (identities, secrets)
-3. **Data marker line** - Separates header from data
-4. **Data entries** - One JSON object per line (identities, secrets, values)
+1. A header marker line that identifies the file as a dotsecenv vault
+2. A header JSON line that indexes identities and secrets for efficient lookup
+3. A data marker line that separates header from data
+4. Data entries: one JSON object per line (identities, secrets, values)
 
 ### Structure
 
@@ -57,11 +57,7 @@ Identities are stored as an ordered array of `[fingerprint, line]` pairs, sorted
 
 ### Why Arrays for Identities?
 
-The array format preserves insertion order, which provides:
-
-- **Deterministic output** - Same vault always serializes identically
-- **Git-friendly** - Consistent ordering means cleaner diffs
-- **Audit trail** - Order reflects when identities were added
+The array format preserves insertion order. That gives you deterministic output (the same vault always serializes identically), cleaner git diffs from consistent ordering, and an implicit audit trail since order reflects when identities were added.
 
 ## Entry Types
 
@@ -141,11 +137,7 @@ The header indexes point to line numbers where each entry can be found, enabling
 
 ## Future Versioning
 
-The format version allows dotsecenv to evolve while maintaining compatibility:
-
-- **Backward compatibility** - Read older vaults without data loss
-- **Forward evolution** - Add new features without breaking existing vaults
-- **Automatic migration** - Future versions may include automatic upgrades
+The format version lets dotsecenv evolve while maintaining compatibility. Older vaults remain readable, new features can land without breaking existing vaults, and future versions may include automatic upgrades.
 
 <Aside type="note">
   Currently only v1 format exists. Future format changes will be announced in release notes with migration guidance.

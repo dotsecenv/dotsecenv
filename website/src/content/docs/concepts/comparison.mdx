@@ -24,12 +24,7 @@ import { Aside } from '@astrojs/starlight/components';
 
 ### What SOPS Does Well
 
-SOPS is an excellent, battle-tested tool for production secrets:
-
-- **In-place encryption** of YAML, JSON, ENV, and INI files
-- **Multiple backends**: GPG, AWS KMS, GCP KMS, Azure Key Vault, HashiCorp Vault
-- **Partial encryption**: Encrypt only values, leaving keys readable
-- **Editor integration**: Decrypt, edit, re-encrypt seamlessly
+SOPS is an excellent, battle-tested tool for production secrets. It encrypts YAML, JSON, ENV, and INI files in place; supports multiple backends (GPG, AWS KMS, GCP KMS, Azure Key Vault, HashiCorp Vault); offers partial encryption that leaves keys readable while encrypting values; and integrates with editors for transparent decrypt-edit-re-encrypt workflows.
 
 ### Key Differences
 
@@ -66,7 +61,7 @@ SOPS can use GPG for multi-recipient encryption, but you manage the key list man
 
 ## dotsecenv vs direnv
 
-[direnv](https://direnv.net/) is an environment switcher for shells—it loads and unloads environment variables as you change directories.
+[direnv](https://direnv.net/) is an environment switcher for shells. It loads and unloads environment variables as you change directories.
 
 ### Similarities
 
@@ -112,14 +107,7 @@ API_KEY={dotsecenv}
 
 ### What Vault Does Well
 
-Vault is the industry standard for production secrets:
-
-- **Dynamic secrets**: Generate database credentials on-demand
-- **Secret rotation**: Automatic credential rotation
-- **PKI**: Certificate authority for TLS
-- **Transit encryption**: Encrypt data without storing it
-- **Access policies**: Fine-grained RBAC
-- **Audit logging**: Comprehensive activity tracking
+Vault is the industry standard for production secrets. It generates dynamic credentials on demand (databases, cloud APIs), rotates them automatically, runs a PKI for TLS, offers transit encryption (encrypt data without storing it), enforces fine-grained RBAC, and produces comprehensive audit logs.
 
 ### Key Differences
 
@@ -160,11 +148,7 @@ Vault can be overkill for developer workflows. Many teams use dotsecenv for deve
 
 ### What Doppler Does Well
 
-- **Web dashboard**: Visual secrets management
-- **Team collaboration**: Invite users, manage permissions
-- **Environment sync**: Automatic sync to cloud providers
-- **Integrations**: 50+ platform integrations
-- **Audit logs**: Track all secret access
+Doppler offers a web dashboard for visual secrets management, team collaboration with invitations and permissions, automatic environment sync to cloud providers, more than 50 platform integrations, and audit logs that track every secret access.
 
 ### Key Differences
 
@@ -201,11 +185,7 @@ Vault can be overkill for developer workflows. Many teams use dotsecenv for deve
 
 ### What Infisical Does Well
 
-- **Open source**: Self-host for full control
-- **Web dashboard**: Visual management
-- **Secret rotation**: Automatic rotation support
-- **Dynamic secrets**: Generate credentials on-demand
-- **Compliance**: SOC 2, HIPAA, FIPS 140-3
+Infisical is open source and self-hostable for full control. It provides a web dashboard for visual management, supports automatic secret rotation, generates dynamic credentials on demand, and carries SOC 2, HIPAA, and FIPS 140-3 compliance attestations.
 
 ### Key Differences
 
