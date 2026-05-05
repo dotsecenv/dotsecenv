@@ -114,10 +114,13 @@ func checkVaultWritable(vaultPath string) *Error {
 	return nil
 }
 
-// VaultDescribeSecretJSON represents a secret in the vault describe JSON output
+// VaultDescribeSecretJSON represents a secret in the vault describe JSON output.
+// AvailableTo reflects the current authorization snapshot (the most-recent value's
+// access list); it is omitted for deleted secrets and secrets without values.
 type VaultDescribeSecretJSON struct {
-	Key     string `json:"key"`
-	Deleted bool   `json:"deleted,omitempty"`
+	Key         string   `json:"key"`
+	Deleted     bool     `json:"deleted,omitempty"`
+	AvailableTo []string `json:"available_to,omitempty"`
 }
 
 // VaultDescribeIdentityJSON represents an identity in the vault describe JSON output
@@ -182,9 +185,14 @@ func (c *CLI) VaultDescribe(jsonOutput bool) *Error {
 				// Build secrets list
 				var secrets []VaultDescribeSecretJSON
 				for _, s := range vaultData.Secrets {
+					var availableTo []string
+					if !s.IsDeleted() && len(s.Values) > 0 {
+						availableTo = s.Values[len(s.Values)-1].AvailableTo
+					}
 					secrets = append(secrets, VaultDescribeSecretJSON{
-						Key:     s.Key,
-						Deleted: s.IsDeleted(),
+						Key:         s.Key,
+						Deleted:     s.IsDeleted(),
+						AvailableTo: availableTo,
 					})
 				}
 				sort.Slice(secrets, func(i, j int) bool {

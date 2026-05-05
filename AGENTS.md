@@ -169,6 +169,9 @@ making changes that look like they might violate them.
 | Vulnerability reporting          | [SECURITY.md](./SECURITY.md)                    |
 | Code of Conduct                  | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)      |
 | Full docs site (Diátaxis)        | <https://dotsecenv.com>                         |
+| Team-lead vault setup tutorial   | <https://dotsecenv.com/tutorials/team-vault-setup/> |
+| Audit trail concepts and queries | <https://dotsecenv.com/concepts/audit-trail/>   |
+| GPG agent operational reference  | <https://dotsecenv.com/guides/gpg-agent/>       |
 | Claude Code skill: `.secenv` files | [skills/secenv/SKILL.md](./skills/secenv/SKILL.md) |
 | Claude Code skill: vault ops     | [skills/secrets/SKILL.md](./skills/secrets/SKILL.md) |
 | Plugin manifest                  | [.claude-plugin/plugin.json](./.claude-plugin/plugin.json) |

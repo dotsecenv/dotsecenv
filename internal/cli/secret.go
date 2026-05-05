@@ -16,11 +16,15 @@ import (
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
-// SecretValueJSON is the JSON output structure for secret values
+// SecretValueJSON is the JSON output structure for secret values.
+// AvailableTo and SignedBy are populated when --all is used so the JSON
+// output is sufficient for auditing access control across versions.
 type SecretValueJSON struct {
-	AddedAt time.Time   `json:"added_at"`
-	Value   interface{} `json:"value"`
-	Vault   string      `json:"vault,omitempty"`
+	AddedAt     time.Time   `json:"added_at"`
+	Value       interface{} `json:"value"`
+	Vault       string      `json:"vault,omitempty"`
+	AvailableTo []string    `json:"available_to,omitempty"`
+	SignedBy    string      `json:"signed_by,omitempty"`
 }
 
 // smartJSONValue returns a json.RawMessage if the value is a JSON object or array,
@@ -387,9 +391,11 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 			valStr := string(plaintext)
 			decryptedValues = append(decryptedValues, valStr)
 			decryptedValuesWithTime = append(decryptedValuesWithTime, SecretValueJSON{
-				AddedAt: val.AddedAt,
-				Value:   smartJSONValue(valStr),
-				Vault:   item.VaultPath,
+				AddedAt:     val.AddedAt,
+				Value:       smartJSONValue(valStr),
+				Vault:       item.VaultPath,
+				AvailableTo: val.AvailableTo,
+				SignedBy:    val.SignedBy,
 			})
 		}
 	} else {
@@ -521,9 +527,11 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 			valStr := string(plaintext)
 			decryptedValues = append(decryptedValues, valStr)
 			decryptedValuesWithTime = append(decryptedValuesWithTime, SecretValueJSON{
-				AddedAt: val.AddedAt,
-				Value:   smartJSONValue(valStr),
-				Vault:   vaultPath,
+				AddedAt:     val.AddedAt,
+				Value:       smartJSONValue(valStr),
+				Vault:       vaultPath,
+				AvailableTo: val.AvailableTo,
+				SignedBy:    val.SignedBy,
 			})
 		}
 	} else {
