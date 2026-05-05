@@ -130,6 +130,16 @@ The plugin enforces four tiers of operations:
   When your GPG passphrase is cached, any process running as your user can trigger decryption, including AI agents. For the operational reference (health checks, cache warming, troubleshooting) see [GPG Agent](/guides/gpg-agent/); for the security rationale see [Threat Model](/concepts/threat-model/#recommended-gpg-agent-configuration).
 </Aside>
 
+## Up-to-date Docs via Context7
+
+[Context7](https://context7.com) is an MCP server and documentation index that ingests project docs and serves them to LLMs and coding agents on demand. When Claude Code (or another MCP-aware tool like Cursor) has the Context7 MCP server configured, it can pull current dotsecenv documentation at request time instead of relying on whatever its training data captured.
+
+dotsecenv's documentation is indexed at [context7.com/code-docs/dotsecenv/dotsecenv](https://context7.com/code-docs/dotsecenv/dotsecenv). If your AI tooling has Context7 set up, asking about `.secenv` syntax, vault commands, or shell plugin behavior will pull from the same docs you're reading here, kept in sync as new releases ship.
+
+<Aside type="tip">
+  Context7 is independent of the `/dotsecenv:secrets` and `/dotsecenv:secenv` skills above. The skills run dotsecenv on your machine; Context7 just provides up-to-date reference material to your assistant.
+</Aside>
+
 ## Variations
 
 ### Local Development (without marketplace)

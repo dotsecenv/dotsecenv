@@ -393,6 +393,17 @@ details > :not(summary) {
   padding: 0 1rem;
 }
 
+/* Contextual menu: keep "Copy page" button label on a single line next to long monospace H1s */
+.contextual-main-action,
+.contextual-main-action span {
+  white-space: nowrap;
+}
+
+.contextual-main-action,
+.contextual-menu-trigger {
+  flex-shrink: 0;
+}
+
 /* Print styles */
 @media print {
   .sidebar,
