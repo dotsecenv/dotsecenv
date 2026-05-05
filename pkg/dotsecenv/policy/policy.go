@@ -157,8 +157,9 @@ func loadFromDir(dir string, statFn func(string) (os.FileInfo, error)) (Policy, 
 }
 
 // rejectForbiddenKeys parses the raw YAML and returns ErrForbiddenKey if any
-// top-level key in forbiddenKeysPhase1 is present. Mirrors the raw-YAML
-// second-pass scan from config.detectLegacyFields.
+// top-level key in forbiddenKeysPhase1 is present. The raw-YAML second pass
+// is required because yaml.v3 silently drops unknown keys during decode,
+// which would otherwise hide forbidden fields.
 func rejectForbiddenKeys(path string, data []byte) error {
 	var raw map[string]yaml.Node
 	if err := yaml.Unmarshal(data, &raw); err != nil {

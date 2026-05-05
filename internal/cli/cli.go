@@ -92,7 +92,7 @@ func loadConfigAndPrepareGPG(configPath string, silent bool, stdin io.Reader, st
 		return nil, NewError(fmt.Sprintf("failed to create directories: %v", err), ExitConfigError)
 	}
 
-	cfg, warnings, err := config.Load(configPath)
+	cfg, err := config.Load(configPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			var suggestion string
@@ -122,9 +122,6 @@ func loadConfigAndPrepareGPG(configPath string, silent bool, stdin io.Reader, st
 	cfg, polApplyWarnings = policy.Apply(cfg, pol)
 
 	if !silent {
-		for _, w := range warnings {
-			_, _ = fmt.Fprintf(stderr, "warning: %s\n", w)
-		}
 		for _, w := range polLoadWarnings {
 			_, _ = fmt.Fprintf(stderr, "warning: %s\n", w)
 		}

@@ -106,7 +106,7 @@ func TestConfigLoadSave(t *testing.T) {
 		t.Fatalf("Save failed: %v", err)
 	}
 
-	loadedCfg, _, err := Load(cfgPath)
+	loadedCfg, err := Load(cfgPath)
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
@@ -131,17 +131,19 @@ func TestConfigLoadSave(t *testing.T) {
 	}
 }
 
-func TestLoad_LegacyFingerprintWarning(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "config_legacy_test")
+// TestLoad_StrayFingerprintFieldIsIgnored guards the post-cleanup contract:
+// an old config that still carries a top-level `fingerprint:` key must load
+// without error. yaml.v3 silently drops unknown keys, so the deprecated value
+// is discarded and the config loads as if the field were absent. Identity is
+// resolved exclusively from the signed `login:` section.
+func TestLoad_StrayFingerprintFieldIsIgnored(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "config_stray_fingerprint_test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
-	// Config containing the deprecated `fingerprint:` key. The struct field is
-	// gone, so unmarshal silently drops it — Load's second-pass detection is
-	// what surfaces the warning.
-	cfgPath := filepath.Join(tempDir, "legacy.yaml")
+	cfgPath := filepath.Join(tempDir, "stray.yaml")
 	body := []byte(`
 approved_algorithms:
   - algo: RSA
@@ -154,44 +156,15 @@ vault:
 		t.Fatalf("write config: %v", err)
 	}
 
-	_, warnings, err := Load(cfgPath)
+	cfg, err := Load(cfgPath)
 	if err != nil {
 		t.Fatalf("Load failed: %v", err)
 	}
-	if len(warnings) != 1 {
-		t.Fatalf("expected exactly 1 warning, got %d: %v", len(warnings), warnings)
+	if cfg.Login != nil {
+		t.Errorf("stray fingerprint must not populate Login: got %+v", cfg.Login)
 	}
-	if !strings.Contains(warnings[0], "deprecated 'fingerprint:' field") {
-		t.Errorf("warning missing legacy-key tag: %s", warnings[0])
-	}
-	if !strings.Contains(warnings[0], "ABC123DEF456") {
-		t.Errorf("warning should include the fingerprint value to migrate: %s", warnings[0])
-	}
-	if !strings.Contains(warnings[0], "dotsecenv login") {
-		t.Errorf("warning should suggest the migration command: %s", warnings[0])
-	}
-}
-
-func TestLoad_NoWarningsForCleanConfig(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "config_clean_test")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
-	cfgPath := filepath.Join(tempDir, "clean.yaml")
-	cfg := DefaultConfig()
-	cfg.Vault = []string{"/tmp/v"}
-	if err := Save(cfgPath, cfg); err != nil {
-		t.Fatalf("Save: %v", err)
-	}
-
-	_, warnings, err := Load(cfgPath)
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if len(warnings) != 0 {
-		t.Errorf("expected no warnings for clean config, got: %v", warnings)
+	if len(cfg.Vault) != 1 || cfg.Vault[0] != "/tmp/v" {
+		t.Errorf("vault entries lost during load: %v", cfg.Vault)
 	}
 }
 
