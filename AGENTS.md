@@ -103,6 +103,14 @@ test.
   Co-Authored-By footers are **not** used in this repo's history; don't add
   them unless asked.
 - **Branches:** `feat/*`, `fix/*`, `docs/*`, etc. (see `CONTRIBUTING.md`).
+- **PRs only:** All changes land on `main` through pull requests. Don't
+  push commits directly to `main`, even when your account holds a bypass
+  permission. Open a PR against `main` and let CI run.
+- **No change without tests:** Every behavior change ships with tests
+  that lock the new behavior in. New struct fields, new branches in
+  control flow, new flag handling, new error paths — each gets at least
+  one test that fails on the unchanged code. Pure refactors that go
+  through existing tests are the only exception.
 - **Linters:** `golangci-lint` v2.11.4 — pinned because v2.12.x had a
   checksum mismatch on release. Don't bump back to `latest` without verifying.
 - **Releases:** Triggered by pushing a signed semver tag. Use
@@ -144,6 +152,10 @@ making changes that look like they might violate them.
   `.goreleaser.yaml`.
 - **Don't bypass git hooks (`--no-verify`).** Pre-commit runs `make lint`;
   pre-push runs `make clean test build e2e`. If a hook fails, fix the cause.
+- **Don't push directly to `main`.** Branch protection allows bypass for
+  some accounts, but the convention is: branch, commit, push the branch,
+  open a PR. Direct pushes skip CI gates and review, and force-pushing
+  `main` to undo a direct push rewrites public history.
 - **Don't modify cryptographic invariants without explicit review.** This
   includes: vault entry signature checks, the SHA-256 hash chain in JSONL
   entries, the append-only writer, multi-recipient PGP encryption, and the
