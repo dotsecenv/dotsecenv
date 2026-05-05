@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
@@ -83,6 +84,52 @@ func TestFilterEncryptionCapableKeys(t *testing.T) {
 			for i, want := range tt.wantFPs {
 				if got[i].Fingerprint != want {
 					t.Errorf("keys[%d].Fingerprint = %s, want %s", i, got[i].Fingerprint, want)
+				}
+			}
+		})
+	}
+}
+
+func TestRequireEncryptionCapableKey(t *testing.T) {
+	const fp = "1E378219F90018AB2102B2131C238966B12A6F21"
+
+	tests := []struct {
+		name    string
+		info    *gpg.KeyInfo
+		wantErr bool
+	}{
+		{
+			name:    "encryption-capable",
+			info:    &gpg.KeyInfo{Fingerprint: fp, CanEncrypt: true},
+			wantErr: false,
+		},
+		{
+			name:    "sign-only",
+			info:    &gpg.KeyInfo{Fingerprint: fp, CanEncrypt: false},
+			wantErr: true,
+		},
+		{
+			name:    "nil info",
+			info:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := requireEncryptionCapableKey(tt.info, fp)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("requireEncryptionCapableKey(...) err=%v, wantErr=%v", err, tt.wantErr)
+			}
+			if err != nil {
+				if !strings.Contains(err.Message, fp) {
+					t.Errorf("error message should mention fingerprint %q: %s", fp, err.Message)
+				}
+				if !strings.Contains(err.Message, "signing-only") {
+					t.Errorf("error message should explain why: %s", err.Message)
+				}
+				if err.ExitCode != ExitGPGError {
+					t.Errorf("exit code = %v, want ExitGPGError", err.ExitCode)
 				}
 			}
 		})

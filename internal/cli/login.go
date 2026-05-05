@@ -122,6 +122,23 @@ func shortFingerprint(fp string) string {
 	return fp[:16] + "..."
 }
 
+// requireEncryptionCapableKey returns an error if `info` represents a
+// sign-only key. Login enforces this regardless of how the fingerprint
+// reached it: interactive selection filters sign-only keys out, but
+// `dotsecenv login FP` and `init config --login FP` bypass that filter
+// and would otherwise produce a "successful" login that fails at the
+// next `secret put`.
+func requireEncryptionCapableKey(info *gpg.KeyInfo, fingerprint string) *Error {
+	if info != nil && info.CanEncrypt {
+		return nil
+	}
+	return NewError(fmt.Sprintf(
+		"key %s is signing-only and cannot decrypt secrets.\n"+
+			"Use a key with an encryption-capable subkey, or create one with: dotsecenv identity create",
+		fingerprint,
+	), ExitGPGError)
+}
+
 // Login initializes the user's identity with a signed login proof.
 // If fingerprint is empty, it will interactively prompt the user to select from available secret keys.
 func (c *CLI) Login(fingerprint string) *Error {
@@ -137,6 +154,10 @@ func (c *CLI) Login(fingerprint string) *Error {
 	publicKeyInfo, pubKeyErr := c.gpgClient.GetPublicKeyInfo(fingerprint)
 	if pubKeyErr != nil {
 		return NewError(fmt.Sprintf("failed to get public key for fingerprint '%s': %v\nMake sure your GPG key is available in gpg-agent", fingerprint, pubKeyErr), ExitGPGError)
+	}
+
+	if capErr := requireEncryptionCapableKey(publicKeyInfo, fingerprint); capErr != nil {
+		return capErr
 	}
 
 	// Display login info
