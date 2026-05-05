@@ -170,7 +170,7 @@ func ValidateVaultPathsAgainstConfig(configPath string, vaultPaths []string, out
 	effectiveConfigPath := ResolveConfigPath(configPath, true, out.Stderr()) // silent for resolution
 
 	// Load config (if it doesn't exist, no validation needed - allow creating vault anywhere)
-	cfg, _, err := config.Load(effectiveConfigPath)
+	cfg, err := config.Load(effectiveConfigPath)
 	if err != nil {
 		// Config doesn't exist or can't be read - allow vault creation
 		return nil
@@ -256,7 +256,7 @@ func InitVaultFile(vaultPath string, out *output.Handler) *Error {
 // InitVaultInteractiveStandalone allows user to select a vault from config to initialize
 // This runs without requiring the vaults to be openable (since they might not exist yet)
 func InitVaultInteractiveStandalone(configPath string, out *output.Handler) *Error {
-	cfg, warnings, err := config.Load(configPath)
+	cfg, err := config.Load(configPath)
 	if err != nil {
 		// Provide helpful suggestion based on execution context
 		var suggestion string
@@ -268,12 +268,6 @@ func InitVaultInteractiveStandalone(configPath string, out *output.Handler) *Err
 			suggestion = fmt.Sprintf("failed to load config: %v\nRun 'dotsecenv init config' first.", err)
 		}
 		return NewError(suggestion, ExitConfigError)
-	}
-
-	if !out.IsSilent() {
-		for _, w := range warnings {
-			_, _ = fmt.Fprintf(out.Stderr(), "warning: %s\n", w)
-		}
 	}
 
 	vaultCfg, err := vault.ParseVaultConfig(cfg.Vault)

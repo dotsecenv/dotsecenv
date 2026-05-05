@@ -135,50 +135,24 @@ func DefaultConfig() Config {
 	}
 }
 
-// Load reads the config from the specified path. Returns the parsed Config,
-// any human-readable warnings about deprecated/removed fields detected in the
-// file (callers should print these to stderr unless silent), and an error.
-// If the file doesn't exist or is empty, it returns an error.
-func Load(path string) (Config, []string, error) {
+// Load reads the config from the specified path. If the file doesn't exist or
+// is empty, it returns an error.
+func Load(path string) (Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Config{}, nil, fmt.Errorf("failed to read config: %w", err)
+		return Config{}, fmt.Errorf("failed to read config: %w", err)
 	}
 
 	if len(data) == 0 {
-		return Config{}, nil, fmt.Errorf("config file is empty")
+		return Config{}, fmt.Errorf("config file is empty")
 	}
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return Config{}, nil, fmt.Errorf("failed to parse config: %w", err)
+		return Config{}, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	return cfg, detectLegacyFields(data, path), nil
-}
-
-// detectLegacyFields scans the raw YAML for top-level keys that have been
-// removed or renamed in this version of dotsecenv and returns human-readable
-// warnings for each one detected. It never errors — unmarshal failures are
-// surfaced by Load's primary parse.
-//
-// The scan operates on the raw bytes (not the parsed Config) so that warnings
-// fire even after the corresponding struct field has been deleted: yaml.v3
-// silently drops unknown keys, which would otherwise hide the deprecation.
-func detectLegacyFields(data []byte, path string) []string {
-	var raw map[string]yaml.Node
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return nil
-	}
-
-	var warnings []string
-	if node, ok := raw["fingerprint"]; ok && node.Kind == yaml.ScalarNode && node.Value != "" {
-		warnings = append(warnings, fmt.Sprintf(
-			"deprecated 'fingerprint:' field detected in %s and ignored. Run 'dotsecenv login %s' to migrate to a signed login.",
-			path, node.Value,
-		))
-	}
-	return warnings
+	return cfg, nil
 }
 
 // Save writes the config to the specified path with proper formatting
