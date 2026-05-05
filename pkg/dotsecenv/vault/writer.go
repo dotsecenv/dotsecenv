@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
 )
@@ -245,6 +246,10 @@ func (w *Writer) AddIdentity(id identity.Identity) error {
 		return fmt.Errorf("skipped, already present: %s", id.Fingerprint)
 	}
 
+	if err := w.checkAppendTimestamps(id.AddedAt); err != nil {
+		return err
+	}
+
 	lineNum := w.nextLineNumber()
 
 	entry, err := CreateIdentityEntry(id)
@@ -271,6 +276,10 @@ func (w *Writer) AddSecret(s Secret) error {
 		if CompareSecretKeys(existingKey, s.Key) {
 			return fmt.Errorf("secret already exists: %s", existingKey)
 		}
+	}
+
+	if err := w.checkAppendTimestamps(s.AddedAt); err != nil {
+		return err
 	}
 
 	lineNum := w.nextLineNumber()
@@ -313,6 +322,10 @@ func (w *Writer) AddSecretValue(secretKey string, sv SecretValue) error {
 		return fmt.Errorf("secret not found: %s", secretKey)
 	}
 
+	if err := w.checkAppendTimestamps(sv.AddedAt); err != nil {
+		return err
+	}
+
 	lineNum := w.nextLineNumber()
 
 	entry, err := CreateValueEntry(secretKey, sv)
@@ -340,6 +353,15 @@ func (w *Writer) AddSecretWithValues(s Secret) error {
 		if CompareSecretKeys(existingKey, s.Key) {
 			return fmt.Errorf("secret already exists: %s", existingKey)
 		}
+	}
+
+	timestamps := make([]time.Time, 0, 1+len(s.Values))
+	timestamps = append(timestamps, s.AddedAt)
+	for _, sv := range s.Values {
+		timestamps = append(timestamps, sv.AddedAt)
+	}
+	if err := w.checkAppendTimestamps(timestamps...); err != nil {
+		return err
 	}
 
 	// Add secret definition

@@ -802,8 +802,10 @@ func TestDefragmentation(t *testing.T) {
 		t.Fatalf("AddIdentity failed: %v", err)
 	}
 
-	// Add value to first secret (fragmenting secret from its value)
-	sv := SecretValue{AddedAt: now, AvailableTo: []string{"FP1"}, Value: "v1"}
+	// Add value to first secret (fragmenting secret from its value).
+	// Timestamp must respect monotonic write-order; the value lands on a
+	// later line than id2, so it must carry a later or equal added_at.
+	sv := SecretValue{AddedAt: now.Add(2 * time.Second), AvailableTo: []string{"FP1"}, Value: "v1"}
 	if err := w.AddSecretValue("SEC1", sv); err != nil {
 		t.Fatalf("AddSecretValue failed: %v", err)
 	}
