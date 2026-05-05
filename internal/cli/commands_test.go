@@ -1484,3 +1484,193 @@ func TestSecretGet_FallbackNotFound(t *testing.T) {
 		t.Errorf("Expected 'not found' in error message, got: %s", err.Message)
 	}
 }
+
+// TestSecretGet_JSONOutput_AllMode_IncludesAvailableToAndSignedBy verifies that
+// `secret get NAME --all --json` exposes per-value available_to and signed_by,
+// which are required for auditing access control across versions.
+func TestSecretGet_JSONOutput_AllMode_IncludesAvailableToAndSignedBy(t *testing.T) {
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	loggedInFP := "ALICEFP"
+	otherFP := "BOBFP"
+
+	now := time.Now().UTC()
+	older := now.Add(-1 * time.Hour)
+
+	mockVaultResolver := NewMockVaultResolver()
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"DB_PASSWORD": {
+			Key: "DB_PASSWORD",
+			Values: []vault.SecretValue{
+				{AddedAt: older, Value: "b2xk", AvailableTo: []string{loggedInFP}, SignedBy: loggedInFP},
+				{AddedAt: now, Value: "bmV3", AvailableTo: []string{loggedInFP, otherFP}, SignedBy: otherFP},
+			},
+		},
+	}
+	mockVaultResolver.VaultPaths = []string{"/vault.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: "/vault.yaml"}}
+
+	mockGPGClient := &MockGPGClientWithDecrypt{
+		MockGPGClient: NewMockGPGClient(),
+		DecryptFunc: func(ciphertext []byte, fingerprint string) ([]byte, error) {
+			return []byte("plaintext"), nil
+		},
+	}
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{{Algo: "RSA", MinBits: 2048}},
+		Login:              newTestSignedLogin(t, loggedInFP),
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	if err := cli.SecretGet("DB_PASSWORD", true, false, true, "", 0); err != nil {
+		t.Fatalf("SecretGet --all --json failed: %v", err)
+	}
+
+	var results []map[string]interface{}
+	if err := json.Unmarshal(stdoutBuf.Bytes(), &results); err != nil {
+		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, stdoutBuf.String())
+	}
+	if len(results) != 2 {
+		t.Fatalf("Expected 2 entries, got %d", len(results))
+	}
+
+	// Sorted newest-first: results[0] is the recent value (signed by Bob, shared with both)
+	got := results[0]
+	if got["signed_by"] != otherFP {
+		t.Errorf("Expected signed_by=%q on newest value, got: %v", otherFP, got["signed_by"])
+	}
+	availableTo, ok := got["available_to"].([]interface{})
+	if !ok {
+		t.Fatalf("Expected available_to to be an array on newest value, got %T: %v", got["available_to"], got["available_to"])
+	}
+	if len(availableTo) != 2 {
+		t.Errorf("Expected 2 fingerprints on newest value, got %d", len(availableTo))
+	}
+
+	// results[1] is the older value (signed by Alice, only Alice has access)
+	older2 := results[1]
+	if older2["signed_by"] != loggedInFP {
+		t.Errorf("Expected signed_by=%q on older value, got: %v", loggedInFP, older2["signed_by"])
+	}
+}
+
+// TestSecretGet_JSONOutput_NoAll_OmitsAvailableToAndSignedBy verifies that the
+// single-value JSON output stays lean and does not leak access metadata.
+func TestSecretGet_JSONOutput_NoAll_OmitsAvailableToAndSignedBy(t *testing.T) {
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	testFP := "TESTFP"
+
+	mockVaultResolver := NewMockVaultResolver()
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"API_KEY": {
+			Key: "API_KEY",
+			Values: []vault.SecretValue{
+				{AddedAt: time.Now().UTC(), Value: "c2VjcmV0", AvailableTo: []string{testFP}, SignedBy: testFP},
+			},
+		},
+	}
+	mockVaultResolver.VaultPaths = []string{"/vault.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: "/vault.yaml"}}
+
+	mockGPGClient := &MockGPGClientWithDecrypt{
+		MockGPGClient: NewMockGPGClient(),
+		DecryptFunc: func(ciphertext []byte, fingerprint string) ([]byte, error) {
+			return []byte("plaintext"), nil
+		},
+	}
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{{Algo: "RSA", MinBits: 2048}},
+		Login:              newTestSignedLogin(t, testFP),
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	if err := cli.SecretGet("API_KEY", false, false, true, "", 0); err != nil {
+		t.Fatalf("SecretGet --json failed: %v", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(stdoutBuf.Bytes(), &result); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, stdoutBuf.String())
+	}
+
+	if _, present := result["available_to"]; present {
+		t.Errorf("Expected available_to to be omitted in non-all JSON output, got: %v", result["available_to"])
+	}
+	if _, present := result["signed_by"]; present {
+		t.Errorf("Expected signed_by to be omitted in non-all JSON output, got: %v", result["signed_by"])
+	}
+}
+
+// TestVaultDescribeSecretJSON_OmitemptyContract documents the JSON contract for
+// VaultDescribeSecretJSON: AvailableTo is omitted for deleted secrets and
+// secrets with no values, and present for active secrets with recipients.
+func TestVaultDescribeSecretJSON_OmitemptyContract(t *testing.T) {
+	cases := []struct {
+		name         string
+		input        VaultDescribeSecretJSON
+		wantContains []string
+		wantOmits    []string
+	}{
+		{
+			name:         "active secret with recipients",
+			input:        VaultDescribeSecretJSON{Key: "DB", AvailableTo: []string{"FP1", "FP2"}},
+			wantContains: []string{`"key":"DB"`, `"available_to":["FP1","FP2"]`},
+			wantOmits:    []string{`"deleted"`},
+		},
+		{
+			name:         "deleted secret",
+			input:        VaultDescribeSecretJSON{Key: "OLD", Deleted: true},
+			wantContains: []string{`"key":"OLD"`, `"deleted":true`},
+			wantOmits:    []string{`"available_to"`},
+		},
+		{
+			name:         "secret with no values",
+			input:        VaultDescribeSecretJSON{Key: "EMPTY"},
+			wantContains: []string{`"key":"EMPTY"`},
+			wantOmits:    []string{`"available_to"`, `"deleted"`},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := json.Marshal(tc.input)
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			got := string(out)
+			for _, sub := range tc.wantContains {
+				if !strings.Contains(got, sub) {
+					t.Errorf("expected output to contain %q, got: %s", sub, got)
+				}
+			}
+			for _, sub := range tc.wantOmits {
+				if strings.Contains(got, sub) {
+					t.Errorf("expected output to omit %q, got: %s", sub, got)
+				}
+			}
+		})
+	}
+}
