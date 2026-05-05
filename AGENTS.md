@@ -100,8 +100,8 @@ test.
   `feat: behavior.* and gpg.program policy fields (last-set-wins) (#116)`.
   Allowed types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`,
   `style`. Breaking changes use `!`, e.g. `refactor!: drop SUID mode (#110)`.
-  Co-Authored-By footers are **not** used in this repo's history; don't add
-  them unless asked.
+  `Co-Authored-By` footers are welcome (e.g. for AI agents that helped
+  produce the change).
 - **Branches:** `feat/*`, `fix/*`, `docs/*`, etc. (see `CONTRIBUTING.md`).
 - **PRs only:** All changes land on `main` through pull requests. Don't
   push commits directly to `main`, even when your account holds a bypass
