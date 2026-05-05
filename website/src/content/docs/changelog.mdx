@@ -13,7 +13,7 @@ _May 4, 2026_
 
 ### Features
 
-- Trusted policy directory at `/etc/dotsecenv/policy.d/` for system-wide admin rules. Fragments can pin allow-lists (`approved_algorithms`, `approved_vault_paths`) and scalars (`behavior.*`, `gpg.program`). Allow-lists intersect with user config; scalars override the user. Two new commands ship with it: `dotsecenv policy list` and `dotsecenv policy validate`, both with `--json`. Policy loads fail-closed, with a distinct exit code per error category. Full design at [Policy Directory](/concepts/policy-directory/). (#114, #115, #116)
+- Trusted policy directory at `/etc/dotsecenv/policy.d/` for system-wide admin rules. Fragments can pin allow-lists (`approved_algorithms`, `approved_vault_paths`) and scalars (`behavior.*`, `gpg.program`). Allow-lists intersect with user config; scalars override the user. Two new commands ship with it: `dotsecenv policy list` and `dotsecenv policy validate`, both with `--json`. Policy loads fail-closed, with a distinct exit code per error category. Full design at [Security Policies](/concepts/security-policies/). (#114, #115, #116)
 
 ### Bug Fixes
 

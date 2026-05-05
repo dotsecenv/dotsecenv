@@ -7,6 +7,12 @@ import { SITE_TITLE } from './src/consts';
 
 export default defineConfig({
   site: 'https://dotsecenv.com',
+  redirects: {
+    // Renamed from Policy Directory → Security Policies (May 2026).
+    // Preserve external links from blog posts, social shares, and search engines.
+    '/concepts/policy-directory': '/concepts/security-policies/',
+    '/concepts/policy-directory/': '/concepts/security-policies/',
+  },
   integrations: [
     starlight({
       plugins: [
@@ -176,7 +182,7 @@ export default defineConfig({
             { label: 'Vault Format', slug: 'concepts/vault-format' },
             { label: 'Audit Trail', slug: 'concepts/audit-trail' },
             { label: 'Behavior Settings', slug: 'concepts/behavior-settings' },
-            { label: 'Policy Directory', slug: 'concepts/policy-directory' },
+            { label: 'Security Policies', slug: 'concepts/security-policies' },
             { label: 'Standards Compliance', slug: 'concepts/compliance' },
             { label: 'Comparison', slug: 'concepts/comparison' },
           ],
