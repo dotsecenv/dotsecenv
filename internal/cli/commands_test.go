@@ -1674,3 +1674,88 @@ func TestVaultDescribeSecretJSON_OmitemptyContract(t *testing.T) {
 		})
 	}
 }
+
+// TestSecretValueJSON_OmitemptyContract documents the JSON contract for
+// SecretValueJSON: available_to and signed_by surface only when populated
+// (i.e. with --all), keeping the single-value JSON output unchanged.
+func TestSecretValueJSON_OmitemptyContract(t *testing.T) {
+	now := time.Date(2026, 4, 12, 10, 22, 1, 0, time.UTC)
+
+	cases := []struct {
+		name         string
+		input        SecretValueJSON
+		wantContains []string
+		wantOmits    []string
+	}{
+		{
+			name: "all-mode entry with access metadata",
+			input: SecretValueJSON{
+				AddedAt:     now,
+				Value:       "plaintext",
+				Vault:       "/path/to/vault",
+				AvailableTo: []string{"ALICE_FP", "BOB_FP"},
+				SignedBy:    "ALICE_FP",
+			},
+			wantContains: []string{
+				`"added_at":"2026-04-12T10:22:01Z"`,
+				`"value":"plaintext"`,
+				`"vault":"/path/to/vault"`,
+				`"available_to":["ALICE_FP","BOB_FP"]`,
+				`"signed_by":"ALICE_FP"`,
+			},
+		},
+		{
+			name: "single-value entry without access metadata",
+			input: SecretValueJSON{
+				AddedAt: now,
+				Value:   "plaintext",
+				Vault:   "/path/to/vault",
+			},
+			wantContains: []string{
+				`"added_at":"2026-04-12T10:22:01Z"`,
+				`"value":"plaintext"`,
+				`"vault":"/path/to/vault"`,
+			},
+			wantOmits: []string{
+				`"available_to"`,
+				`"signed_by"`,
+			},
+		},
+		{
+			name: "minimal entry omits all optional fields",
+			input: SecretValueJSON{
+				AddedAt: now,
+				Value:   "plaintext",
+			},
+			wantContains: []string{
+				`"added_at":"2026-04-12T10:22:01Z"`,
+				`"value":"plaintext"`,
+			},
+			wantOmits: []string{
+				`"vault"`,
+				`"available_to"`,
+				`"signed_by"`,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := json.Marshal(tc.input)
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			got := string(out)
+			for _, sub := range tc.wantContains {
+				if !strings.Contains(got, sub) {
+					t.Errorf("expected output to contain %q, got: %s", sub, got)
+				}
+			}
+			for _, sub := range tc.wantOmits {
+				if strings.Contains(got, sub) {
+					t.Errorf("expected output to omit %q, got: %s", sub, got)
+				}
+			}
+		})
+	}
+}
