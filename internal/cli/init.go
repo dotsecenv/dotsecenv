@@ -62,6 +62,10 @@ func InitConfig(configPath string, initialVaults []string, gpgProgram string, lo
 			return NewError(fmt.Sprintf("failed to get public key for fingerprint '%s': %v\nMake sure your GPG key is available in gpg-agent", loginFingerprint, pubKeyErr), ExitGPGError)
 		}
 
+		if capErr := requireEncryptionCapableKey(publicKeyInfo, loginFingerprint); capErr != nil {
+			return capErr
+		}
+
 		_, _ = fmt.Fprintf(out.Stderr(), "Creating signed login for: %s (%s)\n", publicKeyInfo.UID, loginFingerprint)
 
 		// Create signed login proof
