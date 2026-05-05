@@ -157,7 +157,7 @@ dotsecenv secret get DATABASE_PASSWORD
 
 ```bash
 dotsecenv secret get DATABASE_PASSWORD --json
-# {"name":"DATABASE_PASSWORD","value":"my-secret-value","available_to":["..."]}
+# {"added_at":"2026-04-12T10:22:01Z","value":"my-secret-value","vault":"~/.config/dotsecenv/vault"}
 ```
 
 ### Get all versions
@@ -165,6 +165,21 @@ dotsecenv secret get DATABASE_PASSWORD --json
 ```bash
 dotsecenv secret get DATABASE_PASSWORD --all
 # Lists all historical values
+```
+
+`--all` with `--json` additionally returns `available_to` and `signed_by` per version, which is the supported audit interface — see [Audit Trail](/concepts/audit-trail/).
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD --all --json
+# [
+#   {
+#     "added_at": "2026-04-12T10:22:01Z",
+#     "value": "my-secret-value",
+#     "vault": "~/.config/dotsecenv/vault",
+#     "available_to": ["ALICE_FP", "BOB_FP"],
+#     "signed_by": "ALICE_FP"
+#   }
+# ]
 ```
 
 ### Get latest version only
@@ -242,6 +257,25 @@ echo "new-value" | dotsecenv secret store DATABASE_PASSWORD
 ```bash
 dotsecenv secret revoke "*" THEIR_FINGERPRINT --all
 ```
+
+---
+
+## Audit Secret History
+
+Query who could decrypt a secret, who signed each version, and when each change happened.
+
+```bash
+# Current authorization snapshot per secret
+dotsecenv vault describe --json
+
+# Full version history with signed_by and available_to per value
+dotsecenv secret get DATABASE_PASSWORD --all --json
+
+# Real-world authorship and commit timeline
+git log -p -- path/to/vault
+```
+
+For example queries (filter by signer, diff access changes, query past commits) and a discussion of what append-only can and cannot prove, see [Audit Trail](/concepts/audit-trail/).
 
 ---
 

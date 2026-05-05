@@ -59,6 +59,10 @@ Identities are stored as an ordered array of `[fingerprint, line]` pairs, sorted
 
 The array format preserves insertion order. That gives you deterministic output (the same vault always serializes identically), cleaner git diffs from consistent ordering, and an implicit audit trail since order reflects when identities were added.
 
+<Aside type="tip">
+For querying the audit trail (who signed each entry, who could decrypt each version, when changes happened), see [Audit Trail](/concepts/audit-trail/).
+</Aside>
+
 ## Entry Types
 
 ### Identity Entry

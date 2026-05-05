@@ -157,6 +157,7 @@ export default defineConfig({
           items: [
             { label: 'Reloading Secrets', slug: 'tutorials/reload-secrets' },
             { label: 'Migrate from .env', slug: 'tutorials/migrate-from-dotenv' },
+            { label: 'Team Vault Setup', slug: 'tutorials/team-vault-setup' },
             { label: 'Team Onboarding', slug: 'tutorials/team-onboarding' },
             { label: 'CI/CD Secrets', slug: 'tutorials/ci-cd-secrets' },
             { label: 'Share a Secret', slug: 'tutorials/share-secret' },
@@ -173,6 +174,7 @@ export default defineConfig({
             { label: 'Threat Model', slug: 'concepts/threat-model' },
             { label: 'Architecture', slug: 'concepts/architecture' },
             { label: 'Vault Format', slug: 'concepts/vault-format' },
+            { label: 'Audit Trail', slug: 'concepts/audit-trail' },
             { label: 'Behavior Settings', slug: 'concepts/behavior-settings' },
             { label: 'Policy Directory', slug: 'concepts/policy-directory' },
             { label: 'Standards Compliance', slug: 'concepts/compliance' },
@@ -186,6 +188,7 @@ export default defineConfig({
             { label: 'GitHub Action', slug: 'guides/github-action' },
             { label: 'Terraform & OpenTofu', slug: 'guides/terraform-credentials-helper' },
             { label: 'Claude Code', slug: 'guides/claude-code' },
+            { label: 'GPG Agent', slug: 'guides/gpg-agent' },
             { label: 'How-To', slug: 'how-to' },
           ],
         },

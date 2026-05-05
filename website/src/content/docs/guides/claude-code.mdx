@@ -127,7 +127,7 @@ The plugin enforces four tiers of operations:
 | Prohibited | Keychain extraction, exfiltration, init/login | Never executed |
 
 <Aside type="caution" title="GPG Agent Security">
-  When your GPG passphrase is cached, any process running as your user can trigger decryption, including AI agents. For stronger protection, see the [recommended GPG agent hardening](/concepts/threat-model/#recommended-gpg-agent-configuration) in the threat model.
+  When your GPG passphrase is cached, any process running as your user can trigger decryption, including AI agents. For the operational reference (health checks, cache warming, troubleshooting) see [GPG Agent](/guides/gpg-agent/); for the security rationale see [Threat Model](/concepts/threat-model/#recommended-gpg-agent-configuration).
 </Aside>
 
 ## Variations
