@@ -45,6 +45,8 @@ The signature is created with the originator's private key, so:
 - You can detect modifications
 - There's non-repudiation for audits
 
+What this catches is **post-hoc tampering of an existing entry**: edits or deletions are detected because the recomputed hash and signature no longer match. What it does *not* catch is a holder of a signing key appending a freshly signed entry with any `added_at` they choose — `added_at` is self-reported. See [Audit Trail → What append-only can and cannot prove](/concepts/audit-trail/#what-append-only-can-and-cannot-prove) and use git history for the strongest "when did this land in the shared repo" signal.
+
 ### Algorithm Downgrade
 
 The config file specifies minimum algorithm requirements:
@@ -373,13 +375,7 @@ Current public-key cryptography (RSA, ECC) is vulnerable to quantum computers:
 
 ### Time-Tampering
 
-dotsecenv trusts the system clock. Timestamps in vault entries can be manipulated by setting system time before storage.
-
-This is acceptable because:
-
-- Attackers can't modify existing entries (signatures prevent this)
-- Consumers can choose to trust/distrust specific fingerprints
-- The primary use case is developer workflows, not forensic timestamping
+dotsecenv trusts the signer's asserted `added_at`. The signature commits the signer to that timestamp (non-repudiation of the assertion), but does not prove the entry was actually appended at that time. A legitimate key holder can backdate a fresh entry by signing it now with any `added_at`. The "Tampering" guarantee above protects existing entries from later modification; it does not protect the apparent chronology from a key holder forging plausible-looking history. For verifiable "when did this land in the shared vault," rely on the git commit timestamp — see [Audit Trail](/concepts/audit-trail/).
 
 ---
 
@@ -412,7 +408,8 @@ The vault is designed to be safe in public repositories:
 | ---------------------- | ---------- | ------------------------------------- |
 | Git exposure           | Yes        | Encrypted at rest                     |
 | File theft             | Yes        | Requires private key                  |
-| Tampering              | Yes        | Signature verification                |
+| Tampering with existing entries | Yes | Hash + signature verification         |
+| Backdated insertion by key holder | No | `added_at` is self-reported; use `git log` |
 | Weak algorithms        | Yes        | Config-enforced minimums              |
 | PATH injection         | Yes        | Configure absolute `gpg.program` path |
 | Stealth network egress | Yes        | Hermetic e2e with dual verification   |
