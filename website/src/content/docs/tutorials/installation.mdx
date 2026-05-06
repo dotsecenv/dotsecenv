@@ -244,6 +244,10 @@ dotsecenv <TAB>
 
 ### Install Script Reference
 
+<Aside type="note" title="Available in v0.4.8+">
+  The universal `install.sh` (with checksum/GPG verification, shell-plugin auto-install, and full flag/env support) shipped in v0.4.8. Earlier installs used Homebrew, the GitHub Action, or manual binary download.
+</Aside>
+
 The universal install script (`install.sh`) supports both CLI flags and environment variables for every setting. This makes it equally convenient for interactive use (`curl | bash -s -- --flags`) and automated CI/CD pipelines (`ENV_VAR=value curl | bash`).
 
 **Precedence order:** CLI flags > environment variables > defaults.

@@ -5,6 +5,10 @@ description: Get set up as a new team member to decrypt shared project secrets
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
+<Aside type="note" title="Available in v0.5.1+">
+  This onboarding flow uses `dotsecenv identity add`, which was re-added in v0.5.1 (after being removed during the v0.4.0 vault subcommand restructuring). The team lead and the new member both need v0.5.1 or later.
+</Aside>
+
 <Aside type="tip" title="Runnable example">
 A two-identity share + revoke flow runs end-to-end in [`examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/02-team-share-revoke) on the CLI repo. Useful for seeing the keyring-isolation pattern that mirrors the production "one key per machine" model.
 </Aside>

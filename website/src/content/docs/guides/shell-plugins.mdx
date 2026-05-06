@@ -237,6 +237,10 @@ Clipboard support:
 
 ### `dse reload`: reload current directory
 
+<Aside type="note" title="Available in v0.5.1+">
+  `dse reload` predates v0.5.1, but the "clear secret stack and re-fetch" semantics described below were introduced in v0.5.1. Older versions only re-ran the loader without clearing previously-loaded secrets.
+</Aside>
+
 Re-trigger secret loading for the current directory without leaving and re-entering:
 
 ```bash
@@ -250,6 +254,10 @@ This is useful when:
 - A secret fetch failed and you want to retry
 
 ### `dse up`: load ancestor secrets
+
+<Aside type="note" title="Available in v0.5.0+">
+  Introduced in v0.5.0.
+</Aside>
 
 When you jump directly into a subdirectory, parent `.secenv` files aren't loaded because the plugin only auto-loads on `cd` into the exact directory containing the file. `dse up` fixes this by walking up the directory tree, finding all ancestor `.secenv` files, and loading them root-first:
 

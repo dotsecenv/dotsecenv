@@ -5,6 +5,10 @@ description: Query the history of secret modifications recorded by the append-on
 
 import { Aside } from '@astrojs/starlight/components';
 
+<Aside type="note" title="Available in v0.4.0+">
+  The signed audit chain (signed `login`, signed entries, the `signed_by` field) was introduced in v0.4.0. Earlier vaults still append-only but lack the signed-login proof.
+</Aside>
+
 Every modification to a vault appends a new signed entry rather than mutating an existing one. The vault file itself is the audit log. This page describes what gets recorded, how to query it via the CLI, and the limits of what append-only can prove.
 
 ## What's recorded

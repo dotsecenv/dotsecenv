@@ -5,6 +5,10 @@ description: Initialize a vault encrypted to multiple team members from day one
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
+<Aside type="note" title="Available in v0.4.0+">
+  This tutorial uses `dotsecenv identity create`, which was introduced in v0.4.0.
+</Aside>
+
 <Aside type="tip" title="Runnable example">
 A two-identity reference flow ships at [`examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/02-team-share-revoke) on the CLI repo. It uses isolated `GNUPGHOME` directories to model the "one key per machine" pattern this tutorial follows at scale.
 </Aside>
