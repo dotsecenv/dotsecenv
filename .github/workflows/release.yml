@@ -379,3 +379,133 @@ jobs:
           repository: dotsecenv/website
           event-type: publish-site
           client-payload: '{"version": "${{ github.ref_name }}"}'
+
+  # ---------------------------------------------------------------------------
+  # Monorepo publish jobs (PR 1 of the monorepo migration).
+  # Additive only: old repository_dispatch fan-out above remains intact.
+  # `continue-on-error: true` so failures in these new jobs do not block the
+  # existing pipeline. Status-aware DAG (no draft, sidecar .release-sha,
+  # release-complete integrity gate) lands in PR 3.
+  # ---------------------------------------------------------------------------
+
+  publish-plugin:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate App token (plugin only)
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: plugin
+
+      - name: Checkout dotsecenv/plugin satellite
+        uses: actions/checkout@v6
+        with:
+          repository: dotsecenv/plugin
+          token: ${{ steps.app-token.outputs.token }}
+          path: plugin-satellite
+          fetch-depth: 0
+
+      - name: Sync monorepo plugin/ -> satellite root
+        run: |
+          set -euxo pipefail
+          # Drop everything in satellite except .git
+          find plugin-satellite -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} +
+          # Copy monorepo plugin contents into satellite root
+          cp -R plugin/. plugin-satellite/
+          # Sidecar with the monorepo release SHA (used in PR 3 for status post-back)
+          echo "${{ github.sha }}" > plugin-satellite/.release-sha
+
+      - name: Commit and push to satellite main
+        working-directory: plugin-satellite
+        run: |
+          set -euxo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No content changes to publish for ${{ github.ref_name }}"
+            exit 0
+          fi
+          git commit -m "publish: ${{ github.ref_name }}" \
+                     -m "Sourced from dotsecenv/dotsecenv@${{ github.sha }}"
+          git push origin HEAD:main
+
+  publish-website:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "25"
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+
+      - name: Install website dependencies
+        working-directory: website
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Astro site
+        working-directory: website
+        run: pnpm build
+
+      - name: Write release SHA sidecar (used for cross-repo status in PR 3)
+        run: echo "${{ github.sha }}" > website/dist/.release-sha
+
+      - name: Generate App token (website only)
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: website
+
+      - name: Checkout dotsecenv/website satellite
+        uses: actions/checkout@v6
+        with:
+          repository: dotsecenv/website
+          token: ${{ steps.app-token.outputs.token }}
+          path: website-satellite
+          fetch-depth: 0
+
+      - name: Sync built dist/ -> satellite root
+        run: |
+          set -euxo pipefail
+          # Drop everything in satellite except .git and .github (keep satellite's
+          # own deploy-website.yml in PR 1; PR 3 will retire/replace it)
+          find website-satellite -mindepth 1 -maxdepth 1 -not -name '.git' -not -name '.github' -exec rm -rf {} +
+          # Copy built site
+          cp -R website/dist/. website-satellite/
+
+      - name: Commit and push to satellite main
+        working-directory: website-satellite
+        run: |
+          set -euxo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No content changes to publish for ${{ github.ref_name }}"
+            exit 0
+          fi
+          git commit -m "publish: ${{ github.ref_name }}" \
+                     -m "Built from dotsecenv/dotsecenv@${{ github.sha }}"
+          git push origin HEAD:main

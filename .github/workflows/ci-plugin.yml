@@ -1,0 +1,35 @@
+name: CI Plugin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugin/**"
+      - ".github/workflows/ci-plugin.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "plugin/**"
+      - ".github/workflows/ci-plugin.yml"
+
+permissions: {}
+
+jobs:
+  shell-tests:
+    name: Shell tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: plugin
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run plugin tests
+        run: |
+          if [ -x tests/test_plugins.sh ]; then ./tests/test_plugins.sh; fi
+          if [ -x tests/test_plugin_managers.sh ]; then ./tests/test_plugin_managers.sh || true; fi

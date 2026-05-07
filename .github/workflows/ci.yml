@@ -3,8 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "plugin/**"
+      - "website/**"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "plugin/**"
+      - "website/**"
 
 jobs:
   test:
