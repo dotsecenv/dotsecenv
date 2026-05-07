@@ -7,6 +7,33 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 ---
 
+## v0.6.1
+
+_May 7, 2026_
+
+### Features
+
+- Reject backdated and far-future appends at write time. A new entry's `added_at` must not predate the most recent existing entry, and must not be more than 5 minutes in the future. This blocks trivial backdating and prevents a single forward-dated write from DoS-ing every subsequent append until wall-clock catches up (#134)
+- `login` filters out sign-only keys when matching candidates, and adds a blank line before the login summary for cleaner output (#133)
+- `secret get --all --json` now exposes `available_to` and `signed_by` for each entry (#130)
+
+### Bug Fixes
+
+- `make demo` now produces a working asciinema recording, written to a path that survives sandbox cleanup (#124, #125)
+
+### Other
+
+- **Breaking**: `gpg.program` now defaults to resolving `gpg` via `PATH`, and the `--no-gpg-program` flag is removed. Set `gpg.program` explicitly to an absolute path if you need to pin a specific binary (#119)
+- Drop the deprecated fingerprint migration warning and dead `output/compat.go` (#132)
+- Add `examples/` directory with self-contained scenarios, plus `recipes/` for Context7 retrieval coverage (#117, #122, #123)
+- Claim Context7 library ownership via `context7.json` for documentation indexing (#121, #127, #128)
+- Add `AGENTS.md` for AI coding agents (#118)
+- Require PRs and tests for all changes to `main` (#131)
+- Fix broken cross-refs and link examples to site tutorials (#120)
+- Align example-05/ debugging table with real plugin messages (#129)
+
+---
+
 ## v0.6.0
 
 _May 4, 2026_
