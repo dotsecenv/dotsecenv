@@ -1,0 +1,107 @@
+---
+/**
+ * Asciinema Player component for playing .cast terminal recordings.
+ *
+ * Usage:
+ *   <AsciinemaPlayer src="/demo.cast" />
+ *   <AsciinemaPlayer src="/demo.cast" rows={24} cols={80} autoPlay />
+ */
+
+interface Props {
+  /** Path to the .cast file (relative to public/) */
+  src: string;
+  /** Number of terminal rows */
+  rows?: number;
+  /** Number of terminal columns */
+  cols?: number;
+  /** Auto-play on load */
+  autoPlay?: boolean;
+  /** Loop playback */
+  loop?: boolean;
+  /** Playback speed (1 = normal) */
+  speed?: number;
+  /** Idle time limit in seconds */
+  idleTimeLimit?: number;
+  /** Theme: 'asciinema' | 'tango' | 'solarized-dark' | 'solarized-light' | 'monokai' */
+  theme?: string;
+  /** Poster frame: 'npt:0:0' for first frame, or custom time */
+  poster?: string;
+  /** Fit mode: 'width' | 'height' | 'both' | 'none' */
+  fit?: string;
+}
+
+const {
+  src,
+  rows,
+  cols,
+  autoPlay = false,
+  loop = false,
+  speed = 1,
+  idleTimeLimit,
+  theme = 'asciinema',
+  poster,
+  fit = 'width',
+} = Astro.props;
+
+const playerId = `asciinema-${Math.random().toString(36).slice(2, 9)}`;
+
+const options = JSON.stringify({
+  rows,
+  cols,
+  autoPlay,
+  loop,
+  speed,
+  idleTimeLimit,
+  theme,
+  poster,
+  fit,
+});
+---
+
+<div class="asciinema-container" id={playerId} data-src={src} data-options={options}></div>
+
+<script>
+  import * as AsciinemaPlayer from 'asciinema-player';
+
+  function initPlayers() {
+    document.querySelectorAll('.asciinema-container').forEach((container) => {
+      const el = container as HTMLElement;
+      // Skip if already initialized
+      if (el.querySelector('div')) return;
+
+      const src = el.dataset.src;
+      const options = JSON.parse(el.dataset.options || '{}');
+
+      if (src) {
+        // Filter out undefined values
+        const cleanOptions = Object.fromEntries(
+          Object.entries(options).filter(([_, v]) => v !== undefined && v !== null)
+        );
+        AsciinemaPlayer.create(src, el, cleanOptions);
+      }
+    });
+  }
+
+  // Initialize on page load
+  initPlayers();
+
+  // Re-initialize on Astro page transitions
+  document.addEventListener('astro:page-load', initPlayers);
+</script>
+
+<style is:global>
+  @import 'asciinema-player/dist/bundle/asciinema-player.css';
+</style>
+
+<style>
+  .asciinema-container {
+    margin: 1.5rem 0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .asciinema-container :global(.ap-wrapper),
+  .asciinema-container :global(.ap-overlay) {
+    border-radius: 8px;
+  }
+</style>

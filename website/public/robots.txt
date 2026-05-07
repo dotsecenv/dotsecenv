@@ -1,0 +1,40 @@
+# dotsecenv documentation site
+# https://dotsecenv.com
+#
+# We want our docs to be discoverable to LLMs and AI coding agents,
+# so we explicitly allow well-known AI crawlers in addition to the
+# permissive default for traditional search bots.
+
+User-agent: *
+Allow: /
+
+# Anthropic
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+# OpenAI
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+
+# Google AI training opt-in
+User-agent: Google-Extended
+Allow: /
+
+# Common Crawl (used to train many open models)
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://dotsecenv.com/sitemap-index.xml

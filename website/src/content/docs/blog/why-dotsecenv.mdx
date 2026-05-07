@@ -1,0 +1,115 @@
+---
+title: "Why your .env secrets shouldn't be plaintext on disk"
+date: 2026-03-29
+authors:
+  - dotsecenv
+tags:
+  - security
+  - encryption
+  - launch
+excerpt: "The Trivy supply chain attack swept 50+ filesystem locations for plaintext credentials. It's time to encrypt .env secrets at rest."
+---
+
+On March 19, 2026, a threat actor known as [TeamPCP](https://arcticwolf.com/resources/blog/teampcp-supply-chain-attack-campaign-targets-trivy-checkmarx-kics-and-litellm-potential-downstream-impact-to-additional-projects/) compromised Aqua Security's Trivy vulnerability scanner in a supply chain attack ([CVE-2026-33634](https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23)). The malicious code swept **50+ filesystem locations** on CI/CD runners, harvesting SSH keys, AWS/GCP/Azure credentials, `.env` files, database passwords, Docker configs, and Kubernetes tokens. It then [dumped `Runner.Worker` process memory](https://www.microsoft.com/en-us/security/blog/2026/03/24/detecting-investigating-defending-against-trivy-supply-chain-compromise/) to extract additional secrets.
+
+The damage didn't stop there. Credentials stolen from CI/CD pipelines cascaded downstream. Within days, TeamPCP used harvested PyPI tokens to [backdoor LiteLLM](https://www.bleepingcomputer.com/news/security/popular-litellm-pypi-package-compromised-in-teampcp-supply-chain-attack/), an AI gateway library with [~3.4 million daily downloads](https://securitylabs.datadoghq.com/articles/litellm-compromised-pypi-teampcp-supply-chain-campaign/). The compromised versions deployed a [three-stage payload](https://www.kaspersky.com/blog/critical-supply-chain-attack-trivy-litellm-checkmarx-teampcp/55510/): credential harvesting, Kubernetes lateral movement, and a persistent backdoor for remote code execution. Other projects were also targeted in the same campaign.
+
+This wasn't an isolated pattern. In August 2024, Palo Alto's Unit 42 documented an [extortion campaign](https://unit42.paloaltonetworks.com/large-scale-cloud-extortion-operation/) that found exposed `.env` files on 110,000+ domains and stole 90,000+ environment variables. GitHub's own data shows [39 million secrets](https://resources.github.com/enterprise/understanding-secret-leak-exposure/) were committed to public repositories in 2024 alone.
+
+The pattern is consistent: **plaintext secrets on disk are a high-value, low-effort target.**
+
+## The gap in existing tools
+
+Several tools address parts of this problem, and they're all good at what they do:
+
+**[SOPS](https://getsops.io/)** encrypts config files in-place and supports cloud KMS backends (AWS, GCP, Azure). It's excellent for production config management. But it has no shell integration for developer workflows, and multi-user key sharing requires manual `.sops.yaml` configuration.
+
+**[direnv](https://direnv.net/)** provides the shell integration developers want: environment variables load automatically when you `cd` into a project. But it provides zero encryption. Your secrets are still plaintext in `.envrc`.
+
+**[HashiCorp Vault](https://www.vaultproject.io/), [Doppler](https://www.doppler.com/), [Infisical](https://infisical.com/)** are powerful platforms with dynamic secrets, rotation, and web dashboards. They're the right choice for production. But they require server infrastructure or SaaS accounts, overhead that doesn't make sense when a developer just needs to share an API key with a teammate.
+
+**[git-crypt](https://github.com/AGWA/git-crypt)** encrypts files transparently in git, but operates at the file level with no per-secret granularity and no sharing workflow.
+
+The gap: no tool combined **encryption at rest** + **shell auto-loading** + **simple multi-user sharing** without requiring a server or cloud account.
+
+## How dotsecenv works
+
+[dotsecenv](https://github.com/dotsecenv/dotsecenv) is a Go CLI that encrypts environment secrets at rest using hybrid encryption: AES-256-GCM for data, GPG for key exchange. Secrets are stored in a JSONL vault file that's safe to commit to git.
+Committing the vault is purely optional. You don't have to.
+
+```bash
+# Store a secret (encrypted in the vault)
+echo "my-api-key" | dotsecenv secret store API_KEY
+
+# Retrieve it (decrypted on-demand via GPG)
+dotsecenv secret get API_KEY
+
+# Share with a teammate (their GPG public key)
+dotsecenv secret share API_KEY teammate@company.com
+```
+
+A shell plugin for zsh, bash, and fish decrypts and loads secrets when you enter a directory, like direnv, but your secrets stay encrypted on disk:
+
+```bash
+# .secenv file (safe to commit)
+API_KEY={dotsecenv}
+DATABASE_PASSWORD={dotsecenv}
+
+# cd into the project directory, secrets load automatically
+cd my-project/
+echo $API_KEY  # decrypted on-demand
+```
+
+### Why GPG?
+
+GPG over [age](https://github.com/FiloSottile/age) was a tradeoff. age is simpler, but I needed signatures for tamper detection and audit trails. Signatures let you verify who created each secret (every vault entry is signed by the originator's key), detect tampering with `dotsecenv validate`, and produce audit trails with provable authorship.
+
+Plus most developers already have a GPG key from [GitHub](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits) or [GitLab](https://docs.gitlab.com/user/project/repository/signed_commits/gpg/) commit signing. dotsecenv builds on that existing infrastructure.
+If, however, you don't have a GPG key, you can generate one with [`dotsecenv identity create`](/reference/#identity-create), without needing to get into the GPG nitty-gritty!
+
+Algorithm defaults align with [FIPS 186-5](https://dotsecenv.com/concepts/compliance/) (Ed25519, ECDSA P-384, RSA-3072+), and the tool refuses to operate with weaker algorithms.
+
+## What dotsecenv does NOT protect against
+
+I want to be upfront about the boundaries:
+
+- **Process memory**: once secrets are loaded as environment variables, they're readable via `/proc` or memory dumps. The Trivy attack also dumped `Runner.Worker` process memory; encryption at rest doesn't help there.
+- **Compromised GPG private key**: if your private key is stolen and unprotected, your secrets are exposed.
+- **Root/admin access**: a privileged attacker can read anything.
+- **Production runtime**: dotsecenv targets the development lifecycle (SDLC), not production secret injection. For production, use Vault, AWS Secrets Manager, or similar.
+
+dotsecenv is defense-in-depth. It eliminates the plaintext-on-disk attack surface. If the Trivy attacker's disk sweep had found GPG ciphertext instead of plaintext `.env` files, that component of the attack would have yielded nothing usable, or at the very least made the exfiltration much harder to pull off. The LiteLLM cascade, where a single set of stolen plaintext credentials led to the compromise of a library with millions of daily downloads, illustrates exactly why encryption at rest matters at every stage of the supply chain.
+
+## Current state
+
+dotsecenv is functional and I use it daily. It has:
+
+- Comprehensive [E2E tests](https://github.com/dotsecenv/dotsecenv/actions), including [hermetic tests](https://dotsecenv.com/concepts/security-model/#hermetic-testing) that run with network disabled to prove that all secret handling happens locally
+- [SLSA Build Level 3](https://github.com/dotsecenv/dotsecenv#security-features) release provenance
+- Packages for macOS (Homebrew), Debian/Ubuntu, Fedora/RHEL, and Arch Linux
+- A [GitHub Action](https://dotsecenv.com/guides/github-action/) for CI/CD integration
+- A [Terraform credentials helper](https://dotsecenv.com/guides/terraform-credentials-helper/)
+
+There are rough edges. Windows support is WIP. The vault format is v2 and may evolve; I will generally aim to provide migration tooling for any breaking changes, but it may not always be viable. I'm looking for feedback from developers who deal with secrets in their daily workflow; if you try it out and have feedback, please [open an issue on GitHub](https://github.com/dotsecenv/dotsecenv/issues/new)!
+
+Thank you! 🙏
+
+---
+
+## Further reading on the Trivy/TeamPCP campaign
+
+- [Aqua Security — Trivy Supply Chain Attack: What You Need to Know](https://www.aquasec.com/blog/trivy-supply-chain-attack-what-you-need-to-know/)
+- [Microsoft Security — Detecting, Investigating, and Defending Against the Trivy Compromise](https://www.microsoft.com/en-us/security/blog/2026/03/24/detecting-investigating-defending-against-trivy-supply-chain-compromise/)
+- [CrowdStrike — From Scanner to Stealer: Inside the trivy-action Compromise](https://www.crowdstrike.com/en-us/blog/from-scanner-to-stealer-inside-the-trivy-action-supply-chain-compromise/)
+- [ReversingLabs — Inside the TeamPCP Cascading Supply Chain Attack](https://www.reversinglabs.com/blog/teampcp-supply-chain-attack-spreads)
+- [Datadog Security Labs — LiteLLM Compromised on PyPI](https://securitylabs.datadoghq.com/articles/litellm-compromised-pypi-teampcp-supply-chain-campaign/)
+- [Palo Alto Networks — When Security Scanners Become the Weapon](https://www.paloaltonetworks.com/blog/cloud-security/trivy-supply-chain-attack/)
+
+---
+
+Next steps:
+
+- **Source code**: [github.com/dotsecenv/dotsecenv](https://github.com/dotsecenv/dotsecenv)
+- **Getting Started**: [dotsecenv.com/getting-started](https://dotsecenv.com/getting-started/)
+- **Comparison**: [dotsecenv.com/concepts/comparison](https://dotsecenv.com/concepts/comparison/)
+- **Docs**: [dotsecenv.com](https://dotsecenv.com)

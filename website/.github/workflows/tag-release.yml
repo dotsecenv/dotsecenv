@@ -1,0 +1,79 @@
+name: Tag release
+
+on:
+  pull_request:
+    types: [closed]
+    paths:
+      - src/content/docs/changelog.mdx
+
+  repository_dispatch:
+    types: [tag-release]
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tag name (e.g. v0.5.0)"
+        required: true
+      sha:
+        description: "Commit SHA to tag (defaults to main)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    name: Tag commit
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'repository_dispatch' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.merged == true
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.sha || github.event.client_payload.sha || github.event.pull_request.merge_commit_sha || 'main' }}
+          fetch-depth: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            TAG="${{ inputs.version }}"
+          elif [ -n "${{ github.event.client_payload.version }}" ]; then
+            TAG="${{ github.event.client_payload.version }}"
+          else
+            TAG=$(grep -m1 '^## v[0-9]' src/content/docs/changelog.mdx | sed 's/^## //')
+            if [ -z "$TAG" ]; then
+              echo "::error::No version found in changelog.mdx"
+              exit 1
+            fi
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag already exists
+        id: check
+        run: |
+          git fetch --tags
+          if git tag -l "${{ steps.version.outputs.tag }}" | grep -q .; then
+            echo "::notice::Tag ${{ steps.version.outputs.tag }} already exists, skipping"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure git identity
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - uses: releasetools/cli@v0
+        if: steps.check.outputs.exists == 'false'
+
+      - name: Create tag
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: releasetools git::release --push "${{ steps.version.outputs.tag }}"

