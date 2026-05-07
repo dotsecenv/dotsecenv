@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@astrojs/starlight':
         specifier: ^0.39.0
-        version: 0.39.0(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3)
+        version: 0.39.1(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3)
       asciinema-player:
         specifier: ^3.13.5
         version: 3.15.1
@@ -28,7 +28,7 @@ importers:
         version: 0.34.5
       starlight-blog:
         specifier: ^0.26.1
-        version: 0.26.1(@astrojs/starlight@0.39.0(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3))(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))
+        version: 0.26.1(@astrojs/starlight@0.39.1(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3))(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.0
@@ -53,7 +53,7 @@ importers:
         version: 0.1.5(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(starlight-markdown@0.1.5(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2)))
       starlight-llms-txt:
         specifier: ^0.8.1
-        version: 0.8.1(@astrojs/starlight@0.39.0(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3))(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))
+        version: 0.8.1(@astrojs/starlight@0.39.1(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3))(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))
       starlight-markdown:
         specifier: ^0.1.5
         version: 0.1.5(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))
@@ -100,8 +100,8 @@ packages:
   '@astrojs/sitemap@3.7.2':
     resolution: {integrity: sha512-PqkzkcZTb5ICiyIR8VoKbIAP/laNRXi5tw616N1Ckk+40oNB8Can1AzVV56lrbC5GKSZFCyJYUVYqVivMisvpA==}
 
-  '@astrojs/starlight@0.39.0':
-    resolution: {integrity: sha512-Jggl+Wyq/WLakIeSa/NGWl+hs4g/IeqS08zDkdCkd35IPoN1MbaeyZ3JPviA3e3+Zo1M49eMuh77ZBjk4KrsxQ==}
+  '@astrojs/starlight@0.39.1':
+    resolution: {integrity: sha512-9kIAXBwcqAuFQ7Ft419fr6rz6p0SPg7Yfgc28TfzoCcuOH9utZgIola9yOq5YIMDrR8rmm8kyl7pCsfrPVmLhQ==}
     peerDependencies:
       astro: ^6.0.0
 
@@ -833,6 +833,9 @@ packages:
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
+  '@types/estree@1.0.9':
+    resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
+
   '@types/hast@3.0.4':
     resolution: {integrity: sha512-WPs+bbQw5aCj+x6laNGWLH3wviHtoCv/P3+otBhbOhJgG8qtpdAMlTCxLtsTWA7LH1Oh/bFCHsBn0TPS5m30EQ==}
 
@@ -943,6 +946,9 @@ packages:
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
     deprecated: Potential CWE-502 - Update to 1.3.1 or higher
+
+  '@ungap/structured-clone@1.3.1':
+    resolution: {integrity: sha512-mUFwbeTqrVgDQxFveS+df2yfap6iuP20NAKAsBt5jDEoOTDew+zwLAOilHCeQJOVSvmgCX4ogqIrA0mnyr08yQ==}
 
   '@webgpu/types@0.1.21':
     resolution: {integrity: sha512-pUrWq3V5PiSGFLeLxoGqReTZmiiXwY3jRkIG5sLLKjyqNxrwm/04b4nw7LSmGWJcKk59XOM/YRTUwOzo4MMlow==}
@@ -2936,7 +2942,7 @@ snapshots:
       stream-replace-string: 2.0.0
       zod: 4.4.3
 
-  '@astrojs/starlight@0.39.0(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3)':
+  '@astrojs/starlight@0.39.1(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3)':
     dependencies:
       '@astrojs/markdown-remark': 7.1.1
       '@astrojs/mdx': 5.0.4(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))
@@ -3290,7 +3296,7 @@ snapshots:
 
   '@mdx-js/mdx@3.1.1':
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
       '@types/hast': 3.0.4
       '@types/mdx': 2.0.13
@@ -3402,7 +3408,7 @@ snapshots:
 
   '@rollup/pluginutils@5.3.0(rollup@4.60.3)':
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       estree-walker: 2.0.2
       picomatch: 4.0.4
     optionalDependencies:
@@ -3554,6 +3560,8 @@ snapshots:
 
   '@types/estree@1.0.8': {}
 
+  '@types/estree@1.0.9': {}
+
   '@types/hast@3.0.4':
     dependencies:
       '@types/unist': 3.0.3
@@ -3692,6 +3700,8 @@ snapshots:
       eslint-visitor-keys: 5.0.1
 
   '@ungap/structured-clone@1.3.0': {}
+
+  '@ungap/structured-clone@1.3.1': {}
 
   '@webgpu/types@0.1.21': {}
 
@@ -4217,7 +4227,7 @@ snapshots:
 
   estree-util-attach-comments@3.0.0:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
 
   estree-util-build-jsx@3.0.1:
     dependencies:
@@ -4230,7 +4240,7 @@ snapshots:
 
   estree-util-scope@1.0.0:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       devlop: 1.1.0
 
   estree-util-to-js@2.0.0:
@@ -4248,7 +4258,7 @@ snapshots:
 
   estree-walker@3.0.3:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
 
   esutils@2.0.3: {}
 
@@ -4435,7 +4445,7 @@ snapshots:
     dependencies:
       '@types/hast': 3.0.4
       '@types/unist': 3.0.3
-      '@ungap/structured-clone': 1.3.0
+      '@ungap/structured-clone': 1.3.1
       hast-util-from-parse5: 8.0.3
       hast-util-to-parse5: 8.0.1
       html-void-elements: 3.0.0
@@ -4467,7 +4477,7 @@ snapshots:
 
   hast-util-to-estree@3.1.3:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
       '@types/hast': 3.0.4
       comma-separated-tokens: 2.0.3
@@ -4502,7 +4512,7 @@ snapshots:
 
   hast-util-to-jsx-runtime@2.3.6:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       '@types/hast': 3.0.4
       '@types/unist': 3.0.3
       comma-separated-tokens: 2.0.3
@@ -5490,7 +5500,7 @@ snapshots:
 
   recma-build-jsx@1.0.0:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       estree-util-build-jsx: 3.0.1
       vfile: 6.0.3
 
@@ -5505,14 +5515,14 @@ snapshots:
 
   recma-parse@1.0.0:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       esast-util-from-js: 2.0.1
       unified: 11.0.5
       vfile: 6.0.3
 
   recma-stringify@1.0.0:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       estree-util-to-js: 2.0.0
       unified: 11.0.5
       vfile: 6.0.3
@@ -5555,7 +5565,7 @@ snapshots:
 
   rehype-recma@1.0.0:
     dependencies:
-      '@types/estree': 1.0.8
+      '@types/estree': 1.0.9
       '@types/hast': 3.0.4
       hast-util-to-estree: 3.1.3
     transitivePeerDependencies:
@@ -5817,12 +5827,12 @@ snapshots:
 
   spdx-license-ids@3.0.23: {}
 
-  starlight-blog@0.26.1(@astrojs/starlight@0.39.0(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3))(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2)):
+  starlight-blog@0.26.1(@astrojs/starlight@0.39.1(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3))(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2)):
     dependencies:
       '@astrojs/markdown-remark': 7.1.0
       '@astrojs/mdx': 5.0.3(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))
       '@astrojs/rss': 4.0.18
-      '@astrojs/starlight': 0.39.0(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3)
+      '@astrojs/starlight': 0.39.1(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3)
       astro-remote: 0.3.4
       github-slugger: 2.0.0
       hast-util-from-html: 2.0.3
@@ -5843,10 +5853,10 @@ snapshots:
       astro: 6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2)
       starlight-markdown: 0.1.5(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))
 
-  starlight-llms-txt@0.8.1(@astrojs/starlight@0.39.0(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3))(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2)):
+  starlight-llms-txt@0.8.1(@astrojs/starlight@0.39.1(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3))(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2)):
     dependencies:
       '@astrojs/mdx': 5.0.4(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))
-      '@astrojs/starlight': 0.39.0(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3)
+      '@astrojs/starlight': 0.39.1(astro@6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2))(typescript@5.9.3)
       '@types/hast': 3.0.4
       '@types/micromatch': 4.0.10
       astro: 6.2.2(@types/node@24.12.2)(rollup@4.60.3)(yaml@2.8.2)
