@@ -29,7 +29,35 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Run plugin tests
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+
+      - name: Install fish (Ubuntu)
+        if: runner.os == 'Linux'
         run: |
-          if [ -x tests/test_plugins.sh ]; then ./tests/test_plugins.sh; fi
-          if [ -x tests/test_plugin_managers.sh ]; then ./tests/test_plugin_managers.sh || true; fi
+          sudo apt-add-repository ppa:fish-shell/release-3 -y
+          sudo apt-get update
+          sudo apt-get install -y fish
+
+      - name: Install fish (macOS)
+        if: runner.os == 'macOS'
+        run: brew install fish
+
+      - name: Install bash 5 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install bash
+
+      - name: Format check
+        run: make fmt-check
+
+      - name: Lint
+        run: make lint
+
+      - name: Test plugins
+        run: make test-plugins
+
+      - name: Test plugin managers (Linux)
+        if: runner.os == 'Linux'
+        run: make test-managers
