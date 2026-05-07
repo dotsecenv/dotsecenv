@@ -58,6 +58,10 @@ jobs:
       - name: Test plugins
         run: make test-plugins
 
-      - name: Test plugin managers (Linux)
-        if: runner.os == 'Linux'
-        run: make test-managers
+      # `make test-managers` is intentionally not run here. It builds a Docker
+      # image and runs `git clone /opt/dotsecenv-plugin` inside it, which only
+      # works when plugin/ is its own git repo. In the monorepo plugin/ is a
+      # subdirectory and has no .git, so the clone fails. The plugin satellite
+      # (dotsecenv/plugin) continues to run `make test-managers` on every push
+      # via its own ci.yml, and the release pipeline pushes the latest source
+      # there before tagging — so the integration coverage is preserved.
