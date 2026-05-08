@@ -471,27 +471,6 @@ jobs:
           git_user_signingkey: true
           git_commit_gpgsign: true
 
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: website/package.json
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 11
-
-      - name: Install website dependencies
-        working-directory: website
-        run: make install
-
-      - name: Build Astro site
-        working-directory: website
-        run: make build
-
-      - name: Write release SHA sidecar (used for cross-repo status in PR 3)
-        run: echo "${{ github.sha }}" > website/dist/.release-sha
-
       - name: Generate App token (website only)
         uses: actions/create-github-app-token@v3
         id: app-token
@@ -509,14 +488,23 @@ jobs:
           path: website-satellite
           fetch-depth: 0
 
-      - name: Sync built dist/ -> satellite root
+      - name: Sync monorepo website/ source -> satellite root
         run: |
           set -euxo pipefail
-          # Drop everything in satellite except .git and .github (keep satellite's
-          # own deploy-website.yml in PR 1; PR 3 will retire/replace it)
-          find website-satellite -mindepth 1 -maxdepth 1 -not -name '.git' -not -name '.github' -exec rm -rf {} +
-          # Copy built site
-          cp -R website/dist/. website-satellite/
+          # The satellite's deploy-website.yml builds from SOURCE on main and
+          # deploys to GH Pages. So we push the website/ source tree (incl. its
+          # own .github/workflows/deploy-website.yml from the filter-repo
+          # migration), not the built dist/. The satellite re-builds and
+          # deploys as it does today, just with content sourced from monorepo.
+          # Drop everything in satellite except .git
+          find website-satellite -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} +
+          # Copy tracked source from monorepo's website/ (rsync excludes
+          # generated content defensively even though .gitignore should prevent
+          # them from being present here).
+          rsync -a --exclude='node_modules' --exclude='dist' \
+                website/ website-satellite/
+          # Sidecar with the monorepo release SHA (used in PR 3 for status post-back)
+          echo "${{ github.sha }}" > website-satellite/.release-sha
 
       - name: Commit and push to satellite main
         working-directory: website-satellite
@@ -532,5 +520,5 @@ jobs:
             exit 0
           fi
           git commit -S -m "publish: ${{ github.ref_name }}" \
-                        -m "Built from dotsecenv/dotsecenv@${{ github.sha }}"
+                        -m "Sourced from dotsecenv/dotsecenv@${{ github.sha }}"
           git push origin HEAD:main
