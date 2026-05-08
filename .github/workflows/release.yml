@@ -347,7 +347,6 @@ jobs:
           repositories: |
             packages
             plugin
-            website
 
       - name: Trigger packages update
         uses: peter-evans/repository-dispatch@v4
@@ -371,14 +370,6 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           repository: dotsecenv/plugin
           event-type: tag-release
-          client-payload: '{"version": "${{ github.ref_name }}"}'
-
-      - name: Trigger website redeploy
-        uses: peter-evans/repository-dispatch@v4
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          repository: dotsecenv/website
-          event-type: publish-site
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
   # ---------------------------------------------------------------------------
@@ -452,73 +443,6 @@ jobs:
                         -m "Sourced from dotsecenv/dotsecenv@${{ github.sha }}"
           git push origin HEAD:main
 
-  publish-website:
-    needs: goreleaser
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Import GPG key (signs publish commits to satisfy required_signatures rule)
-        id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v7
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          trust_level: 5
-          git_user_signingkey: true
-          git_commit_gpgsign: true
-
-      - name: Generate App token (website only)
-        uses: actions/create-github-app-token@v3
-        id: app-token
-        with:
-          app-id: ${{ vars.RELEASE_APP_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: website
-
-      - name: Checkout dotsecenv/website satellite
-        uses: actions/checkout@v6
-        with:
-          repository: dotsecenv/website
-          token: ${{ steps.app-token.outputs.token }}
-          path: website-satellite
-          fetch-depth: 0
-
-      - name: Sync monorepo website/ source -> satellite root
-        run: |
-          set -euxo pipefail
-          # The satellite's deploy-website.yml builds from SOURCE on main and
-          # deploys to GH Pages. So we push the website/ source tree (incl. its
-          # own .github/workflows/deploy-website.yml from the filter-repo
-          # migration), not the built dist/. The satellite re-builds and
-          # deploys as it does today, just with content sourced from monorepo.
-          # Drop everything in satellite except .git
-          find website-satellite -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} +
-          # Copy tracked source from monorepo's website/ (rsync excludes
-          # generated content defensively even though .gitignore should prevent
-          # them from being present here).
-          rsync -a --exclude='node_modules' --exclude='dist' \
-                website/ website-satellite/
-          # Sidecar with the monorepo release SHA (used in PR 3 for status post-back)
-          echo "${{ github.sha }}" > website-satellite/.release-sha
-
-      - name: Commit and push to satellite main
-        working-directory: website-satellite
-        run: |
-          set -euxo pipefail
-          # Use the GPG key's identity as committer so signatures verify against
-          # a key registered on the user's GitHub account (required_signatures rule).
-          git config user.name "${{ steps.import_gpg.outputs.name }}"
-          git config user.email "${{ steps.import_gpg.outputs.email }}"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No content changes to publish for ${{ github.ref_name }}"
-            exit 0
-          fi
-          git commit -S -m "publish: ${{ github.ref_name }}" \
-                        -m "Sourced from dotsecenv/dotsecenv@${{ github.sha }}"
-          git push origin HEAD:main
+  # publish-website was here in the additive PR 1 phase; the website now
+  # deploys directly from this monorepo via .github/workflows/deploy-website.yml,
+  # so the cross-repo push to dotsecenv/website is no longer needed.
