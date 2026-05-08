@@ -398,6 +398,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Import GPG key (signs publish commits to satisfy required_signatures rule)
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          trust_level: 5
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+
       - name: Generate App token (plugin only)
         uses: actions/create-github-app-token@v3
         id: app-token
@@ -429,15 +439,17 @@ jobs:
         working-directory: plugin-satellite
         run: |
           set -euxo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Use the GPG key's identity as committer so signatures verify against
+          # a key registered on the user's GitHub account (required_signatures rule).
+          git config user.name "${{ steps.import_gpg.outputs.name }}"
+          git config user.email "${{ steps.import_gpg.outputs.email }}"
           git add -A
           if git diff --cached --quiet; then
             echo "No content changes to publish for ${{ github.ref_name }}"
             exit 0
           fi
-          git commit -m "publish: ${{ github.ref_name }}" \
-                     -m "Sourced from dotsecenv/dotsecenv@${{ github.sha }}"
+          git commit -S -m "publish: ${{ github.ref_name }}" \
+                        -m "Sourced from dotsecenv/dotsecenv@${{ github.sha }}"
           git push origin HEAD:main
 
   publish-website:
@@ -448,6 +460,16 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+
+      - name: Import GPG key (signs publish commits to satisfy required_signatures rule)
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          trust_level: 5
+          git_user_signingkey: true
+          git_commit_gpgsign: true
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -500,13 +522,15 @@ jobs:
         working-directory: website-satellite
         run: |
           set -euxo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Use the GPG key's identity as committer so signatures verify against
+          # a key registered on the user's GitHub account (required_signatures rule).
+          git config user.name "${{ steps.import_gpg.outputs.name }}"
+          git config user.email "${{ steps.import_gpg.outputs.email }}"
           git add -A
           if git diff --cached --quiet; then
             echo "No content changes to publish for ${{ github.ref_name }}"
             exit 0
           fi
-          git commit -m "publish: ${{ github.ref_name }}" \
-                     -m "Built from dotsecenv/dotsecenv@${{ github.sha }}"
+          git commit -S -m "publish: ${{ github.ref_name }}" \
+                        -m "Built from dotsecenv/dotsecenv@${{ github.sha }}"
           git push origin HEAD:main
