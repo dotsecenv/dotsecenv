@@ -395,32 +395,16 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
           trust_level: 5
+          # GPG_PRIVATE_KEY exports only the signing subkey's secret (the
+          # primary is offline). `git commit -S` is strict about `--local-user`
+          # and asks GPG for the primary's secret, which doesn't exist, so
+          # we must point the action at the signing-capable subkey directly.
+          # Set vars.GPG_SIGNING_SUBKEY_FINGERPRINT to the [S]-capable subkey
+          # fingerprint; the one-shot _discover-gpg-subkey.yml workflow can
+          # print the right value.
+          fingerprint: ${{ vars.GPG_SIGNING_SUBKEY_FINGERPRINT }}
           git_user_signingkey: true
           git_commit_gpgsign: true
-
-      - name: Point user.signingkey at the signing subkey
-        # crazy-max sets user.signingkey to the primary key id. The CI key has
-        # the signing capability on a subkey (not the primary), so `git commit -S`
-        # fails with "gpg: signing failed: No secret key" because it asks GPG to
-        # sign with the primary id and the primary has no [S] capability /
-        # exported secret. Detect the signing-capable subkey and re-point
-        # user.signingkey to it. The trailing `!` forces GPG to use exactly that
-        # key (no fallback ambiguity).
-        run: |
-          set -euxo pipefail
-          FPR="${{ steps.import_gpg.outputs.fingerprint }}"
-          SIGNING_SUBKEY=$(gpg --list-secret-keys --with-colons "$FPR" \
-            | awk -F: '/^ssb/ && $12 ~ /s/ {print $5; exit}')
-          if [ -n "$SIGNING_SUBKEY" ]; then
-            git config --global user.signingkey "${SIGNING_SUBKEY}!"
-            echo "Using signing subkey ${SIGNING_SUBKEY}!"
-          else
-            # Primary key carries [S]; crazy-max's default config is fine.
-            echo "No separate signing subkey; primary key carries [S]"
-          fi
-          # Sanity check: dry-sign a small payload so a misconfig fails THIS
-          # step (clear cause) instead of `git commit` later (opaque error).
-          echo test | gpg --clearsign --local-user "$(git config --global user.signingkey)" > /dev/null
 
       - name: Generate App token (plugin only)
         uses: actions/create-github-app-token@v3
