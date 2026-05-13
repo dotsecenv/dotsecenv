@@ -343,9 +343,7 @@ jobs:
           app-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: |
-            packages
-            plugin
+          repositories: packages
 
       - name: Trigger packages update
         uses: peter-evans/repository-dispatch@v4
@@ -361,14 +359,6 @@ jobs:
           token: ${{ github.token }}
           repository: dotsecenv/dotsecenv
           event-type: trigger-action-e2e
-          client-payload: '{"version": "${{ github.ref_name }}"}'
-
-      - name: Tag plugin with current release's version
-        uses: peter-evans/repository-dispatch@v4
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          repository: dotsecenv/plugin
-          event-type: tag-release
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
   # ---------------------------------------------------------------------------
@@ -398,10 +388,8 @@ jobs:
           # GPG_PRIVATE_KEY exports only the signing subkey's secret (the
           # primary is offline). `git commit -S` is strict about `--local-user`
           # and asks GPG for the primary's secret, which doesn't exist, so
-          # we must point the action at the signing-capable subkey directly.
-          # Set vars.GPG_SIGNING_SUBKEY_FINGERPRINT to the [S]-capable subkey
-          # fingerprint; the one-shot _discover-gpg-subkey.yml workflow can
-          # print the right value.
+          # we must point the action at the signing-capable subkey directly via
+          # the repo variable GPG_SIGNING_SUBKEY_FINGERPRINT.
           fingerprint: ${{ vars.GPG_SIGNING_SUBKEY_FINGERPRINT }}
           git_user_signingkey: true
           git_commit_gpgsign: true
@@ -423,32 +411,17 @@ jobs:
           path: plugin-satellite
           fetch-depth: 0
 
-      - name: Sync monorepo plugin/ -> satellite root
-        run: |
-          set -euxo pipefail
-          # Drop everything in satellite except .git
-          find plugin-satellite -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} +
-          # Copy monorepo plugin contents into satellite root
-          cp -R plugin/. plugin-satellite/
-          # Sidecar with the monorepo release SHA (used in PR 3 for status post-back)
-          echo "${{ github.sha }}" > plugin-satellite/.release-sha
-
-      - name: Commit and push to satellite main
-        working-directory: plugin-satellite
-        run: |
-          set -euxo pipefail
-          # Use the GPG key's identity as committer so signatures verify against
-          # a key registered on the user's GitHub account (required_signatures rule).
-          git config user.name "${{ steps.import_gpg.outputs.name }}"
-          git config user.email "${{ steps.import_gpg.outputs.email }}"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No content changes to publish for ${{ github.ref_name }}"
-            exit 0
-          fi
-          git commit -S -m "publish: ${{ github.ref_name }}" \
-                        -m "Sourced from dotsecenv/dotsecenv@${{ github.sha }}"
-          git push origin HEAD:main
+      - name: Publish plugin source + tag the satellite
+        env:
+          SOURCE_DIR: plugin
+          SATELLITE_DIR: plugin-satellite
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          GIT_AUTHOR_NAME: ${{ steps.import_gpg.outputs.name }}
+          GIT_AUTHOR_EMAIL: ${{ steps.import_gpg.outputs.email }}
+          GIT_COMMITTER_NAME: ${{ steps.import_gpg.outputs.name }}
+          GIT_COMMITTER_EMAIL: ${{ steps.import_gpg.outputs.email }}
+        run: scripts/release/publish-to-satellite.sh
 
   # publish-website was here in the additive PR 1 phase; the website now
   # deploys directly from this monorepo via .github/workflows/deploy-website.yml,
