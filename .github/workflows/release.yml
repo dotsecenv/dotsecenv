@@ -335,7 +335,19 @@ jobs:
   trigger-repo-update:
     needs: [goreleaser, update-checksums, update-homebrew-tap]
     runs-on: ubuntu-latest
+    # Exposed for wait-packages-publish so it can window the
+    # `actions/runs?created=>=<ts>` lookup on dotsecenv/packages.
+    outputs:
+      dispatch_time: ${{ steps.timestamp.outputs.dispatch_time }}
     steps:
+      - name: Capture pre-dispatch timestamp
+        id: timestamp
+        run: |
+          # 5s buffer absorbs clock skew between this runner and the
+          # satellite's, plus the time between this step and the actual
+          # dispatch below.
+          echo "dispatch_time=$(date -u -d '5 seconds ago' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Generate App Token
         uses: actions/create-github-app-token@v3
         id: app-token
@@ -360,6 +372,35 @@ jobs:
           repository: dotsecenv/dotsecenv
           event-type: trigger-action-e2e
           client-payload: '{"version": "${{ github.ref_name }}"}'
+
+  # After dispatching to dotsecenv/packages, find the workflow run that
+  # fired in response and wait for it. Surfaces the satellite run's URL
+  # in this job's summary so the maintainer can click straight from the
+  # monorepo release run into the packages publish run.
+  wait-packages-publish:
+    needs: trigger-repo-update
+    if: needs.trigger-repo-update.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate App token (packages only, actions:read needed)
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: packages
+
+      - name: Wait for dotsecenv/packages publish run
+        env:
+          SATELLITE_REPO: dotsecenv/packages
+          SINCE: ${{ needs.trigger-repo-update.outputs.dispatch_time }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/wait-satellite-run.sh
 
   # ---------------------------------------------------------------------------
   # Monorepo publish jobs (PR 1 of the monorepo migration).
