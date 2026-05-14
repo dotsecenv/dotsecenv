@@ -372,7 +372,6 @@ jobs:
   publish-plugin:
     needs: goreleaser
     runs-on: ubuntu-latest
-    continue-on-error: true
     permissions:
       contents: read
     steps:
@@ -425,6 +424,24 @@ jobs:
           GIT_COMMITTER_NAME: ${{ steps.import_gpg.outputs.name }}
           GIT_COMMITTER_EMAIL: ${{ steps.import_gpg.outputs.email }}
         run: scripts/release/publish-to-satellite.sh
+
+  # Gates the release on plugin-manager integration testing. Runs
+  # `make test-managers-remote` against the just-published plugin
+  # satellite (the test clones from github.com/dotsecenv/plugin in
+  # Docker, so it exercises the real install path users experience).
+  # This replaces the previous post-release.yml flow that ran on the
+  # satellite after push but did not surface back to the monorepo run.
+  test-plugin-managers:
+    needs: publish-plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run plugin manager integration tests (remote)
+        working-directory: plugin
+        run: make test-managers-remote
 
   # publish-website was here in the additive PR 1 phase; the website now
   # deploys directly from this monorepo via .github/workflows/deploy-website.yml,
