@@ -384,14 +384,33 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
           trust_level: 5
-          # GPG_PRIVATE_KEY exports only the signing subkey's secret (the
-          # primary is offline). `git commit -S` is strict about `--local-user`
-          # and asks GPG for the primary's secret, which doesn't exist, so
-          # we must point the action at the signing-capable subkey directly via
-          # the repo variable GPG_SIGNING_SUBKEY_FINGERPRINT.
-          fingerprint: ${{ vars.GPG_SIGNING_SUBKEY_FINGERPRINT }}
           git_user_signingkey: true
           git_commit_gpgsign: true
+
+      - name: Point user.signingkey at the signing subkey
+        # GPG_PRIVATE_KEY exports only the signing subkey's secret (the
+        # primary is offline / certify-only). crazy-max sets user.signingkey
+        # to the PRIMARY's keyid regardless of any `fingerprint:` input
+        # (that input selects which key to import, not which subkey to sign
+        # with). git's `commit -S --local-user PRIMARY_KEYID` then fails
+        # with "No secret key" because the primary's secret isn't on disk.
+        #
+        # Detect the [S]-capable subkey and re-point user.signingkey at it
+        # with the trailing `!` to force exact-match (no fallback).
+        run: |
+          set -euxo pipefail
+          FPR="${{ steps.import_gpg.outputs.fingerprint }}"
+          SIGNING_SUBKEY=$(gpg --list-secret-keys --with-colons "$FPR" \
+            | awk -F: '/^ssb/ && $12 ~ /s/ {print $5; exit}')
+          if [ -n "$SIGNING_SUBKEY" ]; then
+            git config --global user.signingkey "${SIGNING_SUBKEY}!"
+            echo "user.signingkey -> ${SIGNING_SUBKEY}!"
+          else
+            echo "No separate signing subkey; keeping crazy-max's default"
+          fi
+          # Dry-sign a test payload so a misconfig fails THIS step with a
+          # clear cause rather than later in an opaque `git commit -S` error.
+          echo test | gpg --clearsign --local-user "$(git config --global user.signingkey)" > /dev/null
 
       - name: Generate App token (plugin only)
         uses: actions/create-github-app-token@v3
@@ -443,6 +462,15 @@ jobs:
         working-directory: plugin
         run: make test-managers-remote
 
-  # publish-website was here in the additive PR 1 phase; the website now
-  # deploys directly from this monorepo via .github/workflows/deploy-website.yml,
-  # so the cross-repo push to dotsecenv/website is no longer needed.
+  # Build + deploy dotsecenv.com to GitHub Pages as part of the release
+  # run, so the release graph shows the website publish alongside binary,
+  # cask, and plugin publishes. Calls the reusable deploy-website.yml so
+  # the build/deploy logic stays single-sourced (deploy-website.yml also
+  # fires standalone on out-of-band main-branch website edits).
+  deploy-website:
+    needs: goreleaser
+    uses: ./.github/workflows/deploy-website.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
