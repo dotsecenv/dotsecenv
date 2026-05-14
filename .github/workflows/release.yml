@@ -335,17 +335,19 @@ jobs:
   trigger-repo-update:
     needs: [goreleaser, update-checksums, update-homebrew-tap]
     runs-on: ubuntu-latest
-    # Exposed for wait-packages-publish so it can window the
-    # `actions/runs?created=>=<ts>` lookup on dotsecenv/packages.
+    # Exposed so wait-packages-publish can watch the just-dispatched run
+    # without re-doing the discovery work.
     outputs:
-      dispatch_time: ${{ steps.timestamp.outputs.dispatch_time }}
+      packages_run_id: ${{ steps.find_packages.outputs.run_id }}
+      packages_run_url: ${{ steps.find_packages.outputs.run_url }}
     steps:
+      - uses: actions/checkout@v6
+
       - name: Capture pre-dispatch timestamp
         id: timestamp
         run: |
           # 5s buffer absorbs clock skew between this runner and the
-          # satellite's, plus the time between this step and the actual
-          # dispatch below.
+          # satellite's, plus the time between this step and the dispatch.
           echo "dispatch_time=$(date -u -d '5 seconds ago' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Generate App Token
@@ -373,10 +375,18 @@ jobs:
           event-type: trigger-action-e2e
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
-  # After dispatching to dotsecenv/packages, find the workflow run that
-  # fired in response and wait for it. Surfaces the satellite run's URL
-  # in this job's summary so the maintainer can click straight from the
-  # monorepo release run into the packages publish run.
+      - name: Find dispatched packages run and surface link
+        id: find_packages
+        env:
+          SATELLITE_REPO: dotsecenv/packages
+          SINCE: ${{ steps.timestamp.outputs.dispatch_time }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/find-satellite-run.sh
+
+  # Poll the dispatched packages run to completion. The link to the
+  # satellite run is already on the trigger-repo-update job summary
+  # (written by find-satellite-run.sh); this job re-prints it on its
+  # own summary along with the final ✅/❌/⏱️ status.
   wait-packages-publish:
     needs: trigger-repo-update
     if: needs.trigger-repo-update.result == 'success'
@@ -395,12 +405,12 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: packages
 
-      - name: Wait for dotsecenv/packages publish run
+      - name: Watch dotsecenv/packages publish run
         env:
           SATELLITE_REPO: dotsecenv/packages
-          SINCE: ${{ needs.trigger-repo-update.outputs.dispatch_time }}
+          RUN_ID: ${{ needs.trigger-repo-update.outputs.packages_run_id }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: scripts/release/wait-satellite-run.sh
+        run: scripts/release/watch-satellite-run.sh
 
   # ---------------------------------------------------------------------------
   # Monorepo publish jobs (PR 1 of the monorepo migration).
