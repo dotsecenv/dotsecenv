@@ -370,7 +370,11 @@ jobs:
   # ---------------------------------------------------------------------------
 
   publish-plugin:
-    needs: goreleaser
+    # Don't push to the satellite (or tag it) if anything earlier in the
+    # release chain failed; a half-baked release shouldn't propagate. Run
+    # on success-or-skipped so legitimate skips upstream don't block us.
+    needs: update-homebrew-tap
+    if: ${{ !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -442,8 +446,13 @@ jobs:
   # cask, and plugin publishes. Calls the reusable deploy-website.yml so
   # the build/deploy logic stays single-sourced (deploy-website.yml also
   # fires standalone on out-of-band main-branch website edits).
+  #
+  # Gated on update-homebrew-tap with success-or-skipped semantics: don't
+  # ship updated docs if the binary build / notarize / cask flow failed,
+  # but DO ship them if those steps were legitimately skipped.
   deploy-website:
-    needs: goreleaser
+    needs: update-homebrew-tap
+    if: ${{ !failure() && !cancelled() }}
     uses: ./.github/workflows/deploy-website.yml
     permissions:
       contents: read
