@@ -52,19 +52,25 @@ SATELLITE_FILES=$(mktemp)
 
 # additions = every file in source/  (each with base64-encoded contents)
 # deletions = files in satellite/ that are NOT in source/
-ADDITIONS_JSON=$(
+#
+# These can run into megabytes of base64 — too large to pass as `jq --argjson`
+# arguments (kernel argv limit, ~128KB on Linux) — so we materialize them to
+# files and have jq slurp them via --slurpfile.
+ADDITIONS_FILE=$(mktemp)
+(
   cd "${SOURCE_DIR}"
   while IFS= read -r f; do
     contents=$(base64 < "$f" | tr -d '\n')
     jq -n --arg path "$f" --arg contents "$contents" '{path: $path, contents: $contents}'
   done < "${SOURCE_FILES}" | jq -s .
-)
+) > "${ADDITIONS_FILE}"
 
-DELETIONS_JSON=$(
+DELETIONS_FILE=$(mktemp)
+(
   comm -23 "${SATELLITE_FILES}" "${SOURCE_FILES}" | while IFS= read -r f; do
     jq -n --arg path "$f" '{path: $path}'
   done | jq -s .
-)
+) > "${DELETIONS_FILE}"
 
 # Current head oid -- required by the mutation as expectedHeadOid to detect
 # races. If something else pushes between this fetch and the mutation, the
@@ -72,27 +78,28 @@ DELETIONS_JSON=$(
 EXPECTED_OID=$(gh api "repos/${SATELLITE_REPO}/branches/main" --jq .commit.sha)
 echo "Current ${SATELLITE_REPO}/main HEAD: ${EXPECTED_OID}"
 
-# Build the mutation input.
-MUTATION_INPUT=$(jq -n \
+# Build the mutation input via files (additions content is too big for argv).
+INPUT_FILE=$(mktemp)
+jq -n \
   --arg repo "${SATELLITE_REPO}" \
   --arg headline "publish: ${TAG}" \
   --arg body "Sourced from dotsecenv/dotsecenv@${SHA}" \
   --arg oid "${EXPECTED_OID}" \
-  --argjson additions "${ADDITIONS_JSON}" \
-  --argjson deletions "${DELETIONS_JSON}" \
+  --slurpfile additions "${ADDITIONS_FILE}" \
+  --slurpfile deletions "${DELETIONS_FILE}" \
   '{
     branch: { repositoryNameWithOwner: $repo, branchName: "main" },
     message: { headline: $headline, body: $body },
     expectedHeadOid: $oid,
     fileChanges: {
-      additions: $additions,
-      deletions: $deletions
+      additions: $additions[0],
+      deletions: $deletions[0]
     }
-  }')
+  }' > "${INPUT_FILE}"
 
 # Run the mutation. GitHub signs the commit server-side with its bot key.
-NEW_OID=$(echo "${MUTATION_INPUT}" \
-  | gh api graphql -F input=@- \
+# Stream the input via stdin to keep it off the command line.
+NEW_OID=$(gh api graphql -F input=@"${INPUT_FILE}" \
       -f query='mutation($input: CreateCommitOnBranchInput!) {
         createCommitOnBranch(input: $input) {
           commit { oid url }
