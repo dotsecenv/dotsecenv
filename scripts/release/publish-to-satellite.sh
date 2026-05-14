@@ -14,12 +14,15 @@
 #   user.signingkey  pointing at the [S]-capable subkey (with ! suffix)
 #   commit.gpgsign   true
 #
+# Required tools in PATH (caller installs):
+#   rsync, git, rt (releasetools/cli@v0 in CI, mise/brew locally)
+#
 # Behaviour:
 #   1. rsync source -> satellite root (excluding .git). Deletions propagate.
 #   2. Write .release-sha sidecar.
 #   3. If there are content changes, commit them (signed) and push to main.
 #      If not, skip the commit but still tag (tag points at current main).
-#   4. Create a signed annotated tag at HEAD and push it.
+#   4. Create a signed tag at HEAD and push it via `rt git::release`.
 
 set -euo pipefail
 
@@ -44,8 +47,10 @@ else
 fi
 
 # Tag the satellite at its current main HEAD (just-pushed if we committed,
-# previous tip otherwise). Idempotent: if a local tag of the same name
-# exists from a prior partial run, delete it first.
+# previous tip otherwise) using releasetools/rt — same tool the previous
+# satellite-side tag-release.yml used, kept for consistency and so any
+# release-tooling conventions (signing, message format) stay uniform across
+# repos. Idempotent: if a local tag of the same name lingers from a prior
+# partial run, delete it first.
 git tag -d "${TAG}" 2>/dev/null || true
-git tag -s -m "Release ${TAG}" "${TAG}"
-git push origin "${TAG}"
+rt git::release --sign --push "${TAG}"

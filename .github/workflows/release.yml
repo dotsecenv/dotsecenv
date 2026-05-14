@@ -411,6 +411,9 @@ jobs:
           path: plugin-satellite
           fetch-depth: 0
 
+      - name: Install releasetools (rt)
+        uses: releasetools/cli@v0
+
       - name: Publish plugin source + tag the satellite
         env:
           SOURCE_DIR: plugin
