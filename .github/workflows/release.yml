@@ -388,6 +388,13 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
           trust_level: 5
+          # crazy-max's default is to set git config LOCALLY in the checked-out
+          # repo (here: dotsecenv/dotsecenv). The publish script later cd's into
+          # plugin-satellite/, a different .git repo, where the local config
+          # doesn't apply -> user.signingkey resolves empty -> git falls back
+          # to email lookup -> gpg fails to unlock the secret. Force --global
+          # so the signing config persists across working-directory changes.
+          git_config_global: true
           git_user_signingkey: true
           git_commit_gpgsign: true
 
@@ -400,9 +407,10 @@ jobs:
         run: |
           set -euxo pipefail
           gpg --list-secret-keys --keyid-format=long
-          echo "user.signingkey -> $(git config --global user.signingkey)"
+          SIGNINGKEY="$(git config --global user.signingkey)"
+          echo "user.signingkey (global) -> ${SIGNINGKEY:?empty - check git_config_global on import_gpg}"
           echo "smoke" | gpg --batch --yes --status-fd 2 \
-            --local-user "$(git config --global user.signingkey)" \
+            --local-user "${SIGNINGKEY}" \
             -bsa > /dev/null
 
       - name: Generate App token (plugin only)
