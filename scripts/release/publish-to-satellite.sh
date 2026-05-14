@@ -78,7 +78,8 @@ DELETIONS_FILE=$(mktemp)
 EXPECTED_OID=$(gh api "repos/${SATELLITE_REPO}/branches/main" --jq .commit.sha)
 echo "Current ${SATELLITE_REPO}/main HEAD: ${EXPECTED_OID}"
 
-# Build the mutation input via files (additions content is too big for argv).
+# Build the CreateCommitOnBranchInput object via files (additions content
+# is too big for argv).
 INPUT_FILE=$(mktemp)
 jq -n \
   --arg repo "${SATELLITE_REPO}" \
@@ -97,18 +98,26 @@ jq -n \
     }
   }' > "${INPUT_FILE}"
 
-# Run the mutation. GitHub signs the commit server-side with its bot key.
-# Stream the input via stdin to keep it off the command line.
-NEW_OID=$(gh api graphql -F input=@"${INPUT_FILE}" \
-      -f query='mutation($input: CreateCommitOnBranchInput!) {
-        createCommitOnBranch(input: $input) {
-          commit { oid url }
-        }
-      }' \
-  | jq -r .data.createCommitOnBranch.commit.oid)
+# Build the full GraphQL request body. We can't use
+# `gh api graphql -F input=@file` because gh's -F flag reads the file
+# as a STRING (it only auto-detects bool/number, not JSON), and the
+# server rejects the resulting variables.input value as "invalid value
+# for type CreateCommitOnBranchInput!". Build {query, variables} ourselves
+# and send via --input.
+REQUEST_FILE=$(mktemp)
+jq -n \
+  --arg query 'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid url } } }' \
+  --slurpfile input "${INPUT_FILE}" \
+  '{query: $query, variables: {input: $input[0]}}' > "${REQUEST_FILE}"
 
-if [ -z "${NEW_OID}" ] || [ "${NEW_OID}" = "null" ]; then
-  echo "::error::createCommitOnBranch returned no commit oid" >&2
+# Run the mutation. GitHub signs the commit server-side with its bot key.
+RESPONSE=$(gh api graphql --input "${REQUEST_FILE}")
+NEW_OID=$(jq -r '.data.createCommitOnBranch.commit.oid // empty' <<<"${RESPONSE}")
+
+if [ -z "${NEW_OID}" ]; then
+  echo "::error::createCommitOnBranch returned no commit oid"
+  echo "Full response from GitHub:" >&2
+  jq . <<<"${RESPONSE}" >&2 || echo "${RESPONSE}" >&2
   exit 1
 fi
 echo "Signed commit ${NEW_OID} created on ${SATELLITE_REPO}/main"
