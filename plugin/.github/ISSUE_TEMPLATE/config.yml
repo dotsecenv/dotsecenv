@@ -1,0 +1,16 @@
+blank_issues_enabled: false
+contact_links:
+  - name: File a bug or request a feature
+    url: https://github.com/dotsecenv/dotsecenv/issues/new/choose
+    about: |
+      The shell plugin source now lives in dotsecenv/dotsecenv at plugin/.
+      Please open all issues there (CLI and plugins are tracked together).
+  - name: Plugin source on dotsecenv/dotsecenv
+    url: https://github.com/dotsecenv/dotsecenv/tree/main/plugin
+    about: Read the plugin source and contribute via that repo.
+  - name: Documentation
+    url: https://dotsecenv.com/guides/shell-plugins/
+    about: Read the shell plugins documentation.
+  - name: Security vulnerability
+    url: https://github.com/dotsecenv/dotsecenv/security/advisories/new
+    about: Report security vulnerabilities privately on dotsecenv/dotsecenv.
