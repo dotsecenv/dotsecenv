@@ -14,13 +14,12 @@ pre-commit:
       glob: "{go.mod,go.sum,**/*.go}"
       run: make lint
     website-node-version-sync:
-      glob: "website/{mise.toml,package.json}"
-      root: website/
+      glob: "{mise.toml,website/package.json}"
       run: |
         mise_v=$(grep -E '^node = ' mise.toml | grep -oE '[0-9]+' | head -1)
-        pkg_v=$(jq -r '.engines.node' package.json | grep -oE '[0-9]+' | head -1)
+        pkg_v=$(jq -r '.engines.node' website/package.json | grep -oE '[0-9]+' | head -1)
         if [ -z "$mise_v" ] || [ -z "$pkg_v" ] || [ "$mise_v" != "$pkg_v" ]; then
-          echo "node major mismatch: mise.toml=$mise_v, package.json engines.node=$pkg_v" >&2
+          echo "node major mismatch: mise.toml=$mise_v, website/package.json engines.node=$pkg_v" >&2
           exit 1
         fi
 

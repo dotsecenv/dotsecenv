@@ -1,0 +1,16 @@
+# https://mise.jdx.dev
+#
+# Language tools used across the monorepo. Run `mise install` at the repo
+# root once after cloning to get all of these set up; the lefthook hooks
+# below assume these versions are present locally.
+#
+# - go    matches go.mod's `go` directive
+# - node  matches website/package.json's engines.node; kept in sync by
+#         the website-node-version-sync lefthook pre-commit hook
+# - pnpm  matches the version pinned in .github/workflows/ci-website.yml
+#         and .github/workflows/deploy-website.yml
+
+[tools]
+go = "1.26"
+node = "25"
+pnpm = "11"
