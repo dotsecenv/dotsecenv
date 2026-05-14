@@ -1,63 +1,116 @@
 #!/usr/bin/env bash
 #
-# Sync a monorepo subdirectory to a satellite repo's root, commit, push to
-# its main, and create + push a tag.
+# Sync a monorepo subdirectory to a satellite repo, creating a SIGNED commit
+# on its main branch via GitHub's GraphQL `createCommitOnBranch` mutation,
+# then push a lightweight tag at that commit.
 #
-# The commit + push use the GitHub App's [bot] identity (derived from the
-# token via /user). The satellite's ruleset has this App in the bypass
-# list, so unsigned commits + direct push to main are accepted; no GPG
-# signing is needed in this flow. (Archive signing for binaries still
-# happens in goreleaser via its own GPG_PRIVATE_KEY import.)
+# GraphQL-created commits are signed server-side by GitHub when issued with
+# an App installation token, so the satellite's "required signatures" rule
+# is satisfied without any GPG handling on the runner. The App also lives
+# in the ruleset's bypass list, so the PR-required rule passes too.
 #
 # Required env:
-#   SOURCE_DIR     path to the monorepo subdirectory to publish (e.g. "plugin")
-#   SATELLITE_DIR  path to the satellite checkout (e.g. "plugin-satellite")
-#   TAG            release tag (e.g. "v0.6.2")
-#   SHA            monorepo commit SHA being published (for .release-sha sidecar)
-#   APP_TOKEN      installation token used to authenticate the push and look
-#                  up the App's bot identity
+#   SOURCE_DIR       path to the monorepo subdirectory to publish (e.g. "plugin")
+#   SATELLITE_DIR    path to a checkout of the satellite (e.g. "plugin-satellite")
+#                    used only for listing what's currently on the satellite
+#                    so we can compute deletions
+#   SATELLITE_REPO   "<owner>/<repo>" of the satellite (e.g. "dotsecenv/plugin")
+#   TAG              release tag (e.g. "v0.6.7")
+#   SHA              monorepo commit SHA being published (for .release-sha sidecar)
+#   GH_TOKEN         App installation token used by gh to call the API
 #
 # Required tools in PATH (caller installs):
-#   rsync, git, jq, curl, rt (releasetools/cli@v0 in CI, mise/brew locally)
+#   gh, jq, find, base64
 
 set -euo pipefail
 
 : "${SOURCE_DIR:?SOURCE_DIR is required}"
 : "${SATELLITE_DIR:?SATELLITE_DIR is required}"
+: "${SATELLITE_REPO:?SATELLITE_REPO is required}"
 : "${TAG:?TAG is required}"
 : "${SHA:?SHA is required}"
-: "${APP_TOKEN:?APP_TOKEN is required}"
+: "${GH_TOKEN:?GH_TOKEN is required}"
 
-# Resolve the App's bot user. /user returns the authenticated identity for
-# the token; for a GitHub App installation token, that's "<slug>[bot]".
-bot_json=$(curl -fsS -H "Authorization: Bearer ${APP_TOKEN}" \
-                    -H "Accept: application/vnd.github+json" \
-                    https://api.github.com/user)
-bot_login=$(jq -r .login <<<"${bot_json}")
-bot_id=$(jq -r .id <<<"${bot_json}")
-bot_email="${bot_id}+${bot_login}@users.noreply.github.com"
-echo "Committer identity: ${bot_login} <${bot_email}>"
+# Write the .release-sha sidecar into the source tree so it shows up as
+# part of the additions array along with everything else.
+echo "${SHA}" > "${SOURCE_DIR}/.release-sha"
 
-# Sync source -> satellite. --delete makes deletions propagate. Exclude
-# .git so we don't blow away the satellite's git metadata.
-rsync -a --delete --exclude='.git' "${SOURCE_DIR}/" "${SATELLITE_DIR}/"
-echo "${SHA}" > "${SATELLITE_DIR}/.release-sha"
+# List every file we want present on the satellite after this publish.
+SOURCE_FILES=$(mktemp)
+( cd "${SOURCE_DIR}" \
+  && find . -type f -not -path './.git/*' \
+  | sed 's|^\./||' \
+  | LC_ALL=C sort -u ) > "${SOURCE_FILES}"
 
-cd "${SATELLITE_DIR}"
-git config user.name "${bot_login}"
-git config user.email "${bot_email}"
-git add -A
+# List every file currently on the satellite (so we can delete anything
+# that's no longer in source).
+SATELLITE_FILES=$(mktemp)
+( cd "${SATELLITE_DIR}" \
+  && find . -type f -not -path './.git/*' \
+  | sed 's|^\./||' \
+  | LC_ALL=C sort -u ) > "${SATELLITE_FILES}"
 
-if git diff --cached --quiet; then
-  echo "No content changes for ${TAG}; skipping commit"
-else
-  git commit -m "publish: ${TAG}" -m "Sourced from dotsecenv/dotsecenv@${SHA}"
-  git push origin HEAD:main
+# additions = every file in source/  (each with base64-encoded contents)
+# deletions = files in satellite/ that are NOT in source/
+ADDITIONS_JSON=$(
+  cd "${SOURCE_DIR}"
+  while IFS= read -r f; do
+    contents=$(base64 < "$f" | tr -d '\n')
+    jq -n --arg path "$f" --arg contents "$contents" '{path: $path, contents: $contents}'
+  done < "${SOURCE_FILES}" | jq -s .
+)
+
+DELETIONS_JSON=$(
+  comm -23 "${SATELLITE_FILES}" "${SOURCE_FILES}" | while IFS= read -r f; do
+    jq -n --arg path "$f" '{path: $path}'
+  done | jq -s .
+)
+
+# Current head oid -- required by the mutation as expectedHeadOid to detect
+# races. If something else pushes between this fetch and the mutation, the
+# mutation fails loudly rather than silently overwriting.
+EXPECTED_OID=$(gh api "repos/${SATELLITE_REPO}/branches/main" --jq .commit.sha)
+echo "Current ${SATELLITE_REPO}/main HEAD: ${EXPECTED_OID}"
+
+# Build the mutation input.
+MUTATION_INPUT=$(jq -n \
+  --arg repo "${SATELLITE_REPO}" \
+  --arg headline "publish: ${TAG}" \
+  --arg body "Sourced from dotsecenv/dotsecenv@${SHA}" \
+  --arg oid "${EXPECTED_OID}" \
+  --argjson additions "${ADDITIONS_JSON}" \
+  --argjson deletions "${DELETIONS_JSON}" \
+  '{
+    branch: { repositoryNameWithOwner: $repo, branchName: "main" },
+    message: { headline: $headline, body: $body },
+    expectedHeadOid: $oid,
+    fileChanges: {
+      additions: $additions,
+      deletions: $deletions
+    }
+  }')
+
+# Run the mutation. GitHub signs the commit server-side with its bot key.
+NEW_OID=$(echo "${MUTATION_INPUT}" \
+  | gh api graphql -F input=@- \
+      -f query='mutation($input: CreateCommitOnBranchInput!) {
+        createCommitOnBranch(input: $input) {
+          commit { oid url }
+        }
+      }' \
+  | jq -r .data.createCommitOnBranch.commit.oid)
+
+if [ -z "${NEW_OID}" ] || [ "${NEW_OID}" = "null" ]; then
+  echo "::error::createCommitOnBranch returned no commit oid" >&2
+  exit 1
 fi
+echo "Signed commit ${NEW_OID} created on ${SATELLITE_REPO}/main"
 
-# Tag the satellite at its current main HEAD (just-pushed if we committed,
-# previous tip otherwise). Idempotent: if a local tag of the same name
-# lingers from a prior partial run, delete it first. rt creates an
-# annotated tag and pushes it; the App's bypass also covers tag refs.
-git tag -d "${TAG}" 2>/dev/null || true
-rt git::release --push "${TAG}"
+# Create a lightweight tag at the new commit. (Annotated tags would require
+# a separate `POST /git/tags` then `POST /git/refs`; lightweight is what
+# plugin managers use anyway.)
+gh api -X POST "repos/${SATELLITE_REPO}/git/refs" \
+  -f ref="refs/tags/${TAG}" \
+  -f sha="${NEW_OID}" \
+  > /dev/null
+echo "Tagged ${TAG} -> ${NEW_OID}"

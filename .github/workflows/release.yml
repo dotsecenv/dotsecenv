@@ -398,16 +398,14 @@ jobs:
           path: plugin-satellite
           fetch-depth: 0
 
-      - name: Install releasetools (rt)
-        uses: releasetools/cli@v0
-
       - name: Publish plugin source + tag the satellite
         env:
           SOURCE_DIR: plugin
           SATELLITE_DIR: plugin-satellite
+          SATELLITE_REPO: dotsecenv/plugin
           TAG: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
-          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: scripts/release/publish-to-satellite.sh
 
   # Gates the release on plugin-manager integration testing. Runs
