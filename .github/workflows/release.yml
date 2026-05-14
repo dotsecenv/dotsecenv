@@ -391,6 +391,20 @@ jobs:
           git_user_signingkey: true
           git_commit_gpgsign: true
 
+      - name: Sanity-check signing works through the agent
+        # If signing fails here, the error happens with full GPG verbose
+        # output (--status-fd 2) and lands at the exact step that broke
+        # rather than inside `git commit -S` later. Catches: import
+        # corruption, wrong passphrase preset, agent killed between
+        # steps, secret stub instead of full export, etc.
+        run: |
+          set -euxo pipefail
+          gpg --list-secret-keys --keyid-format=long
+          echo "user.signingkey -> $(git config --global user.signingkey)"
+          echo "smoke" | gpg --batch --yes --status-fd 2 \
+            --local-user "$(git config --global user.signingkey)" \
+            -bsa > /dev/null
+
       - name: Generate App token (plugin only)
         uses: actions/create-github-app-token@v3
         id: app-token
