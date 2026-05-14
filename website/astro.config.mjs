@@ -11,7 +11,6 @@ export default defineConfig({
     // Renamed from Policy Directory → Security Policies (May 2026).
     // Preserve external links from blog posts, social shares, and search engines.
     '/concepts/policy-directory': '/concepts/security-policies/',
-    '/concepts/policy-directory/': '/concepts/security-policies/',
   },
   integrations: [
     starlight({
