@@ -387,31 +387,6 @@ jobs:
           git_user_signingkey: true
           git_commit_gpgsign: true
 
-      - name: Point user.signingkey at the signing subkey
-        # GPG_PRIVATE_KEY exports only the signing subkey's secret (the
-        # primary is offline / certify-only). crazy-max sets user.signingkey
-        # to the PRIMARY's keyid regardless of any `fingerprint:` input
-        # (that input selects which key to import, not which subkey to sign
-        # with). git's `commit -S --local-user PRIMARY_KEYID` then fails
-        # with "No secret key" because the primary's secret isn't on disk.
-        #
-        # Detect the [S]-capable subkey and re-point user.signingkey at it
-        # with the trailing `!` to force exact-match (no fallback).
-        run: |
-          set -euxo pipefail
-          FPR="${{ steps.import_gpg.outputs.fingerprint }}"
-          SIGNING_SUBKEY=$(gpg --list-secret-keys --with-colons "$FPR" \
-            | awk -F: '/^ssb/ && $12 ~ /s/ {print $5; exit}')
-          if [ -n "$SIGNING_SUBKEY" ]; then
-            git config --global user.signingkey "${SIGNING_SUBKEY}!"
-            echo "user.signingkey -> ${SIGNING_SUBKEY}!"
-          else
-            echo "No separate signing subkey; keeping crazy-max's default"
-          fi
-          # Dry-sign a test payload so a misconfig fails THIS step with a
-          # clear cause rather than later in an opaque `git commit -S` error.
-          echo test | gpg --clearsign --local-user "$(git config --global user.signingkey)" > /dev/null
-
       - name: Generate App token (plugin only)
         uses: actions/create-github-app-token@v3
         id: app-token
