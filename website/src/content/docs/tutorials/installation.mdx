@@ -125,7 +125,7 @@ Install dotsecenv on your system and verify it's working correctly.
 
        # Trust the key
        curl -fsSL https://get.dotsecenv.com/key.asc | sudo pacman-key --add -
-       sudo pacman-key --lsign-key E60A1740BAEF49284D22EA7D3C376348F0921C59
+       sudo pacman-key --lsign-key 0B8DB28079ACFA7497F0B8FE647E9C8219626442
 
        # Install
        sudo pacman -Sy dotsecenv
@@ -357,8 +357,8 @@ Download a specific version from GitHub releases:
 All packages are signed with the dotsecenv release key:
 
 ```text
-pub   rsa4096 2025-12-19 [SC] [expires: 2027-12-19]
-      E60A1740BAEF49284D22EA7D3C376348F0921C59
+pub   rsa4096 2026-05-14 [SC] [expires: 2028-05-13]
+      0B8DB28079ACFA7497F0B8FE647E9C8219626442
 uid   DotSecEnv Releases <release@dotsecenv.com>
 ```
 
@@ -366,11 +366,17 @@ Verify the key from multiple sources:
 
 ```bash
 # OpenPGP Keyserver
-gpg --keyserver keys.openpgp.org --recv-keys E60A1740BAEF49284D22EA7D3C376348F0921C59
+gpg --keyserver keys.openpgp.org --recv-keys 0B8DB28079ACFA7497F0B8FE647E9C8219626442
 
 # Keybase
 curl https://keybase.io/dotsecenv/pgp_keys.asc | gpg --import
 ```
+
+Releases up to and including v0.6.3 were signed with the previous
+key (`E60A1740BAEF49284D22EA7D3C376348F0921C59`). To verify those
+signatures, also import the old key — `https://get.dotsecenv.com/key.asc`
+contains both old and new public keys concatenated so a single import
+covers all releases.
 
 ### Verifying macOS Notarization
 
