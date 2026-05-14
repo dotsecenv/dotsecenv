@@ -1,14 +1,40 @@
 # lefthook.yml - Git hooks configuration
 # https://github.com/evilmartians/lefthook
+#
+# Lefthook auto-discovers only the root config; per-subdir lefthook.yml
+# files (e.g. plugin/lefthook.yml, website/lefthook.yml) would be inert.
+# Subdirectory checks are folded in here with `glob:` so they only run
+# when files in that area are staged, and `root:` so the command runs
+# from the subdirectory (matching its Makefile's expectations).
 
 pre-commit:
   follow: true
   commands:
     lint:
+      glob: "{go.mod,go.sum,**/*.go}"
       run: make lint
+    website-node-version-sync:
+      glob: "website/{mise.toml,package.json}"
+      root: website/
+      run: |
+        mise_v=$(grep -E '^node = ' mise.toml | grep -oE '[0-9]+' | head -1)
+        pkg_v=$(jq -r '.engines.node' package.json | grep -oE '[0-9]+' | head -1)
+        if [ -z "$mise_v" ] || [ -z "$pkg_v" ] || [ "$mise_v" != "$pkg_v" ]; then
+          echo "node major mismatch: mise.toml=$mise_v, package.json engines.node=$pkg_v" >&2
+          exit 1
+        fi
 
 pre-push:
   follow: true
   commands:
     test:
+      glob: "{go.mod,go.sum,Makefile,**/*.go,scripts/**,cmd/**,pkg/**,internal/**}"
       run: make clean test build e2e
+    plugin-test:
+      glob: "plugin/**"
+      root: plugin/
+      run: make fmt-check lint test-plugins
+    website-build:
+      glob: "website/**"
+      root: website/
+      run: make lint build
