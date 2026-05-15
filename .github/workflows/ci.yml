@@ -2,8 +2,18 @@ name: CI
 
 # Pipeline shape (DAG):
 #
-#   test ─► e2e ─► e2e-terraform ─┬─► e2e-action-default-args ─┬─► build-docs
-#                                 └─► e2e-action-init-config
+#   test (matrix) ─┐
+#                  ├─► e2e (matrix)
+#                  ├─► e2e-terraform
+#   build-docs ────┤
+#                  ├─► e2e-action-default-args
+#                  └─► e2e-action-init-config
+#
+# `test` and `build-docs` are the two roots — both fast, both build the
+# binary, and they run in parallel so the slower of the two sets the
+# critical path's first stage. Everything downstream gates on BOTH.
+# Single-os (ubuntu) jobs: e2e-terraform, e2e-action-*, build-docs.
+# Matrix (ubuntu+macos): test, e2e.
 #
 # Scoped to Go-related changes via `paths:` allowlist below — touches to
 # website/, plugin/, docs-only files, etc. don't fire this pipeline.
@@ -119,9 +129,22 @@ jobs:
       - name: Test
         run: go test -v -p 1 ./...
 
+  build-docs:
+    name: Build Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+          cache-dependency-path: "go.sum"
+
+      - run: make build completions docs man
+
   e2e:
     name: E2E Tests (${{ matrix.os }})
-    needs: test
+    needs: [test, build-docs]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -137,12 +160,9 @@ jobs:
       - run: make build e2e
 
   e2e-terraform:
-    name: E2E Terraform Credentials Helper (${{ matrix.os }})
-    needs: e2e
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+    name: E2E Terraform Credentials Helper
+    needs: [test, build-docs]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
@@ -158,12 +178,9 @@ jobs:
       - run: make build e2e-terraform
 
   e2e-action-default-args:
-    name: E2E Action default-args (${{ matrix.os }})
-    needs: e2e-terraform
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+    name: E2E Action default-args
+    needs: [test, build-docs]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
@@ -175,12 +192,9 @@ jobs:
       - run: dotsecenv version
 
   e2e-action-init-config:
-    name: E2E Action init-config (${{ matrix.os }})
-    needs: e2e-terraform
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+    name: E2E Action init-config
+    needs: [test, build-docs]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
@@ -191,20 +205,3 @@ jobs:
           init-config: ""
 
       - run: dotsecenv version
-
-  build-docs:
-    name: Build Docs (${{ matrix.os }})
-    needs: [e2e-action-default-args, e2e-action-init-config]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: "go.mod"
-          cache-dependency-path: "go.sum"
-
-      - run: make build completions docs man
