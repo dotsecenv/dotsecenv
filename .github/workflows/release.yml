@@ -646,11 +646,12 @@ jobs:
   # the build/deploy logic stays single-sourced (deploy-website.yml also
   # fires standalone on out-of-band main-branch website edits).
   #
-  # Gated on update-homebrew-tap with success-or-skipped semantics: don't
-  # ship updated docs if the binary build / notarize / cask flow failed,
-  # but DO ship them if those steps were legitimately skipped.
+  # Gated on wait-homebrew-tap-ci with success-or-skipped semantics: don't
+  # ship updated docs until the cask is proven installable on the tap (so
+  # the docs never advertise a release whose `brew install` is broken),
+  # but DO ship them if upstream steps were legitimately skipped.
   deploy-website:
-    needs: update-homebrew-tap
+    needs: wait-homebrew-tap-ci
     if: ${{ !failure() && !cancelled() }}
     uses: ./.github/workflows/deploy-website.yml
     permissions:
