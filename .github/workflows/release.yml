@@ -31,10 +31,10 @@ jobs:
   # real. Failing early on ci-release would just duplicate the failure
   # we'd see in `goreleaser` itself.
   #
-  # post-release-action.yml is also NOT in this matrix: it's a
+  # e2e-action-post-release.yml is also NOT in this matrix: it's a
   # POST-release smoke (released action ref + released binary), so by
   # definition it can't have a pre-existing run for the tagged SHA —
-  # release.yml workflow_call's it inline (the `post-release-action`
+  # release.yml workflow_call's it inline (the `e2e-action-post-release`
   # job below) after the release is published.
   wait-ci:
     name: Wait for CI on tagged commit
@@ -99,7 +99,7 @@ jobs:
           GPG_KEY_FILE="${{ runner.temp }}/gpg.key"
           echo "$GPG_PRIVATE_KEY" > "$GPG_KEY_FILE"
           chmod 600 "$GPG_KEY_FILE"
-          echo "GPG_KEY_FILE=$GPG_KEY_FILE" >> $GITHUB_ENV
+          echo "GPG_KEY_FILE=$GPG_KEY_FILE" >> "$GITHUB_ENV"
 
       - name: Import GPG key
         id: import_gpg
@@ -459,14 +459,14 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: scripts/release/watch-satellite-run.sh
 
-  # Post-release smoke. post-release-action.yml's 5 matrix jobs run
+  # Post-release smoke. e2e-action-post-release.yml's 5 matrix jobs run
   # synchronously and surface as checks under this release run. The GH
   # release is public by this point and goreleaser has moved the v0
   # major tag, so `dotsecenv/dotsecenv@v0` resolves to the just-
   # published action and the released binary is reachable for download.
-  post-release-action:
+  e2e-action-post-release:
     needs: update-checksums
-    uses: ./.github/workflows/post-release-action.yml
+    uses: ./.github/workflows/e2e-action-post-release.yml
     with:
       version: ${{ github.ref_name }}
 

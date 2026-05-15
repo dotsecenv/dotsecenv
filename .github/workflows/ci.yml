@@ -17,7 +17,7 @@ name: CI
 #   ci-release.yml   — `make release-test` snapshot, on goreleaser-config changes
 #   e2e-install.yml  — scripts/install.sh smoke
 #   e2e-hermetic.yml — hermetic-mode e2e on PR
-#   post-release-action.yml — post-release smoke for the released action ref
+#   e2e-action-post-release.yml — post-release smoke for the released action ref
 
 on:
   workflow_dispatch:

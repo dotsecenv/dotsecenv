@@ -97,7 +97,7 @@ jobs:
           cat /tmp/network-syscalls.log || true
 
           # Check for any connect() calls to non-loopback addresses
-          EXTERNAL=$(grep -E "connect\(" /tmp/network-syscalls.log 2>/dev/null | grep -v "127.0.0.1" | grep -v "::1" | grep -v "AF_UNIX" | wc -l || echo 0)
+          EXTERNAL=$(grep -E "connect\(" /tmp/network-syscalls.log 2>/dev/null | grep -cvE "127.0.0.1|::1|AF_UNIX" || echo 0)
           echo "External connect() calls: $EXTERNAL"
 
           if [ "$EXTERNAL" -gt 0 ]; then

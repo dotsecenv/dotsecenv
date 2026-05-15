@@ -33,7 +33,7 @@ end-to-end test harness verified by network-namespace + strace in CI.
 | `skills/`           | Claude Code skills (`secenv/SKILL.md`, `secrets/SKILL.md`).                    |
 | `.claude-plugin/`   | Claude Code plugin manifest (`plugin.json`, `marketplace.json`).               |
 | `scripts/`          | `install.sh`, `e2e.sh`, `e2e-install.sh`, `e2e-terraform.sh`, `sandbox.sh`, `notarize-macos.sh`, `generate_release_key.sh`. |
-| `.github/workflows/` | CI + release: `ci.yml` (Go DAG), `ci-plugin.yml`, `ci-website.yml`, `ci-release.yml` (goreleaser snapshot), `e2e-hermetic.yml`, `e2e-install.yml`, `post-release-action.yml` (reusable, post-release action smoke), `lint-workflows.yml` (actionlint), `release.yml`, `deploy-website.yml`. |
+| `.github/workflows/` | CI + release: `ci.yml` (Go DAG), `ci-plugin.yml`, `ci-website.yml`, `ci-release.yml` (goreleaser snapshot), `e2e-hermetic.yml`, `e2e-install.yml`, `e2e-action-post-release.yml` (reusable, post-release action smoke), `lint-workflows.yml` (actionlint), `release.yml`, `deploy-website.yml`. |
 | `vendor/`           | Vendored Go dependencies (used by `make build` for hermetic builds).           |
 | `action.yml`        | Composite GitHub Action for installing dotsecenv in CI.                        |
 | `.goreleaser.yaml`  | Release pipeline (signs, attests, packages deb/rpm/archlinux).                 |
@@ -97,7 +97,7 @@ area triggers only that workflow:
   (egress blocked) **and** under `unshare --net` with `strace` tracing every
   `connect()` syscall. Any external network call fails the job. Don't break
   this — the proof of hermeticity is the test. PR-only, scoped to Go paths.
-- **`post-release-action.yml`** — POST-release smoke. Reusable workflow
+- **`e2e-action-post-release.yml`** — POST-release smoke. Reusable workflow
   (`workflow_call`) that exercises the released action ref
   (`dotsecenv/dotsecenv@v0`) against a released binary. Invoked from
   `release.yml` after the release is public; `workflow_dispatch`-able for
@@ -107,7 +107,7 @@ area triggers only that workflow:
   the PR's SHA — this workflow only makes sense after a release exists.
 - **`lint-workflows.yml`** — runs `actionlint` on changes under
   `.github/workflows/**`. The only PR-time validation for `release.yml`
-  and `post-release-action.yml`, which are otherwise tag-triggered /
+  and `e2e-action-post-release.yml`, which are otherwise tag-triggered /
   `workflow_call`-only and never fire pre-merge.
 - **`release.yml`** — full release pipeline (tag-triggered; no
   `workflow_dispatch` — releasing is reserved for signed semver tags).

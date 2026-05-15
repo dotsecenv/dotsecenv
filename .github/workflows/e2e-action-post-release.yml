@@ -1,4 +1,4 @@
-name: Post-release Action Smoke
+name: E2E Action (post-release)
 
 # POST-RELEASE smoke test for the published GitHub Action. Not a PR-time
 # check — `ci.yml` already exercises the action against `./` + the PR's
@@ -8,7 +8,7 @@ name: Post-release Action Smoke
 # release has been published.
 #
 # Invocation:
-#   - `workflow_call` from release.yml's `post-release-action` job, run
+#   - `workflow_call` from release.yml's `e2e-action-post-release` job, run
 #     synchronously after the release goes public so failures land in
 #     the release run's graph.
 #   - `workflow_dispatch` for ad-hoc reruns against an arbitrary version
@@ -85,7 +85,7 @@ jobs:
           EOF
           gpg --batch --gen-key /tmp/gpg-key-params
           FINGERPRINT=$(gpg --list-keys --with-colons test4@dotsecenv.com | grep '^fpr' | head -1 | cut -d: -f10)
-          echo "fingerprint=$FINGERPRINT" >> $GITHUB_OUTPUT
+          echo "fingerprint=$FINGERPRINT" >> "$GITHUB_OUTPUT"
       - uses: dotsecenv/dotsecenv@v0
         with:
           version: ${{ inputs.version || 'latest' }}
