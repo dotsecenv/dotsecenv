@@ -2,8 +2,14 @@ name: GitHub Action E2E
 
 # Reusable workflow: release.yml calls this synchronously after the
 # release is published so the 5 matrix jobs land in the release run's
-# dependency graph (and `release-complete`) without dispatch+poll
-# machinery. Also `workflow_dispatch`-able for ad-hoc reruns.
+# dependency graph without dispatch+poll machinery. Also
+# `workflow_dispatch`-able for ad-hoc reruns.
+#
+# The pull_request trigger gives PR-time functional validation when
+# this workflow file itself is edited (otherwise it'd only be lint-
+# checked by lint-workflows.yml and surface real failures at release
+# time). It runs against `dotsecenv/dotsecenv@v0` + `version: 'latest'`,
+# both external/fixed, so it doesn't need an in-PR release to exercise.
 
 on:
   workflow_call:
@@ -20,6 +26,10 @@ on:
         type: string
         required: false
         default: ""
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/e2e-action.yml"
 
 jobs:
   test-released-action:

@@ -30,6 +30,12 @@ jobs:
   # same goreleaser snapshot that the `goreleaser` job below runs for
   # real. Failing early on ci-release would just duplicate the failure
   # we'd see in `goreleaser` itself.
+  #
+  # e2e-action.yml is also NOT in this matrix: release.yml invokes it
+  # directly via workflow_call (the `e2e-action` job below). Waiting on
+  # an existing PR-time run would be against `version: 'latest'` (i.e.
+  # the previous release), not the version we're about to publish —
+  # the workflow_call invocation tests the right thing.
   wait-ci:
     name: Wait for CI on tagged commit
     runs-on: ubuntu-latest
