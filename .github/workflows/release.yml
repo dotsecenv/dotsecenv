@@ -332,8 +332,47 @@ jobs:
           git commit -m "fix: update Darwin checksums for ${VERSION} (post-notarization)" || echo "No changes to commit"
           git push
 
+  # Inline status awareness for the homebrew tap: actually run `brew install`
+  # against the just-pushed cask. If install fails, the release graph fails
+  # red. Replaces the silent fire-and-forget that lets a broken cask ship to
+  # users who happen to `brew install dotsecenv` between the push and the
+  # next release.
+  verify-homebrew-install:
+    needs: update-homebrew-tap
+    runs-on: macos-latest
+    permissions: {}
+    steps:
+      - name: brew tap and install
+        run: |
+          set -euxo pipefail
+          # Ensure the latest cask is fetched (no stale cache from a previous run)
+          brew untap dotsecenv/tap 2>/dev/null || true
+          brew tap dotsecenv/tap
+          # Match the install command users actually run; brew auto-resolves to
+          # the cask in dotsecenv/tap.
+          brew install dotsecenv
+
+      - name: Verify version matches release tag
+        run: |
+          set -euxo pipefail
+          installed="$(dotsecenv version | head -1)"
+          echo "Installed: $installed"
+          expected="${{ github.ref_name }}"
+          # `dotsecenv version` is expected to print the version somewhere on the
+          # first line; require the tag (without leading 'v') to appear in it.
+          case "$installed" in
+            *${expected#v}*) ;;
+            *)
+              echo "::error::Installed version '$installed' does not contain expected tag '${expected#v}'"
+              exit 1
+              ;;
+          esac
+
+      - name: Smoke a basic command
+        run: dotsecenv help > /dev/null
+
   trigger-repo-update:
-    needs: [goreleaser, update-checksums, update-homebrew-tap]
+    needs: [goreleaser, update-checksums, update-homebrew-tap, verify-homebrew-install]
     runs-on: ubuntu-latest
     # Exposed so wait-packages-publish can watch the just-dispatched run
     # without re-doing the discovery work.
