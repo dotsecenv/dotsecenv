@@ -340,6 +340,8 @@ jobs:
     outputs:
       packages_run_id: ${{ steps.find_packages.outputs.run_id }}
       packages_run_url: ${{ steps.find_packages.outputs.run_url }}
+      action_e2e_run_id: ${{ steps.find_action_e2e.outputs.run_id }}
+      action_e2e_run_url: ${{ steps.find_action_e2e.outputs.run_url }}
     steps:
       - uses: actions/checkout@v6
 
@@ -379,8 +381,18 @@ jobs:
         id: find_packages
         env:
           SATELLITE_REPO: dotsecenv/packages
+          WORKFLOW_FILE: publish.yml
           SINCE: ${{ steps.timestamp.outputs.dispatch_time }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/find-satellite-run.sh
+
+      - name: Find dispatched action-e2e run and surface link
+        id: find_action_e2e
+        env:
+          SATELLITE_REPO: dotsecenv/dotsecenv
+          WORKFLOW_FILE: action-e2e.yml
+          SINCE: ${{ steps.timestamp.outputs.dispatch_time }}
+          GH_TOKEN: ${{ github.token }}
         run: scripts/release/find-satellite-run.sh
 
   # Poll the dispatched packages run to completion. The link to the
@@ -410,6 +422,26 @@ jobs:
           SATELLITE_REPO: dotsecenv/packages
           RUN_ID: ${{ needs.trigger-repo-update.outputs.packages_run_id }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/watch-satellite-run.sh
+
+  # Same shape as wait-packages-publish, for the action-e2e workflow
+  # this repo dispatches to itself via `trigger-action-e2e`. Pulls the
+  # status of those 5 matrix jobs into the release run's graph instead
+  # of leaving them fire-and-forget.
+  wait-action-e2e:
+    needs: trigger-repo-update
+    if: needs.trigger-repo-update.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Watch dotsecenv/dotsecenv action-e2e run
+        env:
+          SATELLITE_REPO: dotsecenv/dotsecenv
+          RUN_ID: ${{ needs.trigger-repo-update.outputs.action_e2e_run_id }}
+          GH_TOKEN: ${{ github.token }}
         run: scripts/release/watch-satellite-run.sh
 
   # ---------------------------------------------------------------------------

@@ -2,29 +2,57 @@ name: CI
 
 # Pipeline shape (DAG):
 #
-#   test  ──►  e2e  ──►  e2e-terraform  ──┬──►  docs  ──►  release-test (PR only)
-#                                         │
-#                                         ├──►  action
-#                                         │     (matrix os)
-#                                         │
-#                                         └──►  action-init-config
-#                                               (matrix os)
+#   test ─► e2e ─┬─► e2e-install ─────────┬─► action ─────────┬─► docs ─► release-test (PR only)
+#                │                        │                   │
+#                └─► e2e-terraform ───────┴─► action-init-config
 #
-# Each step gates on the previous one(s) succeeding. action and
-# action-init-config run in parallel after e2e-terraform; docs then waits
-# on both. release-test only runs on PRs and is the last gate.
+# Scoped to Go-related changes via `paths:` allowlist below — touches to
+# website/, plugin/, docs-only files, etc. don't fire this pipeline.
+# Plugin and website have their own ci-plugin.yml / ci-website.yml.
 
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "plugin/**"
-      - "website/**"
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "vendor/**"
+      - "Makefile"
+      - "cmd/**"
+      - "pkg/**"
+      - "internal/**"
+      - "scripts/**"
+      - "contrib/**"
+      - "examples/**"
+      - "recipes/**"
+      - "demos/**"
+      - "action.yml"
+      - ".goreleaser.yaml"
+      - ".golangci.yaml"
+      - "tools.go"
+      - ".github/workflows/ci.yml"
   pull_request:
     branches: [main]
-    paths-ignore:
-      - "plugin/**"
-      - "website/**"
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "vendor/**"
+      - "Makefile"
+      - "cmd/**"
+      - "pkg/**"
+      - "internal/**"
+      - "scripts/**"
+      - "contrib/**"
+      - "examples/**"
+      - "recipes/**"
+      - "demos/**"
+      - "action.yml"
+      - ".goreleaser.yaml"
+      - ".golangci.yaml"
+      - "tools.go"
+      - ".github/workflows/ci.yml"
 
 jobs:
   test:
@@ -78,6 +106,23 @@ jobs:
 
       - run: make build e2e
 
+  # Folded in from the former contrib-e2e.yml — exercises scripts/install.sh
+  # against real GitHub releases. Sibling of e2e-terraform after e2e.
+  e2e-install:
+    name: Install Script E2E (${{ matrix.os }})
+    needs: e2e
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run install.sh E2E tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: make e2e-install
+
   e2e-terraform:
     name: E2E Terraform Credentials Helper (${{ matrix.os }})
     needs: e2e
@@ -101,7 +146,7 @@ jobs:
 
   action:
     name: Test Action (${{ matrix.os }})
-    needs: e2e-terraform
+    needs: [e2e-install, e2e-terraform]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -118,7 +163,7 @@ jobs:
 
   action-init-config:
     name: Test Action with init config (${{ matrix.os }})
-    needs: e2e-terraform
+    needs: [e2e-install, e2e-terraform]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
