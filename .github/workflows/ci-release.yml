@@ -1,0 +1,48 @@
+name: CI Release
+
+# Validates the release pipeline by running a GoReleaser snapshot build.
+# Path-scoped to release-pipeline CONFIG only — not to Go source. The
+# reasoning: Go build failures are already caught by ci.yml's `test` and
+# `e2e` jobs (both invoke `make build`); what release-test uniquely
+# validates is the goreleaser configuration itself (archives, packages,
+# signing layout, etc.). Triggering this expensive job on every Go
+# change paid for re-validation of a config that didn't change.
+#
+# Run manually before merging changes to .goreleaser.yaml or to the
+# release.yml workflow if you want belt-and-suspenders validation; this
+# workflow's path filter also fires automatically on those files.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".goreleaser.yaml"
+      - "Makefile"
+      - "tools.go"
+      - ".github/workflows/ci-release.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".goreleaser.yaml"
+      - "Makefile"
+      - "tools.go"
+      - ".github/workflows/ci-release.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  release-test:
+    name: Snapshot Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+          cache-dependency-path: "go.sum"
+
+      - run: make release-test

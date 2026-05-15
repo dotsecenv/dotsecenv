@@ -33,7 +33,7 @@ end-to-end test harness verified by network-namespace + strace in CI.
 | `skills/`           | Claude Code skills (`secenv/SKILL.md`, `secrets/SKILL.md`).                    |
 | `.claude-plugin/`   | Claude Code plugin manifest (`plugin.json`, `marketplace.json`).               |
 | `scripts/`          | `install.sh`, `e2e.sh`, `e2e-install.sh`, `e2e-terraform.sh`, `sandbox.sh`, `notarize-macos.sh`, `generate_release_key.sh`. |
-| `.github/workflows/` | CI: `ci.yml`, `hermetic-e2e.yml`, `contrib-e2e.yml`, `action-e2e.yml`, `release.yml`. |
+| `.github/workflows/` | CI + release: `ci.yml` (Go DAG), `ci-plugin.yml`, `ci-website.yml`, `ci-release.yml` (goreleaser snapshot), `e2e-hermetic.yml`, `e2e-install.yml`, `e2e-action.yml` (reusable), `release.yml`, `deploy-website.yml`. |
 | `vendor/`           | Vendored Go dependencies (used by `make build` for hermetic builds).           |
 | `action.yml`        | Composite GitHub Action for installing dotsecenv in CI.                        |
 | `.goreleaser.yaml`  | Release pipeline (signs, attests, packages deb/rpm/archlinux).                 |
@@ -64,7 +64,7 @@ make hooks           # installs lefthook git hooks
 | End-to-end tests (CLI)        | `make build e2e` — `bin/dotsecenv` must exist; runs `scripts/e2e.sh` in an isolated `mktemp -d` HOME with its own GPG, XDG, and PATH. |
 | E2E for Terraform helper      | `make build e2e-terraform`                                     |
 | E2E for `install.sh` (network needed) | `make e2e-install`                                             |
-| Snapshot release build        | `make release-test` (skips sign, publish, nfpm)                |
+| Snapshot release build        | `make release-test` (skips sign, publish, nfpm). Run before merging changes to `.goreleaser.yaml`, `Makefile` release targets, or `tools.go` version pins. CI auto-runs it via `ci-release.yml` when those paths change. |
 | Generate completions/docs/man | `make completions`, `make docs`, `make man`                    |
 | Interactive sandbox shell     | `make sandbox`                                                 |
 | Run everything                | `make all`                                                     |
@@ -74,20 +74,34 @@ expect that to run before push.
 
 ### What CI actually runs
 
-`.github/workflows/ci.yml` runs on `ubuntu-latest` and `macos-latest`:
+Each workflow is path-scoped to its own area. A change touching only one
+area triggers only that workflow:
 
-- `make clean lint build test`
-- `make build e2e`
-- `make build e2e-terraform`
-- `make build completions docs man`
-- The composite action against itself (with and without `init-config`)
-- `make release-test` (PRs only)
-
-`.github/workflows/hermetic-e2e.yml` re-runs `make e2e` under
-`step-security/harden-runner` (egress blocked) **and** under
-`unshare --net` with `strace` tracing every `connect()` syscall. Any external
-network call fails the job. Don't break this — the proof of hermeticity is the
-test.
+- **`ci.yml`** — Go DAG on `ubuntu-latest` + `macos-latest`. Triggers on
+  Go source, `Makefile`, `action.yml`, `.goreleaser.yaml`, `.golangci.yaml`,
+  `tools.go`. Runs (in order): `make clean lint build test` → `make build e2e`
+  → `make build e2e-terraform` → composite action self-test (default-args
+  and init-config variants, both `build-from-source: true`) → `make build
+  completions docs man`. Note: `make release-test` is no longer in this
+  pipeline — see `ci-release.yml` below.
+- **`ci-release.yml`** — `make release-test` (goreleaser snapshot, skips
+  sign/publish/nfpm). Triggers only on `.goreleaser.yaml`, `Makefile`,
+  `tools.go`, or the workflow file. Run `make release-test` locally
+  before merging PRs that touch any of those.
+- **`ci-plugin.yml`** — shell tests under `plugin/`, scoped to `plugin/**`.
+- **`ci-website.yml`** — Astro build under `website/`, scoped to `website/**`.
+- **`e2e-install.yml`** — exercises `scripts/install.sh` against real GH
+  releases. Scoped to `scripts/install.sh` + `scripts/e2e-install.sh`.
+  Independent of Go (`install.sh` fetches its own binary).
+- **`e2e-hermetic.yml`** — re-runs `make e2e` under `step-security/harden-runner`
+  (egress blocked) **and** under `unshare --net` with `strace` tracing every
+  `connect()` syscall. Any external network call fails the job. Don't break
+  this — the proof of hermeticity is the test. PR-only, scoped to Go paths.
+- **`e2e-action.yml`** — reusable workflow (`workflow_call`) that exercises
+  the released action ref against a released binary. Invoked from `release.yml`
+  after the release is public; also `workflow_dispatch`-able for ad-hoc runs.
+- **`release.yml`** — full release pipeline (tag-triggered). See its
+  top-of-file DAG comment for stage layout.
 
 ## Conventions
 
@@ -164,7 +178,7 @@ making changes that look like they might violate them.
   `cmd/dotsecenv/security_test.go` lock these in — if your change requires
   changing those tests, surface that explicitly in the PR.
 - **Don't alter the hermetic E2E harness so it can reach the network.** The
-  whole point is the strace assertion in `.github/workflows/hermetic-e2e.yml`
+  whole point is the strace assertion in `.github/workflows/e2e-hermetic.yml`
   proving zero external `connect()` calls.
 - **Don't run any of the destructive Tier 3 commands from the
   `dotsecenv:secrets` skill (`secret store`, `secret share`, `secret revoke`,
