@@ -38,7 +38,7 @@
     "eslint-plugin-mdx": "^3.6.2",
     "markdownlint-cli": "^0.48.0",
     "starlight-contextual-menu": "^0.1.5",
-    "starlight-llms-txt": "^0.8.1",
+    "starlight-llms-txt": "^0.10.0",
     "starlight-markdown": "^0.1.5",
     "typescript-eslint": "^8.57.2"
   }
