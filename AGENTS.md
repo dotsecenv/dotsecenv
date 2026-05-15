@@ -33,7 +33,7 @@ end-to-end test harness verified by network-namespace + strace in CI.
 | `skills/`           | Claude Code skills (`secenv/SKILL.md`, `secrets/SKILL.md`).                    |
 | `.claude-plugin/`   | Claude Code plugin manifest (`plugin.json`, `marketplace.json`).               |
 | `scripts/`          | `install.sh`, `e2e.sh`, `e2e-install.sh`, `e2e-terraform.sh`, `sandbox.sh`, `notarize-macos.sh`, `generate_release_key.sh`. |
-| `.github/workflows/` | CI + release: `ci.yml` (Go DAG), `ci-plugin.yml`, `ci-website.yml`, `ci-release.yml` (goreleaser snapshot), `e2e-hermetic.yml`, `e2e-install.yml`, `e2e-action.yml` (reusable), `release.yml`, `deploy-website.yml`. |
+| `.github/workflows/` | CI + release: `ci.yml` (Go DAG), `ci-plugin.yml`, `ci-website.yml`, `ci-release.yml` (goreleaser snapshot), `e2e-hermetic.yml`, `e2e-install.yml`, `e2e-action.yml` (reusable), `lint-workflows.yml` (actionlint), `release.yml`, `deploy-website.yml`. |
 | `vendor/`           | Vendored Go dependencies (used by `make build` for hermetic builds).           |
 | `action.yml`        | Composite GitHub Action for installing dotsecenv in CI.                        |
 | `.goreleaser.yaml`  | Release pipeline (signs, attests, packages deb/rpm/archlinux).                 |
@@ -100,8 +100,17 @@ area triggers only that workflow:
 - **`e2e-action.yml`** — reusable workflow (`workflow_call`) that exercises
   the released action ref against a released binary. Invoked from `release.yml`
   after the release is public; also `workflow_dispatch`-able for ad-hoc runs.
-- **`release.yml`** — full release pipeline (tag-triggered). See its
-  top-of-file DAG comment for stage layout.
+- **`lint-workflows.yml`** — runs `actionlint` on changes under
+  `.github/workflows/**`. The only PR-time validation for `release.yml` and
+  `e2e-action.yml`, which are otherwise tag-triggered / `workflow_call`-only
+  and never fire pre-merge.
+- **`release.yml`** — full release pipeline (tag-triggered). Its `wait-ci`
+  job blocks `goreleaser` until each path-scoped CI workflow (ci.yml,
+  e2e-install.yml, ci-plugin.yml, ci-website.yml, lint-workflows.yml) has
+  passed on the tagged SHA — or warns-and-proceeds if a workflow's path
+  filter excluded the commit. `ci-release.yml` is intentionally omitted
+  from the gate (its goreleaser snapshot duplicates the `goreleaser` job
+  about to run). See the workflow's top-of-file DAG comment for stage layout.
 
 ## Conventions
 

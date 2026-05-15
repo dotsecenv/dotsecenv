@@ -42,7 +42,14 @@ on:
       - ".goreleaser.yaml"
       - ".golangci.yaml"
       - "tools.go"
-      - ".github/workflows/ci.yml"
+      # Any workflow change should re-run the canonical Go DAG —
+      # workflow edits can break callsites or assumptions that the Go
+      # tests would otherwise miss. Excludes plugin/website workflows
+      # (orthogonal scopes; they self-trigger).
+      - ".github/workflows/**"
+      - "!.github/workflows/ci-plugin.yml"
+      - "!.github/workflows/ci-website.yml"
+      - "!.github/workflows/deploy-website.yml"
   pull_request:
     branches: [main]
     paths:
@@ -65,7 +72,14 @@ on:
       - ".goreleaser.yaml"
       - ".golangci.yaml"
       - "tools.go"
-      - ".github/workflows/ci.yml"
+      # Any workflow change should re-run the canonical Go DAG —
+      # workflow edits can break callsites or assumptions that the Go
+      # tests would otherwise miss. Excludes plugin/website workflows
+      # (orthogonal scopes; they self-trigger).
+      - ".github/workflows/**"
+      - "!.github/workflows/ci-plugin.yml"
+      - "!.github/workflows/ci-website.yml"
+      - "!.github/workflows/deploy-website.yml"
 
 jobs:
   test:

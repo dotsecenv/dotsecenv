@@ -18,38 +18,51 @@ jobs:
   e2e-hermetic:
     uses: ./.github/workflows/e2e-hermetic.yml
 
-  # Gate the release on ci.yml's existing pass on this commit. ci.yml
-  # runs on push to main, so the tagged SHA already has a CI run — we
-  # don't re-run, we wait for it. Branch protection should enforce
-  # required-status-checks at merge time; this is the runtime defense
-  # for the bypass-and-tag path.
+  # Gate the release on each path-scoped CI workflow's pass on this
+  # commit. These workflows run on push to main, so the tagged SHA
+  # already has runs for whichever workflows' path filters matched.
+  # We don't re-run; we wait for existing runs. If a workflow's path
+  # filter excluded this SHA, no run exists — we warn and proceed
+  # (branch protection + the prior commit's CI is the upstream
+  # guarantee in that case).
+  #
+  # ci-release.yml is intentionally NOT in this matrix: it runs the
+  # same goreleaser snapshot that the `goreleaser` job below runs for
+  # real. Failing early on ci-release would just duplicate the failure
+  # we'd see in `goreleaser` itself.
   wait-ci:
     name: Wait for CI on tagged commit
     runs-on: ubuntu-latest
     permissions:
       actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        workflow:
+          - ci.yml
+          - e2e-install.yml
+          - ci-plugin.yml
+          - ci-website.yml
+          - lint-workflows.yml
     steps:
-      - name: Find and watch ci.yml run on ${{ github.sha }}
+      - name: Find and watch ${{ matrix.workflow }} on ${{ github.sha }}
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
+          WORKFLOW: ${{ matrix.workflow }}
         run: |
           set -euo pipefail
           RUN_ID=$(gh api \
-            "repos/${REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=1" \
+            "repos/${REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${SHA}&per_page=1" \
             --jq '.workflow_runs[0].id // empty')
 
           if [ -z "$RUN_ID" ]; then
-            # No ci.yml run on this SHA — typically because the tagged
-            # commit didn't match ci.yml's paths allowlist (e.g. a
-            # docs-only release commit). Branch protection / the previous
-            # Go-touching commit is the upstream guarantee.
-            echo "::warning::No ci.yml run found for ${SHA} — path filter likely excluded this commit. Proceeding."
+            echo "::warning::No ${WORKFLOW} run found for ${SHA} — path filter likely excluded this commit. Proceeding."
             exit 0
           fi
 
-          echo "Watching ci.yml run ${RUN_ID}..."
+          echo "Watching ${WORKFLOW} run ${RUN_ID}..."
           gh run watch "$RUN_ID" --exit-status --repo "$REPO"
 
   goreleaser:
