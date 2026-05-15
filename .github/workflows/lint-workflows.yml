@@ -7,6 +7,7 @@ name: Lint workflows
 # tag-triggered or workflow_call-only and otherwise never fire pre-merge.
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:

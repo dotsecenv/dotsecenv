@@ -13,6 +13,7 @@ name: CI Release
 # workflow's path filter also fires automatically on those files.
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:

@@ -104,13 +104,35 @@ area triggers only that workflow:
   `.github/workflows/**`. The only PR-time validation for `release.yml` and
   `e2e-action.yml`, which are otherwise tag-triggered / `workflow_call`-only
   and never fire pre-merge.
-- **`release.yml`** — full release pipeline (tag-triggered). Its `wait-ci`
+- **`release.yml`** — full release pipeline (tag-triggered; no
+  `workflow_dispatch` — releasing is reserved for signed semver tags).
+  Its `wait-ci`
   job blocks `goreleaser` until each path-scoped CI workflow (ci.yml,
   e2e-install.yml, ci-plugin.yml, ci-website.yml, lint-workflows.yml) has
   passed on the tagged SHA — or warns-and-proceeds if a workflow's path
   filter excluded the commit. `ci-release.yml` is intentionally omitted
   from the gate (its goreleaser snapshot duplicates the `goreleaser` job
   about to run). See the workflow's top-of-file DAG comment for stage layout.
+
+### Force-running CI
+
+Every CI workflow except `release.yml` has a `workflow_dispatch:` trigger,
+so you can run any of them manually against any branch — path filters are
+bypassed for manual dispatches:
+
+```bash
+gh workflow run ci.yml --ref my-branch
+gh workflow run e2e-hermetic.yml --ref my-branch
+gh workflow run ci-release.yml --ref my-branch
+# etc.
+```
+
+To re-run an existing run (without re-pushing), use `gh run rerun <id>`
+or the "Re-run all jobs" button in the GitHub UI.
+
+`release.yml` is intentionally NOT dispatchable — releasing is reserved
+for signed semver tags pushed via `rt git::release`. To rerun a release
+that failed mid-pipeline, fix forward with a patch tag.
 
 ## Conventions
 
