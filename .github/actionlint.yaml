@@ -1,0 +1,20 @@
+# Config for actionlint (rhysd/actionlint). See:
+# https://github.com/rhysd/actionlint/blob/main/docs/config.md
+
+self-hosted-runner:
+  labels: []
+
+# Allow any GHA configuration variable — we use `vars.RELEASE_APP_CLIENT_ID`,
+# `vars.ENABLE_WINDOWS_CI`, etc. without declaring an exhaustive allowlist.
+config-variables: null
+
+paths:
+  .github/workflows/release.yml:
+    # actionlint's cached action.yml for actions/create-github-app-token@v3
+    # predates v3's `client-id` input (and treats `app-id` as still required).
+    # The action HAS supported `client-id` since the v3.x.y line was tagged.
+    # Suppress both stale-cache warnings; remove once actionlint refreshes
+    # the bundled action.yml.
+    ignore:
+      - 'input "client-id" is not defined in action "actions/create-github-app-token@v3"'
+      - 'missing input "app-id" which is required by action "actions/create-github-app-token@v3"'

@@ -102,7 +102,9 @@ jobs:
   test-windows:
     name: Build, Test (windows-latest)
     runs-on: windows-latest
-    if: false # Windows support is WIP https://github.com/dotsecenv/dotsecenv/issues/8
+    # WIP — set repo var `ENABLE_WINDOWS_CI=true` to opt in.
+    # https://github.com/dotsecenv/dotsecenv/issues/8
+    if: ${{ vars.ENABLE_WINDOWS_CI == 'true' }}
     steps:
       - uses: actions/checkout@v6
 
