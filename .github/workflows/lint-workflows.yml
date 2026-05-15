@@ -3,8 +3,9 @@ name: Lint workflows
 # actionlint catches workflow syntax errors, broken `uses:` refs (local
 # or remote), dangling `needs:`, undeclared inputs, invalid expressions,
 # bad shell, and many other issues at PR-time. This is the only check
-# that validates release.yml and e2e-action.yml on PR — both are
-# tag-triggered or workflow_call-only and otherwise never fire pre-merge.
+# that validates release.yml and post-release-action.yml on PR — both
+# are tag-triggered or workflow_call-only and otherwise never fire
+# pre-merge.
 
 on:
   workflow_dispatch:
