@@ -1,0 +1,42 @@
+name: E2E Install
+
+# Exercises scripts/install.sh (the user-facing installer) against real
+# GitHub releases. scripts/e2e-install.sh sources install.sh and tests
+# the download + checksum + extract path against actual published
+# release assets — it never builds or runs the local Go binary, so this
+# is genuinely decoupled from ci.yml's Go pipeline.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/install.sh"
+      - "scripts/e2e-install.sh"
+      - "Makefile"
+      - ".github/workflows/e2e-install.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/install.sh"
+      - "scripts/e2e-install.sh"
+      - "Makefile"
+      - ".github/workflows/e2e-install.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-install:
+    name: Install Script E2E (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run install.sh E2E tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: make e2e-install

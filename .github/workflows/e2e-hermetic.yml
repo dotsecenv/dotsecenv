@@ -1,8 +1,24 @@
 name: Hermetic E2E
 
 on:
+  workflow_dispatch:
+  # Invoked by release.yml as a reusable workflow so the release pipeline
+  # gets the same hermeticity verification (harden-runner + strace) that
+  # PRs do, without duplicating job definitions across workflows.
+  workflow_call:
   pull_request:
     branches: [main]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "vendor/**"
+      - "Makefile"
+      - "cmd/**"
+      - "pkg/**"
+      - "internal/**"
+      - "scripts/e2e.sh"
+      - ".github/workflows/e2e-hermetic.yml"
 
 permissions:
   contents: read
@@ -81,7 +97,7 @@ jobs:
           cat /tmp/network-syscalls.log || true
 
           # Check for any connect() calls to non-loopback addresses
-          EXTERNAL=$(grep -E "connect\(" /tmp/network-syscalls.log 2>/dev/null | grep -v "127.0.0.1" | grep -v "::1" | grep -v "AF_UNIX" | wc -l || echo 0)
+          EXTERNAL=$(grep -E "connect\(" /tmp/network-syscalls.log 2>/dev/null | grep -cvE "127.0.0.1|::1|AF_UNIX" || echo 0)
           echo "External connect() calls: $EXTERNAL"
 
           if [ "$EXTERNAL" -gt 0 ]; then

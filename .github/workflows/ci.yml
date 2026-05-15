@@ -2,29 +2,85 @@ name: CI
 
 # Pipeline shape (DAG):
 #
-#   test  ──►  e2e  ──►  e2e-terraform  ──┬──►  docs  ──►  release-test (PR only)
-#                                         │
-#                                         ├──►  action
-#                                         │     (matrix os)
-#                                         │
-#                                         └──►  action-init-config
-#                                               (matrix os)
+#   test ─► e2e ─► e2e-terraform ─┬─► e2e-action-default-args ─┬─► build-docs
+#                                 └─► e2e-action-init-config
 #
-# Each step gates on the previous one(s) succeeding. action and
-# action-init-config run in parallel after e2e-terraform; docs then waits
-# on both. release-test only runs on PRs and is the last gate.
+# Scoped to Go-related changes via `paths:` allowlist below — touches to
+# website/, plugin/, docs-only files, etc. don't fire this pipeline.
+# scripts/install.sh is excluded because e2e-install.yml owns that path
+# independently (install.sh fetches its binary from GH releases — no
+# local Go build needed).
+#
+# Sibling workflows, all path-scoped to their own area:
+#   ci-plugin.yml    — plugin/ shell tests
+#   ci-website.yml   — website/ Astro build
+#   ci-release.yml   — `make release-test` snapshot, on goreleaser-config changes
+#   e2e-install.yml  — scripts/install.sh smoke
+#   e2e-hermetic.yml — hermetic-mode e2e on PR
+#   e2e-action-post-release.yml — post-release smoke for the released action ref
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
-    paths-ignore:
-      - "plugin/**"
-      - "website/**"
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "vendor/**"
+      - "Makefile"
+      - "cmd/**"
+      - "pkg/**"
+      - "internal/**"
+      - "scripts/**"
+      - "!scripts/install.sh"
+      - "!scripts/e2e-install.sh"
+      - "contrib/**"
+      - "examples/**"
+      - "recipes/**"
+      - "demos/**"
+      - "action.yml"
+      - ".goreleaser.yaml"
+      - ".golangci.yaml"
+      - "tools.go"
+      # Any workflow change should re-run the canonical Go DAG —
+      # workflow edits can break callsites or assumptions that the Go
+      # tests would otherwise miss. Excludes plugin/website workflows
+      # (orthogonal scopes; they self-trigger).
+      - ".github/workflows/**"
+      - "!.github/workflows/ci-plugin.yml"
+      - "!.github/workflows/ci-website.yml"
+      - "!.github/workflows/deploy-website.yml"
   pull_request:
     branches: [main]
-    paths-ignore:
-      - "plugin/**"
-      - "website/**"
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "vendor/**"
+      - "Makefile"
+      - "cmd/**"
+      - "pkg/**"
+      - "internal/**"
+      - "scripts/**"
+      - "!scripts/install.sh"
+      - "!scripts/e2e-install.sh"
+      - "contrib/**"
+      - "examples/**"
+      - "recipes/**"
+      - "demos/**"
+      - "action.yml"
+      - ".goreleaser.yaml"
+      - ".golangci.yaml"
+      - "tools.go"
+      # Any workflow change should re-run the canonical Go DAG —
+      # workflow edits can break callsites or assumptions that the Go
+      # tests would otherwise miss. Excludes plugin/website workflows
+      # (orthogonal scopes; they self-trigger).
+      - ".github/workflows/**"
+      - "!.github/workflows/ci-plugin.yml"
+      - "!.github/workflows/ci-website.yml"
+      - "!.github/workflows/deploy-website.yml"
 
 jobs:
   test:
@@ -46,7 +102,9 @@ jobs:
   test-windows:
     name: Build, Test (windows-latest)
     runs-on: windows-latest
-    if: false # Windows support is WIP https://github.com/dotsecenv/dotsecenv/issues/8
+    # WIP — set repo var `ENABLE_WINDOWS_CI=true` to opt in.
+    # https://github.com/dotsecenv/dotsecenv/issues/8
+    if: ${{ vars.ENABLE_WINDOWS_CI == 'true' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -99,8 +157,8 @@ jobs:
 
       - run: make build e2e-terraform
 
-  action:
-    name: Test Action (${{ matrix.os }})
+  e2e-action-default-args:
+    name: E2E Action default-args (${{ matrix.os }})
     needs: e2e-terraform
     runs-on: ${{ matrix.os }}
     strategy:
@@ -116,8 +174,8 @@ jobs:
 
       - run: dotsecenv version
 
-  action-init-config:
-    name: Test Action with init config (${{ matrix.os }})
+  e2e-action-init-config:
+    name: E2E Action init-config (${{ matrix.os }})
     needs: e2e-terraform
     runs-on: ${{ matrix.os }}
     strategy:
@@ -134,9 +192,9 @@ jobs:
 
       - run: dotsecenv version
 
-  docs:
-    name: Generate Docs (${{ matrix.os }})
-    needs: [action, action-init-config]
+  build-docs:
+    name: Build Docs (${{ matrix.os }})
+    needs: [e2e-action-default-args, e2e-action-init-config]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -150,20 +208,3 @@ jobs:
           cache-dependency-path: "go.sum"
 
       - run: make build completions docs man
-
-  release-test:
-    name: Release Test
-    needs: docs
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: "go.mod"
-          cache-dependency-path: "go.sum"
-
-      - run: make release-test

@@ -1,14 +1,38 @@
-name: GitHub Action E2E
+name: E2E Action (post-release)
+
+# POST-RELEASE smoke test for the published GitHub Action. Not a PR-time
+# check — `ci.yml` already exercises the action against `./` + the PR's
+# SHA via `e2e-action-default-args` and `e2e-action-init-config`. This
+# workflow tests the RELEASED ref (`dotsecenv/dotsecenv@v0`) against a
+# RELEASED binary (`version: <tag>`), which only makes sense after a
+# release has been published.
+#
+# Invocation:
+#   - `workflow_call` from release.yml's `e2e-action-post-release` job, run
+#     synchronously after the release goes public so failures land in
+#     the release run's graph.
+#   - `workflow_dispatch` for ad-hoc reruns against an arbitrary version
+#     (defaults to 'latest' when no version is given).
 
 on:
-  repository_dispatch:
-    types: [trigger-action-e2e]
+  workflow_call:
+    inputs:
+      version:
+        description: "Released version to exercise (e.g. v0.1.5). Empty/omit => 'latest'."
+        type: string
+        required: false
+        default: ""
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Released version to exercise (e.g. v0.1.5). Empty => 'latest'."
+        type: string
+        required: false
+        default: ""
 
 jobs:
   test-released-action:
     name: Test Released Action (${{ matrix.os }})
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -16,11 +40,11 @@ jobs:
     steps:
       - uses: dotsecenv/dotsecenv@v0
         with:
-          version: ${{ github.event.client_payload.version || 'latest' }}
+          version: ${{ inputs.version || 'latest' }}
       - run: dotsecenv version
+
   test-build-action:
     name: Test Build-From-Source Action (${{ matrix.os }})
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -28,24 +52,22 @@ jobs:
     steps:
       - uses: dotsecenv/dotsecenv@v0
         with:
-          version: ${{ github.event.client_payload.version || 'latest' }}
+          version: ${{ inputs.version || 'latest' }}
           build-from-source: true
       - run: dotsecenv version
 
   test-init-config-defaults:
     name: Test init-config with defaults
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
     runs-on: ubuntu-latest
     steps:
       - uses: dotsecenv/dotsecenv@v0
         with:
-          version: ${{ github.event.client_payload.version || 'latest' }}
+          version: ${{ inputs.version || 'latest' }}
           init-config: ''
       - run: dotsecenv version
 
   test-init-config-login:
     name: Test init-config --login
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
     runs-on: ubuntu-latest
     steps:
       - name: Generate GPG key
@@ -63,21 +85,19 @@ jobs:
           EOF
           gpg --batch --gen-key /tmp/gpg-key-params
           FINGERPRINT=$(gpg --list-keys --with-colons test4@dotsecenv.com | grep '^fpr' | head -1 | cut -d: -f10)
-          echo "fingerprint=$FINGERPRINT" >> $GITHUB_OUTPUT
+          echo "fingerprint=$FINGERPRINT" >> "$GITHUB_OUTPUT"
       - uses: dotsecenv/dotsecenv@v0
         with:
-          version: ${{ github.event.client_payload.version || 'latest' }}
+          version: ${{ inputs.version || 'latest' }}
           init-config: '--login ${{ steps.gpg.outputs.fingerprint }}'
       - run: dotsecenv version
 
   test-init-config-gpg-program:
     name: Test init-config --gpg-program
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.client_payload.version, 'v0.')
     runs-on: ubuntu-latest
     steps:
       - uses: dotsecenv/dotsecenv@v0
         with:
-          version: ${{ github.event.client_payload.version || 'latest' }}
+          version: ${{ inputs.version || 'latest' }}
           init-config: '--gpg-program /usr/bin/gpg'
       - run: dotsecenv version
-
