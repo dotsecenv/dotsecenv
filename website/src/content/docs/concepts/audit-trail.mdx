@@ -1,0 +1,168 @@
+---
+title: Audit Trail
+description: Query the history of secret modifications recorded by the append-only vault format
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="Available in v0.4.0+">
+  The signed audit chain (signed `login`, signed entries, the `signed_by` field) was introduced in v0.4.0. Earlier vaults still append-only but lack the signed-login proof.
+</Aside>
+
+Every modification to a vault appends a new signed entry rather than mutating an existing one. The vault file itself is the audit log. This page describes what gets recorded, how to query it via the CLI, and the limits of what append-only can prove.
+
+## What's recorded
+
+Each entry in a vault is a JSONL line carrying signed metadata. The full schema is documented in [Vault Format](/concepts/vault-format/). The audit-relevant fields are:
+
+| Field          | Where it appears | Meaning                                                                 |
+|----------------|------------------|-------------------------------------------------------------------------|
+| `added_at`     | identity, secret, value | RFC 3339 timestamp asserted by the writer                          |
+| `signed_by`    | identity, secret, value | Fingerprint of the GPG key that signed this entry                  |
+| `available_to` | value entries           | Fingerprints whose keys can decrypt this specific value            |
+| `signature`    | identity, secret, value | Detached GPG signature over the entry hash                         |
+| `hash`         | identity, secret, value | SHA-256/SHA-512 of the entry's canonical form                      |
+
+Three operations write entries: `identity add` writes an identity entry; `secret store` writes a secret-definition entry the first time and a value entry every time; `secret share` and `secret revoke` write a new value entry with an updated `available_to`. `secret forget` writes a value entry with empty `available_to` and `deleted: true`.
+
+## What append-only can and cannot prove
+
+Each entry's signature covers `added_at`, `signed_by`, `available_to`, and the value, binding them together cryptographically. The timestamp is therefore signed and non-repudiable — a key holder cannot later deny writing an entry with that particular `added_at`. What the signature does *not* establish is when the entry actually landed in the shared vault: a key holder could sign with any `added_at` they choose.
+
+<Aside type="tip" title="Use git history for the strongest 'when'">
+Git commit timestamps are recorded by git, not by dotsecenv, so they corroborate (or contradict) the in-vault `added_at`. Vaults are designed to be committed to version control precisely so the commit timestamp and author become an independent record of when each entry landed in the shared repo.
+</Aside>
+
+Concretely:
+
+- **Detected:** an attacker who edits or deletes an existing entry in the vault file. Hash and signature verification fails on read, and `dotsecenv validate` flags it.
+- **Detected:** an attacker without a recipient's private key adding entries. They can't produce a valid signature.
+- **Bounded:** a legitimate key holder writing a fresh entry with a chosen `added_at`. The signature commits the signer to that timestamp but doesn't prove it matches when the entry actually landed in the shared repo. Cross-reference the git commit that introduced the line.
+
+## Three audit surfaces
+
+There are three CLI/git surfaces for querying the history. Pick the one that matches your question.
+
+### Current authorization snapshot
+
+To see who is currently authorized to decrypt each secret in each vault:
+
+```bash
+dotsecenv vault describe --json
+```
+
+Each secret entry includes an `available_to` array reflecting the most-recent value's recipient list. Deleted secrets and secrets without values omit `available_to`.
+
+```json
+[
+  {
+    "position": 1,
+    "vault": "~/.config/dotsecenv/vault",
+    "identities": [
+      { "uid": "Alice <alice@example.com>", "fingerprint": "ALICE_FP", "algorithm": "RSA", "algorithm_bits": 4096, "created_at": "2026-01-04T08:14:32Z" }
+    ],
+    "secrets": [
+      { "key": "DATABASE_PASSWORD", "available_to": ["ALICE_FP", "BOB_FP"] },
+      { "key": "OLD_TOKEN", "deleted": true }
+    ]
+  }
+]
+```
+
+### Per-secret value history
+
+To see every version of a single secret you can decrypt, with timestamps and authorship:
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD --all --json
+```
+
+The output is an array of value entries, ordered newest-first, each with:
+
+```json
+[
+  {
+    "added_at": "2026-04-12T10:22:01Z",
+    "value": "the-current-password",
+    "vault": "~/.config/dotsecenv/vault",
+    "available_to": ["ALICE_FP", "BOB_FP"],
+    "signed_by": "ALICE_FP"
+  },
+  {
+    "added_at": "2026-02-03T14:08:55Z",
+    "value": "the-previous-password",
+    "vault": "~/.config/dotsecenv/vault",
+    "available_to": ["ALICE_FP"],
+    "signed_by": "ALICE_FP"
+  }
+]
+```
+
+The `signed_by` and `available_to` fields are returned only with `--all`. Plain `secret get NAME --json` returns just the current value, vault path, and timestamp. Note that `--all` only surfaces values your key can decrypt; rotated secrets that were never encrypted to your fingerprint are skipped with a warning.
+
+### Real-world authorship and timeline
+
+`signed_by` tells you which key signed an entry; it does not tell you when the entry was committed to the shared repo or which git author landed it. For that, use git directly:
+
+```bash
+git log -p -- path/to/vault
+```
+
+Each commit shows the diff against the previous vault state. Combined with branch protection, signed commits, or required reviewers, this gives you a tamper-evident timeline that the in-vault `added_at` cannot.
+
+## Example queries
+
+### Who can decrypt each non-deleted secret right now?
+
+```bash
+dotsecenv vault describe --json \
+  | jq '.[].secrets[] | select(.deleted | not) | {key, available_to}'
+```
+
+### Who signed each version of a secret?
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD --all --json \
+  | jq '.[] | {added_at, signed_by, available_to}'
+```
+
+### Who could decrypt a secret as of a past commit?
+
+```bash
+git checkout <past-commit> -- path/to/vault
+dotsecenv vault describe --json | jq '.[].secrets[] | select(.key=="DATABASE_PASSWORD")'
+git checkout HEAD -- path/to/vault
+```
+
+### When did each commit to the vault land?
+
+```bash
+git log --format='%h  %ai  %an  %s' -- path/to/vault
+```
+
+### Find every commit that changed who can decrypt a secret
+
+```bash
+git log -p -- path/to/vault \
+  | grep -E '^\+\{"type":"value"' \
+  | jq -s '.[] | {added_at: .data.added_at, available_to: .data.available_to}'
+```
+
+This requires git's diff output to include the JSONL change line. Vault files are designed to produce stable per-line diffs.
+
+## SIEM and audit-system integration
+
+For continuous monitoring, the typical pattern is:
+
+1. Run `dotsecenv vault describe --json` and `dotsecenv secret get NAME --all --json` on a schedule (e.g., GitHub Actions on push).
+2. Diff the result against the previous run.
+3. Forward changes to your SIEM as structured events.
+
+The [GitHub Action guide](/guides/github-action/) shows the CI integration pattern; adapt the same pattern to your audit pipeline.
+
+## Related
+
+- [Vault Format](/concepts/vault-format/) — full JSONL entry schema
+- [Threat Model](/concepts/threat-model/) — what this audit trail does and does not protect against
+- [Revoke Access](/tutorials/revoke-access/) — how revocation interacts with history
+- [CLI Reference](/reference/) — full flag and output documentation

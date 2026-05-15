@@ -1,10 +1,30 @@
 name: CI
 
+# Pipeline shape (DAG):
+#
+#   test  ──►  e2e  ──►  e2e-terraform  ──┬──►  docs  ──►  release-test (PR only)
+#                                         │
+#                                         ├──►  action
+#                                         │     (matrix os)
+#                                         │
+#                                         └──►  action-init-config
+#                                               (matrix os)
+#
+# Each step gates on the previous one(s) succeeding. action and
+# action-init-config run in parallel after e2e-terraform; docs then waits
+# on both. release-test only runs on PRs and is the last gate.
+
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "plugin/**"
+      - "website/**"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "plugin/**"
+      - "website/**"
 
 jobs:
   test:
@@ -43,6 +63,7 @@ jobs:
 
   e2e:
     name: E2E Tests (${{ matrix.os }})
+    needs: test
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -59,6 +80,7 @@ jobs:
 
   e2e-terraform:
     name: E2E Terraform Credentials Helper (${{ matrix.os }})
+    needs: e2e
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -77,24 +99,9 @@ jobs:
 
       - run: make build e2e-terraform
 
-  docs:
-    name: Generate Docs (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: "go.mod"
-          cache-dependency-path: "go.sum"
-
-      - run: make build completions docs man
-
   action:
     name: Test Action (${{ matrix.os }})
+    needs: e2e-terraform
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -111,6 +118,7 @@ jobs:
 
   action-init-config:
     name: Test Action with init config (${{ matrix.os }})
+    needs: e2e-terraform
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -126,8 +134,26 @@ jobs:
 
       - run: dotsecenv version
 
+  docs:
+    name: Generate Docs (${{ matrix.os }})
+    needs: [action, action-init-config]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+          cache-dependency-path: "go.sum"
+
+      - run: make build completions docs man
+
   release-test:
     name: Release Test
+    needs: docs
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:

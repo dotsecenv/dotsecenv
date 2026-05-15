@@ -1,0 +1,199 @@
+---
+title: Team Vault Setup
+description: Initialize a vault encrypted to multiple team members from day one
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="Available in v0.4.0+">
+  This tutorial uses `dotsecenv identity create`, which was introduced in v0.4.0.
+</Aside>
+
+<Aside type="tip" title="Runnable example">
+A two-identity reference flow ships at [`examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/02-team-share-revoke) on the CLI repo. It uses isolated `GNUPGHOME` directories to model the "one key per machine" pattern this tutorial follows at scale.
+</Aside>
+
+## Goal
+
+You are the team lead. You want to initialize a vault that, from the very first secret, is encrypted for every member of your team. Each `secret store` call should produce ciphertext that any teammate can decrypt with their own GPG key, no follow-up `secret share` needed.
+
+<Aside type="tip">
+For a teammate's perspective on joining an existing vault, see [Team Onboarding](/tutorials/team-onboarding/). To bring a new member onto an already-running vault, see [Share a Secret](/tutorials/share-secret/).
+</Aside>
+
+## Prerequisites
+
+- [dotsecenv installed](/tutorials/installation/)
+- Your own GPG key (run `dotsecenv identity create` if you do not have one)
+- The GPG public key fingerprint of every team member who needs access on day one
+
+## Steps
+
+<Steps>
+
+1. **Collect public keys from every team member**
+
+   Each teammate exports their public key:
+
+   ```bash
+   # Each teammate runs:
+   gpg --armor --export them@example.com > them.asc
+   ```
+
+   They send you `them.asc` over a channel you trust. Public keys are safe to share publicly — the encryption only requires their public key, never their private key.
+
+2. **Verify each fingerprint out-of-band**
+
+   <Aside type="caution" title="Do not skip this step">
+   The whole security model depends on the public keys you import actually belonging to the people you think they belong to. An attacker who can substitute a key during transport can read every secret you ever store. Verify the fingerprint over a separate channel — a video call, a phone call, or a printed business card — before importing.
+   </Aside>
+
+   Import and inspect each key:
+
+   ```bash
+   gpg --import alice.asc
+   gpg --fingerprint alice@example.com
+   # Read the 40-character fingerprint aloud and confirm with Alice.
+   ```
+
+   Repeat for every teammate. Make a list of the verified fingerprints.
+
+3. **Initialize your config and vault**
+
+   ```bash
+   dotsecenv init config --login YOUR_FINGERPRINT
+   dotsecenv init vault
+   ```
+
+   `init config` stores your fingerprint as the default identity. `init vault` creates a fresh vault file at the XDG data path and writes its location into your config. See [`dotsecenv init`](/reference/#init) for path overrides.
+
+4. **Add every teammate's identity to the vault**
+
+   The team-lead pattern is a shell loop over your verified fingerprints:
+
+   ```bash
+   TEAM_FPS=(
+     "ABC123DEF456...ALICE"
+     "789ABC012DEF...BOB"
+     "FED654CBA321...CAROL"
+   )
+
+   for fp in "${TEAM_FPS[@]}"; do
+     gpg --fingerprint "$fp" >/dev/null || { echo "Missing key: $fp"; exit 1; }
+     dotsecenv identity add "$fp"
+   done
+   ```
+
+   Each `identity add` writes a signed identity entry to the vault. The pre-flight `gpg --fingerprint` call fails fast if a public key is missing from your keyring before any vault changes happen.
+
+   <Aside type="tip">
+   If you maintain multiple vaults (e.g., `dev` and `prod`), append `--all` to register each identity in every configured vault: `dotsecenv identity add "$fp" --all`.
+   </Aside>
+
+5. **Store your first secret**
+
+   ```bash
+   echo "super-secret-db-password" | dotsecenv secret store DATABASE_PASSWORD
+   ```
+
+   The `store` command encrypts the value with a fresh AES-256-GCM session key, then encrypts that session key once for each registered identity. Every teammate is in `available_to` from the very first version — no follow-up `secret share` needed.
+
+6. **Verify the access list**
+
+   ```bash
+   dotsecenv vault describe
+   ```
+
+   You should see every team member listed under `Identities`, and `DATABASE_PASSWORD` listed under `Secrets`. The JSON form shows the per-secret access list explicitly:
+
+   ```bash
+   dotsecenv vault describe --json | jq '.[].secrets'
+   # [
+   #   {
+   #     "key": "DATABASE_PASSWORD",
+   #     "available_to": ["ALICE_FP", "BOB_FP", "CAROL_FP", "YOUR_FP"]
+   #   }
+   # ]
+   ```
+
+7. **Confirm the GPG environment is healthy**
+
+   ```bash
+   dotsecenv vault doctor
+   ```
+
+   `doctor` checks that gpg-agent is reachable, the vault format is current, and the vault is not fragmented. A green run here means the workflow will Just Work for teammates with the same GPG hygiene.
+
+8. **Commit the vault to version control**
+
+   The vault file is encrypted — committing it to a private repo is the standard distribution mechanism.
+
+   ```bash
+   git add path/to/vault
+   git commit -m "Initialize team vault with N members"
+   git push
+   ```
+
+   Each teammate now follows [Team Onboarding](/tutorials/team-onboarding/) on their machine: pull the vault, `dotsecenv login`, and `secret get DATABASE_PASSWORD` to confirm access.
+
+</Steps>
+
+## Expected Result
+
+After this tutorial:
+
+- One vault file holds one signed identity entry per team member plus one signed value entry for `DATABASE_PASSWORD`.
+- Every team member can decrypt every future `secret store` write into this vault.
+- New team members join via [Team Onboarding](/tutorials/team-onboarding/) or [Share a Secret](/tutorials/share-secret/), without re-initializing the vault.
+
+## Variations
+
+### Multiple vaults (e.g., `dev` and `prod`)
+
+Run `init vault` once per environment, then add identities with `--all`:
+
+```bash
+dotsecenv init vault -v ~/.config/dotsecenv/vault-dev
+dotsecenv init vault -v ~/.config/dotsecenv/vault-prod
+for fp in "${TEAM_FPS[@]}"; do
+  dotsecenv identity add "$fp" --all
+done
+```
+
+`--all` adds the identity to every configured vault in one call.
+
+### Different access lists per environment
+
+If only some teammates should access prod, register only their fingerprints in the prod vault:
+
+```bash
+PROD_FPS=("YOUR_FP" "ALICE_FP")  # smaller subset
+for fp in "${PROD_FPS[@]}"; do
+  dotsecenv identity add "$fp" -v ~/.config/dotsecenv/vault-prod
+done
+```
+
+### CI-only identities
+
+Generate a dedicated CI key and register its fingerprint as a team member. See [GitHub Action integration](/guides/github-action/) for the full CI pattern.
+
+## Troubleshooting
+
+**`gpg: error reading key: No public key`**
+
+You ran `identity add` against a fingerprint whose public key you have not imported. Re-import that teammate's `.asc` and verify with `gpg --fingerprint FP`.
+
+**`secret store` fails with `access denied`**
+
+The latest value of an existing secret was encrypted to a fingerprint set you no longer hold. This typically means a teammate stored a value before adding you back. Either ask them to share the secret with your fingerprint, or rotate the value at its source and `secret store` again.
+
+**Teammate cannot decrypt after pulling the vault**
+
+Check the access list with `dotsecenv vault describe --json` and confirm their fingerprint appears in `available_to`. If not, run `dotsecenv secret share SECRET THEIR_FP --all` and push again.
+
+## Next Steps
+
+- [Team Onboarding](/tutorials/team-onboarding/) — what each teammate runs on their machine
+- [Share a Secret](/tutorials/share-secret/) — extend access to a new member after the initial setup
+- [Audit Trail](/concepts/audit-trail/) — query who added what, and when
+- [Revoke Access](/tutorials/revoke-access/) — remove a member when they leave

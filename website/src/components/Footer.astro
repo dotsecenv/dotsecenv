@@ -1,0 +1,21 @@
+---
+import Default from '@astrojs/starlight/components/Footer.astro';
+---
+
+<Default><slot /></Default>
+<footer class="privacy-footer">
+  <a href="/privacy/">Privacy Policy</a>
+</footer>
+<style>
+  .privacy-footer {
+    text-align: center;
+    padding: 1rem 0 1.5rem;
+    font-size: 0.8rem;
+  }
+  .privacy-footer a {
+    color: var(--sl-color-gray-3);
+  }
+  .privacy-footer a:hover {
+    color: var(--sl-color-text);
+  }
+</style>

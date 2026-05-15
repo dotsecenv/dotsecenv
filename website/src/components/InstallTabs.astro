@@ -1,0 +1,219 @@
+---
+/**
+ * Platform-aware installation tabs component.
+ * Automatically selects the appropriate tab based on the user's OS.
+ * mise is always last and never auto-selected per spec.
+ */
+
+interface Tab {
+  id: string;
+  label: string;
+  content: string;
+}
+
+interface Props {
+  tabs: Tab[];
+}
+
+const { tabs } = Astro.props;
+
+// Generate unique ID for this instance
+const instanceId = `install-tabs-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<div class="install-tabs" id={instanceId}>
+  <div role="tablist" aria-label="Installation methods">
+    {tabs.map((tab, index) => (
+      <button
+        role="tab"
+        id={`${instanceId}-tab-${tab.id}`}
+        aria-controls={`${instanceId}-panel-${tab.id}`}
+        aria-selected={index === 0 ? 'true' : 'false'}
+        tabindex={index === 0 ? 0 : -1}
+        data-tab-id={tab.id}
+      >
+        {tab.label}
+      </button>
+    ))}
+  </div>
+
+  {tabs.map((tab, index) => (
+    <div
+      role="tabpanel"
+      id={`${instanceId}-panel-${tab.id}`}
+      aria-labelledby={`${instanceId}-tab-${tab.id}`}
+      hidden={index !== 0}
+      data-panel-id={tab.id}
+    >
+      <Fragment set:html={tab.content} />
+    </div>
+  ))}
+</div>
+
+<script define:vars={{ instanceId }}>
+  // Platform detection and tab selection
+  (function() {
+    const container = document.getElementById(instanceId);
+    if (!container) return;
+
+    const tabs = container.querySelectorAll('[role="tab"]');
+    const panels = container.querySelectorAll('[role="tabpanel"]');
+
+    // Detect user's platform
+    function detectPlatform() {
+      const ua = navigator.userAgent.toLowerCase();
+      const platform = navigator.platform?.toLowerCase() || '';
+
+      if (platform.includes('mac') || ua.includes('mac os')) {
+        return 'macos';
+      }
+      if (platform.includes('linux') || ua.includes('linux')) {
+        // Try to detect distro from user agent (limited)
+        if (ua.includes('ubuntu') || ua.includes('debian')) {
+          return 'debian';
+        }
+        if (ua.includes('fedora') || ua.includes('rhel') || ua.includes('centos')) {
+          return 'fedora';
+        }
+        if (ua.includes('arch')) {
+          return 'arch';
+        }
+        // Default to Debian for generic Linux
+        return 'debian';
+      }
+      if (platform.includes('win') || ua.includes('windows')) {
+        // Windows users can use binary download
+        return 'binary';
+      }
+      // Default to macOS for unknown
+      return 'macos';
+    }
+
+    // Select a tab by ID
+    function selectTab(tabId) {
+      tabs.forEach(tab => {
+        const isSelected = tab.dataset.tabId === tabId;
+        tab.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        tab.tabIndex = isSelected ? 0 : -1;
+      });
+
+      panels.forEach(panel => {
+        const isVisible = panel.dataset.panelId === tabId;
+        panel.hidden = !isVisible;
+      });
+    }
+
+    // Handle tab clicks
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        selectTab(tab.dataset.tabId);
+      });
+
+      // Keyboard navigation
+      tab.addEventListener('keydown', (e) => {
+        const tabArray = Array.from(tabs);
+        const currentIndex = tabArray.indexOf(tab);
+        let newIndex;
+
+        switch (e.key) {
+          case 'ArrowLeft':
+            newIndex = currentIndex === 0 ? tabArray.length - 1 : currentIndex - 1;
+            break;
+          case 'ArrowRight':
+            newIndex = currentIndex === tabArray.length - 1 ? 0 : currentIndex + 1;
+            break;
+          case 'Home':
+            newIndex = 0;
+            break;
+          case 'End':
+            newIndex = tabArray.length - 1;
+            break;
+          default:
+            return;
+        }
+
+        e.preventDefault();
+        tabArray[newIndex].focus();
+        selectTab(tabArray[newIndex].dataset.tabId);
+      });
+    });
+
+    // Auto-select based on platform (but never mise)
+    const detectedPlatform = detectPlatform();
+    const platformTab = container.querySelector(`[data-tab-id="${detectedPlatform}"]`);
+
+    // Only auto-select if we found a matching tab and it's not mise
+    if (platformTab && detectedPlatform !== 'mise') {
+      selectTab(detectedPlatform);
+    }
+  })();
+</script>
+
+<style>
+  .install-tabs {
+    margin: 1.5rem 0;
+  }
+
+  [role="tablist"] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+
+  [role="tab"] {
+    font-family: var(--sl-font-mono);
+    font-size: 0.85rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background: transparent;
+    color: var(--sl-color-gray-3);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  [role="tab"]:hover {
+    background: var(--sl-color-bg-inline-code);
+    color: var(--sl-color-text);
+  }
+
+  [role="tab"][aria-selected="true"] {
+    background: var(--sl-color-bg-inline-code);
+    border-color: var(--sl-color-hairline);
+    color: var(--sl-color-accent);
+    position: relative;
+  }
+
+  [role="tab"][aria-selected="true"]::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--sl-color-bg-inline-code);
+  }
+
+  [role="tabpanel"] {
+    padding: 1rem;
+    background: var(--sl-color-bg-inline-code);
+    border: 1px solid var(--sl-color-hairline);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+  }
+
+  [role="tabpanel"][hidden] {
+    display: none;
+  }
+
+  /* Code blocks inside panels */
+  [role="tabpanel"] :global(pre) {
+    margin: 0;
+    border: none;
+    background: var(--sl-color-code-bg);
+  }
+</style>

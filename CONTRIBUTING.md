@@ -17,10 +17,12 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 
 ### Prerequisites
 
-- **Go 1.26+** (check with `go version`)
+- **[mise](https://mise.jdx.dev/)** — required for language tools. `mise install` at the repo root picks up `mise.toml` and installs Go, Node, and pnpm at the pinned versions. Lefthook pre-push hooks (e.g. the website Astro build, the plugin shell tests) assume these are on PATH.
 - **GPG** (check with `gpg --version`)
 - **Make** (check with `make --version`)
-- **mise** (optional, for tool management)
+- **Docker** — needed for the plugin's `make test-managers` integration tests.
+
+If you'd rather skip mise, install the equivalents manually: Go matches `go.mod`'s `go` directive; Node and pnpm match `mise.toml`.
 
 ### Clone and Build
 
@@ -29,7 +31,10 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 git clone https://github.com/dotsecenv/dotsecenv.git
 cd dotsecenv
 
-# Install development tools
+# Set up language tools (Go, Node, pnpm) at the pinned versions
+mise install
+
+# Install development tools (golangci-lint, etc.)
 make install-tools
 
 # Build the binary

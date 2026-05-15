@@ -1,0 +1,12 @@
+{
+  "default": true,
+  "MD013": false,
+  "MD024": false,
+  "MD033": {
+    "allowed_elements": ["Tabs", "TabItem", "Steps", "Aside", "Card", "CardGrid", "LinkCard", "AsciinemaPlayer", "DownloadCommands", "VersionOutput", "VersionExample", "a", "details", "summary", "div", "img", "Badge"]
+  },
+  "MD036": false,
+  "MD041": false,
+  "MD046": false,
+  "MD060": false
+}

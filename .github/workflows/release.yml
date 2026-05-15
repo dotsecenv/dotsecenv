@@ -98,7 +98,7 @@ jobs:
         uses: actions/create-github-app-token@v3
         id: app-token
         with:
-          app-id: ${{ vars.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: |
@@ -277,7 +277,7 @@ jobs:
         uses: actions/create-github-app-token@v3
         id: app-token
         with:
-          app-id: ${{ vars.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: |
@@ -374,18 +374,29 @@ jobs:
   trigger-repo-update:
     needs: [goreleaser, update-checksums, update-homebrew-tap, verify-homebrew-install]
     runs-on: ubuntu-latest
+    # Exposed so wait-packages-publish can watch the just-dispatched run
+    # without re-doing the discovery work.
+    outputs:
+      packages_run_id: ${{ steps.find_packages.outputs.run_id }}
+      packages_run_url: ${{ steps.find_packages.outputs.run_url }}
     steps:
+      - uses: actions/checkout@v6
+
+      - name: Capture pre-dispatch timestamp
+        id: timestamp
+        run: |
+          # 5s buffer absorbs clock skew between this runner and the
+          # satellite's, plus the time between this step and the dispatch.
+          echo "dispatch_time=$(date -u -d '5 seconds ago' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Generate App Token
         uses: actions/create-github-app-token@v3
         id: app-token
         with:
-          app-id: ${{ vars.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: |
-            packages
-            plugin
-            website
+          repositories: packages
 
       - name: Trigger packages update
         uses: peter-evans/repository-dispatch@v4
@@ -403,18 +414,122 @@ jobs:
           event-type: trigger-action-e2e
           client-payload: '{"version": "${{ github.ref_name }}"}'
 
-      - name: Tag plugin with current release's version
-        uses: peter-evans/repository-dispatch@v4
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          repository: dotsecenv/plugin
-          event-type: tag-release
-          client-payload: '{"version": "${{ github.ref_name }}"}'
+      - name: Find dispatched packages run and surface link
+        id: find_packages
+        env:
+          SATELLITE_REPO: dotsecenv/packages
+          SINCE: ${{ steps.timestamp.outputs.dispatch_time }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/find-satellite-run.sh
 
-      - name: Trigger website redeploy
-        uses: peter-evans/repository-dispatch@v4
+  # Poll the dispatched packages run to completion. The link to the
+  # satellite run is already on the trigger-repo-update job summary
+  # (written by find-satellite-run.sh); this job re-prints it on its
+  # own summary along with the final ✅/❌/⏱️ status.
+  wait-packages-publish:
+    needs: trigger-repo-update
+    if: needs.trigger-repo-update.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate App token (packages only, actions:read needed)
+        uses: actions/create-github-app-token@v3
+        id: app-token
         with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: packages
+
+      - name: Watch dotsecenv/packages publish run
+        env:
+          SATELLITE_REPO: dotsecenv/packages
+          RUN_ID: ${{ needs.trigger-repo-update.outputs.packages_run_id }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/watch-satellite-run.sh
+
+  # ---------------------------------------------------------------------------
+  # Monorepo publish jobs (PR 1 of the monorepo migration).
+  # Additive only: old repository_dispatch fan-out above remains intact.
+  # `continue-on-error: true` so failures in these new jobs do not block the
+  # existing pipeline. Status-aware DAG (no draft, sidecar .release-sha,
+  # release-complete integrity gate) lands in PR 3.
+  # ---------------------------------------------------------------------------
+
+  publish-plugin:
+    # Don't push to the satellite (or tag it) if anything earlier in the
+    # release chain failed; a half-baked release shouldn't propagate. Run
+    # on success-or-skipped so legitimate skips upstream don't block us.
+    needs: update-homebrew-tap
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate App token (plugin only)
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: plugin
+
+      - name: Checkout dotsecenv/plugin satellite
+        uses: actions/checkout@v6
+        with:
+          repository: dotsecenv/plugin
           token: ${{ steps.app-token.outputs.token }}
-          repository: dotsecenv/website
-          event-type: publish-site
-          client-payload: '{"version": "${{ github.ref_name }}"}'
+          path: plugin-satellite
+          fetch-depth: 0
+
+      - name: Publish plugin source + tag the satellite
+        env:
+          SOURCE_DIR: plugin
+          SATELLITE_DIR: plugin-satellite
+          SATELLITE_REPO: dotsecenv/plugin
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/publish-to-satellite.sh
+
+  # Gates the release on plugin-manager integration testing. Runs
+  # `make test-managers-remote` against the just-published plugin
+  # satellite (the test clones from github.com/dotsecenv/plugin in
+  # Docker, so it exercises the real install path users experience).
+  # This replaces the previous post-release.yml flow that ran on the
+  # satellite after push but did not surface back to the monorepo run.
+  test-plugin-managers:
+    needs: publish-plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run plugin manager integration tests (remote)
+        working-directory: plugin
+        run: make test-managers-remote
+
+  # Build + deploy dotsecenv.com to GitHub Pages as part of the release
+  # run, so the release graph shows the website publish alongside binary,
+  # cask, and plugin publishes. Calls the reusable deploy-website.yml so
+  # the build/deploy logic stays single-sourced (deploy-website.yml also
+  # fires standalone on out-of-band main-branch website edits).
+  #
+  # Gated on update-homebrew-tap with success-or-skipped semantics: don't
+  # ship updated docs if the binary build / notarize / cask flow failed,
+  # but DO ship them if those steps were legitimately skipped.
+  deploy-website:
+    needs: update-homebrew-tap
+    if: ${{ !failure() && !cancelled() }}
+    uses: ./.github/workflows/deploy-website.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

@@ -1,0 +1,17 @@
+---
+/**
+ * VersionExample - Renders a bash snippet showing how to download a specific version.
+ *
+ * Usage:
+ *   <VersionExample />
+ */
+import { Code } from '@astrojs/starlight/components';
+import { DOTSECENV_VERSION } from '../config/version';
+
+const version = await DOTSECENV_VERSION;
+
+const code = `VERSION="${version}"
+curl -LO "https://github.com/dotsecenv/dotsecenv/releases/download/v\${VERSION}/dotsecenv_\${VERSION}_Linux_x86_64.tar.gz"`;
+---
+
+<Code code={code} lang="bash" />
