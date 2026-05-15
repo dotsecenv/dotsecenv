@@ -14,3 +14,6 @@ website/node_modules
 website/build
 website/.docusaurus
 website/.cache
+
+# Claude
+.claude/settings.local.json
