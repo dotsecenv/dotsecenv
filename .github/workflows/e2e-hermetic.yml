@@ -3,6 +3,17 @@ name: Hermetic E2E
 on:
   pull_request:
     branches: [main]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "vendor/**"
+      - "Makefile"
+      - "cmd/**"
+      - "pkg/**"
+      - "internal/**"
+      - "scripts/e2e.sh"
+      - ".github/workflows/e2e-hermetic.yml"
 
 permissions:
   contents: read

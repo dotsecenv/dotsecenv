@@ -2,12 +2,14 @@ name: CI
 
 # Pipeline shape (DAG):
 #
-#   test ─► e2e ─┬─► e2e-install ─────────┬─► action ─────────┬─► docs ─► release-test (PR only)
-#                │                        │                   │
-#                └─► e2e-terraform ───────┴─► action-init-config
+#   test ─► e2e ─► e2e-terraform ─┬─► action ──────────┬─► docs ─► release-test (PR only)
+#                                 └─► action-init-config
 #
 # Scoped to Go-related changes via `paths:` allowlist below — touches to
 # website/, plugin/, docs-only files, etc. don't fire this pipeline.
+# scripts/install.sh is excluded because e2e-install.yml owns that path
+# independently (install.sh fetches its binary from GH releases — no
+# local Go build needed).
 # Plugin and website have their own ci-plugin.yml / ci-website.yml.
 
 on:
@@ -23,6 +25,8 @@ on:
       - "pkg/**"
       - "internal/**"
       - "scripts/**"
+      - "!scripts/install.sh"
+      - "!scripts/e2e-install.sh"
       - "contrib/**"
       - "examples/**"
       - "recipes/**"
@@ -44,6 +48,8 @@ on:
       - "pkg/**"
       - "internal/**"
       - "scripts/**"
+      - "!scripts/install.sh"
+      - "!scripts/e2e-install.sh"
       - "contrib/**"
       - "examples/**"
       - "recipes/**"
@@ -106,23 +112,6 @@ jobs:
 
       - run: make build e2e
 
-  # Folded in from the former contrib-e2e.yml — exercises scripts/install.sh
-  # against real GitHub releases. Sibling of e2e-terraform after e2e.
-  e2e-install:
-    name: Install Script E2E (${{ matrix.os }})
-    needs: e2e
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Run install.sh E2E tests
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: make e2e-install
-
   e2e-terraform:
     name: E2E Terraform Credentials Helper (${{ matrix.os }})
     needs: e2e
@@ -146,7 +135,7 @@ jobs:
 
   action:
     name: Test Action (${{ matrix.os }})
-    needs: [e2e-install, e2e-terraform]
+    needs: e2e-terraform
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -163,7 +152,7 @@ jobs:
 
   action-init-config:
     name: Test Action with init config (${{ matrix.os }})
-    needs: [e2e-install, e2e-terraform]
+    needs: e2e-terraform
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
