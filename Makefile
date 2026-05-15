@@ -150,11 +150,11 @@ demo: build
 	chmod +x "$$DEMO_HOME/demos/demo.sh" && \
 	echo "Downloading demo-magic..." && \
 	curl -fsSL https://raw.githubusercontent.com/paxtonhare/demo-magic/master/demo-magic.sh -o "$$DEMO_HOME/demos/_demo-magic.sh" && \
-	if [ -d ../plugin ]; then \
+	if [ -d ./plugin ]; then \
 		mkdir -p "$$DEMO_HOME/.local/share/dotsecenv"; \
-		cp ../plugin/_dotsecenv_core.sh "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
-		cp ../plugin/dotsecenv.plugin.bash "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
-		cp ../plugin/dotsecenv.plugin.zsh "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
+		cp ./plugin/_dotsecenv_core.sh "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
+		cp ./plugin/dotsecenv.plugin.bash "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
+		cp ./plugin/dotsecenv.plugin.zsh "$$DEMO_HOME/.local/share/dotsecenv/" 2>/dev/null || true; \
 		printf '%s\n' \
 			'# dotsecenv demo bashrc' \
 			'[ -f "$$XDG_DATA_HOME/dotsecenv/dotsecenv.plugin.bash" ] && source "$$XDG_DATA_HOME/dotsecenv/dotsecenv.plugin.bash"' \
@@ -162,8 +162,8 @@ demo: build
 	fi && \
 	echo "Generating GPG key for demo (via dotsecenv identity create)..." && \
 	HOME="$$DEMO_HOME" GNUPGHOME="$$DEMO_HOME/.gnupg" "$$DEMO_HOME/bin/dotsecenv" identity create --no-passphrase --name "Demo User" --email "demo@dotsecenv" && \
-	if [ -d ../website/public ]; then \
-		DEMO_OUT="$$(cd ../website/public && pwd)/demo.cast"; \
+	if [ -d ./website/public ]; then \
+		DEMO_OUT="$$(cd ./website/public && pwd)/demo.cast"; \
 	else \
 		DEMO_OUT="$$(pwd)/demo.cast"; \
 	fi && \
@@ -215,16 +215,11 @@ man:
 
 .PHONY: plugin
 plugin:
-	@if [ -d ../plugin ]; then \
-		echo "Copying plugin files from sibling repo..."; \
-		mkdir -p build/plugin/conf.d && \
-		cp ../plugin/_dotsecenv_core.sh ../plugin/dotsecenv.plugin.bash \
-		   ../plugin/dotsecenv.plugin.zsh build/plugin/ && \
-		cp ../plugin/conf.d/dotsecenv.fish build/plugin/conf.d/; \
-	else \
-		echo "Cloning plugin repo..."; \
-		git clone --depth 1 https://github.com/dotsecenv/plugin.git build/plugin; \
-	fi
+	@echo "Copying plugin files from ./plugin/..."
+	@mkdir -p build/plugin/conf.d
+	@cp ./plugin/_dotsecenv_core.sh ./plugin/dotsecenv.plugin.bash \
+	    ./plugin/dotsecenv.plugin.zsh build/plugin/
+	@cp ./plugin/conf.d/dotsecenv.fish build/plugin/conf.d/
 
 .PHONY: hooks
 hooks: install-lefthook

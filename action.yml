@@ -157,8 +157,14 @@ runs:
       if: inputs.build-from-source == 'true'
       uses: actions/setup-go@v6
       with:
-        cache-dependency-path: "${{ steps.checkout.outputs.dir }}/go.sum"
         go-version-file: "${{ steps.checkout.outputs.dir }}/go.mod"
+        # Disable module caching: the source is cloned into ${{ runner.temp }},
+        # which is outside $GITHUB_WORKSPACE. @actions/glob (used by setup-go
+        # to expand `cache-dependency-path`) can't resolve absolute paths
+        # outside the workspace and emits a "paths were not resolved"
+        # warning. The build-from-source path is a one-shot CI build into a
+        # temp dir anyway, so a cache would have no hit rate worth optimising.
+        cache: false
 
     - name: Build from source
       if: inputs.build-from-source == 'true'

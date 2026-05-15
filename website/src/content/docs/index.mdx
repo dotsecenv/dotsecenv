@@ -1,0 +1,258 @@
+---
+title: dotsecenv
+description: Safe environment secrets, encrypted at rest using GPG
+template: splash
+hero:
+  image:
+    file: ../../assets/logo.png
+    alt: dotsecenv logo
+  tagline: Stop leaking secrets. Encrypt them at rest, commit them safely, share them with your team.
+  actions:
+    - text: Install
+      link: "#install"
+      icon: right-arrow
+      variant: primary
+    - text: Getting Started
+      link: /getting-started/
+      icon: right-arrow
+      variant: secondary
+    - text: View on GitHub
+      link: https://github.com/dotsecenv
+      icon: external
+---
+
+import {
+  Tabs,
+  TabItem,
+  Card,
+  CardGrid,
+  LinkCard,
+  Steps,
+  Aside,
+} from "@astrojs/starlight/components";
+import AsciinemaPlayer from "../../components/AsciinemaPlayer.astro";
+
+## Why dotsecenv?
+
+On March 19, 2026, attackers compromised Aqua Security's **Trivy** vulnerability scanner in a supply chain attack ([CVE-2026-33634](https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23)). The malicious code swept 50+ filesystem locations on CI/CD runners, harvesting SSH keys, AWS/GCP/Azure credentials, `.env` files, database passwords, Docker configs, and Kubernetes tokens, then dumped process memory for good measure. Stolen credentials were used to compromise dozens of npm packages downstream.
+
+This wasn't an isolated incident. In August 2024, Palo Alto's Unit 42 documented an [extortion campaign](https://unit42.paloaltonetworks.com/large-scale-cloud-extortion-operation/) that found exposed `.env` files on 110,000+ domains and stole 90,000+ environment variables. GitHub's own data shows [39 million secrets](https://resources.github.com/enterprise/understanding-secret-leak-exposure/) were committed to public repositories in 2024 alone.
+
+And even without a supply chain attack, plaintext secrets are one mistake away from exposure:
+
+```bash
+echo "AWS_SECRET_ACCESS_KEY=AKIA..." >> .env
+git add . && git commit -m "update config"
+git push
+# Credentials accidentally pushed to a public repo.
+```
+
+`.gitignore` helps with accidental commits, but it can't protect you from malware that reads plaintext files off disk. And it means your secrets can't travel with your code, so you end up sharing them over Slack, sticky notes, or shared drives, none of which are encrypted or auditable.
+
+**dotsecenv** takes a different approach: secrets are **encrypted at rest** using GPG and AES-256-GCM, stored in a vault file that is **safe to keep on disk** and even **safe to commit to git**. Even if an attacker reads your vault file from a repo, a CI runner, or a compromised dependency they get ciphertext, not credentials. No cloud service, no proprietary key management, just your existing GPG keys.
+
+---
+
+## Install
+
+The quickest way to get started. This single command installs the `dotsecenv` binary, shell plugins, completions, and the Terraform credentials helper:
+
+```bash
+curl -fsSL https://get.dotsecenv.com/install.sh | bash
+```
+
+<details>
+<summary>Other installation methods</summary>
+
+<Tabs>
+  <TabItem label="macOS (Homebrew)">
+    ```bash
+    brew tap dotsecenv/tap
+    brew install dotsecenv
+    ```
+  </TabItem>
+
+  <TabItem label="Ubuntu/Debian">
+    ```bash
+    curl -fsSL https://get.dotsecenv.com/key.asc | \
+      sudo gpg --dearmor -o /etc/apt/keyrings/dotsecenv.gpg
+
+    echo "deb [signed-by=/etc/apt/keyrings/dotsecenv.gpg] \
+      https://get.dotsecenv.com/apt/ ./" | \
+      sudo tee /etc/apt/sources.list.d/dotsecenv.list
+
+    sudo apt-get update && sudo apt-get install dotsecenv
+    ```
+
+  </TabItem>
+
+  <TabItem label="Fedora/RHEL">
+    ```bash
+    cat <<EOF | sudo tee /etc/yum.repos.d/dotsecenv.repo
+    [dotsecenv]
+    name=DotSecEnv Repository
+    baseurl=https://get.dotsecenv.com/yum/
+    enabled=1
+    gpgcheck=1
+    repo_gpgcheck=1
+    gpgkey=https://get.dotsecenv.com/key.asc
+    EOF
+
+    sudo dnf install dotsecenv
+    ```
+
+  </TabItem>
+
+  <TabItem label="Arch">
+    ```bash
+    cat <<'EOF' | sudo tee -a /etc/pacman.conf
+    [dotsecenv]
+    Server = https://get.dotsecenv.com/arch/$arch
+    SigLevel = Required DatabaseOptional
+    EOF
+
+    curl -fsSL https://get.dotsecenv.com/key.asc | sudo pacman-key --add -
+    sudo pacman-key --lsign-key E60A1740BAEF49284D22EA7D3C376348F0921C59
+    sudo pacman -Sy dotsecenv
+    ```
+
+  </TabItem>
+
+  <TabItem label="mise">
+    ```bash
+    mise use github:dotsecenv/dotsecenv
+    ```
+  </TabItem>
+
+  <TabItem label="From source">
+    ```bash
+    git clone https://github.com/dotsecenv/dotsecenv.git
+    cd dotsecenv && make build
+    # Binary: bin/dotsecenv
+    ```
+  </TabItem>
+</Tabs>
+
+See the [Installation Guide](/tutorials/installation/) for full details, including verification and platform-specific notes.
+
+</details>
+
+---
+
+## Your first secret
+
+Once installed, you're three commands away from your first encrypted secret.
+
+<Steps>
+
+1. **Initialize dotsecenv**
+
+   This creates your config file and vault, then links your GPG key:
+
+   ```bash
+   dotsecenv init config
+   dotsecenv init vault
+   dotsecenv login   # select your GPG key interactively
+   ```
+
+   <Aside type="tip">
+     Don't have a GPG key? Generate one with `dotsecenv identity create`, which
+     creates a FIPS-compliant key with sensible defaults, abstracting away the
+     complexity of GPG key creation!
+   </Aside>
+
+2. **Store a secret**
+
+   Pipe any value into `dotsecenv secret store`:
+
+   ```bash
+   echo "my-database-password" | dotsecenv secret store DATABASE_PASSWORD
+   ```
+
+   The value is encrypted with AES-256-GCM and stored in your vault. The vault file is safe to commit.
+
+3. **Retrieve it**
+
+   ```bash
+   dotsecenv secret get DATABASE_PASSWORD
+   # Output: my-database-password
+   ```
+
+</Steps>
+
+**That's it!** Your secret is encrypted at rest and can travel safely in version control.
+
+---
+
+## See it in action
+
+The end-to-end flow: initialize dotsecenv, store a secret, define a `.secenv` file with a `{dotsecenv}` placeholder, and watch the shell plugin load the decrypted value into your environment as you `cd` in.
+
+<AsciinemaPlayer src="/demo.cast" idleTimeLimit={1.5} />
+
+---
+
+## Go further
+
+Now that you have dotsecenv running, here's what you can do with it.
+
+<CardGrid>
+  <LinkCard
+    title="Shell plugin that auto-loads secrets"
+    description="Secrets load automatically when you cd into a directory. Create a .secenv file and your environment is ready."
+    href="/guides/shell-plugins/"
+  />
+  <LinkCard
+    title="CLI deep dive"
+    description="Encrypt, decrypt, store, retrieve, share, and revoke secrets from the command line."
+    href="/reference/"
+  />
+  <LinkCard
+    title="Share secrets with your team"
+    description="Use GPG multi-recipient encryption to share secrets with teammates. No Slack DMs required."
+    href="/tutorials/share-secret/"
+  />
+  <LinkCard
+    title="Terraform & OpenTofu credentials"
+    description="Use dotsecenv as a credentials helper for terraform login and registry authentication."
+    href="/guides/terraform-credentials-helper/"
+  />
+  <LinkCard
+    title="GitHub Actions"
+    description="Install dotsecenv in CI/CD pipelines with the official GitHub Action, including signature and provenance verification."
+    href="/guides/github-action/"
+  />
+  <LinkCard
+    title="Security model & compliance"
+    description="AES-256-GCM, FIPS 186-5 signatures, hermetic testing, SLSA Build Level 3. Understand the security guarantees."
+    href="/concepts/security-model/"
+  />
+</CardGrid>
+
+---
+
+## How it works, briefly
+
+dotsecenv uses hybrid encryption. Secrets are encrypted with AES-256-GCM (fast, symmetric), and the encryption key is wrapped with your GPG key (asymmetric). That means:
+
+- Only you (and anyone you explicitly share with) can decrypt your secrets.
+- No cloud service is involved. Your GPG keyring is the only trust anchor.
+- The vault is append-only. Every operation is cryptographically signed, which gives you a built-in audit trail.
+- The vault file is encrypted JSONL, so it's safe to commit to any git remote.
+
+<CardGrid>
+  <Card title="Open source" icon="open-book">
+    Fully open source. Audit the code yourself.
+  </Card>
+  <Card title="No data collection" icon="approve-check">
+    No telemetry, no call-home. Tested with{" "}
+    <a href="/concepts/security-model/#hermetic-testing">network disabled</a> as
+    proof.
+  </Card>
+  <Card title="No centralized keys" icon="random">
+    Uses your existing GPG keys. No cloud services required.
+  </Card>
+  <Card title="Unix philosophy" icon="puzzle">
+    Does one thing well. Composable with git, gpg, and your shell.
+  </Card>
+</CardGrid>

@@ -1,0 +1,25 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+---
+
+<StarlightPage
+  frontmatter={{
+    title: '404: Secret Not Found',
+    template: 'splash',
+  }}
+>
+  <div style="text-align: center; max-width: 800px; margin: 0 auto;">
+    <img 
+      src="/secret_not_found_404.png" 
+      alt="A confused detective searching for secrets near an empty vault" 
+      style="width: 100%; max-width: 700px; margin: 2rem auto; display: block;"
+    />
+    <h2 style="margin-top: 2rem; font-size: 1.8rem;">Oops! This secret has been lost to the void...</h2>
+    <p style="font-size: 1.2rem; margin: 1.5rem auto; max-width: 600px;">
+      The page you're looking for doesn't exist, was never encrypted, or got accidentally committed to git.
+    </p>
+    <p style="margin-top: 2rem;">
+      <a href="/" style="font-weight: bold; font-size: 1.1rem;">🔐 Back to the vault (documentation)</a>
+    </p>
+  </div>
+</StarlightPage>

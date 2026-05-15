@@ -1,0 +1,231 @@
+---
+title: Revoke Access
+description: Remove access to a secret and understand revocation caveats
+---
+
+import { Steps, Aside } from "@astrojs/starlight/components";
+
+<Aside type="tip" title="Runnable example">
+The full share + revoke + rotate flow (with the access-after-revoke caveat demonstrated end-to-end) ships at [`examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/02-team-share-revoke) on the CLI repo.
+</Aside>
+
+## Goal
+
+Revoke someone's access to a secret. Understand what revocation does and doesn't protect against.
+
+## Prerequisites
+
+- A secret shared with at least one other identity
+- Understanding of [how sharing works](/tutorials/share-secret/)
+
+## Steps
+
+<Steps>
+
+1. **List current access**
+
+   See who has access to a secret:
+
+   ```bash
+   dotsecenv vault describe
+   ```
+
+   Look for the `available_to` field:
+
+   ```text
+   DATABASE_PASSWORD
+     available_to: [YOUR_FINGERPRINT, TEAMMATE_FINGERPRINT]
+   ```
+
+2. **Revoke access**
+
+   Remove a specific identity's access:
+
+   ```bash
+   dotsecenv secret revoke DATABASE_PASSWORD TEAMMATE_FINGERPRINT
+   ```
+
+   Or revoke from all vaults:
+
+   ```bash
+   dotsecenv secret revoke DATABASE_PASSWORD TEAMMATE_FINGERPRINT --all
+   ```
+
+3. **Verify revocation**
+
+   ```bash
+   dotsecenv vault describe
+   ```
+
+   The identity should no longer appear in `available_to`:
+
+   ```text
+   DATABASE_PASSWORD
+     available_to: [YOUR_FINGERPRINT]
+   ```
+
+4. **Rotate the secret value** (Critical!)
+
+   <Aside type="danger" title="Essential security step">
+     Revoking access **does not** prevent the revoked user from accessing the
+     **previous** value. They already decrypted it.
+   </Aside>
+
+   Store a new value:
+
+   ```bash
+   echo "new-secret-value" | dotsecenv secret store DATABASE_PASSWORD
+   ```
+
+   This creates a new entry that the revoked user cannot access.
+
+5. **Update systems using the secret**
+
+   Update your database, API keys, or other systems to use the new value.
+
+6. **Commit the changes**
+
+   ```bash
+   git add vault
+   git commit -m "Revoke access and rotate DATABASE_PASSWORD"
+   git push
+   ```
+
+</Steps>
+
+## Expected Result
+
+After revocation + rotation:
+
+- The revoked user **cannot** decrypt the **new** secret value
+- The revoked user **can still** decrypt the **old** value (from vault history)
+- Your vault shows only authorized identities for new values
+
+```bash
+dotsecenv vault describe
+# DATABASE_PASSWORD
+#   available_to: [YOUR_FINGERPRINT]
+#   values: 2 (latest accessible to you)
+```
+
+## What Revocation Does NOT Do
+
+<Aside type="caution" title="Understanding revocation limits">
+  Revocation in dotsecenv (and any GPG-based system) has inherent limitations:
+</Aside>
+
+| Revocation protects against | Revocation does NOT protect against |
+| --------------------------- | ----------------------------------- |
+| Future secret values        | Previously shared values            |
+| New secrets                 | Old values they already decrypted   |
+| Access to new entries       | Copy/paste of decrypted values      |
+
+### Why is this the case?
+
+1. GPG is asymmetric encryption: once a value is encrypted for a key, only that key can decrypt it.
+2. The vault is append-only: old entries remain readable to the original recipients.
+3. There is no time travel: you can't retroactively change who could decrypt a past value.
+
+### What to do about it
+
+1. Always rotate secrets after revoking access.
+2. Treat revocation as a signal that you need to change the value.
+3. Update downstream systems with the new credentials.
+
+## Variations
+
+### Revoke all access to all secrets
+
+Remove an identity completely:
+
+```bash
+# Revoke from all secrets
+for secret in $(dotsecenv vault describe --json | jq -r '.secrets[].name'); do
+  dotsecenv secret revoke "$secret" FINGERPRINT
+done
+```
+
+### Audit access history
+
+The vault preserves full history. View who had access to each version:
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD --all --json | jq '.values[] | {timestamp, available_to}'
+```
+
+### Revoke from all secrets
+
+If someone should no longer have any access:
+
+```bash
+# Revoke from all existing secrets in all vaults
+dotsecenv secret revoke "*" FINGERPRINT --all
+```
+
+<Aside type="note">
+  Revoking access doesn't delete their access to previously shared values. It
+  only prevents them from decrypting future values. To fully clean up the vault,
+  run `vault doctor` after revoking all access.
+</Aside>
+
+---
+
+## Complete Offboarding Checklist
+
+When a team member leaves:
+
+- Revoke their access to all secrets
+- Rotate ALL secrets they had access to
+- Update all systems with new credentials
+- Run `vault doctor` to clean up (optional)
+- Document the change in your security log
+
+```bash
+# Comprehensive offboarding
+FINGERPRINT="THEIR_FINGERPRINT"
+
+# 1. Revoke all access
+dotsecenv secret revoke "*" "$FINGERPRINT" --all
+
+# 2. Rotate secrets (do this for each secret)
+echo "new-value" | dotsecenv secret store DATABASE_PASSWORD
+echo "new-value" | dotsecenv secret store API_KEY
+# ... repeat for all secrets
+
+# 3. Commit
+git add vault
+git commit -m "Offboard: revoke access for $FINGERPRINT"
+git push
+```
+
+---
+
+## Troubleshooting
+
+**Can they still see secrets?**
+
+If they have the old vault file, yes. The vault is encrypted but the entries for their key still exist. They can decrypt old values.
+
+This is why **rotating secrets is essential** after revocation.
+
+**Vault getting large?**
+
+Revoked entries and old values accumulate. Run doctor to check and optionally defragment:
+
+```bash
+dotsecenv vault doctor
+```
+
+The doctor command checks vault health and offers to defragment if needed.
+
+<Aside type="caution">
+  Defragmenting removes old entries. This breaks access to historical values but
+  doesn't affect current values.
+</Aside>
+
+---
+
+## Next Steps
+
+- [Threat Model](/concepts/threat-model/): understand what dotsecenv protects against
+- [Architecture](/concepts/architecture/): how the vault and encryption work

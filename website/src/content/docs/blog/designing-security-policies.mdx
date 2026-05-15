@@ -1,0 +1,108 @@
+---
+title: "Designing Security Policies for dotsecenv"
+date: 2026-05-04
+authors:
+  - dotsecenv
+tags:
+  - security
+  - configuration
+  - fips
+  - design
+excerpt: "How dotsecenv v0.6.0's policy directory came together: a long weekend, a SUID dead end, and Claude Code as inspiration."
+---
+
+*A long weekend, a SUID dead end, and the simpler design that shipped*
+
+What do you do with a long weekend? Work on dotsecenv, naturally. 😃
+
+## The problem: enterprise compatibility without sacrificing user experience
+
+From day one, I've wanted dotsecenv to hold up in enterprise environments. That mostly means one thing: when someone runs the tool in a regulated industry (finance, healthcare, government contractors, anything where compliance auditors show up), the defaults shouldn't disqualify it.
+
+My instinct was to use FIPS-approved algorithm defaults: FIPS 186-5 for keys, FIPS 197 for symmetric, and FIPS 180-4 for hashing. FIPS 140-3 module validation gets left to whatever the host provides, so the defaults don't disqualify dotsecenv on a FIPS-mode host.
+
+Strong defaults aren't free, though. Tools that ignore UX never become popular. The ones auditors trust must be enforceable on a fleet of machines.
+
+The question became: how do you satisfy both?
+
+## Attempt 1: SUID
+
+My first attempt was SUID. Flip the SUID bit on the dotsecenv binary, ship a config in a system-owned directory, and the binary loads it on every invocation. The user can't override it because they don't have write access to that directory.
+
+After living with it for a bit, two problems surfaced.
+
+First, SUID doesn't reliably work on macOS. Between SIP, `nosuid` mounts on user-mountable volumes, and Apple's general direction away from setuid binaries, "ship a setuid binary" is not a portable plan.
+
+Second, dotsecenv has a `login` command. It's a one-time operation where the user selects the GPG identity to use for encryption, and dotsecenv persists that choice so future invocations know who's signing. Login writes per-user state. With SUID, the binary runs as root and trusts a system-owned config path, so per-user mutable state had nowhere natural to live. I'd have had to rebuild `login` around that constraint, and the result was getting uglier the longer I looked at it.
+
+Back to the drawing board.
+
+## Getting inspiration from Claude Code
+
+The unlock came from looking at Claude Code. Claude has three settings layers (user, project, and local), and they compose. The layers are explicit, the merge rules are simple, and the layer the admin cares about lives somewhere the user can't write to.
+
+## Why didn't I copy it exactly?
+
+I started porting that shape to dotsecenv. It got complicated fast.
+
+Does a `login` block in system config override the user's login block? Do user settings dictate the logged-in identity? Are `approved_algorithms` additive across layers, or does each layer replace the last? Every question had a defensible answer, none of them obviously correct.
+
+It also reminded me of the chezmoi problem. I manage my dotfiles with chezmoi, and the recurring frustration is composing the right config across machines: you end up templating fragments, which gets hard to maintain as the configuration grows. Adding more merge layers to dotsecenv would just push that mess onto users.
+
+> Claude composes three layers; for dotsecenv, one file plus constraints turned out to be enough.
+
+I borrowed Claude's idea without copying its layering. One config file the user owns, plus an admin-controlled directory of constraints, not another layer to merge in. Two pieces, simple rules.
+
+## What landed in v0.6.0
+
+I shipped dotsecenv v0.6.0 last night, with three changes:
+
+- The user keeps a config file they own, wherever they want it. Sensible defaults out of the box: a user vault, plus a local-directory vault if one exists.
+- The admin gets `/etc/dotsecenv/policy.d/`, owned by root, where they drop YAML fragments. dotsecenv reads them on every startup.
+- Policy always wins, but via two different mechanisms. For lists (allowed algorithms, allowed vault paths), the effective config is the intersection of policy and user. You can never gain a capability that the policy didn't grant. For scalars (e.g., a minimum key size), the policy value overrides the user's.
+
+A typical org policy might look like:
+
+```yaml
+# /etc/dotsecenv/policy.d/00-fips.yaml
+allowed_algorithms:
+  - rsa4096
+  - ed25519
+min_key_size: 4096
+mandatory_vault_path: /srv/secrets/
+```
+
+A user config that composes cleanly:
+
+```yaml
+# ~/.config/dotsecenv/config.yaml
+default_algorithm: ed25519
+vault_path: /srv/secrets/team-platform/
+```
+
+A user config that gets partially filtered (an unapproved algorithm and an out-of-bounds vault path):
+
+```console
+$ dotsecenv vault list
+warning: ignoring algorithm `rsa2048` (not in policy allowed_algorithms)
+warning: ignoring vault_path `/home/alice/secrets/` (outside policy mandatory_vault_path /srv/secrets/)
+...
+```
+
+Like every other dotsecenv command, anything that gets filtered, rejected, or assumed emits a warning to stderr. Nothing is silent.
+
+That's enough to enforce org-wide defaults via fleet management or MDM software: FIPS-only algorithms, mandatory vault locations, minimum key sizes, whatever the org needs. The admin writes the constraints; the user picks from what's left.
+
+No daemon. No SUID. No macOS asterisk. Files in a directory that the (non-root) user can't write to, and intersection logic they can't bypass.
+
+## Watch out for these caveats
+
+If an attacker has root access, none of this will save you. They can recompile dotsecenv with the policy check stripped, swap the binary, or skip dotsecenv entirely and run `gpg --decrypt` against the vault directly.
+
+Think of the policy directory like a speed limit: it works because cooperating users follow it. It does not stop someone who decides to ignore it. At that point, you need different controls: code signing, anti-malware/security agents, etc.
+
+## Next
+
+You can find the full design at [Security Policies](/concepts/security-policies/).
+
+Thank you for reading! 🙏

@@ -1,0 +1,448 @@
+---
+title: Installation
+description: Step-by-step installation guide for all platforms
+---
+
+import { Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components';
+import DownloadCommands from '../../../components/DownloadCommands.astro';
+import VersionOutput from '../../../components/VersionOutput.astro';
+import VersionExample from '../../../components/VersionExample.astro';
+
+<Aside type="tip">
+For most users, the [Getting Started](/getting-started/) guide handles installation automatically. This page is a reference for all installation methods and options.
+</Aside>
+
+<Aside type="tip" title="Runnable example">
+A self-contained quickstart with `init config` → `init vault` → `login` → `secret store` → `secret get` ships at [`examples/01-quickstart/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/01-quickstart) on the CLI repo. `./run.sh` exercises the whole flow against an ephemeral tempdir and GPG home.
+</Aside>
+
+## Goal
+
+Install dotsecenv on your system and verify it's working correctly.
+
+## Steps
+
+<Steps>
+
+1. **Choose your installation method**
+
+   <Tabs>
+     <TabItem label="Install Script (recommended)">
+       The universal installer is the fastest way to install dotsecenv. It auto-detects your platform,
+       downloads the correct binary, verifies checksums and GPG signatures, and installs shell completions,
+       man pages, and the shell plugin automatically.
+
+       ```bash
+       curl -fsSL https://get.dotsecenv.com/install.sh | bash
+       ```
+
+       Install a specific version:
+
+       ```bash
+       curl -fsSL https://get.dotsecenv.com/install.sh | bash -s -- --version v1.2.3
+       ```
+
+       Customize with flags:
+
+       ```bash
+       curl -fsSL https://get.dotsecenv.com/install.sh | bash -s -- \
+         --install-dir ~/.local/bin \
+         --no-install-shell-plugin
+       ```
+
+       Or use environment variables (useful for CI/CD):
+
+       ```bash
+       VERSION=v1.2.3 INSTALL_DIR=/opt/bin \
+         curl -fsSL https://get.dotsecenv.com/install.sh | bash
+       ```
+
+       Run with `--help` for all available options. CLI flags take precedence over environment variables, which take precedence over defaults.
+     </TabItem>
+
+     <TabItem label="macOS (Homebrew)">
+       ```bash
+       brew tap dotsecenv/tap
+       brew install dotsecenv
+       ```
+
+       This automatically installs shell completions.
+     </TabItem>
+
+     <TabItem label="macOS (Binary)">
+       Download the binary directly:
+
+       <DownloadCommands platform="darwin" />
+     </TabItem>
+
+     <TabItem label="Debian/Ubuntu">
+       Add the apt repository:
+
+       ```bash
+       # Trust the GPG key
+       curl -fsSL https://get.dotsecenv.com/key.asc | \
+         sudo gpg --dearmor -o /etc/apt/keyrings/dotsecenv.gpg
+
+       # Add the repository
+       echo "deb [signed-by=/etc/apt/keyrings/dotsecenv.gpg] \
+         https://get.dotsecenv.com/apt/ ./" | \
+         sudo tee /etc/apt/sources.list.d/dotsecenv.list
+
+       # Install
+       sudo apt-get update
+       sudo apt-get install dotsecenv
+       ```
+     </TabItem>
+
+     <TabItem label="Fedora/RHEL">
+       Add the yum repository:
+
+       ```bash
+       cat <<EOF | sudo tee /etc/yum.repos.d/dotsecenv.repo
+       [dotsecenv]
+       name=DotSecEnv Repository
+       baseurl=https://get.dotsecenv.com/yum/
+       enabled=1
+       gpgcheck=1
+       repo_gpgcheck=1
+       gpgkey=https://get.dotsecenv.com/key.asc
+       EOF
+
+       sudo dnf install dotsecenv
+       ```
+     </TabItem>
+
+     <TabItem label="Arch Linux">
+       Add to pacman:
+
+       ```bash
+       # Add to pacman.conf
+       cat <<'EOF' | sudo tee -a /etc/pacman.conf
+       [dotsecenv]
+       Server = https://get.dotsecenv.com/arch/$arch
+       SigLevel = Required DatabaseOptional
+       EOF
+
+       # Trust the key
+       curl -fsSL https://get.dotsecenv.com/key.asc | sudo pacman-key --add -
+       sudo pacman-key --lsign-key 0B8DB28079ACFA7497F0B8FE647E9C8219626442
+
+       # Install
+       sudo pacman -Sy dotsecenv
+       ```
+     </TabItem>
+
+     <TabItem label="mise">
+       If you use [mise](https://mise.jdx.dev/):
+
+       ```bash
+       mise use github:dotsecenv/dotsecenv
+       ```
+     </TabItem>
+
+     <TabItem label="Windows">
+       <Aside type="caution" title="Work in Progress">
+         Windows support is still under development. Follow [issue #8](https://github.com/dotsecenv/dotsecenv/issues/8) for updates.
+       </Aside>
+
+       Download the `.zip` for your architecture from the [Releases page](https://github.com/dotsecenv/dotsecenv/releases):
+
+       - `dotsecenv_vX.X.X_Windows_x86_64.zip` for 64-bit Intel/AMD
+       - `dotsecenv_vX.X.X_Windows_arm64.zip` for ARM64
+
+       Extract and add the binary location to your PATH.
+
+       **GPG Requirement**: Install [Gpg4win](https://www.gpg4win.org/) for GPG support.
+       When you run `dotsecenv init config`, it will detect GPG automatically and set the path.
+       You can also manually configure it in your config file:
+
+       ```yaml
+       gpg:
+         program: "C:\\Program Files (x86)\\GnuPG\\bin\\gpg.exe"
+       ```
+     </TabItem>
+
+     <TabItem label="From Source">
+       Build from source (requires Go 1.25+):
+
+       ```bash
+       git clone https://github.com/dotsecenv/dotsecenv.git
+       cd dotsecenv
+       make build
+       sudo mv bin/dotsecenv /usr/local/bin/
+       ```
+     </TabItem>
+   </Tabs>
+
+2. **Verify the installation**
+
+   ```bash
+   dotsecenv version
+   ```
+
+   You should see output like:
+
+   <VersionOutput />
+
+3. **Install shell completions** (if not automatic)
+
+   <Tabs>
+     <TabItem label="Bash">
+       ```bash
+       # System-wide
+       dotsecenv completion bash | sudo tee /etc/bash_completion.d/dotsecenv
+
+       # Or user-level (add to ~/.bashrc)
+       eval "$(dotsecenv completion bash)"
+       ```
+     </TabItem>
+
+     <TabItem label="Zsh">
+       ```bash
+       # Add to ~/.zshrc
+       eval "$(dotsecenv completion zsh)"
+       ```
+     </TabItem>
+
+     <TabItem label="Fish">
+       ```bash
+       # Add to ~/.config/fish/config.fish
+       dotsecenv completion fish | source
+       ```
+     </TabItem>
+
+     <TabItem label="PowerShell">
+       <Aside type="caution" title="Work in Progress">
+         Windows support is still under development. Follow [issue #8](https://github.com/dotsecenv/dotsecenv/issues/8) for updates.
+       </Aside>
+
+       ```powershell
+       # Add to your PowerShell profile ($PROFILE)
+       dotsecenv completion powershell | Out-String | Invoke-Expression
+       ```
+     </TabItem>
+   </Tabs>
+
+</Steps>
+
+## Expected Result
+
+After installation, you should be able to:
+
+```bash
+# Check version
+dotsecenv version
+
+# See available commands
+dotsecenv --help
+
+# Tab-complete commands (after shell restart)
+dotsecenv <TAB>
+```
+
+## Variations
+
+### Install Script Reference
+
+<Aside type="note" title="Available in v0.4.8+">
+  The universal `install.sh` (with checksum/GPG verification, shell-plugin auto-install, and full flag/env support) shipped in v0.4.8. Earlier installs used Homebrew, the GitHub Action, or manual binary download.
+</Aside>
+
+The universal install script (`install.sh`) supports both CLI flags and environment variables for every setting. This makes it equally convenient for interactive use (`curl | bash -s -- --flags`) and automated CI/CD pipelines (`ENV_VAR=value curl | bash`).
+
+**Precedence order:** CLI flags > environment variables > defaults.
+
+#### Usage
+
+```bash
+# Piped (simplest)
+curl -fsSL https://get.dotsecenv.com/install.sh | bash
+
+# Piped with CLI flags
+curl -fsSL https://get.dotsecenv.com/install.sh | bash -s -- [OPTIONS]
+
+# Piped with environment variables
+VERSION=v1.2.3 curl -fsSL https://get.dotsecenv.com/install.sh | bash
+
+# Downloaded and run locally
+curl -fsSL https://get.dotsecenv.com/install.sh -o install.sh
+chmod +x install.sh
+./install.sh --version v1.2.3
+```
+
+#### Options
+
+Every setting can be configured via a CLI flag or an environment variable. CLI flags take precedence over environment variables.
+
+| Setting | CLI Flag | Env Var | Default | Description |
+|---------|----------|---------|---------|-------------|
+| Version | `--version VERSION` | `VERSION` | `latest` | Version to install (e.g., `v1.2.3`) |
+| Install directory | `--install-dir DIR` | `INSTALL_DIR` | `~/.local/bin` | Binary install path |
+| System install | `--system` | `SYSTEM_INSTALL` | `0` | Install everything system-wide |
+| Shell plugin | `--[no-]install-shell-plugin` | `INSTALL_SHELL_PLUGIN` | `1` (yes) | Install the shell plugin for zsh/bash/fish |
+| Completions | `--[no-]install-completions` | `INSTALL_COMPLETIONS` | `1` (yes) | Install shell completions for bash, zsh, and fish |
+| Man pages | `--[no-]install-man-pages` | `INSTALL_MAN_PAGES` | `1` (yes) | Install man pages |
+| TF credentials helper | `--[no-]install-tf-credentials-helper` | `INSTALL_TF_CREDENTIALS_HELPER` | `1` (yes) | Install the Terraform credentials helper |
+| Verification | `--[no-]verify` | `VERIFY` | `1` (yes) | Verify SHA-256 checksums and GPG signatures |
+| Help | `-h`, `--help` | — | — | Show help and exit |
+
+#### What the Installer Does
+
+1. Detects your platform (Linux or macOS, x86_64 or arm64)
+2. Resolves the version: queries the GitHub API for the latest release, or uses the version you specified
+3. Downloads the release archive from GitHub Releases
+4. Verifies integrity via SHA-256 checksum and GPG signature (when `gpg` is available)
+5. Installs the binary to `~/.local/bin` by default (or `/usr/local/bin` with `--system`)
+6. Installs shell completions for bash, zsh, and fish under `~/.local/share/` by default (or system directories with `--system`)
+7. Installs man pages under `~/.local/share/man/man1/` by default (or system man directories with `--system`)
+8. Installs the shell plugin: clones to `~/.local/share/dotsecenv/plugin/` by default (or system share path with `--system`), and also integrates with detected plugin managers (Oh My Zsh, Zinit, Antidote, Oh My Bash, Fisher, Oh My Fish). Fish `conf.d` is linked automatically if fish is present.
+9. Installs the Terraform credentials helper to `~/.terraform.d/plugins/` by default (or system share path with `--system`). Skip with `--no-install-tf-credentials-helper`.
+
+#### Install Paths
+
+| Component | Default (user) | `--system` (macOS) | `--system` (Linux) |
+|-----------|---------------|--------------------|--------------------|
+| Binary | `~/.local/bin/` | `/usr/local/bin/` | `/usr/local/bin/` |
+| Completions | `~/.local/share/` | `/usr/local/share/` | `/usr/share/` |
+| Man pages | `~/.local/share/man/man1/` | `/usr/local/share/man/man1/` | `/usr/local/share/man/man1/` |
+| Shell plugin | `~/.local/share/dotsecenv/plugin/` | `/usr/local/share/dotsecenv/plugin/` | `/usr/share/dotsecenv/plugin/` |
+| TF helper | `~/.terraform.d/plugins/` | `/usr/local/share/terraform/plugins/` | `/usr/share/terraform/plugins/` |
+
+#### Examples
+
+**CI/CD: Install specific version, skip interactive components:**
+
+```bash
+VERSION=v1.2.3 INSTALL_SHELL_PLUGIN=0 INSTALL_MAN_PAGES=0 \
+  curl -fsSL https://get.dotsecenv.com/install.sh | bash
+```
+
+**Custom install directory with Terraform helper:**
+
+```bash
+curl -fsSL https://get.dotsecenv.com/install.sh | bash -s -- \
+  --install-dir /opt/dotsecenv/bin \
+  --install-tf-credentials-helper
+```
+
+**Minimal install (binary only):**
+
+```bash
+curl -fsSL https://get.dotsecenv.com/install.sh | bash -s -- \
+  --no-install-shell-plugin \
+  --no-install-completions \
+  --no-install-man-pages
+```
+
+**Download and inspect before running:**
+
+```bash
+curl -fsSL https://get.dotsecenv.com/install.sh -o install.sh
+less install.sh  # review the script
+bash install.sh --version v1.2.3
+```
+
+<Aside type="tip" title="Requires curl or wget">
+The install script works with either `curl` or `wget`. At least one must be available on your system.
+</Aside>
+
+### Installing a Specific Version
+
+Download a specific version from GitHub releases:
+
+<VersionExample />
+
+### Verifying Package Signatures
+
+All packages are signed with the dotsecenv release key:
+
+```text
+pub   rsa4096 2026-05-14 [SC] [expires: 2028-05-13]
+      0B8DB28079ACFA7497F0B8FE647E9C8219626442
+uid   DotSecEnv Releases <release@dotsecenv.com>
+```
+
+Verify the key from multiple sources:
+
+```bash
+# OpenPGP Keyserver
+gpg --keyserver keys.openpgp.org --recv-keys 0B8DB28079ACFA7497F0B8FE647E9C8219626442
+
+# Keybase
+curl https://keybase.io/dotsecenv/pgp_keys.asc | gpg --import
+```
+
+Releases up to and including v0.6.3 were signed with the previous
+key (`E60A1740BAEF49284D22EA7D3C376348F0921C59`). To verify those
+signatures, also import the old key — `https://get.dotsecenv.com/key.asc`
+contains both old and new public keys concatenated so a single import
+covers all releases.
+
+### Verifying macOS Notarization
+
+All macOS binaries are code-signed with an Apple Developer ID certificate and notarized by Apple.
+This ensures Gatekeeper allows the binary to run without security warnings.
+
+**Verify code signature:**
+
+```bash
+codesign --verify --verbose /usr/local/bin/dotsecenv
+# Expected: valid on disk
+```
+
+**Verify notarization status:**
+
+```bash
+spctl --assess --verbose /usr/local/bin/dotsecenv
+# Expected: accepted
+# source=Notarized Developer ID
+```
+
+**View signature details:**
+
+```bash
+codesign -dv --verbose=4 /usr/local/bin/dotsecenv
+```
+
+<Aside type="tip" title="Homebrew Users">
+If you installed via Homebrew, the binary is located at `$(brew --prefix)/bin/dotsecenv`.
+Homebrew casks automatically handle quarantine removal, so Gatekeeper warnings are bypassed.
+</Aside>
+
+### Uninstalling
+
+<Tabs>
+  <TabItem label="Homebrew">
+    ```bash
+    brew uninstall dotsecenv
+    brew untap dotsecenv/tap
+    ```
+  </TabItem>
+
+  <TabItem label="apt">
+    ```bash
+    sudo apt-get remove dotsecenv
+    sudo rm /etc/apt/sources.list.d/dotsecenv.list
+    ```
+  </TabItem>
+
+  <TabItem label="Binary">
+    ```bash
+    sudo rm /usr/local/bin/dotsecenv
+    ```
+  </TabItem>
+</Tabs>
+
+<Aside type="note">
+Uninstalling dotsecenv does not remove your vault or config files. To remove all data:
+```bash
+rm -rf ~/.config/dotsecenv
+```
+</Aside>
+
+---
+
+## Next Steps
+
+- [First Secret](/tutorials/first-secret/): store and use your first secret
+- [Getting Started](/getting-started/): complete initial setup
