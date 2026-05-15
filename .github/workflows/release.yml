@@ -287,6 +287,8 @@ jobs:
   update-homebrew-tap:
     needs: update-checksums
     runs-on: ubuntu-latest
+    outputs:
+      cask_commit_sha: ${{ steps.commit.outputs.cask_commit_sha }}
     steps:
       - name: Generate App Token
         uses: actions/create-github-app-token@v3
@@ -311,6 +313,43 @@ jobs:
           VERSION="${{ github.ref_name }}"
           gh release download "$VERSION" --repo dotsecenv/dotsecenv --pattern "checksums.txt" --dir .
 
+      # The notarize-macos jobs re-upload the Darwin archives. GitHub
+      # Releases is fronted by a CDN that can briefly serve the pre-
+      # notarization copy, which makes `brew install` fail with a sha
+      # mismatch on whoever fetches in that window. Don't push the cask
+      # until the CDN is serving the same bytes that checksums.txt now
+      # advertises for both Darwin archives.
+      - name: Wait for CDN to serve notarized Darwin archives
+        run: |
+          set -euo pipefail
+          VERSION="${{ github.ref_name }}"
+          VERSION_NUM="${VERSION#v}"
+
+          for arch in arm64 x86_64; do
+            ASSET="dotsecenv_${VERSION_NUM}_Darwin_${arch}.tar.gz"
+            EXPECTED=$(grep "${ASSET}\$" checksums.txt | cut -d' ' -f1)
+            if [ -z "$EXPECTED" ]; then
+              echo "::error::No checksum entry for ${ASSET} in checksums.txt"
+              exit 1
+            fi
+            URL="https://github.com/dotsecenv/dotsecenv/releases/download/${VERSION}/${ASSET}"
+
+            deadline=$(( $(date +%s) + 300 ))
+            while :; do
+              ACTUAL=$(curl -fsSL "$URL" | sha256sum | cut -d' ' -f1)
+              if [ "$ACTUAL" = "$EXPECTED" ]; then
+                echo "${ASSET}: CDN matches expected (${EXPECTED})"
+                break
+              fi
+              if [ "$(date +%s)" -ge "$deadline" ]; then
+                echo "::error::${ASSET}: CDN still stale after 300s (expected ${EXPECTED}, got ${ACTUAL})"
+                exit 1
+              fi
+              echo "${ASSET}: CDN stale (expected ${EXPECTED}, got ${ACTUAL}); retrying in 10s"
+              sleep 10
+            done
+          done
+
       - name: Update cask with correct checksums
         run: |
           VERSION="${{ github.ref_name }}"
@@ -329,23 +368,89 @@ jobs:
           # Update version
           sed -i "s/version \".*\"/version \"${VERSION_NUM}\"/" "$CASK_FILE"
 
-          # Update arm64 sha256 (on_arm block)
-          sed -i "/on_arm do/,/end/{s/sha256 \"[a-f0-9]*\"/sha256 \"${ARM64_SHA}\"/}" "$CASK_FILE"
+          # Update Darwin arm64 sha256 — must be scoped to the on_macos
+          # block, otherwise sed also rewrites on_linux/on_arm with the
+          # Darwin sha (Linux ARM users would then fail `brew install`).
+          sed -i "/on_macos do/,/on_linux do/{/on_arm do/,/end/{s/sha256 \"[a-f0-9]*\"/sha256 \"${ARM64_SHA}\"/}}" "$CASK_FILE"
 
-          # Update x86_64 sha256 (on_intel block for macOS)
+          # Update Darwin x86_64 sha256 (on_intel block for macOS)
           sed -i "/on_macos do/,/on_linux do/{/on_intel do/,/end/{s/sha256 \"[a-f0-9]*\"/sha256 \"${X86_64_SHA}\"/}}" "$CASK_FILE"
 
           echo "==> Updated cask file:"
           cat "$CASK_FILE"
 
       - name: Commit and push
+        id: commit
         run: |
+          set -euo pipefail
           VERSION="${{ github.ref_name }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Casks/dotsecenv.rb
-          git commit -m "fix: update Darwin checksums for ${VERSION} (post-notarization)" || echo "No changes to commit"
-          git push
+          if git commit -m "fix: update Darwin checksums for ${VERSION} (post-notarization)"; then
+            git push
+            echo "cask_commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          else
+            echo "No cask changes to commit — skipping push (downstream wait will no-op)"
+          fi
+
+  # Push to homebrew-tap fires that repo's own post-release.yml CI
+  # (a `brew tap && brew install` smoke). Until now that run was
+  # fire-and-forget, so a red tap CI didn't fail the release graph and
+  # could silently ship a broken cask between releases. This job waits
+  # for the run we just triggered and surfaces its result here.
+  wait-homebrew-tap-ci:
+    needs: update-homebrew-tap
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Generate App token (homebrew-tap actions:read)
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: homebrew-tap
+
+      - name: Wait for dotsecenv/homebrew-tap post-release.yml to pass
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SHA: ${{ needs.update-homebrew-tap.outputs.cask_commit_sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SHA" ]; then
+            echo "::warning::update-homebrew-tap made no commit (cask unchanged); nothing to wait on."
+            exit 0
+          fi
+
+          # Push-triggered runs take a moment to register; poll until the
+          # run for our cask commit appears.
+          deadline=$(( $(date +%s) + 120 ))
+          RUN_ID=""
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            RUN_ID=$(gh api \
+              "repos/dotsecenv/homebrew-tap/actions/workflows/post-release.yml/runs?head_sha=${SHA}&per_page=1" \
+              --jq '.workflow_runs[0].id // empty')
+            [ -n "$RUN_ID" ] && break
+            sleep 5
+          done
+
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::No post-release.yml run registered on dotsecenv/homebrew-tap for cask commit ${SHA} within 120s"
+            exit 1
+          fi
+
+          RUN_URL="https://github.com/dotsecenv/homebrew-tap/actions/runs/${RUN_ID}"
+          echo "Watching ${RUN_URL}"
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            {
+              echo "## homebrew-tap post-release CI"
+              echo ""
+              echo "Watching [run #${RUN_ID}](${RUN_URL}) for cask commit \`${SHA}\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          gh run watch "$RUN_ID" --exit-status --repo dotsecenv/homebrew-tap
 
   # Inline status awareness for the homebrew tap: actually run `brew install`
   # against the just-pushed cask. If install fails, the release graph fails
@@ -387,7 +492,7 @@ jobs:
         run: dotsecenv help > /dev/null
 
   dispatch-packages:
-    needs: [goreleaser, update-checksums, update-homebrew-tap, verify-homebrew-install]
+    needs: [goreleaser, update-checksums, update-homebrew-tap, verify-homebrew-install, wait-homebrew-tap-ci]
     runs-on: ubuntu-latest
     # Exposed so wait-publish-packages can watch the just-dispatched run
     # without re-doing the discovery work.
@@ -541,11 +646,12 @@ jobs:
   # the build/deploy logic stays single-sourced (deploy-website.yml also
   # fires standalone on out-of-band main-branch website edits).
   #
-  # Gated on update-homebrew-tap with success-or-skipped semantics: don't
-  # ship updated docs if the binary build / notarize / cask flow failed,
-  # but DO ship them if those steps were legitimately skipped.
+  # Gated on wait-homebrew-tap-ci with success-or-skipped semantics: don't
+  # ship updated docs until the cask is proven installable on the tap (so
+  # the docs never advertise a release whose `brew install` is broken),
+  # but DO ship them if upstream steps were legitimately skipped.
   deploy-website:
-    needs: update-homebrew-tap
+    needs: wait-homebrew-tap-ci
     if: ${{ !failure() && !cancelled() }}
     uses: ./.github/workflows/deploy-website.yml
     permissions:
