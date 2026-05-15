@@ -22,7 +22,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   # Job 1: Build and prepare artifacts (with network)
