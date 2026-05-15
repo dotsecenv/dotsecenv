@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   # Job 1: Build artifacts (with network)
-  hermetic-setup:
+  setup-hermetic:
     name: Build E2E Artifacts
     runs-on: ubuntu-latest
     steps:
@@ -37,9 +37,9 @@ jobs:
           retention-days: 1
 
   # Job 2: Hermetic E2E (network blocked)
-  hermetic-test:
+  test-hermetic:
     name: Hermetic E2E Verification
-    needs: hermetic-setup
+    needs: setup-hermetic
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -57,7 +57,7 @@ jobs:
         run: make e2e
 
   goreleaser:
-    needs: hermetic-test
+    needs: test-hermetic
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -332,10 +332,10 @@ jobs:
           git commit -m "fix: update Darwin checksums for ${VERSION} (post-notarization)" || echo "No changes to commit"
           git push
 
-  trigger-repo-update:
+  dispatch-packages:
     needs: [goreleaser, update-checksums, update-homebrew-tap]
     runs-on: ubuntu-latest
-    # Exposed so wait-packages-publish can watch the just-dispatched run
+    # Exposed so wait-publish-packages can watch the just-dispatched run
     # without re-doing the discovery work.
     outputs:
       packages_run_id: ${{ steps.find_packages.outputs.run_id }}
@@ -377,12 +377,12 @@ jobs:
         run: scripts/release/find-satellite-run.sh
 
   # Poll the dispatched packages run to completion. The link to the
-  # satellite run is already on the trigger-repo-update job summary
+  # satellite run is already on the dispatch-packages job summary
   # (written by find-satellite-run.sh); this job re-prints it on its
   # own summary along with the final ✅/❌/⏱️ status.
-  wait-packages-publish:
-    needs: trigger-repo-update
-    if: needs.trigger-repo-update.result == 'success'
+  wait-publish-packages:
+    needs: dispatch-packages
+    if: needs.dispatch-packages.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -401,19 +401,19 @@ jobs:
       - name: Watch dotsecenv/packages publish run
         env:
           SATELLITE_REPO: dotsecenv/packages
-          RUN_ID: ${{ needs.trigger-repo-update.outputs.packages_run_id }}
+          RUN_ID: ${{ needs.dispatch-packages.outputs.packages_run_id }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: scripts/release/watch-satellite-run.sh
 
-  # Reusable workflow invocation — action-e2e.yml's 5 matrix jobs run
+  # Reusable workflow invocation — e2e-action.yml's 5 matrix jobs run
   # synchronously and surface as checks under this release run, no
   # repository_dispatch + poll machinery needed. Same lifecycle stage
   # as the satellites: the GH release is public, v0 major tag has been
   # moved by goreleaser, so `dotsecenv/dotsecenv@v0` resolves to the
   # just-published action and the released binary is reachable.
-  action-e2e:
+  e2e-action:
     needs: update-checksums
-    uses: ./.github/workflows/action-e2e.yml
+    uses: ./.github/workflows/e2e-action.yml
     with:
       version: ${{ github.ref_name }}
 
