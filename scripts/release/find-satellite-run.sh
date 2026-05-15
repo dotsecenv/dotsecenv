@@ -13,7 +13,7 @@
 #   GH_TOKEN             token with `actions: read` on SATELLITE_REPO
 #
 # Optional env:
-#   WORKFLOW_FILE        e.g. "action-e2e.yml" — narrows discovery to runs
+#   WORKFLOW_FILE        e.g. "publish.yml" — narrows discovery to runs
 #                        of that specific workflow. Use this when a single
 #                        dispatcher fires multiple repository_dispatch
 #                        events that map to different workflows; otherwise
