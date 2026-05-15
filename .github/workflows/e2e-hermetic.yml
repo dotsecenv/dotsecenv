@@ -24,7 +24,11 @@ permissions:
   contents: read
 
 jobs:
-  # Job 1: Build and prepare artifacts (with network)
+  # Job 1: Build the binary once with network available.
+  # The compiled bin/dotsecenv is consumed by `hermetic-harden-runner`,
+  # which cannot fetch the Go toolchain itself (see job 2 comment).
+  # `hermetic-strace-verified` does NOT consume this artifact — it
+  # rebuilds from vendored sources so the compile step is also traced.
   setup:
     name: Build artifacts
     runs-on: ubuntu-latest
@@ -49,7 +53,13 @@ jobs:
             scripts/e2e.sh
           retention-days: 1
 
-  # Job 2: harden-runner enforcement (no network needed)
+  # Job 2: harden-runner enforcement on the e2e phase.
+  # `egress-policy: block` must be the first step for tamper-resistance,
+  # which means no later step can use the network — including
+  # actions/setup-go (vendoring covers `go build`, not toolchain install).
+  # So this job consumes the pre-built artifact from `setup` and only
+  # exercises `make e2e`. Verifies zero egress during the e2e flow via
+  # step-security's runtime egress interceptor.
   hermetic-harden-runner:
     name: Hermetic E2E (harden-runner)
     needs: setup
@@ -69,7 +79,14 @@ jobs:
       - name: Run hermetic e2e
         run: make e2e
 
-  # Job 3: Network namespace + strace verification
+  # Job 3: Network namespace + strace verification on build AND e2e.
+  # Intentionally NOT `needs: setup` — we do checkout + setup-go BEFORE
+  # entering `unshare --net`, then run `make build e2e` inside the
+  # namespace so the compile step is also under syscall inspection.
+  # Vendored modules (`go build -mod=vendor`) make the in-namespace
+  # build possible without any network. Complements job 2: harden-runner
+  # verifies egress at the application layer, strace + netns verify at
+  # the kernel layer and additionally cover the compile step.
   hermetic-strace-verified:
     name: Hermetic E2E (strace + namespace)
     runs-on: ubuntu-latest

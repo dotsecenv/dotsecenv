@@ -200,10 +200,10 @@ dotsecenv validate
 A secrets management tool that "phones home" or makes unexpected network connections is a severe risk. dotsecenv's CI pipeline includes hermetic e2e testing with two independent verifications:
 
 1. Vendored dependencies. Go modules are vendored, so the build needs no network.
-2. Dual verification. Two parallel jobs check that zero network connections happen:
+2. Dual verification. Two jobs check that zero network connections happen:
    - [step-security/harden-runner](https://github.com/step-security/harden-runner) blocks egress at the kernel level
    - A network namespace plus `strace` traces every network syscall in isolation
-3. Defense in depth. If one method has a bug, the other still catches violations.
+3. Complementary coverage. The two jobs aren't identical reruns; they check different parts of the pipeline (see [Why Two Jobs?](#why-two-jobs)).
 4. Auditable artifacts. Job summaries and downloadable syscall traces.
 5. Release gate. Releases are blocked if hermetic tests fail.
 
@@ -229,6 +229,23 @@ A secrets management tool that "phones home" or makes unexpected network connect
 │  ✓ Both jobs must pass = zero network connections verified twice       │
 └───────────────────────────────────────────────────────────────────────┘
 ```
+
+### Why Two Jobs?
+
+The two jobs cover different parts of the pipeline, not just the same part twice. The split exists because of an ordering constraint in `harden-runner`.
+
+| Surface under inspection | `harden-runner` job | `strace + netns` job |
+| --- | --- | --- |
+| `go build` (compile step) | uses pre-built binary | rebuilds inside namespace |
+| `make e2e` (runtime) | yes | yes |
+| Enforcement layer | userspace egress interceptor | kernel network namespace + syscall trace |
+| Catches a bug in the other? | yes (different mechanism) | yes (different mechanism) |
+
+Why does only the strace job cover the build? `harden-runner` should be the first step of the job so a compromised later step cannot disable it. Once `egress-policy: block` is set, no later step has network access, including `actions/setup-go`, which has to fetch the Go toolchain. Vendoring removes the network requirement from `go build` itself but not from installing the compiler. So the `harden-runner` job consumes a pre-built `bin/dotsecenv` from the `setup` job and only exercises `make e2e`.
+
+The strace job has no such constraint. It runs `actions/setup-go` before entering `unshare --net`, then builds and runs e2e inside the namespace. The kernel namespace is the isolation boundary, so the compile step is covered too. `go build -mod=vendor` is what makes the in-namespace build possible.
+
+So every CI step has at least one job watching it, and the e2e phase has both.
 
 ### Trusted By
 
