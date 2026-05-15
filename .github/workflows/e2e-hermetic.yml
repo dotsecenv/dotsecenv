@@ -1,6 +1,10 @@
 name: Hermetic E2E
 
 on:
+  # Invoked by release.yml as a reusable workflow so the release pipeline
+  # gets the same hermeticity verification (harden-runner + strace) that
+  # PRs do, without duplicating job definitions across workflows.
+  workflow_call:
   pull_request:
     branches: [main]
     paths:

@@ -11,53 +11,15 @@ permissions:
   attestations: write
 
 jobs:
-  # Job 1: Build artifacts (with network)
-  setup-hermetic:
-    name: Build E2E Artifacts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: "go.mod"
-          cache-dependency-path: "go.sum"
-
-      - name: Build binary
-        run: make build
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-e2e-artifacts
-          path: |
-            Makefile
-            bin/dotsecenv
-            scripts/e2e.sh
-          retention-days: 1
-
-  # Job 2: Hermetic E2E (network blocked)
-  test-hermetic:
-    name: Hermetic E2E Verification
-    needs: setup-hermetic
-    runs-on: ubuntu-latest
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
-        with:
-          egress-policy: block
-          disable-sudo-and-containers: true
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: release-e2e-artifacts
-
-      - name: Run hermetic e2e
-        run: make e2e
+  # Reusable hermetic E2E (harden-runner + strace network-syscall
+  # verification). Single source of truth in e2e-hermetic.yml — used by
+  # PRs and by the release pipeline so the verification logic doesn't
+  # drift between the two.
+  e2e-hermetic:
+    uses: ./.github/workflows/e2e-hermetic.yml
 
   goreleaser:
-    needs: test-hermetic
+    needs: e2e-hermetic
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
