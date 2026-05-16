@@ -51,13 +51,40 @@ max-cache-ttl 14400
 no-allow-external-cache
 ```
 
-Reload the agent after editing:
-
-```bash
-gpgconf --reload gpg-agent
-```
-
 For the security rationale behind each option — why `no-allow-external-cache` matters, when to set both TTLs to `0` for maximum security, and how the OS keychain interacts with these settings — see [Threat Model: Recommended GPG Agent Configuration](/concepts/threat-model/#recommended-gpg-agent-configuration).
+
+## Apply and verify
+
+After editing the config, run this once to confirm the agent picked up your changes and that the cache holds across calls.
+
+1. Reload the agent so the new values take effect without interrupting in-flight operations:
+
+   ```bash
+   gpgconf --reload gpg-agent
+   ```
+
+   The older `killall gpg-agent` works, but it cuts off any decryption already in progress. Use the reload instead.
+
+2. Confirm the agent now reports the TTLs you set:
+
+   ```bash
+   gpgconf --list-options gpg-agent | grep -E '^(default-cache-ttl|max-cache-ttl):'
+   # default-cache-ttl:0:0:N:N:0:::3600:
+   # max-cache-ttl:0:0:N:N:0:::14400:
+   ```
+
+   The number after the seventh colon is the current value. If you see `0` or your previous setting instead of `3600` / `14400`, you reloaded a different `GNUPGHOME` than you edited. Cross-check `gpgconf --list-dirs homedir` against `echo $GNUPGHOME` and try again.
+
+3. Seed the cache once with a signing operation, then confirm a follow-up dotsecenv call runs without prompting:
+
+   ```bash
+   gpg --sign --local-user YOUR_FINGERPRINT </dev/null >/dev/null   # pinentry prompts here
+   dotsecenv secret get ANY_SECRET                                  # silent within default-cache-ttl
+   ```
+
+   If the `dotsecenv` call also prompts, one of three things is true: `default-cache-ttl` is set to `0` (caching disabled), `no-allow-external-cache` is fighting an OS keychain entry left by an earlier setup, or the agent serving signing differs from the one serving decryption. `dotsecenv vault doctor` reports the last case directly.
+
+Once both calls run silently, every `dotsecenv` operation within `default-cache-ttl` seconds of the previous one will reuse the cached passphrase, up to the `max-cache-ttl` hard cap. For non-interactive contexts (CI, AI coding agents, cron) you also need to seed the cache *before* launching the job. See [Cache warming](#cache-warming-for-non-interactive-use).
 
 ## Pinentry compatibility
 

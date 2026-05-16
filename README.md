@@ -842,7 +842,7 @@ sudo pacman -S pinentry-tty
 # etc.
 ```
 
-In rare cases you may need to add a `pinentry-program` line to your `~/.gnupg/gpg-agent.conf` and restart the gpg-agent (`killall gpg-agent`).
+In rare cases you may need to add a `pinentry-program` line to your `~/.gnupg/gpg-agent.conf` and reload the gpg-agent (`gpgconf --reload gpg-agent`).
 
 ### gpg: signing failed: Inappropriate ioctl for device
 
