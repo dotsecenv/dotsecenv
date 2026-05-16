@@ -1,7 +1,8 @@
-name: Verify Satellites
+name: Verify Satellite Drift
 
 # Reconcile the published satellite repos (dotsecenv/plugin,
-# dotsecenv/packages) against the monorepo source at the release SHA.
+# dotsecenv/packages) against the monorepo source at the SHA each
+# satellite says it was last published from.
 #
 # Why a separate workflow (and not part of release.yml)?
 #   The release pipeline already shipped binaries, packaged assets,
@@ -13,12 +14,24 @@ name: Verify Satellites
 #   in its own workflow keeps the release graph clean and lets us
 #   iterate on the verifier without touching the release path.
 #
-# Failure UX: opens (or comments on) a single dedup'd
-# `satellite-drift` issue on the monorepo. The next clean run closes
-# the issue automatically. No paging, no extra surfaces.
+# Reference SHA precedence (highest to lowest):
+#   1. workflow_dispatch input `sha` (explicit operator override)
+#   2. workflow_run.head_sha (the tag commit the upstream Release
+#      just published — newest known publish SHA)
+#   3. The satellite's own .release-sha sidecar (the satellite's
+#      authoritative claim of which monorepo commit it was last
+#      published from)
 #
-# Manual dispatch is also enabled so you can rerun against an
-# arbitrary monorepo SHA without waiting for the next release.
+# Crucially, we do NOT default to `github.sha`. That would be the
+# main HEAD when the workflow fires, which can be ahead of the last
+# release — main is allowed to move between releases without the
+# satellites moving with it, so comparing the satellite against
+# main HEAD would produce false drift every time the workflow ran
+# off-cycle.
+#
+# Failure UX: the workflow goes red. GitHub's built-in failure
+# notification (email to the actor + workflow watchers) is enough
+# signal — no separate issue tracker plumbing.
 
 on:
   workflow_run:
@@ -28,13 +41,12 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: "Monorepo SHA to verify satellites against (default: HEAD of main)"
+        description: "Monorepo SHA to verify satellites against (default: each satellite's own .release-sha)"
         required: false
         default: ""
 
 permissions:
   contents: read
-  issues: write
   actions: read
 
 jobs:
@@ -59,7 +71,16 @@ jobs:
             repo: dotsecenv/packages
             source_dir: packages
     steps:
-      - name: Resolve monorepo SHA
+      # Satellite goes first because we may need to read its
+      # .release-sha to decide which monorepo commit to compare against.
+      - name: Checkout ${{ matrix.repo }} satellite
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ matrix.repo }}
+          path: satellite
+          fetch-depth: 1
+
+      - name: Resolve monorepo SHA to verify against
         id: sha
         env:
           INPUT_SHA: ${{ inputs.sha }}
@@ -67,17 +88,25 @@ jobs:
         run: |
           if [ -n "${INPUT_SHA}" ]; then
             SHA="${INPUT_SHA}"
+            SRC="workflow_dispatch input"
           elif [ -n "${WR_SHA}" ]; then
             SHA="${WR_SHA}"
+            SRC="upstream Release run head_sha"
+          elif [ -f satellite/.release-sha ]; then
+            SHA=$(tr -d '[:space:]' < satellite/.release-sha)
+            SRC="satellite/.release-sha"
           else
-            SHA="${{ github.sha }}"
+            echo "::error::No SHA source available (no input, no workflow_run, no .release-sha on satellite)"
+            exit 1
           fi
+          echo "Reference SHA: ${SHA} (from ${SRC})"
           echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout monorepo @ release SHA
+      - name: Checkout monorepo @ ${{ steps.sha.outputs.sha }}
         uses: actions/checkout@v6
         with:
           ref: ${{ steps.sha.outputs.sha }}
+          path: monorepo
 
       # The packages satellite is published with a retracted.txt
       # generated from go.mod at publish time. The monorepo source
@@ -90,128 +119,17 @@ jobs:
         if: matrix.satellite == 'packages'
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: monorepo/go.mod
           cache: false
 
       - name: Regenerate packages/retracted.txt from go.mod
         if: matrix.satellite == 'packages'
+        working-directory: monorepo
         run: ./scripts/extract-retracted.sh go.mod > packages/retracted.txt
-
-      - name: Checkout ${{ matrix.repo }} satellite
-        uses: actions/checkout@v6
-        with:
-          repository: ${{ matrix.repo }}
-          path: satellite
-          fetch-depth: 1
 
       - name: Verify ${{ matrix.satellite }} satellite
         env:
-          SOURCE_DIR: ${{ matrix.source_dir }}
+          SOURCE_DIR: monorepo/${{ matrix.source_dir }}
           SATELLITE_DIR: satellite
           EXPECTED_SHA: ${{ steps.sha.outputs.sha }}
-        run: scripts/release/verify-satellite.sh
-
-  # ---------- Issue lifecycle on drift -------------------------------------
-  # Open or comment on a dedup'd issue when at least one matrix leg
-  # of verify failed; close any open drift issue when all legs passed.
-  open-or-update-drift-issue:
-    needs: verify
-    if: ${{ failure() }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - name: Ensure satellite-drift label exists
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh label create satellite-drift \
-            --color "d93f0b" \
-            --description "Drift between monorepo source and a published satellite repo" \
-            --repo "${{ github.repository }}" 2>/dev/null \
-          || gh label edit satellite-drift \
-               --color "d93f0b" \
-               --description "Drift between monorepo source and a published satellite repo" \
-               --repo "${{ github.repository }}"
-
-      - name: Open or update drift issue (deduplicated)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          UPSTREAM_RUN_URL: ${{ github.event.workflow_run.html_url }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          set -euo pipefail
-          BODY=$(cat <<EOF
-          Satellite verification detected drift between the monorepo source
-          tree and one or more published satellite repos.
-
-          - Verify run: ${RUN_URL}
-          - Triggering release run: ${UPSTREAM_RUN_URL:-(manual dispatch)}
-          - Monorepo SHA: ${SHA:-(see verify run)}
-
-          Open the verify run above and expand the failing matrix leg
-          (\`verify (plugin)\` or \`verify (packages)\`) to see the
-          \`Verify ... satellite\` step's job summary — it lists exactly
-          which files differ.
-
-          This issue is auto-managed by .github/workflows/verify-satellites.yml.
-          The next clean verification run will close it automatically.
-          EOF
-          )
-
-          existing=$(gh issue list \
-            --repo "${{ github.repository }}" \
-            --state open \
-            --label satellite-drift \
-            --limit 1 \
-            --json number \
-            --jq '.[0].number // ""')
-
-          if [ -n "${existing}" ]; then
-            echo "Updating existing drift issue #${existing}"
-            gh issue comment "${existing}" \
-              --repo "${{ github.repository }}" \
-              --body "${BODY}"
-          else
-            echo "Opening new drift issue"
-            gh issue create \
-              --repo "${{ github.repository }}" \
-              --label satellite-drift \
-              --title "Satellite drift detected (${SHA:0:7})" \
-              --body "${BODY}"
-          fi
-
-  close-drift-issue:
-    needs: verify
-    if: ${{ success() }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - name: Close any open satellite-drift issue
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          existing=$(gh issue list \
-            --repo "${{ github.repository }}" \
-            --state open \
-            --label satellite-drift \
-            --limit 100 \
-            --json number \
-            --jq '.[].number')
-          if [ -z "${existing}" ]; then
-            echo "No open satellite-drift issues; nothing to close."
-            exit 0
-          fi
-          while IFS= read -r n; do
-            [ -z "$n" ] && continue
-            echo "Closing issue #${n}"
-            gh issue close "$n" \
-              --repo "${{ github.repository }}" \
-              --comment "Resolved: satellite verification is clean at ${RUN_URL}"
-          done <<< "${existing}"
+        run: monorepo/scripts/release/verify-satellite.sh
