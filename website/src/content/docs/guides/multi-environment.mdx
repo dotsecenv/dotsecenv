@@ -1,0 +1,83 @@
+---
+title: Multi-environment vaults
+description: Strategy for running dotsecenv across development, staging, and production with separate identities and FIPS 186-5 compliance
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A working pattern for teams that need to keep development, staging, and production secrets cryptographically separate, with FIPS 186-5 algorithm enforcement applied to all three.
+
+<Aside type="tip" title="Runnable companion">
+The complete demo with three GPG identities, three vaults, and the 3x3 access matrix ships at [`examples/06-multi-environment-fips/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/06-multi-environment-fips) on the CLI repo. This page is the narrative; the example is what you run.
+</Aside>
+
+## The strategy in three lines
+
+1. **One vault file per environment.** `vault-dev`, `vault-staging`, `vault-prod` are independent files in your application repo. Each has its own recipient list. The same secret key (`DATABASE_URL`) in each vault holds a different value. That is what makes the vaults environment-specific.
+2. **Different recipient subsets per vault.** Developers are listed on dev (and maybe staging). Operations is listed on staging and production. Production typically excludes developers entirely. The union of identities across vaults equals your team; no single vault holds the union.
+3. **One FIPS 186-5 policy fragment, machine-wide.** Drop `00-corp-fips.yaml` into `/etc/dotsecenv/policy.d/` on every developer laptop, CI runner, and bastion. Allow-list fields union across fragments, so teams that want stricter limits add a `50-team.yaml` rather than rewriting the corporate baseline.
+
+## Identity patterns
+
+dotsecenv stores one `login.fingerprint` per config file. Where you put the keyring (and which fingerprint you log in with) is what gives you per-environment isolation. Three real-world patterns, roughly in order of operational overhead:
+
+### Pattern 1: One machine per environment
+
+The cleanest separation. Each runner (CI job, deploy bastion, build node) holds exactly one secret key, in its only `$GNUPGHOME`. No switching needed at the shell level; the machine itself is the boundary. The [Team Vault Setup tutorial](/tutorials/team-vault-setup/#variations) documents the multi-vault `--all` flag pattern that makes this ergonomic for the initial bootstrap.
+
+Pick this when you can dedicate hardware (or a runner image) per environment and you trust the machine boundary.
+
+### Pattern 2: GNUPGHOME-switching on a single machine
+
+A developer laptop holds multiple keyrings under different `$GNUPGHOME` paths. Shell aliases route every command to the correct keyring:
+
+```bash
+alias dse-dev='GNUPGHOME=~/.gnupg-dev dotsecenv'
+alias dse-staging='GNUPGHOME=~/.gnupg-staging dotsecenv'
+```
+
+The runnable example ([`examples/06-multi-environment-fips/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/06-multi-environment-fips)) uses this pattern because it works in one shell without faking a multi-machine deployment.
+
+Pick this when developers need to operate against more than one environment but the org has not (yet) dedicated machines per env.
+
+### Pattern 3: One identity, recipient-set partitioning
+
+A single person holds one identity. Different vaults list different subsets of the team on their recipient lists. Access is controlled by which vault you share a secret into, not by which key you hold. The [Share a Secret tutorial](/tutorials/share-secret/) walks the recipient-set mechanics.
+
+Pick this when "different identities per environment" is overkill for your threat model and the per-vault recipient list is sufficient isolation. For example, when the same developer reads dev and staging from the same laptop.
+
+The patterns are not mutually exclusive. Production CI runners often use pattern 1; the same team's developer laptops use pattern 2.
+
+## FIPS 186-5 vs FIPS 140-3
+
+These are two different standards and dotsecenv treats them differently. Both matter for a regulated deployment.
+
+| Standard   | Governs                               | Where it lives                                                       |
+|------------|---------------------------------------|----------------------------------------------------------------------|
+| FIPS 186-5 | Approved digital-signature algorithms | `approved_algorithms` policy fragment + user config allow-list       |
+| FIPS 140-3 | Validated cryptographic module        | Build-time flag `GOFIPS140=v1.26.0` on `go build`                    |
+
+FIPS 186-5 is the runtime concern. At every `identity create`, vault write, and `policy validate` call, dotsecenv refuses algorithms outside the union of the policy allow-list and the user's own narrower list. The fragment in [`examples/06-multi-environment-fips/policy.d/00-corp-fips.yaml`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/06-multi-environment-fips/policy.d) encodes the FIPS 186-5 approved set: ECC P-384/P-521, EdDSA Ed25519/Ed448, RSA ≥ 3072.
+
+FIPS 140-3 is the build-time concern. The cryptographic primitives themselves (AES-256-GCM, SHA-384/512, the signature operations) come from the Go cryptographic module. Pinning that module to a validated version requires building the binary with `GOFIPS140=v1.26.0`. See [Compliance: Module Locking](/concepts/compliance/#module-locking) for the full discussion of validated environments and the build flag.
+
+A regulated deployment usually wants both: the policy fragment for algorithm enforcement, plus a validated binary pinned into every machine and runner image.
+
+## CI enforcement
+
+The companion [`ci.yml`](https://github.com/dotsecenv/dotsecenv/blob/main/examples/06-multi-environment-fips/ci.yml) in the example directory shows a GitHub Actions layout that:
+
+1. Validates the policy fragment once per push with `dotsecenv policy validate`. The job fails fast on any of the distinct exit codes (1 for empty allow-list, 2 for malformed fragment, 8 for insecure permissions).
+2. Fans out a matrix job over `dev` / `staging` / `production`. Each matrix entry imports a different repo-secret-stored private key (`DOTSECENV_GPG_PRIVATE_KEY_DEV` and friends) and points at the matching vault file.
+3. Runs `dotsecenv vault doctor --json` per environment before any `secret get` call, so a fragmented or stale vault fails the job before it can leak partial state.
+
+The pattern works the same on GitLab CI, Buildkite, CircleCI, and self-hosted Jenkins. The only platform-specific pieces are the secret-storage syntax and the runner image.
+
+## See also
+
+- Example: [`examples/06-multi-environment-fips/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/06-multi-environment-fips) — runnable demo with the 3x3 access matrix.
+- Example: [`examples/04-policy-directory/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/04-policy-directory) — the policy.d fragment story without the multi-environment overlay.
+- Tutorial: [Team Vault Setup](/tutorials/team-vault-setup/) — multi-vault initialization with the `--all` flag.
+- Tutorial: [Share a Secret](/tutorials/share-secret/) — recipient-set partitioning on a single vault.
+- Concept: [Compliance](/concepts/compliance/) — full FIPS 186-5 and FIPS 140-3 discussion.
+- Concept: [Security Policies](/concepts/security-policies/) — policy.d directory contract, merge semantics, exit codes.

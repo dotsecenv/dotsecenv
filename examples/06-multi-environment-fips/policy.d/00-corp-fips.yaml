@@ -1,0 +1,55 @@
+# /etc/dotsecenv/policy.d/00-corp-fips.yaml
+#
+# Org-wide policy fragment that enforces FIPS 186-5 algorithm selection
+# for every dotsecenv user on the machine. Pin this fragment in every
+# environment (development / staging / production) so identities stay
+# interoperable across vaults.
+#
+# What this fragment enforces:
+#   - Identity keys must be FIPS 186-5 approved: ECC P-384/P-521,
+#     EdDSA Ed25519/Ed448, or RSA >= 3072.
+#   - The user's own `approved_algorithms` is intersected with this
+#     list (users can be stricter locally; users cannot exceed the
+#     policy).
+#   - Identity creation and vault signing with weaker algorithms is
+#     refused at run time.
+#
+# What this fragment does NOT cover:
+#   - FIPS 140-3 cryptographic module compliance. That is a build-time
+#     concern, controlled by `GOFIPS140=v1.26.0 go build`. See
+#     https://dotsecenv.com/concepts/compliance/#module-locking for
+#     the validated-module discussion.
+#
+# Required permissions:
+#   - File owned root:root, mode 0644 or stricter
+#   - Directory /etc/dotsecenv/policy.d/ owned root:root, mode 0755
+#   - dotsecenv refuses to start when permissions are looser than this
+#
+# Installing this fragment:
+#   sudo install -o root -g root -m 0644 \
+#     policy.d/00-corp-fips.yaml /etc/dotsecenv/policy.d/00-corp-fips.yaml
+#   dotsecenv policy validate
+#   # expect: "policy valid (1 fragment(s) in /etc/dotsecenv/policy.d)"
+#
+# Layering more rules on top:
+#   - Allow-list fields (approved_algorithms) merge by union across
+#     fragments. A later fragment cannot remove what this baseline
+#     allows; only stricter overall enforcement is achievable through
+#     intersection with the user's own narrower allow-list.
+#   - Scalar fields (gpg.program, behavior.*) merge by last-fragment-wins
+#     in lexical filename order. Add team or environment overrides at
+#     `50-team.yaml` or `99-overrides.yaml` to override scalars.
+
+approved_algorithms:
+  - algo: ECC
+    curves:
+      - P-384
+      - P-521
+    min_bits: 384
+  - algo: EdDSA
+    curves:
+      - Ed25519
+      - Ed448
+    min_bits: 255
+  - algo: RSA
+    min_bits: 3072
