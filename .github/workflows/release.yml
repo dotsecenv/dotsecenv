@@ -42,8 +42,9 @@ jobs:
           if [ "$ASSET_COUNT" -gt 0 ]; then
             RELEASE_URL=$(echo "$RELEASE_JSON" | jq -r '.html_url')
             echo "::error::Release ${TAG} already exists with ${ASSET_COUNT} assets: ${RELEASE_URL}"
-            echo "::error::This usually means the tag was moved or this run is a retry of an already-published release."
-            echo "::error::To proceed: delete the existing release and tag, or bump the version."
+            echo "::error::Tag protection rules prevent moving or deleting release tags, so the only forward path is a new version."
+            echo "::error::To ship a fix: bump the version (next patch) and cut a new tag."
+            echo "::error::To withdraw the existing release: retract it (see scripts/retract-version.sh)."
             exit 1
           fi
 
