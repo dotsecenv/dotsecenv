@@ -18,3 +18,8 @@ paths:
     ignore:
       - 'input "client-id" is not defined in action "actions/create-github-app-token@v3"'
       - 'missing input "app-id" which is required by action "actions/create-github-app-token@v3"'
+  .github/workflows/publish-satellites.yml:
+    # Same actionlint stale-cache issue as release.yml above.
+    ignore:
+      - 'input "client-id" is not defined in action "actions/create-github-app-token@v3"'
+      - 'missing input "app-id" which is required by action "actions/create-github-app-token@v3"'

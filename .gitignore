@@ -17,3 +17,4 @@ website/.cache
 
 # Claude
 .claude/settings.local.json
+.worktrees/

@@ -1,0 +1,408 @@
+name: Publish Packages
+
+on:
+  # Trigger on push to main. The monorepo's publish-packages job pushes
+  # source (key.asc, retracted.txt, this very workflow file, etc.) to
+  # this satellite via a signed commit on every release; that push lands
+  # here and triggers this workflow. Renovate PRs that merge to main
+  # also trigger a republish to pick up dependency updates.
+  push:
+    branches: [main]
+
+  workflow_dispatch:
+    inputs:
+      keep_versions:
+        description: "Number of releases to include (default: 5)"
+        required: false
+        default: "5"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+env:
+  KEEP_VERSIONS: ${{ inputs.keep_versions || '5' }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev createrepo-c jq
+
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          trust_level: 5
+
+      - name: Generate App Token
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: dotsecenv
+
+      - name: Read Retraction List
+        id: retracted
+        run: |
+          # retracted.txt is pushed to this satellite from the monorepo
+          # (dotsecenv/dotsecenv) by the publish-packages job in
+          # release.yml. It's generated there from go.mod's `retract`
+          # block via `go mod edit -json | jq`, so the canonical source
+          # of truth lives with the code in one place.
+          # Format: one "VERSION<TAB>REASON" line per retracted version.
+          set -euo pipefail
+
+          if [ -f retracted.txt ] && [ -s retracted.txt ]; then
+            echo "Retracted versions:"
+            cat retracted.txt
+            # Comma-separated tag list for the jq exclusion in the next step.
+            RETRACTED_CSV=$(cut -f1 retracted.txt | grep -v '^$' | paste -sd, -)
+          else
+            echo "No retracted.txt or file is empty; treating as no retractions"
+            RETRACTED_CSV=""
+          fi
+          echo "csv=${RETRACTED_CSV}" >> "$GITHUB_OUTPUT"
+
+      - name: Get Release Versions
+        id: versions
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RETRACTED_CSV: ${{ steps.retracted.outputs.csv }}
+        run: |
+          # Get last N release tags. Filter out:
+          #  - drafts (stale orphans / rc tags pushed for CI testing)
+          #  - prereleases
+          #  - versions listed in dotsecenv's go.mod retract block
+          # Retracted releases may still appear in the API even after
+          # their assets are deleted; excluding by tag_name catches both
+          # asset-deleted and not-yet-asset-deleted cases.
+          RETRACTED_FILTER=""
+          if [ -n "${RETRACTED_CSV}" ]; then
+            # Build a jq array literal from the CSV.
+            RETRACTED_FILTER=$(printf '%s' "${RETRACTED_CSV}" | \
+              awk -F, '{
+                for (i=1; i<=NF; i++) printf "%s\"%s\"", (i>1?",":""), $i
+              }')
+          fi
+          JQ_EXPR='.[] | select(.draft|not) | select(.prerelease|not)'
+          if [ -n "${RETRACTED_FILTER}" ]; then
+            JQ_EXPR="${JQ_EXPR} | select(.tag_name | IN(${RETRACTED_FILTER}) | not)"
+          fi
+          JQ_EXPR="${JQ_EXPR} | .tag_name"
+
+          VERSIONS=$(gh api repos/dotsecenv/dotsecenv/releases \
+            --jq "${JQ_EXPR}" \
+            | head -n ${{ env.KEEP_VERSIONS }})
+
+          echo "versions<<EOF" >> $GITHUB_OUTPUT
+          echo "$VERSIONS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # Latest version (first in list)
+          LATEST=$(echo "$VERSIONS" | head -n 1)
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+
+          echo "Found versions (after filtering retracted):"
+          echo "$VERSIONS"
+
+      # Mirrors update-homebrew-tap's CDN-fresh wait. GitHub Releases is
+      # fronted by a CDN that can briefly serve the pre-notarization copy
+      # of Darwin tarballs right after a release publish — the notarize-
+      # macos jobs re-upload those archives, and the CDN may still hand
+      # out the original goreleaser-built bytes for a window. Only the
+      # LATEST version's Darwin archives can be in this state; everything
+      # older has long since converged. Wait for them to match the
+      # published checksums.txt before downloading.
+      - name: Wait for CDN to serve latest Darwin archives
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          LATEST: ${{ steps.versions.outputs.latest }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LATEST}" ]; then
+            echo "No latest version resolved; skipping CDN wait"
+            exit 0
+          fi
+
+          mkdir -p /tmp/cdn-check
+          gh release download "${LATEST}" --repo dotsecenv/dotsecenv \
+            --pattern "checksums.txt" --dir /tmp/cdn-check
+
+          VERSION_NUM="${LATEST#v}"
+          for arch in arm64 x86_64; do
+            ASSET="dotsecenv_${VERSION_NUM}_Darwin_${arch}.tar.gz"
+            EXPECTED=$(grep "${ASSET}\$" /tmp/cdn-check/checksums.txt | cut -d' ' -f1 || true)
+            if [ -z "${EXPECTED}" ]; then
+              echo "::warning::No checksum entry for ${ASSET}; skipping"
+              continue
+            fi
+            URL="https://github.com/dotsecenv/dotsecenv/releases/download/${LATEST}/${ASSET}"
+
+            deadline=$(( $(date +%s) + 300 ))
+            while :; do
+              ACTUAL=$(curl -fsSL "${URL}" | sha256sum | cut -d' ' -f1)
+              if [ "${ACTUAL}" = "${EXPECTED}" ]; then
+                echo "${ASSET}: CDN matches expected (${EXPECTED})"
+                break
+              fi
+              if [ "$(date +%s)" -ge "${deadline}" ]; then
+                echo "::error::${ASSET}: CDN still stale after 300s (expected ${EXPECTED}, got ${ACTUAL})"
+                exit 1
+              fi
+              echo "${ASSET}: CDN stale (expected ${EXPECTED}, got ${ACTUAL}); retrying in 10s"
+              sleep 10
+            done
+          done
+
+      - name: Download All Release Assets
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          mkdir -p incoming
+
+          while IFS= read -r VERSION; do
+            [ -z "$VERSION" ] && continue
+            echo "Downloading assets for $VERSION..."
+            gh release download "$VERSION" \
+              --repo dotsecenv/dotsecenv \
+              --pattern "dotsecenv_*.deb" \
+              --pattern "dotsecenv_*.rpm" \
+              --pattern "dotsecenv_*.tar.gz" \
+              --pattern "dotsecenv_*.pkg.tar.zst" \
+              --pattern "dotsecenv_*.sig" \
+              --pattern "checksums.txt" \
+              --pattern "checksums.txt.sig" \
+              --dir "incoming/$VERSION"
+          done <<< "${{ steps.versions.outputs.versions }}"
+
+      - name: Verify All Assets
+        run: |
+          for dir in incoming/*/; do
+            [ -d "$dir" ] || continue
+            echo "Verifying $dir..."
+            cd "$dir"
+            gpg --verify checksums.txt.sig checksums.txt
+            sha256sum -c checksums.txt || true
+            cd - > /dev/null
+          done
+
+      - name: Create Staging Directory
+        run: |
+          mkdir -p _stage/apt _stage/yum _stage/arch/x86_64 _stage/arch/aarch64
+          mkdir -p _stage/darwin _stage/linux
+
+      - name: Build APT Repository (Multi-Version)
+        run: |
+          # Copy ALL versions of debs
+          for dir in incoming/*/; do
+            [ -d "$dir" ] || continue
+            cp "$dir"/*.deb _stage/apt/ 2>/dev/null || true
+            cp "$dir"/*.deb.sig _stage/apt/ 2>/dev/null || true
+          done
+
+          cd _stage/apt
+
+          # Check if we have any debs
+          if ls *.deb 1>/dev/null 2>&1; then
+            sha256sum *.deb > checksums.txt
+
+            # Generate multi-version Packages
+            dpkg-scanpackages --multiversion . /dev/null > Packages
+            gzip -k -f Packages
+
+            # Generate Release
+            apt-ftparchive -o APT::FTPArchive::Release::Architectures="amd64 arm64" release . > Release
+
+            # Sign
+            gpg --batch --yes --default-key "${{ steps.import_gpg.outputs.keyid }}" -abs -o Release.gpg Release
+            gpg --batch --yes --default-key "${{ steps.import_gpg.outputs.keyid }}" --clearsign -o InRelease Release
+          fi
+
+      - name: Build YUM Repository (Multi-Version)
+        run: |
+          # Copy ALL versions of rpms
+          for dir in incoming/*/; do
+            [ -d "$dir" ] || continue
+            cp "$dir"/*.rpm _stage/yum/ 2>/dev/null || true
+            cp "$dir"/*.rpm.sig _stage/yum/ 2>/dev/null || true
+          done
+
+          cd _stage/yum
+
+          # Check if we have any rpms
+          if ls *.rpm 1>/dev/null 2>&1; then
+            sha256sum *.rpm > checksums.txt
+
+            # Create repo (includes all RPMs automatically)
+            createrepo_c .
+
+            # Sign
+            gpg --batch --yes --detach-sign --default-key "${{ steps.import_gpg.outputs.keyid }}" repodata/repomd.xml
+          fi
+
+      - name: Build Arch Repository (Latest Only)
+        env:
+          LATEST: ${{ steps.versions.outputs.latest }}
+        uses: docker://archlinux:base-devel
+        with:
+          entrypoint: /bin/bash
+          args: |
+            -c "
+            pacman -Sy --noconfirm
+
+            # Only copy latest version for Arch
+            if [ -d \"incoming/${LATEST}\" ]; then
+              cp incoming/${LATEST}/*_amd64.pkg.tar.zst _stage/arch/x86_64/ 2>/dev/null || true
+              cp incoming/${LATEST}/*_amd64.pkg.tar.zst.sig _stage/arch/x86_64/ 2>/dev/null || true
+              cp incoming/${LATEST}/*_arm64.pkg.tar.zst _stage/arch/aarch64/ 2>/dev/null || true
+              cp incoming/${LATEST}/*_arm64.pkg.tar.zst.sig _stage/arch/aarch64/ 2>/dev/null || true
+
+              cd _stage/arch/x86_64
+              if ls *.pkg.tar.zst 1>/dev/null 2>&1; then
+                sha256sum *.pkg.tar.zst > checksums.txt
+                repo-add dotsecenv.db.tar.gz *.pkg.tar.zst
+              fi
+
+              cd ../aarch64
+              if ls *.pkg.tar.zst 1>/dev/null 2>&1; then
+                sha256sum *.pkg.tar.zst > checksums.txt
+                repo-add dotsecenv.db.tar.gz *.pkg.tar.zst
+              fi
+            fi
+            "
+
+      - name: Build Darwin/Linux Tarballs (All Versions)
+        run: |
+          # Copy ALL versions
+          for dir in incoming/*/; do
+            [ -d "$dir" ] || continue
+            cp "$dir"/*_Darwin_*.tar.gz _stage/darwin/ 2>/dev/null || true
+            cp "$dir"/*_Darwin_*.tar.gz.sig _stage/darwin/ 2>/dev/null || true
+            cp "$dir"/*_Linux_*.tar.gz _stage/linux/ 2>/dev/null || true
+            cp "$dir"/*_Linux_*.tar.gz.sig _stage/linux/ 2>/dev/null || true
+          done
+
+          cd _stage/darwin
+          if ls *.tar.gz 1>/dev/null 2>&1; then
+            sha256sum *.tar.gz > checksums.txt
+          fi
+
+          cd ../linux
+          if ls *.tar.gz 1>/dev/null 2>&1; then
+            sha256sum *.tar.gz > checksums.txt
+          fi
+
+      - name: Copy Static Files
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          LATEST: ${{ steps.versions.outputs.latest }}
+        run: |
+          # key.asc in this repo is the canonical bundle of public keys
+          # users need to verify ANY release (current + previous keys
+          # concatenated). Copy it as-is so prior signatures stay
+          # verifiable across key rotations.
+          # We deliberately do NOT regenerate via `gpg --armor --export`:
+          # that exports only the currently-imported signing key and
+          # would strip retired keys from the deployed bundle.
+          cp key.asc _stage/key.asc
+          cp README.md _stage/
+          cp CNAME _stage/
+
+          # Serve retracted.txt at get.dotsecenv.com/retracted.txt so
+          # install.sh can fetch it and refuse to install retracted
+          # versions. The file lives at the satellite repo root because
+          # the monorepo publish-packages job generates it from go.mod
+          # and pushes it as part of packages/ source.
+          if [ -f retracted.txt ]; then
+            cp retracted.txt _stage/retracted.txt
+          fi
+
+          # Fetch install.sh from the main repo (pinned to the latest release tag)
+          gh api "repos/dotsecenv/dotsecenv/contents/scripts/install.sh?ref=${LATEST}" \
+            --jq '.content' | base64 -d > _stage/install.sh
+
+      - name: Generate Index Pages
+        run: bash .github/generate-index.sh _stage
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./_stage
+          destination: ./_site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+  verify-darwin-notarization:
+    needs: build-and-deploy
+    runs-on: macos-latest
+    steps:
+      - name: Generate App Token
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: dotsecenv
+
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          trust_level: 5
+
+      - name: Verify Latest Darwin Release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          LATEST=$(gh api repos/dotsecenv/dotsecenv/releases/latest --jq '.tag_name')
+
+          for arch in arm64 x86_64; do
+            ARCHIVE="dotsecenv_${LATEST#v}_Darwin_${arch}.tar.gz"
+
+            gh release download "$LATEST" \
+              --repo dotsecenv/dotsecenv \
+              --pattern "$ARCHIVE" \
+              --pattern "${ARCHIVE}.sig"
+
+            gpg --verify "${ARCHIVE}.sig" "$ARCHIVE"
+
+            TEMP_DIR=$(mktemp -d)
+            tar -xzf "$ARCHIVE" -C "$TEMP_DIR"
+
+            echo "==> Verifying code signature for ${arch}..."
+            codesign --verify --verbose "$TEMP_DIR/dotsecenv"
+            codesign -dv --verbose=4 "$TEMP_DIR/dotsecenv"
+
+            rm -rf "$TEMP_DIR" "$ARCHIVE" "${ARCHIVE}.sig"
+          done
