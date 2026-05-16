@@ -1,24 +1,28 @@
 #!/usr/bin/env bash
 #
-# Discover the workflow run on a satellite repo triggered by a
-# repository_dispatch we just sent, write its URL to the calling job's
-# step summary, and emit `run_id` / `run_url` to $GITHUB_OUTPUT so a
-# downstream wait job can poll the known run directly.
+# Discover the workflow run on a satellite repo triggered by an event we
+# just caused (default: a push from publish-to-satellite.sh's signed
+# commit), write its URL to the calling job's step summary, and emit
+# `run_id` / `run_url` to $GITHUB_OUTPUT so a downstream wait job can
+# poll the known run directly.
 #
 # Required env:
 #   SATELLITE_REPO       "<owner>/<repo>" (e.g. dotsecenv/packages, or
 #                        dotsecenv/dotsecenv when self-dispatching)
 #   SINCE                ISO8601 timestamp; only runs created on/after this
-#                        are candidates. Pass the pre-dispatch timestamp.
+#                        are candidates. Pass the pre-trigger timestamp.
 #   GH_TOKEN             token with `actions: read` on SATELLITE_REPO
 #
 # Optional env:
+#   EVENT                workflow trigger event to filter on (default "push").
+#                        Set to "repository_dispatch" for legacy dispatch
+#                        flows, or any other GitHub events API value.
 #   WORKFLOW_FILE        e.g. "publish.yml" — narrows discovery to runs
 #                        of that specific workflow. Use this when a single
-#                        dispatcher fires multiple repository_dispatch
-#                        events that map to different workflows; otherwise
-#                        a discovery for the wrong one may collide.
-#   DISCOVER_TIMEOUT_S   max seconds to look for the dispatched run (default 60)
+#                        trigger fires multiple events that map to different
+#                        workflows; otherwise a discovery for the wrong one
+#                        may collide.
+#   DISCOVER_TIMEOUT_S   max seconds to look for the triggered run (default 60)
 
 set -euo pipefail
 
@@ -28,6 +32,7 @@ set -euo pipefail
 
 DISCOVER_TIMEOUT_S=${DISCOVER_TIMEOUT_S:-60}
 WORKFLOW_FILE=${WORKFLOW_FILE:-}
+EVENT=${EVENT:-push}
 
 if [ -n "$WORKFLOW_FILE" ]; then
   RUNS_API="repos/${SATELLITE_REPO}/actions/workflows/${WORKFLOW_FILE}/runs"
@@ -41,12 +46,12 @@ summary() {
   fi
 }
 
-echo "Looking for repository_dispatch run on ${SATELLITE_REPO}${WORKFLOW_FILE:+ (${WORKFLOW_FILE})} since ${SINCE}..."
+echo "Looking for ${EVENT} run on ${SATELLITE_REPO}${WORKFLOW_FILE:+ (${WORKFLOW_FILE})} since ${SINCE}..."
 deadline=$(( $(date +%s) + DISCOVER_TIMEOUT_S ))
 run_id=""
 
 while [ "$(date +%s)" -lt "$deadline" ]; do
-  json=$(gh api "${RUNS_API}?event=repository_dispatch&created=>=${SINCE}&per_page=5")
+  json=$(gh api "${RUNS_API}?event=${EVENT}&created=>=${SINCE}&per_page=5")
   count=$(jq -r '.total_count // 0' <<<"$json")
   if [ "$count" -gt 0 ]; then
     run_id=$(jq -r '.workflow_runs[0].id' <<<"$json")
@@ -60,10 +65,10 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
 done
 
 if [ -z "$run_id" ]; then
-  echo "::error::No repository_dispatch run appeared on ${SATELLITE_REPO} within ${DISCOVER_TIMEOUT_S}s"
+  echo "::error::No ${EVENT} run appeared on ${SATELLITE_REPO} within ${DISCOVER_TIMEOUT_S}s"
   summary "## ❌ Satellite publish on \`${SATELLITE_REPO}\` — NOT STARTED" \
           "" \
-          "No \`repository_dispatch\` run appeared on [\`${SATELLITE_REPO}\`](https://github.com/${SATELLITE_REPO}/actions) within ${DISCOVER_TIMEOUT_S}s of dispatch."
+          "No \`${EVENT}\` run appeared on [\`${SATELLITE_REPO}\`](https://github.com/${SATELLITE_REPO}/actions) within ${DISCOVER_TIMEOUT_S}s of trigger."
   exit 1
 fi
 
