@@ -15,9 +15,15 @@
 #                    used only for listing what's currently on the satellite
 #                    so we can compute deletions
 #   SATELLITE_REPO   "<owner>/<repo>" of the satellite (e.g. "dotsecenv/plugin")
-#   TAG              release tag (e.g. "v0.6.7")
 #   SHA              monorepo commit SHA being published (for .release-sha sidecar)
 #   GH_TOKEN         App installation token used by gh to call the API
+#
+# Optional env:
+#   TAG              release tag (e.g. "v0.6.7"). When set, a lightweight
+#                    tag is created on the satellite at the new commit.
+#                    When empty, no tag is created — useful for ad-hoc
+#                    workflow_dispatch publishes that aren't tied to a
+#                    release version.
 #
 # Required tools in PATH (caller installs):
 #   gh, jq, find, base64
@@ -27,9 +33,9 @@ set -euo pipefail
 : "${SOURCE_DIR:?SOURCE_DIR is required}"
 : "${SATELLITE_DIR:?SATELLITE_DIR is required}"
 : "${SATELLITE_REPO:?SATELLITE_REPO is required}"
-: "${TAG:?TAG is required}"
 : "${SHA:?SHA is required}"
 : "${GH_TOKEN:?GH_TOKEN is required}"
+TAG="${TAG:-}"
 
 # Write the .release-sha sidecar into the source tree so it shows up as
 # part of the additions array along with everything else.
@@ -80,10 +86,16 @@ echo "Current ${SATELLITE_REPO}/main HEAD: ${EXPECTED_OID}"
 
 # Build the CreateCommitOnBranchInput object via files (additions content
 # is too big for argv).
+if [ -n "${TAG}" ]; then
+  HEADLINE="publish: ${TAG}"
+else
+  HEADLINE="publish: ad-hoc (${SHA:0:7})"
+fi
+
 INPUT_FILE=$(mktemp)
 jq -n \
   --arg repo "${SATELLITE_REPO}" \
-  --arg headline "publish: ${TAG}" \
+  --arg headline "${HEADLINE}" \
   --arg body "Sourced from dotsecenv/dotsecenv@${SHA}" \
   --arg oid "${EXPECTED_OID}" \
   --slurpfile additions "${ADDITIONS_FILE}" \
@@ -122,11 +134,17 @@ if [ -z "${NEW_OID}" ]; then
 fi
 echo "Signed commit ${NEW_OID} created on ${SATELLITE_REPO}/main"
 
-# Create a lightweight tag at the new commit. (Annotated tags would require
-# a separate `POST /git/tags` then `POST /git/refs`; lightweight is what
-# plugin managers use anyway.)
-gh api -X POST "repos/${SATELLITE_REPO}/git/refs" \
-  -f ref="refs/tags/${TAG}" \
-  -f sha="${NEW_OID}" \
-  > /dev/null
-echo "Tagged ${TAG} -> ${NEW_OID}"
+# Create a lightweight tag at the new commit IF a TAG was supplied.
+# (Annotated tags would require a separate `POST /git/tags` then
+# `POST /git/refs`; lightweight is what plugin managers use anyway.)
+# Ad-hoc workflow_dispatch publishes pass TAG="" and skip the tag step —
+# the satellite's history just shows the publish commit without a ref.
+if [ -n "${TAG}" ]; then
+  gh api -X POST "repos/${SATELLITE_REPO}/git/refs" \
+    -f ref="refs/tags/${TAG}" \
+    -f sha="${NEW_OID}" \
+    > /dev/null
+  echo "Tagged ${TAG} -> ${NEW_OID}"
+else
+  echo "No TAG supplied; skipped tag creation (ad-hoc publish)"
+fi

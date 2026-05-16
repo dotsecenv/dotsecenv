@@ -1,0 +1,147 @@
+name: Publish Satellites
+
+# Manual / ad-hoc publish of plugin/ or packages/ source from this
+# monorepo to its respective satellite repo, outside of the release
+# pipeline. Use this when you need to ship a Renovate update, a doc
+# fix in packages/README.md, or any other change that doesn't
+# warrant cutting a new dotsecenv release tag.
+#
+# On a real release, release.yml's publish-plugin and publish-packages
+# jobs handle the same push (and additionally tag the satellite with
+# the release version). This workflow leaves the satellite untagged.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Which satellite(s) to publish source to"
+        type: choice
+        required: true
+        default: both
+        options:
+          - packages
+          - plugin
+          - both
+
+permissions:
+  contents: read
+
+jobs:
+  publish-packages:
+    if: inputs.target == 'packages' || inputs.target == 'both'
+    runs-on: ubuntu-latest
+    outputs:
+      packages_run_id: ${{ steps.find_packages.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Capture pre-push timestamp
+        id: timestamp
+        run: |
+          echo "push_time=$(date -u -d '5 seconds ago' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go (for extract-retracted.sh)
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Generate retracted.txt from go.mod
+        run: |
+          ./scripts/extract-retracted.sh go.mod > packages/retracted.txt
+          echo "Retracted versions being published:"
+          cat packages/retracted.txt || echo "(none)"
+
+      - name: Generate App token (packages only)
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: packages
+
+      - name: Checkout dotsecenv/packages satellite
+        uses: actions/checkout@v6
+        with:
+          repository: dotsecenv/packages
+          token: ${{ steps.app-token.outputs.token }}
+          path: packages-satellite
+          fetch-depth: 0
+
+      - name: Publish packages source to satellite (no tag)
+        env:
+          SOURCE_DIR: packages
+          SATELLITE_DIR: packages-satellite
+          SATELLITE_REPO: dotsecenv/packages
+          # Empty TAG → publish-to-satellite.sh skips tag creation.
+          # Ad-hoc publishes shouldn't clutter the satellite with refs.
+          TAG: ""
+          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/publish-to-satellite.sh
+
+      - name: Find satellite publish.yml run
+        id: find_packages
+        env:
+          SATELLITE_REPO: dotsecenv/packages
+          WORKFLOW_FILE: publish.yml
+          SINCE: ${{ steps.timestamp.outputs.push_time }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/find-satellite-run.sh
+
+  wait-publish-packages:
+    needs: publish-packages
+    if: inputs.target == 'packages' || inputs.target == 'both'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate App token (packages, actions:read needed)
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: packages
+
+      - name: Watch packages publish run
+        env:
+          SATELLITE_REPO: dotsecenv/packages
+          RUN_ID: ${{ needs.publish-packages.outputs.packages_run_id }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/watch-satellite-run.sh
+
+  publish-plugin:
+    if: inputs.target == 'plugin' || inputs.target == 'both'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate App token (plugin only)
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: plugin
+
+      - name: Checkout dotsecenv/plugin satellite
+        uses: actions/checkout@v6
+        with:
+          repository: dotsecenv/plugin
+          token: ${{ steps.app-token.outputs.token }}
+          path: plugin-satellite
+          fetch-depth: 0
+
+      - name: Publish plugin source to satellite (no tag)
+        env:
+          SOURCE_DIR: plugin
+          SATELLITE_DIR: plugin-satellite
+          SATELLITE_REPO: dotsecenv/plugin
+          TAG: ""
+          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/publish-to-satellite.sh
