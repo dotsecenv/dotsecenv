@@ -79,6 +79,7 @@ jobs:
           TAG: ""
           SHA: ${{ github.sha }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: scripts/release/publish-to-satellite.sh
 
       - name: Find satellite publish.yml run
@@ -144,6 +145,7 @@ jobs:
           TAG: ""
           SHA: ${{ github.sha }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: scripts/release/publish-to-satellite.sh
 
   # Mirror release.yml's test-plugin-managers gate. The plugin satellite

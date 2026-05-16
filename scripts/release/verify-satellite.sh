@@ -5,21 +5,20 @@
 #
 # The publish flow (publish-to-satellite.sh) syncs every file under
 # SOURCE_DIR into the satellite via GitHub's GraphQL createCommitOnBranch
-# mutation, plus a .release-sha sidecar pointing at the monorepo commit.
-# So a healthy satellite at commit SHA contains exactly:
-#
-#   (files under SOURCE_DIR at SHA)  +  .release-sha
-#
-# Anything else is drift: a missed file, an out-of-band edit on the
-# satellite, a publish bug, or a stale satellite that didn't receive a
-# later push.
+# mutation. Provenance lives in RFC-822 git trailers in the satellite's
+# HEAD commit body (Source-Commit, Source-SHA, Source-Path, Source-Tag,
+# Published-By), parseable via `git interpret-trailers --parse`. So a
+# healthy satellite at commit SHA contains exactly the files under
+# SOURCE_DIR at SHA. Anything else is drift: a missed file, an out-of-
+# band edit on the satellite, a publish bug, or a stale satellite that
+# didn't receive a later push.
 #
 # This script:
 #   1. Diffs the file LISTS (source-only / satellite-only / common),
 #      with GENERATED_PATHS whitelisted as expected on the satellite.
 #   2. Diffs the file CONTENTS and Unix mode for files present in both.
-#   3. If EXPECTED_SHA is set, validates the satellite's .release-sha
-#      and/or commit-body trailer matches it.
+#   3. If EXPECTED_SHA is set, validates the Source-SHA trailer in
+#      the satellite's HEAD commit body matches it.
 #
 # Exits non-zero on any drift. The diff payload (capped) is printed to
 # stdout and additionally written to $GITHUB_STEP_SUMMARY when running
@@ -31,10 +30,9 @@
 #
 # Optional env:
 #   EXPECTED_SHA      monorepo commit SHA the satellite should be at.
-#                     Validates the .release-sha sidecar AND the
-#                     "Sourced from dotsecenv/dotsecenv@<sha>" trailer
-#                     in the satellite's HEAD commit body. If unset,
-#                     SHA-pinning checks are skipped.
+#                     Validates the Source-SHA trailer in the satellite's
+#                     HEAD commit body matches. If unset, the SHA-pinning
+#                     check is skipped.
 #   GENERATED_PATHS   newline-separated paths the publish workflow
 #                     writes into the satellite but that don't live
 #                     in the monorepo source tree (e.g. "retracted.txt"
@@ -47,8 +45,8 @@
 #
 # Required tools in PATH:
 #   find, diff, cmp, comm, sort, sed, awk, stat
-#   (git is only needed when EXPECTED_SHA is set, to check the commit
-#    body trailer on the satellite)
+#   (git is only needed when EXPECTED_SHA is set, to read the
+#    Source-SHA trailer on the satellite's HEAD commit)
 
 set -euo pipefail
 
@@ -69,43 +67,39 @@ say "  source    : ${SOURCE_DIR}"
 say "  satellite : ${SATELLITE_DIR}"
 [ -n "${EXPECTED_SHA}" ] && say "  expected  : ${EXPECTED_SHA}"
 
-# ---------- .release-sha + commit-body trailer ------------------------------
-# Both should encode the same SHA. The sidecar is a one-line file; the
-# trailer is in the satellite HEAD's commit message body, written by
-# publish-to-satellite.sh.
+# ---------- Source-SHA trailer ----------------------------------------------
+# The publish flow writes a Source-SHA trailer to the satellite commit
+# body. Read it via `git interpret-trailers --parse` and check that it
+# matches what the caller expects.
 if [ -n "${EXPECTED_SHA}" ]; then
-  if [ -f "${SATELLITE_DIR}/.release-sha" ]; then
-    SIDECAR_SHA="$(tr -d '[:space:]' < "${SATELLITE_DIR}/.release-sha")"
-    if [ "${SIDECAR_SHA}" = "${EXPECTED_SHA}" ]; then
-      say "  .release-sha: OK (${SIDECAR_SHA:0:12})"
+  if command -v git >/dev/null 2>&1 && [ -d "${SATELLITE_DIR}/.git" ]; then
+    TRAILER_SHA=$(git -C "${SATELLITE_DIR}" log -1 --format=%B \
+      | git interpret-trailers --parse \
+      | awk -F': ' '$1=="Source-SHA"{print $2}')
+    if [ -z "${TRAILER_SHA}" ]; then
+      say "  Source-SHA trailer: MISSING on satellite HEAD commit"
+      DRIFT=1
+    elif [ "${TRAILER_SHA}" = "${EXPECTED_SHA}" ]; then
+      say "  Source-SHA trailer: OK (${TRAILER_SHA:0:12})"
     else
-      say "  .release-sha: DRIFT — file says ${SIDECAR_SHA:0:12}, expected ${EXPECTED_SHA:0:12}"
+      say "  Source-SHA trailer: DRIFT — trailer says ${TRAILER_SHA:0:12}, expected ${EXPECTED_SHA:0:12}"
       DRIFT=1
     fi
   else
-    say "  .release-sha: MISSING on satellite"
-    DRIFT=1
-  fi
-
-  if command -v git >/dev/null 2>&1 && [ -d "${SATELLITE_DIR}/.git" ]; then
-    TRAILER_SHA=$(git -C "${SATELLITE_DIR}" log -1 --format=%B \
-      | sed -n 's|^Sourced from dotsecenv/dotsecenv@||p' | head -1)
-    if [ -z "${TRAILER_SHA}" ]; then
-      say "  commit body: MISSING 'Sourced from dotsecenv/dotsecenv@<sha>' trailer"
-      DRIFT=1
-    elif [ "${TRAILER_SHA}" = "${EXPECTED_SHA}" ]; then
-      say "  commit body: OK (${TRAILER_SHA:0:12})"
-    else
-      say "  commit body: DRIFT — trailer says ${TRAILER_SHA:0:12}, expected ${EXPECTED_SHA:0:12}"
-      DRIFT=1
-    fi
+    say "  Source-SHA trailer: SKIPPED (no git available or satellite has no .git/)"
   fi
 fi
 
 # ---------- File-list comparison --------------------------------------------
-# Build NL-separated exclude list for satellite-side listing: always
-# .release-sha (sidecar checked above), plus any caller-supplied
-# generated paths (e.g. retracted.txt).
+# Build NL-separated exclude list for satellite-side listing.
+#
+# `.release-sha` was a legacy sidecar from before the trailer convention
+# landed; the publish flow no longer writes it. Existing satellites still
+# carry the file until their next publish, and the GraphQL publish auto-
+# deletes any satellite file not in source — so this entry is purely
+# transitional and can be removed once both satellites have been
+# republished. Until then, we whitelist it here so the file-list check
+# doesn't flag it as an unexpected satellite-only file.
 SAT_EXCLUDES=".release-sha"
 if [ -n "${GENERATED_PATHS}" ]; then
   SAT_EXCLUDES="${SAT_EXCLUDES}

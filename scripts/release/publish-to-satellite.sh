@@ -9,21 +9,36 @@
 # is satisfied without any GPG handling on the runner. The App also lives
 # in the ruleset's bypass list, so the PR-required rule passes too.
 #
+# Provenance is recorded as RFC-822 git trailers in the satellite commit
+# body, parseable via `git interpret-trailers --parse`. The trailer set:
+#
+#   Source-Commit: dotsecenv/dotsecenv@<sha>          (linkable in GitHub UI)
+#   Source-SHA:    <sha>                              (parseable, no splitting)
+#   Source-Path:   <SOURCE_DIR>                       (plugin | packages)
+#   Source-Tag:    <TAG>                              (omitted when TAG is empty)
+#   Published-By:  <PUBLISHED_BY URL>                 (omitted when not set)
+#
 # Required env:
 #   SOURCE_DIR       path to the monorepo subdirectory to publish (e.g. "plugin")
 #   SATELLITE_DIR    path to a checkout of the satellite (e.g. "plugin-satellite")
 #                    used only for listing what's currently on the satellite
 #                    so we can compute deletions
 #   SATELLITE_REPO   "<owner>/<repo>" of the satellite (e.g. "dotsecenv/plugin")
-#   SHA              monorepo commit SHA being published (for .release-sha sidecar)
+#   SHA              monorepo commit SHA being published (recorded in trailers)
 #   GH_TOKEN         App installation token used by gh to call the API
 #
 # Optional env:
 #   TAG              release tag (e.g. "v0.6.7"). When set, a lightweight
-#                    tag is created on the satellite at the new commit.
-#                    When empty, no tag is created — useful for ad-hoc
-#                    workflow_dispatch publishes that aren't tied to a
-#                    release version.
+#                    tag is created on the satellite at the new commit and
+#                    a Source-Tag trailer is emitted. When empty, no tag
+#                    is created — useful for ad-hoc workflow_dispatch
+#                    publishes that aren't tied to a release version.
+#   PUBLISHED_BY     URL of the CI run that produced this publish (typically
+#                    "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}").
+#                    When set, a Published-By trailer is emitted, linkifying
+#                    the originating workflow run in the satellite commit view.
+#                    When unset, the trailer is omitted — keeps the script
+#                    callable from a local shell for one-off testing.
 #
 # Required tools in PATH (caller installs):
 #   gh, jq, find, base64
@@ -36,10 +51,7 @@ set -euo pipefail
 : "${SHA:?SHA is required}"
 : "${GH_TOKEN:?GH_TOKEN is required}"
 TAG="${TAG:-}"
-
-# Write the .release-sha sidecar into the source tree so it shows up as
-# part of the additions array along with everything else.
-echo "${SHA}" > "${SOURCE_DIR}/.release-sha"
+PUBLISHED_BY="${PUBLISHED_BY:-}"
 
 # List every file we want present on the satellite after this publish.
 SOURCE_FILES=$(mktemp)
@@ -92,11 +104,22 @@ else
   HEADLINE="publish: ad-hoc (${SHA:0:7})"
 fi
 
+# Build the RFC-822 trailer block for the commit body. Each trailer is
+# a single Key: value line; the block is the entire commit body, so
+# `git interpret-trailers --parse` will recognize all of them.
+BODY=$(
+  printf 'Source-Commit: dotsecenv/dotsecenv@%s\n' "${SHA}"
+  printf 'Source-SHA: %s\n' "${SHA}"
+  printf 'Source-Path: %s\n' "${SOURCE_DIR}"
+  [ -n "${TAG}" ] && printf 'Source-Tag: %s\n' "${TAG}"
+  [ -n "${PUBLISHED_BY}" ] && printf 'Published-By: %s\n' "${PUBLISHED_BY}"
+)
+
 INPUT_FILE=$(mktemp)
 jq -n \
   --arg repo "${SATELLITE_REPO}" \
   --arg headline "${HEADLINE}" \
-  --arg body "Sourced from dotsecenv/dotsecenv@${SHA}" \
+  --arg body "${BODY}" \
   --arg oid "${EXPECTED_OID}" \
   --slurpfile additions "${ADDITIONS_FILE}" \
   --slurpfile deletions "${DELETIONS_FILE}" \

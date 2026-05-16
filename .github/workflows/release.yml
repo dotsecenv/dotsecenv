@@ -598,6 +598,7 @@ jobs:
           TAG: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: scripts/release/publish-to-satellite.sh
 
       - name: Find satellite publish.yml run (push-triggered)
@@ -693,6 +694,7 @@ jobs:
           TAG: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: scripts/release/publish-to-satellite.sh
 
   # Gates the release on plugin-manager integration testing. Runs

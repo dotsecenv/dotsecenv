@@ -18,9 +18,10 @@ name: Verify Satellite Drift
 #   1. workflow_dispatch input `sha` (explicit operator override)
 #   2. workflow_run.head_sha (the tag commit the upstream Release
 #      just published — newest known publish SHA)
-#   3. The satellite's own .release-sha sidecar (the satellite's
-#      authoritative claim of which monorepo commit it was last
-#      published from)
+#   3. The Source-SHA trailer in the satellite's HEAD commit body
+#      (the satellite's authoritative claim of which monorepo commit
+#      it was last published from), parsed via
+#      `git interpret-trailers --parse`.
 #
 # Crucially, we do NOT default to `github.sha`. That would be the
 # main HEAD when the workflow fires, which can be ahead of the last
@@ -41,7 +42,7 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: "Monorepo SHA to verify satellites against (default: each satellite's own .release-sha)"
+        description: "Monorepo SHA to verify satellites against (default: each satellite's own Source-SHA trailer)"
         required: false
         default: ""
 
@@ -71,8 +72,8 @@ jobs:
             repo: dotsecenv/packages
             source_dir: packages
     steps:
-      # Satellite goes first because we may need to read its
-      # .release-sha to decide which monorepo commit to compare against.
+      # Satellite goes first because we may need to read its Source-SHA
+      # trailer to decide which monorepo commit to compare against.
       - name: Checkout ${{ matrix.repo }} satellite
         uses: actions/checkout@v6
         with:
@@ -92,11 +93,17 @@ jobs:
           elif [ -n "${WR_SHA}" ]; then
             SHA="${WR_SHA}"
             SRC="upstream Release run head_sha"
-          elif [ -f satellite/.release-sha ]; then
-            SHA=$(tr -d '[:space:]' < satellite/.release-sha)
-            SRC="satellite/.release-sha"
+          elif [ -d satellite/.git ]; then
+            SHA=$(git -C satellite log -1 --format=%B \
+              | git interpret-trailers --parse \
+              | awk -F': ' '$1=="Source-SHA"{print $2}')
+            if [ -z "${SHA}" ]; then
+              echo "::error::Satellite HEAD commit has no Source-SHA trailer"
+              exit 1
+            fi
+            SRC="satellite Source-SHA trailer"
           else
-            echo "::error::No SHA source available (no input, no workflow_run, no .release-sha on satellite)"
+            echo "::error::No SHA source available (no input, no workflow_run, no satellite git history)"
             exit 1
           fi
           echo "Reference SHA: ${SHA} (from ${SRC})"
