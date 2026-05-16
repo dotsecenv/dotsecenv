@@ -9,6 +9,7 @@ set -euo pipefail
 readonly GITHUB_ORG="dotsecenv"
 readonly GITHUB_REPO="dotsecenv"
 readonly GPG_KEY_URL="https://get.dotsecenv.com/key.asc"
+readonly RETRACTED_URL="https://get.dotsecenv.com/retracted.txt"
 
 # ---------------------------------------------------------------------------
 # Color setup (conditional on tty)
@@ -171,6 +172,32 @@ resolve_version() {
     fi
 
     info "Version: ${VERSION}"
+}
+
+# ---------------------------------------------------------------------------
+# Retraction check
+# ---------------------------------------------------------------------------
+# Refuse to install versions listed at get.dotsecenv.com/retracted.txt.
+# The file is generated from dotsecenv's go.mod `retract` block at package
+# publish time, so the canonical source of truth lives with the code.
+# Format: one "VERSION<TAB>REASON" line per retracted version.
+# There is no override flag: retracted means retracted. If you genuinely
+# need a retracted binary for forensic / replay use, download it
+# manually with full awareness of the retraction.
+# If the list cannot be fetched (offline, 404), warn and proceed — we
+# don't want to block installs when the dotsecenv.com side is down.
+check_retracted() {
+    local list reason
+    if ! list="$(download_to_stdout "${RETRACTED_URL}" 2>/dev/null)"; then
+        warn "Could not fetch retraction list (${RETRACTED_URL}); proceeding without check"
+        return 0
+    fi
+
+    reason="$(printf '%s' "$list" | awk -F'\t' -v v="${VERSION}" '$1 == v { sub(/^[[:space:]]*\/\/[[:space:]]*/, "", $2); print $2; exit }')"
+    if [ -n "$reason" ]; then
+        printf "${RED}error:${RESET} %s has been retracted: %s\n" "${VERSION}" "$reason" >&2
+        exit 1
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -701,6 +728,7 @@ main() {
     detect_arch
     detect_downloader
     resolve_version
+    check_retracted
     resolve_install_dir
 
     TMPDIR_ROOT="$(mktemp -d)"
