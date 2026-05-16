@@ -532,25 +532,48 @@ jobs:
       - name: Smoke a basic command
         run: dotsecenv help > /dev/null
 
-  dispatch-packages:
+  # Push monorepo packages/ source to the dotsecenv/packages satellite
+  # (mirroring publish-plugin). Generates retracted.txt from go.mod via
+  # the canonical `go mod edit -json | jq` pipeline before pushing, so
+  # the satellite receives the freshly-derived retraction list. The push
+  # itself triggers the satellite's publish.yml (push: main), which
+  # builds apt/yum/arch repos and deploys to get.dotsecenv.com.
+  publish-packages:
+    # Don't push to the satellite (or tag it) if anything earlier in the
+    # release chain failed; a half-baked release shouldn't propagate. Run
+    # on success-or-skipped so legitimate skips upstream don't block us.
     needs: [goreleaser, update-checksums, update-homebrew-tap, verify-homebrew-install, wait-homebrew-tap-ci]
+    if: ${{ !failure() && !cancelled() }}
     runs-on: ubuntu-latest
-    # Exposed so wait-publish-packages can watch the just-dispatched run
-    # without re-doing the discovery work.
+    permissions:
+      contents: read
+    # Exposed so wait-publish-packages can watch the just-triggered satellite run.
     outputs:
       packages_run_id: ${{ steps.find_packages.outputs.run_id }}
       packages_run_url: ${{ steps.find_packages.outputs.run_url }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Capture pre-dispatch timestamp
+      - name: Capture pre-push timestamp
         id: timestamp
         run: |
           # 5s buffer absorbs clock skew between this runner and the
-          # satellite's, plus the time between this step and the dispatch.
-          echo "dispatch_time=$(date -u -d '5 seconds ago' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          # satellite's, plus the time between this step and the push.
+          echo "push_time=$(date -u -d '5 seconds ago' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      - name: Generate App Token
+      - name: Set up Go (for extract-retracted.sh)
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Generate retracted.txt from go.mod
+        run: |
+          ./scripts/extract-retracted.sh go.mod > packages/retracted.txt
+          echo "Retracted versions being published:"
+          cat packages/retracted.txt || echo "(none)"
+
+      - name: Generate App token (packages only)
         uses: actions/create-github-app-token@v3
         id: app-token
         with:
@@ -559,30 +582,39 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: packages
 
-      - name: Trigger packages update
-        uses: peter-evans/repository-dispatch@v4
+      - name: Checkout dotsecenv/packages satellite
+        uses: actions/checkout@v6
         with:
-          token: ${{ steps.app-token.outputs.token }}
           repository: dotsecenv/packages
-          event-type: publish-packages
-          client-payload: '{"version": "${{ github.ref_name }}"}'
+          token: ${{ steps.app-token.outputs.token }}
+          path: packages-satellite
+          fetch-depth: 0
 
-      - name: Find dispatched packages run and surface link
+      - name: Publish packages source + tag the satellite
+        env:
+          SOURCE_DIR: packages
+          SATELLITE_DIR: packages-satellite
+          SATELLITE_REPO: dotsecenv/packages
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: scripts/release/publish-to-satellite.sh
+
+      - name: Find satellite publish.yml run (push-triggered)
         id: find_packages
         env:
           SATELLITE_REPO: dotsecenv/packages
           WORKFLOW_FILE: publish.yml
-          SINCE: ${{ steps.timestamp.outputs.dispatch_time }}
+          SINCE: ${{ steps.timestamp.outputs.push_time }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: scripts/release/find-satellite-run.sh
 
-  # Poll the dispatched packages run to completion. The link to the
-  # satellite run is already on the dispatch-packages job summary
-  # (written by find-satellite-run.sh); this job re-prints it on its
-  # own summary along with the final ✅/❌/⏱️ status.
+  # Poll the satellite's publish.yml run to completion. The link to the
+  # satellite run is on the publish-packages job summary; this job
+  # re-prints it on its own summary along with the final ✅/❌/⏱️ status.
   wait-publish-packages:
-    needs: dispatch-packages
-    if: needs.dispatch-packages.result == 'success'
+    needs: publish-packages
+    if: needs.publish-packages.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -601,7 +633,7 @@ jobs:
       - name: Watch dotsecenv/packages publish run
         env:
           SATELLITE_REPO: dotsecenv/packages
-          RUN_ID: ${{ needs.dispatch-packages.outputs.packages_run_id }}
+          RUN_ID: ${{ needs.publish-packages.outputs.packages_run_id }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: scripts/release/watch-satellite-run.sh
 
