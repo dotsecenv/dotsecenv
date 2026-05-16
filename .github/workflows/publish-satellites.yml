@@ -145,3 +145,22 @@ jobs:
           SHA: ${{ github.sha }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: scripts/release/publish-to-satellite.sh
+
+  # Mirror release.yml's test-plugin-managers gate. The plugin satellite
+  # has no CI of its own, so verification happens here in the monorepo
+  # by running `make test-managers-remote` — which clones the just-
+  # pushed plugin source from github.com/dotsecenv/plugin in Docker and
+  # exercises the install path real users experience. If install is
+  # broken on the satellite, this job fails and the workflow run is red.
+  test-plugin-managers:
+    needs: publish-plugin
+    if: inputs.target == 'plugin' || inputs.target == 'both'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run plugin manager integration tests (remote)
+        working-directory: plugin
+        run: make test-managers-remote
