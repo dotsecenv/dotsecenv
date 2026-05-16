@@ -11,11 +11,51 @@ permissions:
   attestations: write
 
 jobs:
+  # Fail fast if a release for this tag already exists with assets.
+  # Surfaces tag-moves (same tag re-pushed onto a different commit) in
+  # seconds rather than 4+ minutes into goreleaser's upload phase, which
+  # would 422 with `already_exists` on every asset. All downstream jobs
+  # depend on this (directly or transitively) so we don't burn runner
+  # minutes on a release that cannot publish. Tag protection rules are
+  # the upstream defense; this job is the in-pipeline guard for cases
+  # where the rule was bypassed, disabled, or not yet enforced.
+  preflight:
+    name: Pre-flight release check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Verify no existing release for tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # gh api exits non-zero on 404; treat that as the happy path.
+          if ! RELEASE_JSON=$(gh api "repos/${REPO}/releases/tags/${TAG}" 2>/dev/null); then
+            echo "::notice::No existing release for ${TAG}; clear to proceed."
+            exit 0
+          fi
+
+          ASSET_COUNT=$(echo "$RELEASE_JSON" | jq '.assets | length')
+          if [ "$ASSET_COUNT" -gt 0 ]; then
+            RELEASE_URL=$(echo "$RELEASE_JSON" | jq -r '.html_url')
+            echo "::error::Release ${TAG} already exists with ${ASSET_COUNT} assets: ${RELEASE_URL}"
+            echo "::error::Tag protection rules prevent moving or deleting release tags, so the only forward path is a new version."
+            echo "::error::To ship a fix: bump the version (next patch) and cut a new tag."
+            echo "::error::To withdraw the existing release: retract it (see scripts/retract-version.sh)."
+            exit 1
+          fi
+
+          echo "::notice::Release ${TAG} exists with no assets (likely partial prior failure); proceeding."
+
   # Reusable hermetic E2E (harden-runner + strace network-syscall
   # verification). Single source of truth in e2e-hermetic.yml — used by
   # PRs and by the release pipeline so the verification logic doesn't
   # drift between the two.
   e2e-hermetic:
+    needs: preflight
     uses: ./.github/workflows/e2e-hermetic.yml
 
   # Gate the release on each path-scoped CI workflow's pass on this
@@ -38,6 +78,7 @@ jobs:
   # job below) after the release is published.
   wait-ci:
     name: Wait for CI on tagged commit
+    needs: preflight
     runs-on: ubuntu-latest
     permissions:
       actions: read
