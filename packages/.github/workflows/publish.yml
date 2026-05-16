@@ -55,58 +55,27 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: dotsecenv
 
-      - name: Fetch Retraction List
+      - name: Read Retraction List
         id: retracted
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          # Canonical source of truth is dotsecenv's go.mod retract block.
-          # Mirror the parser logic from dotsecenv/scripts/extract-retracted.sh
-          # so this workflow stays self-contained (no curl-piping a script
-          # into bash from another repo). Output is "VERSION<TAB>REASON"
-          # lines, suitable for both filtering below and for serving as
-          # get.dotsecenv.com/retracted.txt later in the build.
-          gh api repos/dotsecenv/dotsecenv/contents/go.mod \
-            --jq '.content' | base64 -d > /tmp/dotsecenv-go.mod
+          # retracted.txt is pushed to this satellite from the monorepo
+          # (dotsecenv/dotsecenv) by the publish-packages job in
+          # release.yml. It's generated there from go.mod's `retract`
+          # block via `go mod edit -json | jq`, so the canonical source
+          # of truth lives with the code in one place.
+          # Format: one "VERSION<TAB>REASON" line per retracted version.
+          set -euo pipefail
 
-          awk '
-            function emit(v, r) {
-              gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
-              gsub(/^[[:space:]]+|[[:space:]]+$/, "", r)
-              if (v != "") printf "%s\t%s\n", v, r
-            }
-            /^retract[[:space:]]*\(/ { in_block = 1; next }
-            in_block && /^[[:space:]]*\)/ { in_block = 0; next }
-            in_block {
-              line = $0
-              sub(/^[[:space:]]+/, "", line)
-              if (line == "" || line ~ /^\/\//) next
-              if (match(line, /^v[0-9]+\.[0-9]+\.[0-9]+[^[:space:]]*/)) {
-                v = substr(line, RSTART, RLENGTH)
-                rest = substr(line, RSTART + RLENGTH)
-                r = (match(rest, /\/\//)) ? substr(rest, RSTART + RLENGTH) : ""
-                emit(v, r)
-              }
-              next
-            }
-            /^retract[[:space:]]+v[0-9]/ {
-              line = $0
-              sub(/^retract[[:space:]]+/, "", line)
-              if (match(line, /^v[0-9]+\.[0-9]+\.[0-9]+[^[:space:]]*/)) {
-                v = substr(line, RSTART, RLENGTH)
-                rest = substr(line, RSTART + RLENGTH)
-                r = (match(rest, /\/\//)) ? substr(rest, RSTART + RLENGTH) : ""
-                emit(v, r)
-              }
-            }
-          ' /tmp/dotsecenv-go.mod > /tmp/retracted.txt
-
-          echo "Retracted versions:"
-          cat /tmp/retracted.txt || echo "(none)"
-
-          # Comma-separated tag list for the jq exclusion below.
-          RETRACTED_CSV=$(cut -f1 /tmp/retracted.txt | paste -sd, -)
-          echo "csv=${RETRACTED_CSV}" >> $GITHUB_OUTPUT
+          if [ -f retracted.txt ] && [ -s retracted.txt ]; then
+            echo "Retracted versions:"
+            cat retracted.txt
+            # Comma-separated tag list for the jq exclusion in the next step.
+            RETRACTED_CSV=$(cut -f1 retracted.txt | grep -v '^$' | paste -sd, -)
+          else
+            echo "No retracted.txt or file is empty; treating as no retractions"
+            RETRACTED_CSV=""
+          fi
+          echo "csv=${RETRACTED_CSV}" >> "$GITHUB_OUTPUT"
 
       - name: Get Release Versions
         id: versions
@@ -149,6 +118,55 @@ jobs:
 
           echo "Found versions (after filtering retracted):"
           echo "$VERSIONS"
+
+      # Mirrors update-homebrew-tap's CDN-fresh wait. GitHub Releases is
+      # fronted by a CDN that can briefly serve the pre-notarization copy
+      # of Darwin tarballs right after a release publish — the notarize-
+      # macos jobs re-upload those archives, and the CDN may still hand
+      # out the original goreleaser-built bytes for a window. Only the
+      # LATEST version's Darwin archives can be in this state; everything
+      # older has long since converged. Wait for them to match the
+      # published checksums.txt before downloading.
+      - name: Wait for CDN to serve latest Darwin archives
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          LATEST: ${{ steps.versions.outputs.latest }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LATEST}" ]; then
+            echo "No latest version resolved; skipping CDN wait"
+            exit 0
+          fi
+
+          mkdir -p /tmp/cdn-check
+          gh release download "${LATEST}" --repo dotsecenv/dotsecenv \
+            --pattern "checksums.txt" --dir /tmp/cdn-check
+
+          VERSION_NUM="${LATEST#v}"
+          for arch in arm64 x86_64; do
+            ASSET="dotsecenv_${VERSION_NUM}_Darwin_${arch}.tar.gz"
+            EXPECTED=$(grep "${ASSET}\$" /tmp/cdn-check/checksums.txt | cut -d' ' -f1 || true)
+            if [ -z "${EXPECTED}" ]; then
+              echo "::warning::No checksum entry for ${ASSET}; skipping"
+              continue
+            fi
+            URL="https://github.com/dotsecenv/dotsecenv/releases/download/${LATEST}/${ASSET}"
+
+            deadline=$(( $(date +%s) + 300 ))
+            while :; do
+              ACTUAL=$(curl -fsSL "${URL}" | sha256sum | cut -d' ' -f1)
+              if [ "${ACTUAL}" = "${EXPECTED}" ]; then
+                echo "${ASSET}: CDN matches expected (${EXPECTED})"
+                break
+              fi
+              if [ "$(date +%s)" -ge "${deadline}" ]; then
+                echo "::error::${ASSET}: CDN still stale after 300s (expected ${EXPECTED}, got ${ACTUAL})"
+                exit 1
+              fi
+              echo "${ASSET}: CDN stale (expected ${EXPECTED}, got ${ACTUAL}); retrying in 10s"
+              sleep 10
+            done
+          done
 
       - name: Download All Release Assets
         env:
@@ -306,9 +324,12 @@ jobs:
 
           # Serve retracted.txt at get.dotsecenv.com/retracted.txt so
           # install.sh can fetch it and refuse to install retracted
-          # versions. Generated from dotsecenv go.mod in the
-          # "Fetch Retraction List" step above.
-          cp /tmp/retracted.txt _stage/retracted.txt
+          # versions. The file lives at the satellite repo root because
+          # the monorepo publish-packages job generates it from go.mod
+          # and pushes it as part of packages/ source.
+          if [ -f retracted.txt ]; then
+            cp retracted.txt _stage/retracted.txt
+          fi
 
           # Fetch install.sh from the main repo (pinned to the latest release tag)
           gh api "repos/dotsecenv/dotsecenv/contents/scripts/install.sh?ref=${LATEST}" \
