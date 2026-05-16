@@ -203,7 +203,7 @@ A secrets management tool that "phones home" or makes unexpected network connect
 2. Dual verification. Two jobs check that zero network connections happen:
    - [step-security/harden-runner](https://github.com/step-security/harden-runner) blocks egress at the kernel level
    - A network namespace plus `strace` traces every network syscall in isolation
-3. Complementary coverage. The two jobs aren't identical reruns; they check different parts of the pipeline (see [Why Two Jobs?](#why-two-jobs)).
+3. Build and runtime are both hermetic. The two jobs cover different surfaces of the pipeline (see [Hermetic guarantees across build and runtime](#hermetic-guarantees-across-build-and-runtime)).
 4. Auditable artifacts. Job summaries and downloadable syscall traces.
 5. Release gate. Releases are blocked if hermetic tests fail.
 
@@ -230,7 +230,7 @@ A secrets management tool that "phones home" or makes unexpected network connect
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-### Why Two Jobs?
+### Hermetic guarantees across build and runtime
 
 The two jobs cover different parts of the pipeline, not just the same part twice. The split exists because of an ordering constraint in `harden-runner`.
 
