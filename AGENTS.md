@@ -152,8 +152,13 @@ The script does three things per version:
 2. Deletes every asset on the corresponding GitHub release (so direct
    `curl`/`wget` and `gh release download` cannot pull retracted
    binaries).
-3. Renames the GitHub release to `[RETRACTED] vX.Y.Z` and appends a notice
-   to the release body. `[RETRACTED]` is used to match Go's `retract`
+3. Renames the GitHub release to `[RETRACTED] vX.Y.Z`, appends a notice
+   to the release body, and flips it to `prerelease: true`. The
+   prerelease flag is load-bearing: it excludes the release from
+   GitHub's `releases/latest` endpoint, which `install.sh` and the
+   packages publish workflow both consult. Without it, retracted
+   versions would still resolve as "latest" for anyone running the
+   default installer. `[RETRACTED]` is used to match Go's `retract`
    vocabulary in `go.mod` (other ecosystems use "yank" or "deprecate";
    sticking to one term across the project avoids confusion).
 

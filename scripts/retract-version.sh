@@ -173,13 +173,19 @@ mark_release_yanked() {
                     "> Reason:" "$reason"; printf '\n%s\n' "$current_body")
     fi
 
-    log "  marking release ${tag} as [RETRACTED]"
+    log "  marking release ${tag} as [RETRACTED] and prerelease"
     if [ "$DRY_RUN" -eq 1 ]; then
         printf '[dry-run] new title: %s\n' "$new_title"
+        printf '[dry-run] set prerelease=true (excludes from releases/latest)\n'
     else
+        # --prerelease excludes the release from the `releases/latest`
+        # GitHub API endpoint that install.sh resolves "latest" against,
+        # so users defaulting to "latest" skip the retracted version.
+        # The packages publish workflow's existing prerelease filter
+        # also benefits.
         printf '%s' "$new_body" | \
             gh release edit "$tag" --repo "${REPO_OWNER}/${REPO_NAME}" \
-                --title "$new_title" --notes-file -
+                --title "$new_title" --prerelease --notes-file -
     fi
 }
 
