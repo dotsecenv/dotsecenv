@@ -140,8 +140,8 @@ Remove an identity completely:
 
 ```bash
 # Revoke from all secrets
-for secret in $(dotsecenv vault describe --json | jq -r '.secrets[].name'); do
-  dotsecenv secret revoke "$secret" FINGERPRINT
+for secret in $(dotsecenv vault describe --json | jq -r '.[].secrets[].key' | sort -u); do
+  dotsecenv secret revoke "$secret" FINGERPRINT --all
 done
 ```
 
@@ -172,31 +172,46 @@ dotsecenv secret revoke "*" FINGERPRINT --all
 
 ## Complete Offboarding Checklist
 
+<Aside type="tip" title="Tactical runbook">
+For the urgent / panic-moment version with pre-flight comms, an inventory query, error handling, and a leaver-comms template, see [recipes/team-member-offboarding.md](https://github.com/dotsecenv/dotsecenv/blob/main/recipes/team-member-offboarding.md). The section below is the at-a-glance checklist; the recipe is the full runbook.
+</Aside>
+
 When a team member leaves:
 
-- Revoke their access to all secrets
-- Rotate ALL secrets they had access to
-- Update all systems with new credentials
-- Run `vault doctor` to clean up (optional)
-- Document the change in your security log
+1. **Announce** the rotation window in your on-call channel so consumers know to expect brief credential changes.
+2. **Revoke** their access to every secret in one pass.
+3. **Rotate** every secret they had access to, **production-critical first**.
+4. **Update** dependent systems with the new credentials.
+5. **Verify** with `vault describe` and `vault doctor`.
+6. **Document** the change in your security log.
 
 ```bash
-# Comprehensive offboarding
+# At-a-glance offboarding
 FINGERPRINT="THEIR_FINGERPRINT"
 
-# 1. Revoke all access
+# 1. Revoke from every secret in every vault
 dotsecenv secret revoke "*" "$FINGERPRINT" --all
 
-# 2. Rotate secrets (do this for each secret)
-echo "new-value" | dotsecenv secret store DATABASE_PASSWORD
-echo "new-value" | dotsecenv secret store API_KEY
-# ... repeat for all secrets
+# 2. Rotate each secret at its source — production first
+echo "new-prod-db-password" | dotsecenv secret store DATABASE_PASSWORD
+echo "new-prod-api-key"     | dotsecenv secret store API_KEY
+# ... continue for staging and dev
 
-# 3. Commit
+# 3. Confirm the leaver no longer appears in any current recipient list
+dotsecenv vault describe --json \
+  | jq --arg fp "$FINGERPRINT" \
+       '.[].secrets[] | select((.available_to // []) | index($fp)) | .key'
+# (empty output means the revoke took effect)
+
+# 4. Commit
 git add vault
 git commit -m "Offboard: revoke access for $FINGERPRINT"
 git push
 ```
+
+<Aside type="caution" title="Hostile exits">
+For hostile or suspected-compromise departures, skip the pre-rotation announcement, proceed straight to revoke + rotate, and loop in legal afterward. The recipe's [Talking to the leaver](https://github.com/dotsecenv/dotsecenv/blob/main/recipes/team-member-offboarding.md#talking-to-the-leaver) section covers both cases.
+</Aside>
 
 ---
 

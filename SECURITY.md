@@ -84,6 +84,9 @@ For more details, see our [Security Model](https://dotsecenv.com/concepts/securi
 If a private GPG key in your team's keyring is suspected or known
 to be compromised, work through the runbook in
 [`recipes/rotate-compromised-key.md`](recipes/rotate-compromised-key.md).
+For the related but distinct case of removing a departing
+teammate's key (planned exit, no compromise assumed), use
+[`recipes/team-member-offboarding.md`](recipes/team-member-offboarding.md).
 
 The short version:
 

@@ -98,7 +98,10 @@ per-directory trust).
   `dotsecenv secret share NAME <THEIR_FINGERPRINT> --all`.
 - **Rotating values.** Instead of "rotate everything when someone
   leaves", revoke and rotate the affected secrets. See
-  [rotate a compromised key](rotate-compromised-key.md).
+  [offboard a departing team member](team-member-offboarding.md)
+  for planned exits, or
+  [rotate a compromised key](rotate-compromised-key.md) for
+  compromise scenarios.
 
 ## See also
 
