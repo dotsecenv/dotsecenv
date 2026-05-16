@@ -1,8 +1,13 @@
 name: Publish Packages
 
 on:
-  repository_dispatch:
-    types: [publish-packages]
+  # Trigger on push to main. The monorepo's publish-packages job pushes
+  # source (key.asc, retracted.txt, this very workflow file, etc.) to
+  # this satellite via a signed commit on every release; that push lands
+  # here and triggers this workflow. Renovate PRs that merge to main
+  # also trigger a republish to pick up dependency updates.
+  push:
+    branches: [main]
 
   workflow_dispatch:
     inputs:
@@ -21,7 +26,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  KEEP_VERSIONS: ${{ github.event.client_payload.keep_versions || inputs.keep_versions || '5' }}
+  KEEP_VERSIONS: ${{ inputs.keep_versions || '5' }}
 
 jobs:
   build-and-deploy:
