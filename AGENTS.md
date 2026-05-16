@@ -139,6 +139,64 @@ or the "Re-run all jobs" button in the GitHub UI.
 for signed semver tags pushed via `rt git::release`. To rerun a release
 that failed mid-pipeline, fix forward with a patch tag.
 
+## Retracting a bad release
+
+If a release shipped broken binaries, a tag was moved (see the pre-flight
+check in `release.yml`), or a published version has to be withdrawn for
+any reason, use `scripts/retract-version.sh` rather than deleting the tag.
+
+The script does three things per version:
+
+1. Adds an entry to `go.mod`'s `retract` block. The Go module proxy
+   honors this and warns/excludes the version for every Go consumer.
+2. Deletes every asset on the corresponding GitHub release (so direct
+   `curl`/`wget` and `gh release download` cannot pull retracted
+   binaries).
+3. Renames the GitHub release to `[RETRACTED] vX.Y.Z`, appends a notice
+   to the release body, and flips it to `prerelease: true`. The
+   prerelease flag is load-bearing: it excludes the release from
+   GitHub's `releases/latest` endpoint, which `install.sh` and the
+   packages publish workflow both consult. Without it, retracted
+   versions would still resolve as "latest" for anyone running the
+   default installer. `[RETRACTED]` is used to match Go's `retract`
+   vocabulary in `go.mod` (other ecosystems use "yank" or "deprecate";
+   sticking to one term across the project avoids confusion).
+
+The git tag itself is preserved — Go module retraction requires the tag
+to remain reachable so existing consumers can resolve it (and now read
+the retraction). Tag protection rules block re-creation.
+
+```bash
+# Dry-run first to see what will happen.
+./scripts/retract-version.sh --dry-run --reason "tag moved" v0.6.11
+
+# Real run; --yes skips the interactive confirmation.
+./scripts/retract-version.sh --yes --reason "tag moved" v0.6.11
+```
+
+The script is idempotent: re-running for an already-retracted version
+edits nothing. It commits the `go.mod` change with a `chore: retract …`
+message; push the commit and cut the next semver tag as usual.
+
+Downstream filtering happens automatically once the commit lands:
+
+- The packages publish workflow (`dotsecenv/packages`) reads the
+  `retract` block from `go.mod`, derives `get.dotsecenv.com/retracted.txt`,
+  and refuses to include retracted versions in apt/yum/arch repos or
+  tarball mirrors.
+- `scripts/install.sh` fetches `retracted.txt` at install time and
+  refuses to install a retracted version. There is no override flag:
+  if you need a retracted binary for forensic / replay use, download
+  it manually with full awareness of the retraction.
+
+What the script does NOT do — handle manually if needed:
+
+- Update Homebrew tap formula (do it in `homebrew-tap` repo).
+- Notify users of a security-relevant retraction (use a GitHub Security
+  Advisory; the release-body notice is informational, not a CVE).
+- Remove the version from the changelog (keep it visible with a
+  `[RETRACTED]` annotation so the historical record is intact).
+
 ## Conventions
 
 - **Go version:** 1.26.2 (see `go.mod`). Go 1.26+ required.

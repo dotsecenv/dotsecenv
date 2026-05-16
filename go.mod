@@ -21,3 +21,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.49.0 // indirect
 )
+
+retract v0.6.10 // no release published
+
+retract v0.6.11 // tag moved; second push triggered duplicate-upload failure
