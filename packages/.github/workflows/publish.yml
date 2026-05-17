@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       keep_versions:
-        description: "Number of releases to include (default: 5)"
+        description: "Number of minor versions to include — last patch of each (default: 5)"
         required: false
         default: "5"
 
@@ -88,13 +88,35 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RETRACTED_CSV: ${{ steps.retracted.outputs.csv }}
         run: |
-          # Get last N release tags. Filter out:
+          # Pick the latest patch of each of the last KEEP_VERSIONS
+          # MINOR versions. Rationale: a refactor cycle can produce
+          # many patches against the same minor (e.g. 0.6.4..0.6.13
+          # were nearly-identical builds during the release-pipeline
+          # rewrite). Indexing the package repos by every patch
+          # wastes storage and obscures the meaningful version axis;
+          # users typically want to pin to a minor and ride the
+          # latest patch. With this selector, dropping "0.6" into a
+          # `brew install` / apt pinning configuration always
+          # resolves to the freshest known-good patch of that minor.
+          #
+          # Pre-filtering (in jq, same as before):
           #  - drafts (stale orphans / rc tags pushed for CI testing)
           #  - prereleases
           #  - versions listed in dotsecenv's go.mod retract block
-          # Retracted releases may still appear in the API even after
-          # their assets are deleted; excluding by tag_name catches both
-          # asset-deleted and not-yet-asset-deleted cases.
+          #    (retracted releases may still appear in the API even
+          #    after their assets are deleted; excluding by tag_name
+          #    catches both asset-deleted and not-yet-asset-deleted
+          #    cases).
+          #
+          # Post-filtering (shell pipeline):
+          #  - grep keeps only strict semver tags (v\d+\.\d+\.\d+),
+          #    so a one-off `funky-tag` or `v0.6.0-rc1` doesn't
+          #    crash the version parse.
+          #  - `sort -V -r` puts everything newest-first so awk's
+          #    "first occurrence per minor" picks the highest patch.
+          #  - awk dedups by major.minor, keeping the first-seen
+          #    (= highest patch for that minor).
+          #  - head -n KEEP_VERSIONS takes the last N minor lineages.
           RETRACTED_FILTER=""
           if [ -n "${RETRACTED_CSV}" ]; then
             # Build a jq array literal from the CSV.
@@ -109,9 +131,11 @@ jobs:
           fi
           JQ_EXPR="${JQ_EXPR} | .tag_name"
 
-          VERSIONS=$(gh api repos/dotsecenv/dotsecenv/releases \
-            --jq "${JQ_EXPR}" \
-            | head -n ${{ env.KEEP_VERSIONS }})
+          VERSIONS=$(gh api repos/dotsecenv/dotsecenv/releases --jq "${JQ_EXPR}" \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V -r \
+            | awk -F. '!seen[$1"."$2]++' \
+            | head -n "${KEEP_VERSIONS}")
 
           echo "versions<<EOF" >> $GITHUB_OUTPUT
           echo "$VERSIONS" >> $GITHUB_OUTPUT
