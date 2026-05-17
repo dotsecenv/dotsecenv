@@ -220,6 +220,11 @@ jobs:
 
       - name: Verify All Assets
         run: |
+          # key.asc bundles current + retired public keys. ghaction-import-gpg
+          # above imports only the current signing key; importing the bundle
+          # here adds retired keys so older releases also verify.
+          gpg --import key.asc
+
           for dir in incoming/*/; do
             [ -d "$dir" ] || continue
             echo "Verifying $dir..."
