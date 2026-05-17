@@ -1,0 +1,88 @@
+name: CI Merge Gate
+
+# Single status check that lets branch protection require ONE thing instead
+# of seven. Polls every PR-triggered workflow on this commit and treats
+# "no run found" as a legitimate paths-filter skip. Real failures still
+# surface — `gh run watch --exit-status` exits non-zero on failure.
+#
+# When adding or renaming a PR-triggered workflow, update the matrix below.
+# Pattern mirrors `release.yml`'s `wait-ci` job (which does the same thing
+# for tagged commits).
+
+on:
+  pull_request:
+    branches: [main]
+  # no paths: filter — this workflow must always start on every PR to main
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: ci-merge-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ci-merge-gate:
+    name: ci-merge-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        workflow:
+          - ci.yml
+          - ci-plugin.yml
+          - ci-release.yml
+          - e2e-hermetic.yml
+          - e2e-install.yml
+          - ci-website.yml
+          - lint-workflows.yml
+    steps:
+      - name: Wait for ${{ matrix.workflow }} on PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          WORKFLOW: ${{ matrix.workflow }}
+        run: |
+          set -euo pipefail
+          # Race window: ci-merge-gate can queue before sibling workflows
+          # register their runs in the Actions API. Retry for up to 60s
+          # before declaring "no run" (legitimate paths-filter skip).
+          # release.yml's wait-ci catches anything missed pre-release.
+          deadline=$(( $(date +%s) + 60 ))
+          RUN_ID=""
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            RUN_ID=$(gh api \
+              "repos/${REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${SHA}&event=pull_request&per_page=1" \
+              --jq '.workflow_runs[0].id // empty')
+            [ -n "$RUN_ID" ] && break
+            sleep 10
+          done
+
+          if [ -z "$RUN_ID" ]; then
+            echo "::notice::No ${WORKFLOW} run for ${SHA} within 60s — paths filter excluded it. Treating as success."
+            exit 0
+          fi
+
+          echo "Watching ${WORKFLOW} run ${RUN_ID}..."
+          # exits non-zero on failure/cancelled/timed_out, zero on success/skipped
+          gh run watch "$RUN_ID" --exit-status --repo "$REPO"
+
+  allow:
+    name: allow
+    needs: ci-merge-gate
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all ci-merge-gate shards passed
+        env:
+          RESULT: ${{ needs.ci-merge-gate.result }}
+        run: |
+          echo "ci-merge-gate aggregate result: $RESULT"
+          # Aggregate over all matrix shards:
+          #   success  → all shards passed
+          #   failure  → at least one shard failed
+          #   cancelled → run was cancelled
+          [ "$RESULT" = "success" ] || exit 1
