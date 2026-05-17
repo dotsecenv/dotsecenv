@@ -220,10 +220,9 @@ jobs:
 
       - name: Verify All Assets
         run: |
-          # key.asc bundles current + retired public keys. The ghaction-import-gpg
-          # step above only loaded the current signing key, so older releases
-          # signed under a retired key fail `gpg --verify` with "No public key".
-          # Import the bundle so historical versions verify too.
+          # key.asc bundles current + retired public keys. ghaction-import-gpg
+          # above imports only the current signing key; importing the bundle
+          # here adds retired keys so older releases also verify.
           gpg --import key.asc
 
           for dir in incoming/*/; do
