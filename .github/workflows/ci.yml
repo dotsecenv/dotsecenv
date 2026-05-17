@@ -90,6 +90,8 @@ on:
       - "!.github/workflows/ci-website.yml"
       - "!.github/workflows/deploy-website.yml"
 
+permissions: {}
+
 jobs:
   test:
     name: Lint, Build, Test (${{ matrix.os }})

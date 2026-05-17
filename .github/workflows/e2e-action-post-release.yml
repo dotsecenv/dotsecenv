@@ -30,6 +30,8 @@ on:
         required: false
         default: ""
 
+permissions: {}
+
 jobs:
   test-released-action:
     name: Test Released Action (${{ matrix.os }})
