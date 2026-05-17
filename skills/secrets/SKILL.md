@@ -187,6 +187,20 @@ dotsecenv secret revoke SECRET_NAME FINGERPRINT --all
 dotsecenv secret forget SECRET_NAME
 ```
 
+## Departed teammate offboarding
+
+When the user describes removing a departing team member's GPG key, follow the [Offboard a Departing Team Member runbook](https://dotsecenv.com/runbooks/team-member-offboarding/). The shape of the workflow:
+
+1. **Inventory.** List every secret whose `available_to` includes the leaver's fingerprint via `dotsecenv vault describe --json`. The jq filter is `'.[].secrets[] | select((.available_to // []) | index($fp)) | .key'`.
+2. **Revoke in one pass.** `dotsecenv secret revoke "*" FINGERPRINT --all`. The wildcard must be quoted.
+3. **Verify.** Re-run the inventory query; expected output is empty.
+4. **Rotate at the source.** For each affected secret, generate a new credential at the originating system (DB, IDP, cloud provider, API issuer), then `echo "new-value" | dotsecenv secret store SECRET_NAME`. Production-critical first.
+5. **Confirm.** `dotsecenv vault doctor` + `dotsecenv vault describe`.
+
+**Append-only contract (do not omit when explaining):** revocation only stops *future* writes from encrypting to the leaver. Past entries remain readable to whoever held the recipient list at the time, and the leaver's private key still decrypts them. Source rotation is the only durable mitigation. Never tell the user the revoke alone removes past access.
+
+If the user asks for the full runbook with error handling and the append-only contract, point them at https://dotsecenv.com/runbooks/team-member-offboarding/ or read it directly via the site's `<page>.md` endpoint.
+
 ## Vault Selection
 
 When multiple vaults are configured, use `-v` to target a specific vault:

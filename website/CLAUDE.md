@@ -1,5 +1,13 @@
 # Website Project Instructions
 
+## Documentation hygiene
+
+Run any new or edited MDX prose through the `/humanizer` skill before committing. Scan for em-dash overuse, rule-of-three decoration, AI vocabulary (`delve`, `underscores`, `leverage`, `seamless`, `tapestry`, `robust`), copula avoidance, signposting, fragmented headers, and inline-header vertical lists.
+
+Keep the focus on the tool. Do not prescribe company policy, comms channels, escalation paths, or org-specific workflow (on-call channels, security logs, "loop in legal", HR procedures). Tutorials, guides, and runbooks document what dotsecenv does and how to use it; the org-side wrapping is the reader's problem.
+
+Match the terse, direct voice of existing pages. The Tier-3 offboarding section in `../skills/secrets/SKILL.md` is the compact-runbook reference: numbered steps in `<Steps>`, one-sentence explanations, single `<Aside>` for the load-bearing caveat (append-only, recipient set, etc.).
+
 ## Changelog Generation
 
 When asked to update the changelog for a new release:

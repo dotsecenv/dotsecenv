@@ -1,0 +1,85 @@
+---
+title: Offboard a departing team member
+description: Remove a leaving teammate's GPG key from every vault they could read and rotate the secrets they had access to
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Remove a leaving teammate's GPG key from every vault they could read and rotate the secrets they had access to.
+
+<Aside type="caution" title="Append-only contract">
+`secret revoke` only stops *future* writes from encrypting to the leaver. Past entries remain readable to whoever held the recipient list at the time, and the leaver's private key still decrypts them. Source rotation is the only durable mitigation.
+</Aside>
+
+<Aside type="tip" title="Suspected key compromise, not a planned exit?">
+Use [Rotate a Compromised GPG Key](/runbooks/rotate-compromised-key/) instead.
+</Aside>
+
+## Runbook
+
+<Steps>
+
+1. **Inventory.** List every secret whose recipient list includes the leaver's fingerprint:
+
+   ```bash
+   LEAVER_FP="ABCD1234..."   # the 40-char fingerprint
+
+   for v in $(dotsecenv vault describe --json | jq -r '.[].vault'); do
+     dotsecenv vault describe --json -v "$v" \
+       | jq -r --arg fp "$LEAVER_FP" \
+           '.[].secrets[] | select((.available_to // []) | index($fp)) | .key'
+   done
+   ```
+
+   Order the worklist by blast radius: production credentials first.
+
+2. **Revoke in one pass.** Quote the wildcard so the shell does not expand it.
+
+   ```bash
+   dotsecenv secret revoke "*" "$LEAVER_FP" --all
+   ```
+
+3. **Verify.** Re-run the inventory from step 1. The output should be empty.
+
+   ```bash
+   dotsecenv vault doctor
+   ```
+
+4. **Rotate at the source.** Generate a new credential at the originating system (database, IDP, cloud provider, API issuer) and store it. Production-critical first.
+
+   ```bash
+   echo "<new-value>" | dotsecenv secret store SECRET_NAME
+   ```
+
+5. **Commit.**
+
+   ```bash
+   git add path/to/vault
+   git commit -m "Offboard <name>: revoke $LEAVER_FP, rotate N secrets"
+   ```
+
+</Steps>
+
+## Error handling
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `secret revoke ... --all` says "no matching secret" | Wildcard not quoted; shell expanded `*` to local filenames | Quote it: `"*"` |
+| `vault describe` is missing a vault you expected | Vault path not in `vault:` config, or blocked by policy | Add it with `-v` once, or list it under `vault:` in `~/.config/dotsecenv/config.yaml` |
+| Decrypt failure when rotating | Your own login fingerprint was accidentally revoked from this secret | `dotsecenv secret share SECRET YOUR_FP --all`, then re-run `secret store` |
+| Revoke succeeds in some vaults, fails in others | A vault file is read-only or owned by another user | Run revoke per vault with `-v` and a writeable path |
+| Leaver's fingerprint is not in your keyring | Public key was never imported, or expired and was purged | Revoke works without the public key; you only need the fingerprint string |
+
+## What you cannot do
+
+- **Erase a leaked entry from the vault file.** Append-only by design. Rewriting `git` history with `git filter-repo` is possible, but anyone who already cloned the repo still has the old data and the leaver's key still decrypts it.
+- **Re-encrypt an existing entry to a different recipient set.** `secret share` and `secret revoke` only affect future writes. Source rotation is the only fix.
+- **Recall a value the leaver memorized or saved elsewhere.** Rotating the underlying credential makes that knowledge worthless.
+
+## See also
+
+- Runbook: [Rotate a Compromised GPG Key](/runbooks/rotate-compromised-key/)
+- Tutorial: [Revoke Access](/tutorials/revoke-access/)
+- Concept: [Vault Format — append-only semantics](/concepts/vault-format/#append-only-semantics)
+- Concept: [Threat Model](/concepts/threat-model/)
+- Runnable example: [`examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/02-team-share-revoke)

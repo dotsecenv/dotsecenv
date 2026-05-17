@@ -52,8 +52,14 @@ export default defineConfig({
             {
               label: 'Guides',
               description:
-                'Integration guides: shell plugins, GitHub Action, Terraform credentials helper, Claude Code, plus the how-to recipe book.',
+                'Integration guides: shell plugins, GitHub Action, Terraform credentials helper, Claude Code, plus the how-to lookup page.',
               paths: ['guides/**', 'how-to'],
+            },
+            {
+              label: 'Runbooks',
+              description:
+                'Operational runbooks: rotating a compromised GPG key and offboarding a departing team member, with the append-only-vault caveats that apply to both.',
+              paths: ['runbooks/**'],
             },
             {
               label: 'Reference',
@@ -195,6 +201,13 @@ export default defineConfig({
             { label: 'Claude Code', slug: 'guides/claude-code' },
             { label: 'GPG Agent', slug: 'guides/gpg-agent' },
             { label: 'How-To', slug: 'how-to' },
+          ],
+        },
+        {
+          label: 'Runbooks',
+          items: [
+            { label: 'Rotate a Compromised GPG Key', slug: 'runbooks/rotate-compromised-key' },
+            { label: 'Offboard a Departing Team Member', slug: 'runbooks/team-member-offboarding' },
           ],
         },
         {

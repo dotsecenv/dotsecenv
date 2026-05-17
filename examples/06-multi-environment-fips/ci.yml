@@ -1,0 +1,134 @@
+# examples/06-multi-environment-fips/ci.yml
+#
+# Per-environment GitHub Actions workflow for a 3-environment
+# dotsecenv setup (development / staging / production) under FIPS
+# 186-5 policy enforcement.
+#
+# Save this file at: .github/workflows/deploy.yml in your application
+# repo. It expects one repo secret per environment, each holding the
+# ASCII-armored private key for that environment's CI identity.
+#
+# Repository secrets required:
+#   DOTSECENV_GPG_PRIVATE_KEY_DEV       (the CI identity for dev)
+#   DOTSECENV_GPG_PRIVATE_KEY_STAGING   (the CI identity for staging)
+#   DOTSECENV_GPG_PRIVATE_KEY_PROD      (the CI identity for production)
+#
+# Vault layout in the repo:
+#   .dotsecenv/vault-dev
+#   .dotsecenv/vault-staging
+#   .dotsecenv/vault-prod
+#   .dotsecenv/policy.d/00-corp-fips.yaml
+#
+# FIPS coverage:
+#   - `dotsecenv policy validate` checks the policy fragment shape and
+#     exits non-zero if a fragment is malformed (exit code 2),
+#     unreadable (exit code 8), or carries an empty allow-list (exit
+#     code 1). The job below fails fast on any of those.
+#   - For FIPS 140-3 module validation, build the binary with
+#     `GOFIPS140=v1.26.0 go build -o dotsecenv ./cmd/dotsecenv` and pin
+#     the validated binary into your runner image rather than pulling
+#     a release artifact. See compliance docs for the trade-off.
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  policy-validate:
+    # Runs once per push. Confirms the policy fragment is structurally
+    # valid before any environment job tries to use a vault under it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dotsecenv/dotsecenv@v0
+        with:
+          version: latest
+          verify-provenance: true
+      - name: Install corp FIPS policy fragment
+        run: |
+          sudo mkdir -p /etc/dotsecenv/policy.d
+          sudo install -o root -g root -m 0644 \
+            .dotsecenv/policy.d/00-corp-fips.yaml \
+            /etc/dotsecenv/policy.d/00-corp-fips.yaml
+      - name: Validate policy fragment
+        run: dotsecenv policy validate
+
+  deploy:
+    needs: policy-validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: dev
+            vault: .dotsecenv/vault-dev
+            secret_name: DOTSECENV_GPG_PRIVATE_KEY_DEV
+          - env: staging
+            vault: .dotsecenv/vault-staging
+            secret_name: DOTSECENV_GPG_PRIVATE_KEY_STAGING
+          - env: production
+            vault: .dotsecenv/vault-prod
+            secret_name: DOTSECENV_GPG_PRIVATE_KEY_PROD
+
+    env:
+      GNUPGHOME: ${{ runner.temp }}/gnupg
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dotsecenv/dotsecenv@v0
+        with:
+          version: latest
+          verify-provenance: true
+
+      - name: Install corp FIPS policy fragment
+        run: |
+          sudo mkdir -p /etc/dotsecenv/policy.d
+          sudo install -o root -g root -m 0644 \
+            .dotsecenv/policy.d/00-corp-fips.yaml \
+            /etc/dotsecenv/policy.d/00-corp-fips.yaml
+
+      - name: Import CI identity for ${{ matrix.env }}
+        env:
+          KEY: ${{ secrets[matrix.secret_name] }}
+        run: |
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+          echo "$KEY" | gpg --batch --import
+          FP=$(gpg --list-secret-keys --with-colons \
+            | awk -F: '/^fpr:/ { print $10; exit }')
+          echo "DOTSECENV_FP=$FP" >> "$GITHUB_ENV"
+
+      - name: Initialize dotsecenv for ${{ matrix.env }}
+        run: |
+          dotsecenv init config -v "${{ matrix.vault }}"
+          dotsecenv login "$DOTSECENV_FP"
+
+      - name: Vault health check
+        run: dotsecenv vault doctor --json
+
+      - name: Decrypt environment secrets
+        run: |
+          set -euo pipefail
+          for SECRET in DATABASE_URL DEPLOY_TOKEN; do
+            VALUE=$(dotsecenv secret get "$SECRET")
+            echo "::add-mask::$VALUE"
+            {
+              echo "$SECRET<<__DOTSECENV_EOF__"
+              echo "$VALUE"
+              echo "__DOTSECENV_EOF__"
+            } >> "$GITHUB_ENV"
+          done
+
+      - name: Deploy to ${{ matrix.env }}
+        run: |
+          echo "Deploying to ${{ matrix.env }}"
+          echo "DATABASE_URL is set: ${DATABASE_URL:+yes}"
+          echo "DEPLOY_TOKEN is set: ${DEPLOY_TOKEN:+yes}"
+          # ./scripts/deploy-${{ matrix.env }}.sh

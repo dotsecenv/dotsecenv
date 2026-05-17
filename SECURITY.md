@@ -82,8 +82,11 @@ For more details, see our [Security Model](https://dotsecenv.com/concepts/securi
 ## Recovering from a compromised GPG key
 
 If a private GPG key in your team's keyring is suspected or known
-to be compromised, work through the runbook in
-[`recipes/rotate-compromised-key.md`](recipes/rotate-compromised-key.md).
+to be compromised, work through the
+[Rotate a Compromised GPG Key](https://dotsecenv.com/runbooks/rotate-compromised-key/)
+runbook. For the related but distinct case of removing a departing
+teammate's key (planned exit, no compromise assumed), use
+[Offboard a Departing Team Member](https://dotsecenv.com/runbooks/team-member-offboarding/).
 
 The short version:
 

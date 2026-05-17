@@ -1,0 +1,69 @@
+---
+title: Rotate a compromised GPG key
+description: Remove a compromised private key from your dotsecenv vaults and rotate the underlying secrets it could decrypt
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Remove a compromised private key from every vault it could read and rotate the underlying secrets at their source. Applies whether the compromised key is yours or a teammate's.
+
+<Aside type="caution" title="Append-only contract">
+`secret revoke` only stops *future* writes from encrypting to the compromised key. Past entries remain in the vault file and in `git` history, encrypted to whoever held the recipient list at the time. The compromised private key still decrypts them. Source rotation is the only durable mitigation.
+</Aside>
+
+<Aside type="tip" title="Planned departure rather than a key compromise?">
+Use [Offboard a Departing Team Member](/runbooks/team-member-offboarding/) instead.
+</Aside>
+
+## Runbook
+
+<Steps>
+
+1. **Generate or import a replacement identity.** If the compromised key is yours, generate a new pair (`gpg --full-generate-key`), publish the new public key, and have each teammate import it.
+
+2. **Revoke the compromised fingerprint from every affected secret.** Quote the wildcard so the shell does not expand it.
+
+   ```bash
+   dotsecenv secret revoke "*" <COMPROMISED_FP> --all
+   ```
+
+3. **Add the replacement recipient.**
+
+   ```bash
+   dotsecenv secret share <SECRET_NAME> <NEW_FP> --all
+   ```
+
+4. **Rotate each affected secret at its source.** Generate a new credential at the originating system (database, IDP, cloud provider, API issuer) and store it. This is what neutralizes the compromise.
+
+   ```bash
+   echo "<new-value>" | dotsecenv secret store <SECRET_NAME>
+   ```
+
+5. **Verify.** Every current secret should list the new key as a recipient and not the compromised one.
+
+   ```bash
+   dotsecenv vault doctor
+   dotsecenv vault describe
+   ```
+
+6. **Commit.**
+
+   ```bash
+   git add path/to/vault
+   git commit -m "Rotate compromised key <COMPROMISED_FP>, rotate N secrets"
+   ```
+
+</Steps>
+
+## What you cannot do
+
+- **Erase a leaked entry from the vault file.** Append-only by design. Rewriting `git` history with `git filter-repo` is possible, but anyone who already cloned the repo still has the old data and the compromised key still decrypts it.
+- **Re-encrypt an existing entry to a different recipient set.** `secret share` and `secret revoke` only affect future writes. Source rotation is the only fix.
+
+## See also
+
+- Runbook: [Offboard a Departing Team Member](/runbooks/team-member-offboarding/)
+- Tutorial: [Revoke Access](/tutorials/revoke-access/)
+- Concept: [Vault Format — append-only semantics](/concepts/vault-format/#append-only-semantics)
+- Concept: [Threat Model](/concepts/threat-model/)
+- Runnable example: [`examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/02-team-share-revoke)

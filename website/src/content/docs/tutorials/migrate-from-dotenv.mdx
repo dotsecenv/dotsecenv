@@ -13,6 +13,18 @@ Take an existing `.env` file, move the sensitive values into your dotsecenv vaul
 
 - [Getting Started](/getting-started/) completed
 
+## Mental model
+
+| `.env` file                        | dotsecenv                                                              |
+|------------------------------------|------------------------------------------------------------------------|
+| One file per project, plain text   | One vault file per project, encrypted                                  |
+| Edit a line to change a value      | `secret store NAME` writes a new entry; old values stay as history    |
+| Cannot commit safely               | Vault file commits safely to git                                       |
+| No history of who could read what  | Append-only; recipients tracked per entry                              |
+| Loaded by `source .env` at runtime | Loaded by the [shell plugin](/guides/shell-plugins/) on `cd`           |
+
+The unit of encryption and audit is the individual secret, not the file. There is no bulk-import command for that reason; the loop below loops the single-secret store call over your `.env` lines.
+
 ## Steps
 
 <Steps>
@@ -109,6 +121,27 @@ Take an existing `.env` file, move the sensitive values into your dotsecenv vaul
 | `DATABASE_NAME` | `.env` | Yes |
 | `DATABASE_PASSWORD` | vault via `.secenv` | No |
 | `API_KEY` | vault via `.secenv` | No |
+
+## Variations
+
+### Bulk migration from a large `.env`
+
+For a `.env` with many keys, a shell loop is faster than copy-pasting:
+
+```bash
+while IFS='=' read -r name value; do
+  case "$name" in ''|\#*) continue ;; esac
+  printf '%s' "$value" | dotsecenv secret store "$name"
+done < .env
+```
+
+Inspect any quoted or multi-line values manually before relying on this; `IFS='='` splits on the first `=` only and does not handle escapes.
+
+## What changes about your workflow
+
+- **Editing values.** Instead of editing a line in `.env`, run `echo NEW | dotsecenv secret store NAME`. The old value is preserved in the vault history. See [Vault Format: append-only semantics](/concepts/vault-format/#append-only-semantics).
+- **Sharing values.** Instead of sending the secret over a chat, add a teammate as a recipient: `dotsecenv secret share NAME <THEIR_FINGERPRINT> --all`.
+- **Rotating values.** See [Offboard a Departing Team Member](/runbooks/team-member-offboarding/) for planned exits, or [Rotate a Compromised GPG Key](/runbooks/rotate-compromised-key/) for compromise scenarios.
 
 ## Next steps
 

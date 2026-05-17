@@ -35,13 +35,14 @@ dotsecenv secret get TEST_SECRET # should output "xyz"
 > further), drop a `policy.d/*.yaml` fragment with
 > `approved_algorithms`; see [example 04](./examples/04-policy-directory/).
 
-### Common recipes
+### Common tasks
 
 Short, self-contained how-tos for the workflows beyond the quickstart:
 
-- [Add a secret (and the append-only audit trail)](./recipes/add-secret.md)
-- [Migrate from a `.env` file](./recipes/migrate-from-dotenv.md)
-- [Rotate a compromised GPG key](./recipes/rotate-compromised-key.md)
+- [Append-only semantics: editing, audit, and rotation](https://dotsecenv.com/concepts/vault-format/#append-only-semantics)
+- [Migrate from a `.env` file](https://dotsecenv.com/tutorials/migrate-from-dotenv/)
+- [Rotate a compromised GPG key](https://dotsecenv.com/runbooks/rotate-compromised-key/)
+- [Offboard a departing team member](https://dotsecenv.com/runbooks/team-member-offboarding/)
 
 ### Installation
 
@@ -842,7 +843,7 @@ sudo pacman -S pinentry-tty
 # etc.
 ```
 
-In rare cases you may need to add a `pinentry-program` line to your `~/.gnupg/gpg-agent.conf` and restart the gpg-agent (`killall gpg-agent`).
+In rare cases you may need to add a `pinentry-program` line to your `~/.gnupg/gpg-agent.conf` and reload the gpg-agent (`gpgconf --reload gpg-agent`).
 
 ### gpg: signing failed: Inappropriate ioctl for device
 
