@@ -65,7 +65,7 @@ jobs:
       # with refs. Source-Tag is omitted from the body for the same reason:
       # there's no release tag this commit corresponds to.
       - name: Publish packages source to satellite (no tag)
-        uses: releasetools/actions/signed-push@v0
+        uses: releasetools/actions/signed-push@57073d3d58774563dfaa76eaaf89ae086c278ee3  # v0.0.2
         with:
           source-dir: packages
           target-repo: dotsecenv/packages
@@ -126,7 +126,7 @@ jobs:
           repositories: plugin
 
       - name: Publish plugin source to satellite (no tag)
-        uses: releasetools/actions/signed-push@v0
+        uses: releasetools/actions/signed-push@57073d3d58774563dfaa76eaaf89ae086c278ee3  # v0.0.2
         with:
           source-dir: plugin
           target-repo: dotsecenv/plugin
