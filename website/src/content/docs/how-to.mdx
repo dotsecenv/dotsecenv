@@ -40,62 +40,7 @@ Variables from `.secenv` can override `.env` if names match.
 
 ## Migrate Secrets from .env
 
-Move sensitive values from a plaintext `.env` to encrypted storage.
-
-<Steps>
-
-1. **Identify sensitive values**
-
-   Common sensitive values:
-   - Passwords: `DATABASE_PASSWORD`, `ADMIN_PASSWORD`
-   - API keys: `API_KEY`, `SECRET_KEY`, `AUTH_TOKEN`
-   - Connection strings with credentials
-   - Private keys or certificates
-
-2. **Store each secret**
-
-   ```bash
-   # From .env: DATABASE_PASSWORD=super-secret
-   echo "super-secret" | dotsecenv secret store DATABASE_PASSWORD
-
-   # From .env: API_KEY=sk-abc123
-   echo "sk-abc123" | dotsecenv secret store API_KEY
-   ```
-
-3. **Create .secenv file**
-
-   ```bash
-   cat > .secenv << 'EOF'
-   DATABASE_PASSWORD={dotsecenv}
-   API_KEY={dotsecenv}
-   EOF
-   ```
-
-4. **Update .env**
-
-   Remove the sensitive values:
-
-   ```bash
-   # .env (updated)
-   DATABASE_HOST=localhost
-   DATABASE_PORT=5432
-   # DATABASE_PASSWORD=  ← Removed, now in .secenv
-   ```
-
-5. **Add .env to .gitignore** (if not already)
-
-   ```bash
-   echo ".env" >> .gitignore
-   ```
-
-6. **Commit .secenv** (safe to commit; it contains no secrets)
-
-   ```bash
-   git add .secenv
-   git commit -m "Move secrets to dotsecenv"
-   ```
-
-</Steps>
+See the [Migrate from .env tutorial](/tutorials/migrate-from-dotenv/). It walks the full sequence: identify which values are secret, store each in the vault, write a `.secenv` file, drop the plaintext `.env`, and commit only the encrypted vault.
 
 ---
 
@@ -199,64 +144,13 @@ dotsecenv secret get -v ./path/to/vault DATABASE_PASSWORD
 
 ## Share a Secret
 
-Give another identity access to decrypt a secret.
-
-<Steps>
-
-1. **Import their GPG public key**
-
-   ```bash
-   gpg --import teammate-public.asc
-   ```
-
-2. **Share the secret**
-
-   The `secret share` command automatically adds the identity to the vault if needed:
-
-   ```bash
-   dotsecenv secret share DATABASE_PASSWORD THEIR_FINGERPRINT
-   ```
-
-3. **Commit and push**
-
-   ```bash
-   git add vault
-   git commit -m "Share DATABASE_PASSWORD with teammate"
-   git push
-   ```
-
-</Steps>
-
-### Share all secrets at once
-
-```bash
-dotsecenv secret share "*" THEIR_FINGERPRINT --all
-```
+See the [Share a Secret tutorial](/tutorials/share-secret/). The short form is `dotsecenv secret share NAME THEIR_FINGERPRINT --all`; the tutorial covers the public-key exchange, the access-list semantics, and the team-onboarding follow-up. To share every secret with a new teammate in one pass, use the wildcard form: `dotsecenv secret share "*" THEIR_FINGERPRINT --all`.
 
 ---
 
 ## Revoke Access to a Secret
 
-Remove someone's ability to decrypt future values.
-
-```bash
-dotsecenv secret revoke DATABASE_PASSWORD THEIR_FINGERPRINT
-```
-
-<Aside type="danger" title="Important">
-Revoking access does NOT prevent them from decrypting the old value. Always rotate the secret after revoking:
-
-```bash
-echo "new-value" | dotsecenv secret store DATABASE_PASSWORD
-```
-
-</Aside>
-
-### Revoke from all secrets
-
-```bash
-dotsecenv secret revoke "*" THEIR_FINGERPRINT --all
-```
+See the [Revoke Access tutorial](/tutorials/revoke-access/) for the full sequence including the rotate-after-revoke caveat (the revoked recipient can still decrypt the previous value; rotating at the source is what neutralizes it). The short form is `dotsecenv secret revoke NAME THEIR_FINGERPRINT --all`. To strip a leaving teammate's key entirely from every vault, see the [Offboard a Departing Team Member](/runbooks/team-member-offboarding/) runbook.
 
 ---
 
@@ -562,44 +456,7 @@ Defragmenting removes historical values. Make sure you don't need the history be
 
 ## Use with CI/CD
 
-Access secrets in CI/CD pipelines.
-
-### GitHub Actions
-
-```yaml
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install dotsecenv
-        run: |
-          curl -LO https://get.dotsecenv.com/linux/dotsecenv_latest_Linux_x86_64.tar.gz
-          tar -xzf dotsecenv_*.tar.gz
-          sudo mv dotsecenv /usr/local/bin/
-
-      - name: Import GPG key
-        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import
-
-      - name: Deploy
-        run: |
-          export DATABASE_PASSWORD=$(dotsecenv secret get DATABASE_PASSWORD)
-          ./deploy.sh
-```
-
-### GitLab CI
-
-```yaml
-deploy:
-  script:
-    - apt-get update && apt-get install -y gpg
-    - curl -LO https://get.dotsecenv.com/linux/dotsecenv_latest_Linux_x86_64.tar.gz
-    - tar -xzf dotsecenv_*.tar.gz && mv dotsecenv /usr/local/bin/
-    - echo "$GPG_PRIVATE_KEY" | gpg --import
-    - export API_KEY=$(dotsecenv secret get API_KEY)
-    - ./deploy.sh
-```
+See the [CI/CD Secrets tutorial](/tutorials/ci-cd-secrets/) for the end-to-end first-time setup (CI-only identity creation, sealed-secret import, vault decryption, masked-env injection). For the published `dotsecenv/dotsecenv` GitHub Action's inputs, outputs, and provenance verification, see the [GitHub Action guide](/guides/github-action/). For running multiple environments side-by-side in one workflow, see [Multi-environment Vaults](/guides/multi-environment/).
 
 ---
 

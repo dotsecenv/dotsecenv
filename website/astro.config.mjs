@@ -96,7 +96,7 @@ export default defineConfig({
       ],
 
       editLink: {
-        baseUrl: 'https://github.com/dotsecenv/website/edit/main/',
+        baseUrl: 'https://github.com/dotsecenv/dotsecenv/edit/main/website/',
       },
 
       disable404Route: true,
@@ -200,6 +200,7 @@ export default defineConfig({
             { label: 'Terraform & OpenTofu', slug: 'guides/terraform-credentials-helper' },
             { label: 'Claude Code', slug: 'guides/claude-code' },
             { label: 'GPG Agent', slug: 'guides/gpg-agent' },
+            { label: 'Multi-environment Vaults', slug: 'guides/multi-environment' },
             { label: 'How-To', slug: 'how-to' },
           ],
         },

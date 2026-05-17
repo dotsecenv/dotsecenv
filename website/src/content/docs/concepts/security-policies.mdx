@@ -301,3 +301,8 @@ A few things the policy directory is not.
 - Windows. Not yet supported. The permission check assumes POSIX semantics, and the policy loader returns an error on Windows.
 
 If `/etc/dotsecenv/policy.d/` does not exist, none of this is in effect. dotsecenv runs entirely from user config.
+
+## See also
+
+- [Multi-environment Vaults](/guides/multi-environment/) — a worked example of pinning the same `approved_algorithms` fragment across development, staging, and production while each environment keeps its own vault and recipient set.
+- [Standards Compliance](/concepts/compliance/) — the standards (FIPS 186-5, FIPS 140-3, RFC 9580) that the allow-list fields are usually configured against.
