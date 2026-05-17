@@ -23,3 +23,13 @@ paths:
     ignore:
       - 'input "client-id" is not defined in action "actions/create-github-app-token@v3"'
       - 'missing input "app-id" which is required by action "actions/create-github-app-token@v3"'
+  packages/.github/workflows/publish.yml:
+    # Same actionlint stale-cache issue as release.yml above. This file
+    # lives under packages/ because it gets published to the satellite
+    # repo (dotsecenv/packages); actionlint only scans .github/workflows
+    # by default and won't reach here in normal CI, but the entry keeps
+    # `actionlint packages/.github/workflows/publish.yml` clean for
+    # anyone linting it directly.
+    ignore:
+      - 'input "client-id" is not defined in action "actions/create-github-app-token@v3"'
+      - 'missing input "app-id" which is required by action "actions/create-github-app-token@v3"'
