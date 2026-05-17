@@ -659,6 +659,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    environment:
+      name: get.dotsecenv.com
+      url: https://get.dotsecenv.com
     # Exposed so wait-publish-packages can watch the just-triggered satellite run.
     outputs:
       packages_run_id: ${{ steps.find_packages.outputs.run_id }}
