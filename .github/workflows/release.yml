@@ -347,6 +347,18 @@ jobs:
           repository: dotsecenv/homebrew-tap
           token: ${{ steps.app-token.outputs.token }}
 
+      # Checkout the monorepo into a subdir so we can call its release
+      # scripts (specifically scripts/release/commit-cask-via-graphql.sh)
+      # from this job. The homebrew-tap stays at workspace root so the
+      # existing sed step keeps using relative `Casks/dotsecenv.rb`.
+      # Order matters: the homebrew-tap checkout above defaults to
+      # clean: true (git clean -ffdx in workspace root), which would
+      # wipe a pre-existing monorepo/ subdir if we ran it second.
+      - name: Checkout dotsecenv monorepo
+        uses: actions/checkout@v6
+        with:
+          path: monorepo
+
       - name: Download updated checksums
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -420,20 +432,57 @@ jobs:
           echo "==> Updated cask file:"
           cat "$CASK_FILE"
 
-      - name: Commit and push
+      # Commit the cask update via GitHub's GraphQL createCommitOnBranch
+      # mutation, which signs the commit server-side with the App's key.
+      # Replaces the previous `git config user.name; git commit; git push`
+      # flow so the homebrew-tap commit gets the same signed-by-bot
+      # provenance as the satellite publishes (see publish-to-satellite.sh).
+      # Provenance trailers (Source-Commit, Source-SHA, Source-Tag,
+      # Published-By) match the satellite convention so tap commits are
+      # parseable by the same `git interpret-trailers --parse` machinery.
+      - name: Commit cask via GraphQL (server-signed)
         id: commit
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ github.ref_name }}
+          SOURCE_SHA: ${{ github.sha }}
+          PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          VERSION="${{ github.ref_name }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks/dotsecenv.rb
-          if git commit -m "fix: update Darwin checksums for ${VERSION} (post-notarization)"; then
-            git push
-            echo "cask_commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          else
+
+          # Skip if sed didn't change anything (release where Darwin
+          # checksums didn't move). Same idempotency as the old
+          # `git commit` exit-code check.
+          if git diff --quiet HEAD -- Casks/dotsecenv.rb; then
             echo "No cask changes to commit — skipping push (downstream wait will no-op)"
+            exit 0
           fi
+
+          HEADLINE="fix: update Darwin checksums for ${VERSION} (post-notarization)"
+          BODY=$(
+            printf 'Source-Commit: dotsecenv/dotsecenv@%s\n' "${SOURCE_SHA}"
+            printf 'Source-SHA: %s\n' "${SOURCE_SHA}"
+            printf 'Source-Tag: %s\n' "${VERSION}"
+            printf 'Published-By: %s\n' "${PUBLISHED_BY}"
+          )
+
+          OUTPUT=$(
+            TAP_REPO=dotsecenv/homebrew-tap \
+            TAP_BRANCH=main \
+            CASK_PATH=Casks/dotsecenv.rb \
+            CASK_FILE=Casks/dotsecenv.rb \
+            HEADLINE="${HEADLINE}" \
+            BODY="${BODY}" \
+            monorepo/scripts/release/commit-cask-via-graphql.sh
+          )
+          echo "${OUTPUT}"
+
+          NEW_SHA=$(echo "${OUTPUT}" | sed -n 's/^commit_sha=//p')
+          if [ -z "${NEW_SHA}" ]; then
+            echo "::error::commit-cask-via-graphql.sh did not emit a commit SHA"
+            exit 1
+          fi
+          echo "cask_commit_sha=${NEW_SHA}" >> "$GITHUB_OUTPUT"
 
   # Push to homebrew-tap fires that repo's own post-release.yml CI
   # (a `brew tap && brew install` smoke). Until now that run was
