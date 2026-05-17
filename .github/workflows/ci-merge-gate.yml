@@ -1,4 +1,4 @@
-name: CI Automerge Gate
+name: CI Merge Gate
 
 # Single status check that lets branch protection require ONE thing instead
 # of seven. Polls every PR-triggered workflow on this commit and treats
@@ -19,12 +19,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-automerge-${{ github.event.pull_request.number }}
+  group: ci-merge-gate-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  ci-automerge:
-    name: ci-automerge
+  ci-merge-gate:
+    name: ci-merge-gate
     runs-on: ubuntu-latest
     timeout-minutes: 75
     strategy:
@@ -47,7 +47,7 @@ jobs:
           WORKFLOW: ${{ matrix.workflow }}
         run: |
           set -euo pipefail
-          # Race window: ci-automerge can queue before sibling workflows
+          # Race window: ci-merge-gate can queue before sibling workflows
           # register their runs in the Actions API. Retry for up to 120s
           # before declaring "no run" (legitimate paths-filter skip).
           deadline=$(( $(date +%s) + 120 ))
@@ -69,17 +69,17 @@ jobs:
           # exits non-zero on failure/cancelled/timed_out, zero on success/skipped
           gh run watch "$RUN_ID" --exit-status --repo "$REPO"
 
-  gate:
-    name: gate
-    needs: ci-automerge
+  allow:
+    name: allow
+    needs: ci-merge-gate
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Verify all ci-automerge shards passed
+      - name: Verify all ci-merge-gate shards passed
         env:
-          RESULT: ${{ needs.ci-automerge.result }}
+          RESULT: ${{ needs.ci-merge-gate.result }}
         run: |
-          echo "ci-automerge aggregate result: $RESULT"
+          echo "ci-merge-gate aggregate result: $RESULT"
           # Aggregate over all matrix shards:
           #   success  → all shards passed
           #   failure  → at least one shard failed
