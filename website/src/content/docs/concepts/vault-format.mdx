@@ -63,6 +63,22 @@ The array format preserves insertion order. That gives you deterministic output 
 For querying the audit trail (who signed each entry, who could decrypt each version, when changes happened), see [Audit Trail](/concepts/audit-trail/).
 </Aside>
 
+## Append-only semantics
+
+`secret store` always appends a new line to the vault. The file only grows forward; no dotsecenv command mutates or removes a past entry.
+
+On read, `secret get` returns the latest entry. `vault describe` shows every entry the vault holds, including the recipient list each was encrypted to and the signature on each line. Together with `git log` on the vault file, that history is the audit trail.
+
+Three properties follow from this:
+
+- **Audit trail.** What value was stored, when, and to whom it was encrypted is provable, going back to the first `secret store` in the repo's history.
+- **Rotation safety.** Adding a new value never overwrites or destroys the prior one. To replace a value, the new entry is written; the old entry remains as evidence.
+- **No edits in place.** No CLI subcommand mutates a past entry. Every change is a new line.
+
+### What this means for revocation
+
+`secret revoke` and `secret share` only affect *future* writes. They do not rewrite past entries. A revoked recipient still decrypts every entry that was written while their fingerprint was on the recipient list, including entries already in the repo's `git` history. The durable mitigation is to rotate the underlying secret at its source (issue a new database password, reissue the API key) and store the new value. See [Rotate a Compromised GPG Key](/runbooks/rotate-compromised-key/) and [Offboard a Departing Team Member](/runbooks/team-member-offboarding/) for the end-to-end runbooks.
+
 ## Entry Types
 
 ### Identity Entry

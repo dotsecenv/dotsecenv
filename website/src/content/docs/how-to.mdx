@@ -281,72 +281,9 @@ For example queries (filter by signer, diff access changes, query past commits) 
 
 ## Recover from a Compromised GPG Key
 
-Steps for handling a private GPG key that has been leaked, suspected of being leaked, or otherwise needs to be removed from your team's vaults. The same workflow applies whether the compromised key is yours or a teammate's.
+See the dedicated runbook: [Rotate a Compromised GPG Key](/runbooks/rotate-compromised-key/). It covers the full revoke → share → rotate-at-source → verify sequence and the append-only caveats.
 
-<Aside type="caution" title="Append-only design caveat">
-The leaked private key can still decrypt every entry written before the rotation, both in the vault file and in git history. Revocation only affects future writes. The durable mitigation is to rotate the underlying secret value at its source (new database password, reissued API key) and store the new value.
-</Aside>
-
-<Steps>
-
-1. **Generate or import a replacement identity**
-
-   If the compromised key is yours, generate a new GPG key pair. Each teammate then imports your new public key into their keyring.
-
-   ```bash
-   dotsecenv identity create
-   # or: gpg --full-generate-key
-   ```
-
-2. **Revoke the compromised fingerprint per affected secret**
-
-   For every secret the compromised key could read:
-
-   ```bash
-   dotsecenv secret revoke <SECRET_NAME> <COMPROMISED_FP> --all
-   ```
-
-   `--all` extends the revoke to every vault that already holds the secret. Repeat per secret name. Future `secret store` calls will not encrypt to the compromised key after this step.
-
-3. **Add the replacement recipient**
-
-   ```bash
-   dotsecenv secret share <SECRET_NAME> <NEW_FP> --all
-   ```
-
-4. **Rotate each affected secret at its source**
-
-   This is the step that neutralizes the compromise. Generate a new underlying value (new database password, reissued API key) and store it:
-
-   ```bash
-   echo "<new-value>" | dotsecenv secret store <SECRET_NAME>
-   ```
-
-   The leaked key can still decrypt every entry written before this point, but those entries hold values that no longer authenticate to anything.
-
-5. **Verify**
-
-   ```bash
-   dotsecenv vault doctor
-   dotsecenv vault describe
-   ```
-
-   Every current secret should list the replacement key as a recipient and not the compromised key. Past entries still show the compromised key, which is expected.
-
-6. **Commit and push**
-
-   The new vault entries land in the file. The git history retains the old entries as part of the audit trail.
-
-</Steps>
-
-### What you cannot do
-
-Two limitations that follow from the append-only design:
-
-- **Erase a leaked encrypted entry from the vault file.** Vaults are append-only. You can rewrite git history with `git filter-repo`, but anyone who already cloned the repo retains the old data, and the compromised key still decrypts it.
-- **Re-encrypt an existing entry to a different recipient set.** `secret share` and `secret revoke` only affect future writes. Past entries are immutable.
-
-For the design rationale, see [Threat Model](/concepts/threat-model/) and [Vault Format](/concepts/vault-format/).
+For a planned departure rather than a key compromise, see [Offboard a Departing Team Member](/runbooks/team-member-offboarding/) instead.
 
 ---
 
