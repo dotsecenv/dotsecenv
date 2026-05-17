@@ -1,9 +1,39 @@
 /* dotsecenv custom theme - Dark mode optimized */
 
+/*
+ * Font-metric-adjusted fallbacks to prevent layout shift during web font
+ * load (PSI CLS fix for /reference/ desktop, 0.418 → ~0.0). Each fallback
+ * @font-face inherits a local system font and uses size-adjust + override
+ * metrics so the fallback renders at the same per-glyph footprint as the
+ * web font. When Inter / JetBrains Mono finishes loading and swaps in, no
+ * content reflows.
+ *
+ * Inter metric overrides reference seek-oss/capsize / web.dev fallback
+ * calculations. JetBrains Mono overrides match Menlo at the same size.
+ */
+
+@font-face {
+  font-family: 'Inter Fallback';
+  src: local('Arial');
+  size-adjust: 107.36%;
+  ascent-override: 90%;
+  descent-override: 22.5%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono Fallback';
+  src: local('Menlo'), local('Monaco'), local('Consolas');
+  size-adjust: 99%;
+  ascent-override: 95%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
 :root {
   /* Typography */
-  --sl-font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --sl-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --sl-font: 'Inter', 'Inter Fallback', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', 'JetBrains Mono Fallback', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Line height for readability */
   --sl-line-height: 1.65;

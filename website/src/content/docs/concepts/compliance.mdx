@@ -378,3 +378,8 @@ These standards define the cryptographic primitives themselves:
 <Aside type="tip">
 For maximum compliance, build dotsecenv with Go 1.26+ and `GOFIPS140=v1.26.0`, deploy to a validated Operating Environment, and use Ed25519 or RSA-4096 keys.
 </Aside>
+
+## See also
+
+- [Multi-environment Vaults](/guides/multi-environment/) — pin a FIPS 186-5 policy fragment per machine while keeping separate vaults and identities per environment.
+- [Security Policies](/concepts/security-policies/) — how `approved_algorithms` is enforced via `/etc/dotsecenv/policy.d/`.
