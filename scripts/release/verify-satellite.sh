@@ -91,20 +91,10 @@ if [ -n "${EXPECTED_SHA}" ]; then
 fi
 
 # ---------- File-list comparison --------------------------------------------
-# Build NL-separated exclude list for satellite-side listing.
-#
-# `.release-sha` was a legacy sidecar from before the trailer convention
-# landed; the publish flow no longer writes it. Existing satellites still
-# carry the file until their next publish, and the GraphQL publish auto-
-# deletes any satellite file not in source — so this entry is purely
-# transitional and can be removed once both satellites have been
-# republished. Until then, we whitelist it here so the file-list check
-# doesn't flag it as an unexpected satellite-only file.
-SAT_EXCLUDES=".release-sha"
-if [ -n "${GENERATED_PATHS}" ]; then
-  SAT_EXCLUDES="${SAT_EXCLUDES}
-${GENERATED_PATHS}"
-fi
+# Build NL-separated exclude list for satellite-side listing: just
+# caller-supplied generated paths (e.g. "retracted.txt" for the packages
+# satellite, generated from go.mod by extract-retracted.sh).
+SAT_EXCLUDES="${GENERATED_PATHS}"
 
 SRC_LIST=$(mktemp); SAT_LIST=$(mktemp)
 trap 'rm -f "${REPORT}" "${SRC_LIST}" "${SAT_LIST}"' EXIT
@@ -112,13 +102,25 @@ trap 'rm -f "${REPORT}" "${SRC_LIST}" "${SAT_LIST}"' EXIT
 ( cd "${SOURCE_DIR}" && find . -type f -not -path './.git/*' | sed 's|^\./||' ) \
   | LC_ALL=C sort -u > "${SRC_LIST}"
 
-( cd "${SATELLITE_DIR}" && find . -type f -not -path './.git/*' | sed 's|^\./||' ) \
-  | grep -vxF "${SAT_EXCLUDES}" \
-  | LC_ALL=C sort -u > "${SAT_LIST}"
+# When SAT_EXCLUDES is empty, skip the grep — `grep -vxF ""` would match
+# empty lines (harmless here, since find never emits them, but odd to read).
+if [ -n "${SAT_EXCLUDES}" ]; then
+  ( cd "${SATELLITE_DIR}" && find . -type f -not -path './.git/*' | sed 's|^\./||' ) \
+    | grep -vxF "${SAT_EXCLUDES}" \
+    | LC_ALL=C sort -u > "${SAT_LIST}"
+else
+  ( cd "${SATELLITE_DIR}" && find . -type f -not -path './.git/*' | sed 's|^\./||' ) \
+    | LC_ALL=C sort -u > "${SAT_LIST}"
+fi
 
-SRC_ONLY=$(comm -23 "${SRC_LIST}" "${SAT_LIST}")
-SAT_ONLY=$(comm -13 "${SRC_LIST}" "${SAT_LIST}")
-COMMON=$(comm -12 "${SRC_LIST}" "${SAT_LIST}")
+# Match the LC_ALL=C used for sort above. Without it, GNU comm uses the
+# system locale's collation, which can disagree with LC_ALL=C sort about
+# how dotfiles order vs alphanumerics — leading to spurious "not in
+# sorted order" errors, a non-zero comm exit, and (under set -e) the
+# script bailing before printing which files actually drifted.
+SRC_ONLY=$(LC_ALL=C comm -23 "${SRC_LIST}" "${SAT_LIST}")
+SAT_ONLY=$(LC_ALL=C comm -13 "${SRC_LIST}" "${SAT_LIST}")
+COMMON=$(LC_ALL=C comm -12 "${SRC_LIST}" "${SAT_LIST}")
 
 if [ -n "${SRC_ONLY}" ]; then
   say ""
