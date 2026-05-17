@@ -61,26 +61,22 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: packages
 
-      - name: Checkout dotsecenv/packages satellite
-        uses: actions/checkout@v6
-        with:
-          repository: dotsecenv/packages
-          token: ${{ steps.app-token.outputs.token }}
-          path: packages-satellite
-          fetch-depth: 0
-
+      # No `tag:` input — ad-hoc publishes shouldn't clutter the satellite
+      # with refs. Source-Tag is omitted from the body for the same reason:
+      # there's no release tag this commit corresponds to.
       - name: Publish packages source to satellite (no tag)
-        env:
-          SOURCE_DIR: packages
-          SATELLITE_DIR: packages-satellite
-          SATELLITE_REPO: dotsecenv/packages
-          # Empty TAG → publish-to-satellite.sh skips tag creation.
-          # Ad-hoc publishes shouldn't clutter the satellite with refs.
-          TAG: ""
-          SHA: ${{ github.sha }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: scripts/release/publish-to-satellite.sh
+        uses: releasetools/actions/signed-push@57073d3d58774563dfaa76eaaf89ae086c278ee3  # v0.0.2
+        with:
+          source-dir: packages
+          target-repo: dotsecenv/packages
+          target-branch: main
+          headline: "publish: ad-hoc (${{ github.sha }})"
+          body: |
+            Source-Commit: dotsecenv/dotsecenv@${{ github.sha }}
+            Source-SHA: ${{ github.sha }}
+            Source-Path: packages
+            Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Find satellite publish.yml run
         id: find_packages
@@ -129,24 +125,19 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: plugin
 
-      - name: Checkout dotsecenv/plugin satellite
-        uses: actions/checkout@v6
-        with:
-          repository: dotsecenv/plugin
-          token: ${{ steps.app-token.outputs.token }}
-          path: plugin-satellite
-          fetch-depth: 0
-
       - name: Publish plugin source to satellite (no tag)
-        env:
-          SOURCE_DIR: plugin
-          SATELLITE_DIR: plugin-satellite
-          SATELLITE_REPO: dotsecenv/plugin
-          TAG: ""
-          SHA: ${{ github.sha }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: scripts/release/publish-to-satellite.sh
+        uses: releasetools/actions/signed-push@57073d3d58774563dfaa76eaaf89ae086c278ee3  # v0.0.2
+        with:
+          source-dir: plugin
+          target-repo: dotsecenv/plugin
+          target-branch: main
+          headline: "publish: ad-hoc (${{ github.sha }})"
+          body: |
+            Source-Commit: dotsecenv/dotsecenv@${{ github.sha }}
+            Source-SHA: ${{ github.sha }}
+            Source-Path: plugin
+            Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          token: ${{ steps.app-token.outputs.token }}
 
   # Mirror release.yml's test-plugin-managers gate. The plugin satellite
   # has no CI of its own, so verification happens here in the monorepo
