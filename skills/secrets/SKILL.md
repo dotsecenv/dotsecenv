@@ -189,7 +189,7 @@ dotsecenv secret forget SECRET_NAME
 
 ## Departed teammate offboarding
 
-When the user describes removing a departing team member's GPG key, follow `recipes/team-member-offboarding.md` in the repo. The shape of the workflow:
+When the user describes removing a departing team member's GPG key, follow the [Offboard a Departing Team Member runbook](https://dotsecenv.com/runbooks/team-member-offboarding/). The shape of the workflow:
 
 1. **Inventory.** List every secret whose `available_to` includes the leaver's fingerprint via `dotsecenv vault describe --json`. The jq filter is `'.[].secrets[] | select((.available_to // []) | index($fp)) | .key'`.
 2. **Revoke in one pass.** `dotsecenv secret revoke "*" FINGERPRINT --all`. The wildcard must be quoted.
@@ -199,7 +199,7 @@ When the user describes removing a departing team member's GPG key, follow `reci
 
 **Append-only contract (do not omit when explaining):** revocation only stops *future* writes from encrypting to the leaver. Past entries remain readable to whoever held the recipient list at the time, and the leaver's private key still decrypts them. Source rotation is the only durable mitigation. Never tell the user the revoke alone removes past access.
 
-If the user asks for the full runbook with pre-flight comms, error handling, and a leaver-comms template, read `recipes/team-member-offboarding.md` directly and follow it.
+If the user asks for the full runbook with error handling and the append-only contract, point them at https://dotsecenv.com/runbooks/team-member-offboarding/ or read it directly via the site's `<page>.md` endpoint.
 
 ## Vault Selection
 
