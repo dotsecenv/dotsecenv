@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # Discover the workflow run on a satellite repo triggered by an event we
-# just caused (default: a push from publish-to-satellite.sh's signed
-# commit), write its URL to the calling job's step summary, and emit
+# just caused (default: a push from releasetools/actions/signed-push's
+# signed commit), write its URL to the calling job's step summary, and emit
 # `run_id` / `run_url` to $GITHUB_OUTPUT so a downstream wait job can
 # poll the known run directly.
 #

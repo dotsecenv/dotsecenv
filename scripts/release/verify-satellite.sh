@@ -3,9 +3,10 @@
 # Verify that a satellite checkout matches what the monorepo's source
 # subdirectory says it should be — byte-for-byte, mode-for-mode.
 #
-# The publish flow (publish-to-satellite.sh) syncs every file under
-# SOURCE_DIR into the satellite via GitHub's GraphQL createCommitOnBranch
-# mutation. Provenance lives in RFC-822 git trailers in the satellite's
+# The publish flow (releasetools/actions/signed-push) syncs every file
+# under SOURCE_DIR into the satellite via GitHub's GraphQL
+# createCommitOnBranch mutation. Provenance lives in RFC-822 git trailers
+# in the satellite's
 # HEAD commit body (Source-Commit, Source-SHA, Source-Path, Source-Tag,
 # Published-By), parseable via `git interpret-trailers --parse`. So a
 # healthy satellite at commit SHA contains exactly the files under
@@ -26,7 +27,7 @@
 #
 # Required env:
 #   SOURCE_DIR        path to the monorepo subdirectory (e.g. "plugin")
-#   SATELLITE_DIR     path to a checkout of the satellite (e.g. "plugin-satellite")
+#   SATELLITE_DIR     path to a checkout of the satellite (e.g. "satellite/")
 #
 # Optional env:
 #   EXPECTED_SHA      monorepo commit SHA the satellite should be at.

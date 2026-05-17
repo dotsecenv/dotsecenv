@@ -534,11 +534,11 @@ jobs:
 
   # Tag dotsecenv/homebrew-tap at the release version once `brew install`
   # has been proven to work against the just-pushed cask. Lightweight tag
-  # via REST API (mirrors the satellite tagging pattern in
-  # publish-to-satellite.sh: no GPG handling on the runner). When the
-  # cask file didn't change in this release (cask_commit_sha empty),
-  # tag the current HEAD of homebrew-tap/main so every release still
-  # corresponds to a tag.
+  # via REST API (mirrors the satellite tagging pattern that
+  # releasetools/actions/signed-push uses internally: no GPG handling on
+  # the runner). When the cask file didn't change in this release
+  # (cask_commit_sha empty), tag the current HEAD of homebrew-tap/main
+  # so every release still corresponds to a tag.
   #
   # This job is an independent leaf — a tagging failure does NOT gate
   # publish-packages / publish-plugin. If something here breaks, the
@@ -645,24 +645,21 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: packages
 
-      - name: Checkout dotsecenv/packages satellite
-        uses: actions/checkout@v6
-        with:
-          repository: dotsecenv/packages
-          token: ${{ steps.app-token.outputs.token }}
-          path: packages-satellite
-          fetch-depth: 0
-
       - name: Publish packages source + tag the satellite
-        env:
-          SOURCE_DIR: packages
-          SATELLITE_DIR: packages-satellite
-          SATELLITE_REPO: dotsecenv/packages
-          TAG: ${{ github.ref_name }}
-          SHA: ${{ github.sha }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: scripts/release/publish-to-satellite.sh
+        uses: releasetools/actions/signed-push@v0
+        with:
+          source-dir: packages
+          target-repo: dotsecenv/packages
+          target-branch: main
+          headline: "publish: ${{ github.ref_name }}"
+          body: |
+            Source-Commit: dotsecenv/dotsecenv@${{ github.sha }}
+            Source-SHA: ${{ github.sha }}
+            Source-Path: packages
+            Source-Tag: ${{ github.ref_name }}
+            Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          tag: ${{ github.ref_name }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Find satellite publish.yml run (push-triggered)
         id: find_packages
@@ -741,24 +738,21 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: plugin
 
-      - name: Checkout dotsecenv/plugin satellite
-        uses: actions/checkout@v6
-        with:
-          repository: dotsecenv/plugin
-          token: ${{ steps.app-token.outputs.token }}
-          path: plugin-satellite
-          fetch-depth: 0
-
       - name: Publish plugin source + tag the satellite
-        env:
-          SOURCE_DIR: plugin
-          SATELLITE_DIR: plugin-satellite
-          SATELLITE_REPO: dotsecenv/plugin
-          TAG: ${{ github.ref_name }}
-          SHA: ${{ github.sha }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: scripts/release/publish-to-satellite.sh
+        uses: releasetools/actions/signed-push@v0
+        with:
+          source-dir: plugin
+          target-repo: dotsecenv/plugin
+          target-branch: main
+          headline: "publish: ${{ github.ref_name }}"
+          body: |
+            Source-Commit: dotsecenv/dotsecenv@${{ github.sha }}
+            Source-SHA: ${{ github.sha }}
+            Source-Path: plugin
+            Source-Tag: ${{ github.ref_name }}
+            Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          tag: ${{ github.ref_name }}
+          token: ${{ steps.app-token.outputs.token }}
 
   # Gates the release on plugin-manager integration testing. Runs
   # `make test-managers-remote` against the just-published plugin
