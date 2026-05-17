@@ -532,6 +532,69 @@ jobs:
       - name: Smoke a basic command
         run: dotsecenv help > /dev/null
 
+  # Tag dotsecenv/homebrew-tap at the release version once `brew install`
+  # has been proven to work against the just-pushed cask. Lightweight tag
+  # via REST API (mirrors the satellite tagging pattern in
+  # publish-to-satellite.sh: no GPG handling on the runner). When the
+  # cask file didn't change in this release (cask_commit_sha empty),
+  # tag the current HEAD of homebrew-tap/main so every release still
+  # corresponds to a tag.
+  #
+  # This job is an independent leaf — a tagging failure does NOT gate
+  # publish-packages / publish-plugin. If something here breaks, the
+  # release still ships and the tag can be added by hand. Conversely,
+  # the release graph stays red until the tag is created or the failure
+  # is investigated.
+  tag-homebrew-tap:
+    needs: [update-homebrew-tap, verify-homebrew-install]
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Generate App Token
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: homebrew-tap
+
+      - name: Create release tag on homebrew-tap
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ github.ref_name }}
+          CASK_SHA: ${{ needs.update-homebrew-tap.outputs.cask_commit_sha }}
+        run: |
+          set -euo pipefail
+
+          # Determine which SHA to tag: the cask-update commit if there
+          # was one, otherwise the current HEAD of homebrew-tap/main.
+          if [ -n "$CASK_SHA" ]; then
+            SHA="$CASK_SHA"
+            REASON="cask updated by update-homebrew-tap"
+          else
+            SHA=$(gh api repos/dotsecenv/homebrew-tap/branches/main --jq .commit.sha)
+            REASON="cask unchanged; tagging current homebrew-tap main HEAD"
+          fi
+          echo "Tagging homebrew-tap ${VERSION} -> ${SHA} (${REASON})"
+
+          # Lightweight tag via REST. Re-runs are idempotent: a 422
+          # 'Reference already exists' response is treated as success
+          # (the tag is what we wanted to land), anything else fails
+          # the job loudly.
+          if gh api -X POST "repos/dotsecenv/homebrew-tap/git/refs" \
+              -f ref="refs/tags/${VERSION}" \
+              -f sha="${SHA}" > /tmp/tag-response.json 2>&1; then
+            echo "Tagged homebrew-tap ${VERSION} -> ${SHA}"
+          elif grep -q 'Reference already exists' /tmp/tag-response.json; then
+            echo "::warning::Tag ${VERSION} already exists on homebrew-tap; skipping (idempotent re-run)"
+          else
+            echo "::error::Failed to create tag ${VERSION} on homebrew-tap:"
+            cat /tmp/tag-response.json
+            exit 1
+          fi
+
   # Push monorepo packages/ source to the dotsecenv/packages satellite
   # (mirroring publish-plugin). Generates retracted.txt from go.mod via
   # the canonical `go mod edit -json | jq` pipeline before pushing, so
