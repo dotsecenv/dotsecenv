@@ -48,9 +48,10 @@ jobs:
         run: |
           set -euo pipefail
           # Race window: ci-merge-gate can queue before sibling workflows
-          # register their runs in the Actions API. Retry for up to 120s
+          # register their runs in the Actions API. Retry for up to 60s
           # before declaring "no run" (legitimate paths-filter skip).
-          deadline=$(( $(date +%s) + 120 ))
+          # release.yml's wait-ci catches anything missed pre-release.
+          deadline=$(( $(date +%s) + 60 ))
           RUN_ID=""
           while [ "$(date +%s)" -lt "$deadline" ]; do
             RUN_ID=$(gh api \
@@ -61,7 +62,7 @@ jobs:
           done
 
           if [ -z "$RUN_ID" ]; then
-            echo "::notice::No ${WORKFLOW} run for ${SHA} within 120s — paths filter excluded it. Treating as success."
+            echo "::notice::No ${WORKFLOW} run for ${SHA} within 60s — paths filter excluded it. Treating as success."
             exit 0
           fi
 
