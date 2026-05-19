@@ -86,7 +86,7 @@ The signed-push pattern fits when all of these are true:
 
 If your release flow already runs `git commit -S` with a hardware-backed key on a self-hosted runner you control, this rewrite buys you nothing. If you are doing key generation, GPG import, and key cleanup on hosted runners across multiple satellite repos, it deletes a lot of code and a lot of lifecycle complexity.
 
-The end state runs in a single workflow: [unified release view](https://github.com/dotsecenv/dotsecenv/actions/runs/26005850942). Goreleaser builds the binaries. Homebrew-tap, packages, and plugin satellites each get a signed commit and a tag. Zero private keys touch the runner.
+The end state runs in a single workflow: [unified release view](https://github.com/dotsecenv/dotsecenv/actions/runs/26005850942). [Goreleaser](https://github.com/dotsecenv/dotsecenv/blob/main/.goreleaser.yaml) builds the binaries. Homebrew-tap, packages, and plugin satellites each get a signed commit and a tag. Zero private keys touch the runner.
 
 And every release lives in one URL. Green across the board means the release shipped clean. A red box anywhere points straight at the failed step, no chasing CI runs across satellite repos.
 
