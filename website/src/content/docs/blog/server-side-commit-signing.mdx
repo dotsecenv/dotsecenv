@@ -12,7 +12,7 @@ tags:
 excerpt: "How a monorepo release workflow publishes signed commits to homebrew-tap, apt/yum packages, and plugin satellite repos, with no private signing key on the CI runner."
 ---
 
-The nice thing about personal projects is that the developer audience is one. When you get an itch, you scratch it.
+The nice thing about personal projects is that you only have to convince yourself. When you get an itch, you scratch it.
 
 Last weekend's itch was the dotsecenv release pipeline. Specifically: 150 lines of shell on every release that did GPG dances on a GitHub Actions runner just to sign a single commit into a satellite repo. It worked. It also looked nothing like code I wanted to maintain.
 
