@@ -88,4 +88,6 @@ If your release flow already runs `git commit -S` with a hardware-backed key on 
 
 The end state runs in a single workflow: [unified release view](https://github.com/dotsecenv/dotsecenv/actions/runs/26005850942). Goreleaser builds the binaries. Homebrew-tap, packages, and plugin satellites each get a signed commit and a tag. Zero private keys touch the runner.
 
+And every release lives in one URL. Green across the board means the release shipped clean. A red box anywhere points straight at the failed step, no chasing CI runs across satellite repos.
+
 The custom GHA is open source: [releasetools/actions/signed-push](https://github.com/releasetools/actions/tree/main/signed-push). The dotsecenv migration that adopted it is in [commit 17b003e](https://github.com/dotsecenv/dotsecenv/commit/17b003e66509aea26dc5f7b54aa90e3749f7d326), with the earlier groundwork in [commit 21eee00](https://github.com/dotsecenv/dotsecenv/commit/21eee0028a7b8182e37cac526725b2fa9023d6e4).
