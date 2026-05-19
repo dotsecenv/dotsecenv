@@ -1,5 +1,5 @@
 ---
-title: "Server-side commit signing for release pipelines"
+title: "Publishing a monorepo via a custom signed-push GitHub Action"
 date: 2026-05-19
 authors:
   - dotsecenv
@@ -7,8 +7,9 @@ tags:
   - ci
   - github-actions
   - release-pipeline
+  - monorepo
   - graphql
-excerpt: "How dotsecenv stopped doing GPG dances on the CI runner and got GitHub to sign release commits server-side, plus the gh api flag that nearly derailed the rewrite."
+excerpt: "How a monorepo release pipeline pushes to homebrew-tap, apt/yum packages, and plugin satellites via a custom GitHub Action that gets GitHub to sign commits server-side, with no private key on the runner."
 ---
 
 The nice thing about personal projects is that the developer audience is one. When you get an itch, you scratch it.
