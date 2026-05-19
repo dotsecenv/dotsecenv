@@ -1,0 +1,90 @@
+---
+title: "Server-side commit signing for release pipelines"
+date: 2026-05-19
+authors:
+  - dotsecenv
+tags:
+  - ci
+  - github-actions
+  - release-pipeline
+  - graphql
+excerpt: "How dotsecenv stopped doing GPG dances on the CI runner and got GitHub to sign release commits server-side, plus the gh api flag that nearly derailed the rewrite."
+---
+
+The nice thing about personal projects is that the developer audience is one. When you get an itch, you scratch it.
+
+Last weekend's itch was the dotsecenv release pipeline. Specifically: 150 lines of shell on every release that did GPG dances on a GitHub Actions runner just to sign a single commit into a satellite repo. It worked. It also looked nothing like code I wanted to maintain.
+
+The rewrite ended up at zero private keys on the runner, one GraphQL mutation, and a custom GHA we can reuse across the whole org. Here is what got in the way.
+
+## Why dotsecenv needs satellite repos
+
+The dotsecenv project sits in [a mostly monorepo structure](https://github.com/dotsecenv/dotsecenv). "Mostly" because two integration points force separate repos:
+
+1. [homebrew-tap](https://github.com/dotsecenv/homebrew-tap), because Homebrew expects a tap to live in its own repo at `<owner>/homebrew-<name>`.
+2. [packages](https://github.com/dotsecenv/packages), because GitHub Pages publishes one site per repo. The main site is on dotsecenv.com, so the Linux and Mac package indices for apt, yum, and arch need their own GitHub Pages host.
+
+Then there is the [shell plugin repo](https://github.com/dotsecenv/plugin). Plugin managers like oh-my-zsh and fish clone single repos. Package indexers like apt and yum do the same. None of them can fetch a subdirectory of a monorepo. So the plugin lives in its own repo, and the release pipeline pushes into it on every tag.
+
+The pattern is the same for all three satellites: take the source-of-truth output (formula, package index, plugin code), write it into a satellite repo, sign the commit, push.
+
+## What the first version looked like
+
+The first version was a shell script. It generated a signing key, imported it on the runner, configured `git config user.signingkey`, ran `git commit -S`, then `git push`. The script also handled cleanup, key lifecycle, and a handful of corner cases that surfaced after the first few releases.
+
+By the time it was reliable, it was about 150 lines. The signing key had to be a real secret with real lifecycle. The runner had to be trusted with that secret for the duration of the job. Every new satellite repo meant another copy of the same shell to maintain.
+
+A cleaner shape was waiting: have GitHub sign the commits itself, attributed to a GitHub App, with no private key on the runner at any point. GitHub exposes exactly that via the [`createCommitOnBranch` GraphQL mutation](https://docs.github.com/en/graphql/reference/mutations#createcommitonbranch). Every commit it produces is verified by GitHub's own signing key, attributed to whoever owns the token.
+
+Sounds great. The mutation is also where I lost most of two days.
+
+## The flag that lies
+
+The natural way to call a GraphQL mutation from a shell script is `gh api graphql -F input=@file.json`, where `file.json` is your variables payload.
+
+The `-F` flag has a footnote in the gh docs: it reads scalars and auto-detects type. The footnote does not mention that when you pass `@file.json`, gh reads the file as a single string and only auto-detects type at the top level, not inside the file. Every boolean and integer inside that file is silently sent as a string.
+
+The createCommitOnBranch input schema has typed fields. Send one of those as a string when the schema expects a structured object and GitHub rejects the whole call:
+
+```text
+invalid value for type CreateCommitOnBranchInput!
+```
+
+The error message names the top-level input type, not the field that is actually wrong. Which makes the bug delightful to track down on a release-blocking workflow.
+
+The workaround is straightforward once you find it. Build the request body yourself with `jq --slurpfile` so the types survive, then feed the resulting JSON as a single raw payload via `--input -`. That worked. It also added enough boilerplate that the script kept growing. The version that finally shipped was about 150 lines of shell and a mess to read.
+
+## Extracting the custom GHA
+
+A 150-line shell script that exists in one place is a quirk. The same script copy-pasted into three repos is a problem.
+
+I extracted the working version into [`releasetools/actions/signed-push`](https://github.com/releasetools/actions/tree/main/signed-push), a custom GitHub Action. The action takes a source directory, a target repo, a target branch, a commit body, and a token. It writes the directory into the satellite repo via createCommitOnBranch and tags the commit. The caller never sees GraphQL.
+
+The commit body uses [RFC-822 trailers](https://git-scm.com/docs/git-interpret-trailers) so the linkage to the source commit is both human-readable and machine-parseable:
+
+```text
+publish: v0.6.1
+
+Source-Commit: dotsecenv/dotsecenv@21eee0028a7b8182e37cac526725b2fa9023d6e4
+Source-SHA: 21eee0028a7b8182e37cac526725b2fa9023d6e4
+Source-Path: packages
+Source-Tag: v0.6.1
+Published-By: https://github.com/dotsecenv/dotsecenv/actions/runs/26005850942
+```
+
+`Source-Commit` in `owner/repo@SHA` form gets auto-linked in the GitHub commit view, so the satellite commit always points back to the monorepo revision that produced it. `Source-SHA`, `Source-Path`, and `Source-Tag` are denormalized into separate trailers so downstream tooling can grep them out without parsing the compound form.
+
+## When this pattern is worth it
+
+The signed-push pattern fits when all of these are true:
+
+- You publish to one or more satellite repos on every release.
+- You want commits in those repos to be signed and verifiable on GitHub.
+- You do not want to manage a long-lived signing key on a CI runner.
+- The satellite repos are within or accessible to a GitHub App you control.
+
+If your release flow already runs `git commit -S` with a hardware-backed key on a self-hosted runner you control, this rewrite buys you nothing. If you are doing key generation, GPG import, and key cleanup on hosted runners across multiple satellite repos, it deletes a lot of code and a lot of lifecycle complexity.
+
+The end state runs in a single workflow: [unified release view](https://github.com/dotsecenv/dotsecenv/actions/runs/26005850942). Goreleaser builds the binaries. Homebrew-tap, packages, and plugin satellites each get a server-signed commit and a tag. Zero private keys touch the runner.
+
+The custom GHA is open source: [releasetools/actions/signed-push](https://github.com/releasetools/actions/tree/main/signed-push). The dotsecenv migration that adopted it is in [commit 17b003e](https://github.com/dotsecenv/dotsecenv/commit/17b003e66509aea26dc5f7b54aa90e3749f7d326), with the earlier groundwork in [commit 21eee00](https://github.com/dotsecenv/dotsecenv/commit/21eee0028a7b8182e37cac526725b2fa9023d6e4).
