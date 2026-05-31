@@ -114,6 +114,63 @@ dotsecenv init vault
 dotsecenv init vault -v ~/project/secrets/vault
 ```
 
+### init secenv
+
+Add references for your vault secrets to the `.secenv` file in the current directory. In a terminal this opens an interactive picker, one tab per vault. Without a terminal, or with `--all` or `--silent`, it adds every reference that is not already present.
+
+<Aside type="note" title="Available in v0.7.0+">
+  Introduced in v0.7.0.
+</Aside>
+
+```bash
+dotsecenv init secenv [flags]
+```
+
+It writes references (`KEY={dotsecenv/...}`), never plaintext values, and never overwrites a key already in `.secenv`. A key that is already present is skipped with a warning that `--silent` mutes.
+
+**Picker keys:**
+
+| Key | Action |
+|-----|--------|
+| `←` / `→` | Switch vault tabs (the last tab is **Apply**) |
+| `↑` / `↓` | Move within a tab |
+| `space` | Toggle the key under the cursor |
+| `ctrl+a` / `ctrl+n` / `ctrl+r` | Select all / none / reverse, current tab only |
+| `enter` | Advance to **Apply**, then confirm and write |
+| `esc` / `ctrl+c` | Cancel |
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Add every not-present reference without prompting (warnings still shown) |
+| `-v PATH` or `-v INDEX` | Restrict to specific vaults; works in both modes |
+
+**Reference derivation:**
+
+| Vault key | `.secenv` line |
+|-----------|----------------|
+| `DATABASE_PASSWORD` | `DATABASE_PASSWORD={dotsecenv/}` |
+| `prod::DB_PASSWORD` | `PROD_DB_PASSWORD={dotsecenv/prod::DB_PASSWORD}` |
+
+Namespaced keys are prefixed, with `::` becoming `_`, so two namespaces that share a key name do not collide.
+
+**Examples:**
+
+```bash
+# Pick interactively (in a terminal)
+dotsecenv init secenv
+
+# Add every reference not already present
+dotsecenv init secenv --all
+
+# Restrict to one vault
+dotsecenv init secenv -v 2 --all
+
+# No terminal: adds everything automatically
+echo | dotsecenv init secenv
+```
+
 ---
 
 ## login
