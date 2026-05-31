@@ -3,7 +3,7 @@ package secenvpicker
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func newTestModel() Model {
@@ -20,7 +20,11 @@ func newTestModel() Model {
 	return newModel(tabs, "/tmp/.secenv")
 }
 
-func key(t tea.KeyType) tea.KeyMsg { return tea.KeyMsg{Type: t} }
+// press builds a v2 key-press message for a key code (e.g. tea.KeyUp, tea.KeySpace).
+func press(code rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: code} }
+
+// ctrl builds a v2 ctrl+<rune> key-press message (e.g. ctrl('a') -> "ctrl+a").
+func ctrl(r rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: r, Mod: tea.ModCtrl} }
 
 func send(m Model, msgs ...tea.Msg) Model {
 	for _, msg := range msgs {
@@ -31,7 +35,7 @@ func send(m Model, msgs ...tea.Msg) Model {
 }
 
 func TestSpaceTogglesCurrentTabOnly(t *testing.T) {
-	m := send(newTestModel(), key(tea.KeySpace))
+	m := send(newTestModel(), press(tea.KeySpace))
 	if !m.selected[0][0] {
 		t.Error("expected row 0 of tab 0 to be selected")
 	}
@@ -39,14 +43,14 @@ func TestSpaceTogglesCurrentTabOnly(t *testing.T) {
 		t.Errorf("tab 1 selection must be untouched, got %v", m.selected[1])
 	}
 	// Toggle again clears it.
-	m = send(m, key(tea.KeySpace))
+	m = send(m, press(tea.KeySpace))
 	if len(m.selected[0]) != 0 {
 		t.Error("second space should clear the selection")
 	}
 }
 
 func TestCtrlASelectsAllSelectableInTabOnly(t *testing.T) {
-	m := send(newTestModel(), key(tea.KeyCtrlA))
+	m := send(newTestModel(), ctrl('a'))
 	if len(m.selected[0]) != 2 {
 		t.Errorf("expected 2 selected (pre-existing skipped), got %d", len(m.selected[0]))
 	}
@@ -59,12 +63,12 @@ func TestCtrlASelectsAllSelectableInTabOnly(t *testing.T) {
 }
 
 func TestCtrlNClearsCurrentTabOnly(t *testing.T) {
-	m := send(newTestModel(), key(tea.KeyCtrlA))      // select all in tab 0
-	m = send(m, key(tea.KeyRight), key(tea.KeySpace)) // select QUX in tab 1
+	m := send(newTestModel(), ctrl('a'))                  // select all in tab 0
+	m = send(m, press(tea.KeyRight), press(tea.KeySpace)) // select QUX in tab 1
 	if len(m.selected[1]) != 1 {
 		t.Fatalf("tab 1 should have 1 selection, got %d", len(m.selected[1]))
 	}
-	m = send(m, key(tea.KeyLeft), key(tea.KeyCtrlN)) // back to tab 0, clear
+	m = send(m, press(tea.KeyLeft), ctrl('n')) // back to tab 0, clear
 	if len(m.selected[0]) != 0 {
 		t.Error("tab 0 should be cleared by ctrl+n")
 	}
@@ -74,8 +78,8 @@ func TestCtrlNClearsCurrentTabOnly(t *testing.T) {
 }
 
 func TestCtrlRReversesSelectableInTabOnly(t *testing.T) {
-	m := send(newTestModel(), key(tea.KeySpace)) // row 0 on
-	m = send(m, key(tea.KeyCtrlR))               // reverse selectable rows
+	m := send(newTestModel(), press(tea.KeySpace)) // row 0 on
+	m = send(m, ctrl('r'))                         // reverse selectable rows
 	if m.selected[0][0] {
 		t.Error("row 0 should be off after reverse")
 	}
@@ -91,50 +95,50 @@ func TestCtrlRReversesSelectableInTabOnly(t *testing.T) {
 }
 
 func TestPreExistingRowUnselectable(t *testing.T) {
-	m := send(newTestModel(), key(tea.KeyDown), key(tea.KeyDown)) // cursor to row 2
+	m := send(newTestModel(), press(tea.KeyDown), press(tea.KeyDown)) // cursor to row 2
 	if m.cursor[0] != 2 {
 		t.Fatalf("cursor = %d, want 2", m.cursor[0])
 	}
-	m = send(m, key(tea.KeySpace))
+	m = send(m, press(tea.KeySpace))
 	if len(m.selected[0]) != 0 {
 		t.Error("pre-existing row must not toggle on space")
 	}
 }
 
 func TestArrowsClamp(t *testing.T) {
-	m := send(newTestModel(), key(tea.KeyUp)) // up at top
+	m := send(newTestModel(), press(tea.KeyUp)) // up at top
 	if m.cursor[0] != 0 {
 		t.Errorf("cursor should clamp at 0, got %d", m.cursor[0])
 	}
-	m = send(m, key(tea.KeyDown), key(tea.KeyDown), key(tea.KeyDown), key(tea.KeyDown))
+	m = send(m, press(tea.KeyDown), press(tea.KeyDown), press(tea.KeyDown), press(tea.KeyDown))
 	if m.cursor[0] != 2 {
 		t.Errorf("cursor should clamp at last row 2, got %d", m.cursor[0])
 	}
-	m = send(m, key(tea.KeyLeft)) // left at tab 0
+	m = send(m, press(tea.KeyLeft)) // left at tab 0
 	if m.activeTab != 0 {
 		t.Errorf("activeTab should clamp at 0, got %d", m.activeTab)
 	}
-	m = send(m, key(tea.KeyRight), key(tea.KeyRight)) // tab0 -> tab1 -> Apply
+	m = send(m, press(tea.KeyRight), press(tea.KeyRight)) // tab0 -> tab1 -> Apply
 	if m.activeTab != m.applyIdx {
 		t.Errorf("activeTab should be applyIdx %d, got %d", m.applyIdx, m.activeTab)
 	}
-	m = send(m, key(tea.KeyRight)) // clamp at Apply
+	m = send(m, press(tea.KeyRight)) // clamp at Apply
 	if m.activeTab != m.applyIdx {
 		t.Errorf("activeTab should clamp at applyIdx, got %d", m.activeTab)
 	}
 }
 
 func TestEnterAdvancesThenConfirms(t *testing.T) {
-	m := send(newTestModel(), key(tea.KeySpace))      // FOO in tab 0
-	m = send(m, key(tea.KeyRight), key(tea.KeySpace)) // QUX in tab 1
-	m = send(m, key(tea.KeyEnter))                    // advance to Apply
+	m := send(newTestModel(), press(tea.KeySpace))        // FOO in tab 0
+	m = send(m, press(tea.KeyRight), press(tea.KeySpace)) // QUX in tab 1
+	m = send(m, press(tea.KeyEnter))                      // advance to Apply
 	if m.activeTab != m.applyIdx {
 		t.Fatalf("enter on vault tab should advance to Apply, got %d", m.activeTab)
 	}
 	if m.quitting {
 		t.Fatal("should not quit on first enter")
 	}
-	m = send(m, key(tea.KeyEnter)) // confirm
+	m = send(m, press(tea.KeyEnter)) // confirm
 	if !m.quitting || !m.result.Confirmed {
 		t.Fatalf("enter on Apply should confirm and quit: quitting=%v confirmed=%v", m.quitting, m.result.Confirmed)
 	}
@@ -144,7 +148,7 @@ func TestEnterAdvancesThenConfirms(t *testing.T) {
 }
 
 func TestEscCancels(t *testing.T) {
-	m := send(newTestModel(), key(tea.KeySpace), key(tea.KeyEsc))
+	m := send(newTestModel(), press(tea.KeySpace), press(tea.KeyEscape))
 	if !m.quitting {
 		t.Error("esc should quit")
 	}
@@ -154,20 +158,20 @@ func TestEscCancels(t *testing.T) {
 }
 
 func TestCtrlCCancels(t *testing.T) {
-	m := send(newTestModel(), key(tea.KeyCtrlC))
+	m := send(newTestModel(), ctrl('c'))
 	if !m.quitting || m.result.Confirmed {
 		t.Error("ctrl+c should cancel")
 	}
 }
 
-// View should not panic on any tab and should mention the target path on Apply.
+// View should not panic on any tab and should produce content on Apply.
 func TestViewRenders(t *testing.T) {
 	m := newTestModel()
-	if m.View() == "" {
+	if m.View().Content == "" {
 		t.Error("vault-tab view should not be empty")
 	}
-	m = send(m, key(tea.KeyRight), key(tea.KeyRight)) // to Apply
-	if out := m.View(); out == "" {
+	m = send(m, press(tea.KeyRight), press(tea.KeyRight)) // to Apply
+	if m.View().Content == "" {
 		t.Error("apply-tab view should not be empty")
 	}
 }
