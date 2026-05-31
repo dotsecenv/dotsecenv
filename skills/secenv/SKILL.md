@@ -115,7 +115,15 @@ When the plugin loads `/project/.secenv`, it `cd`s to `/project/` first, then ru
 
 ### Creating a .secenv File
 
-When the user wants to create a `.secenv` file:
+The fastest way is `dotsecenv init secenv`, which builds the file from the user's vaults. In a terminal it opens a picker (one tab per vault, `space` to select); with `--all` it adds every reference not already present. It writes references only, never values, and skips keys already in the file.
+
+```bash
+cd /path/to/project
+dotsecenv init secenv          # pick interactively
+dotsecenv init secenv --all    # add every vault secret
+```
+
+To write the file by hand instead:
 
 1. Ask which variables they need (plain vs. secret)
 2. For secrets, check if they exist in a vault first:

@@ -44,6 +44,34 @@ See the [Migrate from .env tutorial](/tutorials/migrate-from-dotenv/). It walks 
 
 ---
 
+## Generate a .secenv from Your Vault
+
+Build a `.secenv` from the secrets already in your vault instead of writing it by hand.
+
+### Pick interactively
+
+```bash
+dotsecenv init secenv
+```
+
+Opens one tab per vault. Use `←`/`→` to switch tabs, `↑`/`↓` to move, `space` to select, and `enter` to reach the Apply tab and confirm.
+
+### Add everything at once
+
+```bash
+dotsecenv init secenv --all
+```
+
+Adds every reference not already present. Use `-v` to restrict to one vault:
+
+```bash
+dotsecenv init secenv -v 2 --all
+```
+
+It writes references, never values, and leaves existing keys untouched. See [`init secenv`](/reference/#init-secenv) for the full key map.
+
+---
+
 ## Create a Secret
 
 Store a new encrypted secret in your vault.

@@ -358,6 +358,16 @@ API_KEY={dotsecenv/production::API_KEY}
 
 See [Your First Secret](/tutorials/first-secret/) for more details on file syntax.
 
+### Generating a `.secenv`
+
+Instead of writing these lines by hand, `dotsecenv init secenv` builds them from your vaults. In a terminal it opens a picker (one tab per vault, `space` to select); with `--all` it adds every reference at once. It writes references only, never values, and skips keys already in the file. See [`init secenv`](/reference/#init-secenv) in the CLI reference.
+
+```bash
+cd ~/my-project
+dotsecenv init secenv          # pick interactively
+dotsecenv init secenv --all    # add everything from your vaults
+```
+
 ### `.env` vs `.secenv`
 
 The dotsecenv plugin **only** handles `.secenv` files. This is intentional. We don't reinvent the wheel.

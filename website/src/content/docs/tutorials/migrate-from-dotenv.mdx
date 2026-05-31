@@ -59,14 +59,28 @@ The unit of encryption and audit is the individual secret, not the file. There i
 
 4. **Create a `.secenv` file**
 
+   Now that the secrets are in your vault, generate `.secenv` from them:
+
+   ```bash
+   dotsecenv init secenv --all
+   ```
+
+   This writes one reference per vault secret:
+
+   ```bash
+   # .secenv
+   DATABASE_PASSWORD={dotsecenv/}
+   API_KEY={dotsecenv/}
+   ```
+
+   Run `dotsecenv init secenv` without `--all` to pick interactively. The `{dotsecenv/}` syntax tells the shell plugin to fetch the secret with the same name as the variable. To write the file by hand instead:
+
    ```bash
    cat > .secenv << 'EOF'
    DATABASE_PASSWORD={dotsecenv}
    API_KEY={dotsecenv}
    EOF
    ```
-
-   The `{dotsecenv}` syntax tells the shell plugin to fetch the secret with the same name as the variable.
 
 5. **Remove the secrets from `.env`**
 

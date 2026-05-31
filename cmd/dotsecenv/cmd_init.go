@@ -120,12 +120,54 @@ Two modes of operation:
 	},
 }
 
+// initSecenvAll forces non-interactive batch mode without suppressing warnings.
+var initSecenvAll bool
+
+var initSecenvCmd = &cobra.Command{
+	Use:   "secenv",
+	Short: "Add vault secret references to .secenv",
+	Long: `Add vault secret references to the .secenv file in the current directory.
+
+In a terminal this opens an interactive picker: one tab per vault, arrow keys
+to move, space to select, and a final Apply tab to confirm. Without a terminal,
+or with --all or --silent, it adds every reference not already present.
+
+References point at vault secrets (KEY={dotsecenv/...}); it never writes
+plaintext values. Keys already defined in .secenv stay untouched.
+
+Modes:
+  -v PATH or -v INDEX   restrict to specific vaults (path or 1-based index)
+  --all                 add all references without prompting (warnings shown)
+  --silent              add all references and suppress duplicate warnings`,
+	Args: cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cwd, wdErr := os.Getwd()
+		if wdErr != nil {
+			exitWithError(clilib.NewError(fmt.Sprintf("failed to determine working directory: %v", wdErr), clilib.ExitGeneralError))
+		}
+
+		forceBatch := globalOpts.Silent || initSecenvAll || !clilib.HasTTY()
+
+		cli, cliErr := createCLI()
+		if cliErr != nil {
+			os.Exit(int(clilib.PrintError(os.Stderr, cliErr)))
+		}
+		defer func() { _ = cli.Close() }()
+
+		exitErr := cli.InitSecenv(cwd, forceBatch)
+		exitWithError(exitErr)
+	},
+}
+
 func init() {
 	// Flags for init config
 	// Use custom pathValue to reject flag-like values during parsing (before Cobra's subcommand resolution)
 	initConfigCmd.Flags().Var(&pathValue{value: &initConfigOpts.GPGProgram}, "gpg-program", "Set gpg.program to this absolute path (default: PATH, resolved at runtime)")
 	initConfigCmd.Flags().StringVar(&initConfigOpts.LoginFingerprint, "login", "", "Initialize config with specified fingerprint")
 
+	initSecenvCmd.Flags().BoolVar(&initSecenvAll, "all", false, "Add all not-present references without prompting")
+
 	initCmd.AddCommand(initConfigCmd)
 	initCmd.AddCommand(initVaultCmd)
+	initCmd.AddCommand(initSecenvCmd)
 }
