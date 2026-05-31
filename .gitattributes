@@ -1,0 +1,6 @@
+# Vendored Go dependencies. Mark as vendored + generated so GitHub collapses
+# them in pull-request diffs and excludes them from language statistics. The
+# files are produced by `go mod vendor`; review go.mod/go.sum for dependency
+# changes, not the vendored trees.
+vendor/** linguist-vendored=true
+vendor/** linguist-generated=true

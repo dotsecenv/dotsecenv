@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // Run launches the picker on the controlling terminal (/dev/tty), so it works
@@ -23,7 +23,6 @@ func Run(tabs []VaultTab, targetPath string) (Result, error) {
 		newModel(tabs, targetPath),
 		tea.WithInput(tty),
 		tea.WithOutput(tty),
-		tea.WithAltScreen(),
 	)
 	final, err := p.Run()
 	if err != nil {
