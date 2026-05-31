@@ -203,12 +203,20 @@ What the script does NOT do — handle manually if needed:
 - **FIPS 140-3:** Release binaries set `GOFIPS140=v1.26.0` and `CGO_ENABLED=0`.
   The build is pure-Go; **don't add CGO dependencies**.
 - **Vendoring:** Dependencies are vendored. `make build` uses `-mod=vendor`.
-  After changing imports, run `go mod tidy && go mod vendor`. **Vendor changes
-  go in their own PR, separate from logic.** Adding a dependency can touch
-  hundreds of files (#183 vendored bubbletea/lipgloss across 308), which buries
-  the real diff and makes review impractical. Add or bump the dependency,
-  vendor it, and merge that PR first; then build the feature on the updated
-  `main`.
+  After changing imports, run `go mod tidy && go mod vendor`. `vendor/` is
+  marked generated in `.gitattributes`, so GitHub collapses it in PR diffs.
+  **Keep the vendor churn out of the way of the real diff:**
+  - *Routine bumps* (same module path, no source change — most Renovate PRs):
+    land as their own vendor-only PR. Don't fold them into a feature PR.
+  - *New dependency for a feature:* vendor it in its own PR first, then build
+    the feature on the updated `main`. Adding a dependency can touch hundreds
+    of files (#183 vendored bubbletea/lipgloss across 308) and bury the change.
+  - *Major upgrade that renames the module path or changes the API* (e.g.
+    bubbletea/lipgloss v2, which moved to `charm.land/*`): the vendor bump and
+    the code migration are atomic. A vendor-only PR fails `go mod tidy`/build,
+    so it can't pass CI alone. Keep one PR, but put the vendored tree in one
+    commit and the source migration in another (#187), so the code commit
+    reviews on its own.
 - **Commit messages:** Conventional Commits with PR-number suffix, e.g.
   `feat: behavior.* and gpg.program policy fields (last-set-wins) (#116)`.
   Allowed types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`,
@@ -269,10 +277,13 @@ making changes that look like they might violate them.
   some accounts, but the convention is: branch, commit, push the branch,
   open a PR. Direct pushes skip CI gates and review, and force-pushing
   `main` to undo a direct push rewrites public history.
-- **Don't mix vendored dependency changes with logic in one PR.** `go mod
-  vendor` can add hundreds of files; bundled with a feature, the real change
-  is unreviewable (#183 came to 308 files). Vendor the dependency in its own
-  PR first, then open the feature PR against the updated `main`.
+- **Don't mix vendored dependency changes with unrelated logic in one PR.**
+  `go mod vendor` can add hundreds of files; bundled with a feature, the real
+  change is unreviewable (#183 came to 308 files). Vendor a new or bumped
+  dependency in its own PR first, then open the feature PR against the updated
+  `main`. The one exception is a major upgrade that also changes the module
+  path or API: the vendor and code changes are then atomic, so keep them in
+  one PR but split them into a vendor commit and a code commit (#187).
 - **Don't modify cryptographic invariants without explicit review.** This
   includes: vault entry signature checks, the SHA-256 hash chain in JSONL
   entries, the append-only writer, multi-recipient PGP encryption, and the
