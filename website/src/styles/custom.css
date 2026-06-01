@@ -113,10 +113,27 @@ h1, h2, h3, h4, h5, h6 {
   margin-top: 2rem;
 }
 
-/* Terminal-like code blocks */
-pre {
-  border: 1px solid var(--sl-color-hairline);
-  border-radius: 6px;
+/*
+ * Code blocks render through Expressive Code, which owns each block's border
+ * and corner radius. A blanket `pre { border; border-radius }` rule used to
+ * live here, but being unlayered it overrode EC's own per-corner rules: it
+ * re-rounded the body's top corners (which EC zeroes so the title tab can sit
+ * flush on top), leaving a 6px-rounded body behind a square, left-aligned tab.
+ * It also leaked a border onto the asciinema player's internal <pre>. Drive EC
+ * through its own variables instead, so the frame, title tab, and code body
+ * round together as one unit.
+ */
+.expressive-code {
+  --ec-brdRad: 6px; /* frame + code-body corners */
+  --ec-frm-edTabBrdRad: 6px; /* title tab top corners, matched to the frame */
+  /*
+   * One border color for the whole frame. EC draws the body outline from
+   * --ec-brdCol and the title-tab outline from --ec-frm-edTabBarBrdCol; left
+   * unmatched, the tab's blue-gray border met the body's neutral hairline in a
+   * two-tone seam down the left edge.
+   */
+  --ec-brdCol: var(--sl-color-hairline);
+  --ec-frm-edTabBarBrdCol: var(--sl-color-hairline);
 }
 
 /* Inline code styling */
