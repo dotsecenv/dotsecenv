@@ -1308,6 +1308,424 @@ EOF
 }
 
 # ============================================================================
+# Trailing-whitespace / CRLF parsing tests (FIX B)
+# ============================================================================
+
+# Helper: parse one line in a subshell and echo TYPE|VALUE
+_parse_one() {
+    local shell="$1"
+    local line="$2"
+    if [[ "$shell" == "bash" ]]; then
+        "$BASH_BIN" -c "
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            _dotsecenv_parse_line \"\$1\"
+            echo \"\$_DOTSECENV_PARSE_TYPE|\$_DOTSECENV_PARSE_VALUE\"
+        " _ "$line" 2>&1
+    else
+        zsh -c "
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            _dotsecenv_parse_line \"\$1\"
+            echo \"\$_DOTSECENV_PARSE_TYPE|\$_DOTSECENV_PARSE_VALUE\"
+        " _ "$line" 2>&1
+    fi
+}
+
+test_parse_trailing_whitespace_secret() {
+    local shell="$1"
+    log "[$shell] Testing {dotsecenv*} with trailing whitespace resolves as secret..."
+    ((TESTS_RUN++)) || true
+
+    local ok=1
+    local r
+    # {dotsecenv} forms
+    r=$(_parse_one "$shell" "DB_PASSWORD={dotsecenv} ")
+    [[ "$r" == "secret_same|DB_PASSWORD" ]] || ok=0
+    # {dotsecenv/} empty-name forms
+    r=$(_parse_one "$shell" "CLOUDFLARE_API_TOKEN={dotsecenv/}")
+    [[ "$r" == "secret_same|CLOUDFLARE_API_TOKEN" ]] || ok=0
+    r=$(_parse_one "$shell" "CLOUDFLARE_API_TOKEN={dotsecenv/} ")
+    [[ "$r" == "secret_same|CLOUDFLARE_API_TOKEN" ]] || ok=0
+    # CRLF on empty-name form
+    r=$(_parse_one "$shell" $'CLOUDFLARE_API_TOKEN={dotsecenv/}\r')
+    [[ "$r" == "secret_same|CLOUDFLARE_API_TOKEN" ]] || ok=0
+    # {dotsecenv/name} forms
+    r=$(_parse_one "$shell" "MY_VAR={dotsecenv/API_KEY} ")
+    [[ "$r" == "secret_named|API_KEY" ]] || ok=0
+    r=$(_parse_one "$shell" $'MY_VAR={dotsecenv/API_KEY}\r')
+    [[ "$r" == "secret_named|API_KEY" ]] || ok=0
+
+    if [[ $ok -eq 1 ]]; then
+        pass "[$shell] Trailing whitespace/CR forms resolve as secrets (not literal)"
+    else
+        fail "[$shell] Trailing whitespace/CR mis-parsed, last got: $r"
+    fi
+}
+
+test_load_crlf_empty_name_resolves() {
+    local shell="$1"
+    log "[$shell] Testing end-to-end CRLF {dotsecenv/} loads resolved secret..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_crlf_empty"
+    mkdir -p "$test_dir"
+    # API_KEY={dotsecenv/} with a real CRLF line ending
+    printf 'API_KEY={dotsecenv/}\r\n' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    local config_dir="$TEMP_DIR/config"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir'
+            _dotsecenv_chpwd_hook
+            echo \"\$API_KEY\"
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir'
+            echo \"\$API_KEY\"
+        " 2>&1)
+    fi
+
+    if [[ "$result" == *"mock-api-key-12345"* && "$result" != *"{dotsecenv/}"* ]]; then
+        pass "[$shell] CRLF {dotsecenv/} resolved to secret value"
+    else
+        fail "[$shell] CRLF {dotsecenv/} not resolved, got: $result"
+    fi
+}
+
+# ============================================================================
+# Reload / new-key detection tests (FIX A)
+# ============================================================================
+
+test_sync_new_key_always_trusted() {
+    local shell="$1"
+    log "[$shell] Testing new key auto-loads in always-trusted dir (no prompt)..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_sync_always"
+    mkdir -p "$test_dir/src"
+
+    cat >"$test_dir/.secenv" <<'EOF'
+DB_PASSWORD={dotsecenv}
+EOF
+    chmod 644 "$test_dir/.secenv"
+
+    local config_dir="$TEMP_DIR/config_sync_always"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    # Enter dir, append a new key, then trigger the same-dir PHASE 2 sync by
+    # going into a subdir and back (works in both bash and zsh).
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir'
+            _dotsecenv_chpwd_hook
+            echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
+            cd '$test_dir/src'
+            _dotsecenv_chpwd_hook
+            cd '$test_dir'
+            _dotsecenv_chpwd_hook
+            echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir'
+            echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
+            cd '$test_dir/src'
+            cd '$test_dir'
+            echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
+        " 2>&1)
+    fi
+
+    if [[ "$result" == *"DB=super-secret-password|API=mock-api-key-12345"* && "$result" != *"Load secrets"* ]]; then
+        pass "[$shell] Always-trusted new key auto-loaded without prompt"
+    else
+        fail "[$shell] Always-trusted new key not auto-loaded, got: $result"
+    fi
+}
+
+test_sync_no_new_keys_noop() {
+    local shell="$1"
+    log "[$shell] Testing no new keys means no prompt and no spurious load line..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_sync_noop"
+    mkdir -p "$test_dir/src"
+
+    cat >"$test_dir/.secenv" <<'EOF'
+DB_PASSWORD={dotsecenv}
+EOF
+    chmod 644 "$test_dir/.secenv"
+
+    local config_dir="$TEMP_DIR/config_sync_noop"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    # Enter, then trigger same-dir sync repeatedly with NO file change.
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir'
+            _dotsecenv_chpwd_hook
+            cd '$test_dir/src'; _dotsecenv_chpwd_hook
+            cd '$test_dir'; _dotsecenv_chpwd_hook
+            cd '$test_dir/src'; _dotsecenv_chpwd_hook
+            cd '$test_dir'; _dotsecenv_chpwd_hook
+            echo MARKER
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir'
+            cd '$test_dir/src'
+            cd '$test_dir'
+            cd '$test_dir/src'
+            cd '$test_dir'
+            echo MARKER
+        " 2>&1)
+    fi
+
+    if [[ "$result" != *"new key(s)"* && "$result" != *"Load secrets"* && "$result" == *"MARKER"* ]]; then
+        pass "[$shell] No-op sync produces no prompt and no load-spam"
+    else
+        fail "[$shell] No-op sync produced unexpected output, got: $result"
+    fi
+}
+
+test_sync_new_key_unload_integrity() {
+    local shell="$1"
+    log "[$shell] Testing synced new key is tracked and unloads on leaving tree..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_sync_unload"
+    mkdir -p "$test_dir/project/src"
+    mkdir -p "$test_dir/other"
+
+    cat >"$test_dir/project/.secenv" <<'EOF'
+DB_PASSWORD={dotsecenv}
+EOF
+    chmod 644 "$test_dir/project/.secenv"
+
+    local config_dir="$TEMP_DIR/config_sync_unload"
+    mkdir -p "$config_dir"
+    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir/project'
+            _dotsecenv_chpwd_hook
+            echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
+            cd '$test_dir/project/src'; _dotsecenv_chpwd_hook
+            cd '$test_dir/project'; _dotsecenv_chpwd_hook
+            cd '$test_dir/other'; _dotsecenv_chpwd_hook
+            echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir/project'
+            echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
+            cd '$test_dir/project/src'
+            cd '$test_dir/project'
+            cd '$test_dir/other'
+            echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
+        " 2>&1)
+    fi
+
+    if [[ "$result" == *"DB=unset|API=unset"* ]]; then
+        pass "[$shell] Synced key tracked and unloaded on leave"
+    else
+        fail "[$shell] Synced key leaked on leave, got: $result"
+    fi
+}
+
+test_reload_ingests_new_key() {
+    local shell="$1"
+    log "[$shell] Testing 'dse reload' ingests a key added to an already-loaded dir..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_reload_newkey"
+    mkdir -p "$test_dir/project"
+
+    cat >"$test_dir/project/.secenv" <<'EOF'
+DB_PASSWORD={dotsecenv}
+EOF
+    chmod 644 "$test_dir/project/.secenv"
+
+    local config_dir="$TEMP_DIR/config_reload_newkey"
+    mkdir -p "$config_dir"
+    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir/project'
+            _dotsecenv_chpwd_hook
+            echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
+            dse reload
+            echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir/project'
+            echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
+            dse reload
+            echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
+        " 2>&1)
+    fi
+
+    if [[ "$result" == *"DB=super-secret-password|API=mock-api-key-12345"* ]]; then
+        pass "[$shell] 'dse reload' ingests newly-added key"
+    else
+        fail "[$shell] 'dse reload' did not ingest new key, got: $result"
+    fi
+}
+
+test_sync_new_key_not_always_trusted_no_autoload() {
+    local shell="$1"
+    log "[$shell] Testing new key in a NOT-always-trusted dir does not silently auto-load..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_sync_session"
+    mkdir -p "$test_dir/src"
+
+    cat >"$test_dir/.secenv" <<'EOF'
+DB_PASSWORD={dotsecenv}
+EOF
+    chmod 644 "$test_dir/.secenv"
+
+    # NOT in the persistent trusted_dirs file: session-trust the dir at runtime
+    # via the session array, so the first load succeeds but the dir is not
+    # always-trusted. A new key must NOT auto-load; without a TTY the sync
+    # re-prompt is skipped (no-TTY guard), so the key stays unloaded.
+    local config_dir="$TEMP_DIR/config_sync_session"
+    mkdir -p "$config_dir"
+    : >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            _dotsecenv_trust_session '$test_dir'
+            cd '$test_dir'
+            _dotsecenv_chpwd_hook
+            echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
+            _dotsecenv_sync_new_keys '$test_dir' </dev/null
+            echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            _dotsecenv_trust_session '$test_dir'
+            cd '$test_dir'
+            echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
+            _dotsecenv_sync_new_keys '$test_dir' </dev/null
+            echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
+        " 2>&1)
+    fi
+
+    # Original DB_PASSWORD stays loaded; the new API_KEY is NOT silently added.
+    if [[ "$result" == *"DB=super-secret-password|API=unset"* ]]; then
+        pass "[$shell] New key in session-trusted dir is not silently auto-loaded"
+    else
+        fail "[$shell] Session-trusted new-key handling wrong, got: $result"
+    fi
+}
+
+test_bash_cd_dot_asymmetry() {
+    local shell="$1"
+    # Only meaningful for bash (PROMPT_COMMAND gated on PWD change).
+    [[ "$shell" == "bash" ]] || return 0
+    log "[$shell] Testing bash hook does not pick up on unchanged PWD, reload does..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_bash_asym"
+    mkdir -p "$test_dir"
+
+    cat >"$test_dir/.secenv" <<'EOF'
+DB_PASSWORD={dotsecenv}
+EOF
+    chmod 644 "$test_dir/.secenv"
+
+    local config_dir="$TEMP_DIR/config_bash_asym"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+        export PATH='$mock_path:$PATH'
+        source '$SHELL_DIR/_dotsecenv_core.sh'
+        source '$SHELL_DIR/dotsecenv.plugin.bash'
+        cd '$test_dir'
+        _dotsecenv_prompt_hook
+        echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
+        _dotsecenv_prompt_hook
+        echo \"AFTER_HOOK=\${API_KEY:-unset}\"
+        dse reload
+        echo \"AFTER_RELOAD=\${API_KEY:-unset}\"
+    " 2>&1)
+
+    if [[ "$result" == *"AFTER_HOOK=unset"* && "$result" == *"AFTER_RELOAD=mock-api-key-12345"* ]]; then
+        pass "[$shell] bash unchanged-PWD hook is a no-op; reload ingests"
+    else
+        fail "[$shell] bash cd-dot asymmetry wrong, got: $result"
+    fi
+}
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -1355,6 +1773,14 @@ main() {
         test_dse_up_no_ancestors "bash"
         test_dse_reload_refreshes_values "bash"
         test_dse_reload_clears_and_reloads_stack "bash"
+        test_parse_trailing_whitespace_secret "bash"
+        test_load_crlf_empty_name_resolves "bash"
+        test_sync_new_key_always_trusted "bash"
+        test_sync_no_new_keys_noop "bash"
+        test_sync_new_key_unload_integrity "bash"
+        test_reload_ingests_new_key "bash"
+        test_sync_new_key_not_always_trusted_no_autoload "bash"
+        test_bash_cd_dot_asymmetry "bash"
     fi
 
     # Run zsh tests
@@ -1386,6 +1812,13 @@ main() {
             test_dse_up_no_ancestors "zsh"
             test_dse_reload_refreshes_values "zsh"
             test_dse_reload_clears_and_reloads_stack "zsh"
+            test_parse_trailing_whitespace_secret "zsh"
+            test_load_crlf_empty_name_resolves "zsh"
+            test_sync_new_key_always_trusted "zsh"
+            test_sync_no_new_keys_noop "zsh"
+            test_sync_new_key_unload_integrity "zsh"
+            test_reload_ingests_new_key "zsh"
+            test_sync_new_key_not_always_trusted_no_autoload "zsh"
         else
             warn "Zsh not found, skipping zsh tests"
         fi
