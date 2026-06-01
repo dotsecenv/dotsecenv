@@ -761,11 +761,7 @@ function test_parse_trailing_whitespace_secret
         echo \"named|\$_DOTSECENV_PARSE_TYPE|\$_DOTSECENV_PARSE_VALUE\"
     " 2>&1)
 
-    if string match -q "*same|secret_same|DB_PASSWORD*" "$result"; \
-        and string match -q "*emptyclean|secret_same|CLOUDFLARE_API_TOKEN*" "$result"; \
-        and string match -q "*emptyspace|secret_same|CLOUDFLARE_API_TOKEN*" "$result"; \
-        and string match -q "*emptycr|secret_same|CLOUDFLARE_API_TOKEN*" "$result"; \
-        and string match -q "*named|secret_named|API_KEY*" "$result"
+    if string match -q "*same|secret_same|DB_PASSWORD*" "$result"; and string match -q "*emptyclean|secret_same|CLOUDFLARE_API_TOKEN*" "$result"; and string match -q "*emptyspace|secret_same|CLOUDFLARE_API_TOKEN*" "$result"; and string match -q "*emptycr|secret_same|CLOUDFLARE_API_TOKEN*" "$result"; and string match -q "*named|secret_named|API_KEY*" "$result"
         pass "[fish] Trailing whitespace/CR and empty-name forms resolve as secrets"
     else
         fail "[fish] Trailing whitespace/CR mis-parsed, got: $result"
