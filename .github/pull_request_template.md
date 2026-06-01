@@ -1,5 +1,9 @@
 ## Description
 
+<!-- This description becomes the squash commit message on merge. Write it with
+Markdown headings and clear prose. GitHub adds the Co-authored-by footer itself,
+so leave attribution out of the description. -->
+
 <!-- Describe your changes in detail -->
 
 ## Related Issue
