@@ -217,12 +217,19 @@ What the script does NOT do — handle manually if needed:
     so it can't pass CI alone. Keep one PR, but put the vendored tree in one
     commit and the source migration in another (#187), so the code commit
     reviews on its own.
-- **Commit messages:** Conventional Commits with PR-number suffix, e.g.
-  `feat: behavior.* and gpg.program policy fields (last-set-wins) (#116)`.
-  Allowed types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`,
-  `style`. Breaking changes use `!`, e.g. `refactor!: drop SUID mode (#110)`.
-  `Co-Authored-By` footers are welcome (e.g. for AI agents that helped
-  produce the change).
+- **Commit messages:** Conventional Commits, e.g. `feat: behavior.* and
+  gpg.program policy fields (last-set-wins)`. Allowed types: `feat`, `fix`,
+  `docs`, `chore`, `refactor`, `test`, `ci`, `style`. Breaking changes use
+  `!`, e.g. `refactor!: drop SUID mode`. Keep a `Co-Authored-By` trailer on a
+  commit when an AI agent helped. GitHub collects those trailers and writes a
+  single deduplicated `Co-authored-by:` footer onto the squash commit.
+- **The PR title and description become the squash commit.** `main` takes
+  squash merges. GitHub uses the PR title as the subject (it appends `(#NNN)`)
+  and the PR description as the body. Title the PR as a Conventional Commit.
+  Write the description the way you want the commit body to read: Markdown
+  headings and prose, not a bulleted list of commits. Leave attribution out of
+  the description; GitHub adds the `Co-authored-by:` footer from the commit
+  trailers.
 - **Branches:** `feat/*`, `fix/*`, `docs/*`, etc. (see `CONTRIBUTING.md`).
 - **PRs only:** All changes land on `main` through pull requests. Don't
   push commits directly to `main`, even when your account holds a bypass
