@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	lipgloss "charm.land/lipgloss/v2"
 )
 
 // Candidate is one selectable secret: its vault key, the env-var name it would
@@ -77,7 +77,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
 			m.result = Result{Confirmed: false}
@@ -106,7 +106,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case " ":
+		case "space":
 			if m.onVaultTab() {
 				m.toggleCurrent()
 			}
@@ -198,10 +198,13 @@ var (
 	helpStyle        = lipgloss.NewStyle().Faint(true)
 )
 
-// View implements tea.Model.
-func (m Model) View() string {
+// View implements tea.Model. bubbletea v2 returns a tea.View, which also
+// carries the alt-screen flag (the v1 WithAltScreen program option is gone).
+func (m Model) View() tea.View {
 	if m.quitting {
-		return ""
+		view := tea.NewView("")
+		view.AltScreen = true
+		return view
 	}
 	var b strings.Builder
 	b.WriteString(m.renderTabs())
@@ -214,7 +217,9 @@ func (m Model) View() string {
 	b.WriteString("\n\n")
 	b.WriteString(m.renderFooter())
 	b.WriteString("\n")
-	return b.String()
+	view := tea.NewView(b.String())
+	view.AltScreen = true
+	return view
 }
 
 func (m Model) renderTabs() string {
