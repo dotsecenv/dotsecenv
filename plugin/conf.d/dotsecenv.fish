@@ -30,6 +30,8 @@ set -g _DOTSECENV_PREV_PWD ""
 # Format: _DOTSECENV_LOADED_<hash> = "VAR1 VAR2 VAR3"
 # Track secrets loaded from .secenv (reset per directory change)
 set -g _DOTSECENV_SECRETS_LOADED
+# Track plain env vars loaded from .secenv (reset per directory change)
+set -g _DOTSECENV_ENVVARS_LOADED
 # Stack of directories with loaded .secenv (ordered ancestor → descendant)
 set -g _DOTSECENV_SOURCE_STACK
 # Track unloaded keys for re-fetch logic
@@ -283,6 +285,7 @@ function _dotsecenv_load_file
                 # Phase 1: load plain variables
                 set -gx $key "$value"
                 set -g -a _DOTSECENV_LOADED_$dir_hash "$key"
+                set -g -a _DOTSECENV_ENVVARS_LOADED "$key"
 
             else if test "$phase" = 2; and begin
                     test "$ptype" = secret_same; or test "$ptype" = secret_named
@@ -320,11 +323,22 @@ function _dotsecenv_unload_dir
     set -l dir_hash (_dotsecenv_dir_hash "$dir")
     set -l vars_var "_DOTSECENV_LOADED_$dir_hash"
     set -l secrets_var "_DOTSECENV_SECRETS_$dir_hash"
+    set -l envvars_var "_DOTSECENV_ENVVARS_$dir_hash"
 
     # Reset the unloaded keys tracking
     set -g _DOTSECENV_UNLOADED_KEYS
 
-    # Report secrets being unloaded before clearing them
+    # Report plain env vars and secrets on separate lines before clearing them;
+    # skip a line when its category is empty.
+    if set -q $envvars_var
+        set -l envvar_count (count $$envvars_var)
+        if test $envvar_count -gt 0
+            set -l envvars_list (string join ', ' $$envvars_var)
+            echo "dotsecenv: unloaded $envvar_count env var(s): $envvars_list" >&2
+        end
+        set -e $envvars_var
+    end
+
     if set -q $secrets_var
         set -l secret_count (count $$secrets_var)
         if test $secret_count -gt 0
@@ -423,6 +437,7 @@ function _dotsecenv_load_key
             if test "$ptype" = plain
                 set -gx $key "$value"
                 set -g -a _DOTSECENV_LOADED_$dir_hash "$key"
+                set -g -a _DOTSECENV_ENVVARS_$dir_hash "$key"
                 return 0
             else if test "$ptype" = secret_same; or test "$ptype" = secret_named
                 set -l secret_name "$value"
@@ -622,11 +637,21 @@ function _dotsecenv_on_cd
     end
 
     # Phase 1: Load plain variables from .secenv
+    set -g _DOTSECENV_ENVVARS_LOADED
     _dotsecenv_load_file "$new_dir/.secenv" 1 "$new_dir"
 
     # Phase 2: Load secrets from .secenv
     set -g _DOTSECENV_SECRETS_LOADED
     _dotsecenv_load_file "$new_dir/.secenv" 2 "$new_dir"
+
+    # Report plain env vars and secrets on separate lines; skip a line when its
+    # category is empty (an empty .secenv produces no output at all).
+    if test (count $_DOTSECENV_ENVVARS_LOADED) -gt 0
+        # Track env vars per directory for unload reporting
+        set -g _DOTSECENV_ENVVARS_$dir_hash $_DOTSECENV_ENVVARS_LOADED
+        set -l envvars_list (string join ', ' $_DOTSECENV_ENVVARS_LOADED)
+        echo "dotsecenv: loaded "(count $_DOTSECENV_ENVVARS_LOADED)" env var(s) from .secenv: $envvars_list" >&2
+    end
 
     if test (count $_DOTSECENV_SECRETS_LOADED) -gt 0
         # Track secrets per directory for unload reporting

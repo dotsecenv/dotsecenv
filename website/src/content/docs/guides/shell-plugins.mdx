@@ -104,7 +104,7 @@ Now `cd` into the project:
 ~ $ cd myapp/
 dotsecenv: found .secenv in /home/user/myapp
 Load secrets? [y]es / [n]o / [a]lways: y
-dotsecenv: loaded 2 secret(s) from .secenv: APP_ENV, NODE_ENV
+dotsecenv: loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV
 ```
 
 Your answer decides what happens:
@@ -156,7 +156,8 @@ Reload the directory to pick up the new line:
 
 ```text
 ~/myapp $ cd .                # or: dse reload
-dotsecenv: loaded 3 secret(s) from .secenv: APP_ENV, NODE_ENV, DATABASE_URL
+dotsecenv: loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV
+dotsecenv: loaded 1 secret(s) from .secenv: DATABASE_URL
 
 ~/myapp $ echo $DATABASE_URL
 postgres://...
@@ -185,7 +186,8 @@ PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL}
 
 ```text
 ~/myapp $ dse reload
-dotsecenv: loaded 4 secret(s) from .secenv: APP_ENV, NODE_ENV, DATABASE_URL, PROD_DB_PASSWORD
+dotsecenv: loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV
+dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, PROD_DB_PASSWORD
 ```
 
 ## Tree-scoped loading
@@ -205,14 +207,16 @@ Navigate down into the project and the secrets follow you. Step out of the tree 
 
 ```text
 ~ $ cd myapp/
-dotsecenv: loaded 4 secret(s) from .secenv: APP_ENV, NODE_ENV, DATABASE_URL, PROD_DB_PASSWORD
+dotsecenv: loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV
+dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, PROD_DB_PASSWORD
 
 ~/myapp $ cd src/components/
 ~/myapp/src/components $ echo $DATABASE_URL
 postgres://...                 # still loaded; same tree
 
 ~/myapp/src/components $ cd ~/other-project/
-dotsecenv: unloaded 4 secret(s): APP_ENV, NODE_ENV, DATABASE_URL, PROD_DB_PASSWORD
+dotsecenv: unloaded 2 env var(s): APP_ENV, NODE_ENV
+dotsecenv: unloaded 2 secret(s): DATABASE_URL, PROD_DB_PASSWORD
 ```
 
 Auto-loading happens when you `cd` through the directory that holds the `.secenv`. If your shell starts straight inside a subdirectory, for example a tmux pane or an editor terminal, the parent file was never crossed, so nothing loaded. Run `dse up` to walk up the tree and load ancestor files:
@@ -223,7 +227,8 @@ Auto-loading happens when you `cd` through the directory that holds the `.secenv
                                # empty
 
 ~/myapp/src/components $ dse up
-dotsecenv: loaded 4 secret(s) from .secenv: APP_ENV, NODE_ENV, DATABASE_URL, PROD_DB_PASSWORD
+dotsecenv: loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV
+dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, PROD_DB_PASSWORD
 
 ~/myapp/src/components $ echo $DATABASE_URL
 postgres://...
@@ -295,6 +300,7 @@ dotsecenv init secenv --all    # add every vault reference
   DATABASE_URL={dotsecenv}
   PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL}
   ```
+
 </Aside>
 
 ## The dse command
@@ -341,7 +347,8 @@ Clipboard backends: `pbcopy` on macOS, `wl-copy` on Wayland, `xclip` or `xsel` o
 
 ```text
 ~/myapp $ dse reload
-dotsecenv: loaded 4 secret(s) from .secenv: APP_ENV, NODE_ENV, DATABASE_URL, PROD_DB_PASSWORD
+dotsecenv: loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV
+dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, PROD_DB_PASSWORD
 ```
 
 <Aside type="note" title="dse reload semantics (v0.5.1+)">
