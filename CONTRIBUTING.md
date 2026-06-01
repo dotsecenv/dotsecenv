@@ -105,7 +105,8 @@ the PR title becomes the subject (with `(#NNN)` appended) and the PR
 description becomes the body. Write the description the way you want it to
 read in `git log`: use Markdown headings and prose, not a list of commits.
 You do not need to add a `Co-authored-by:` line; GitHub collects the trailers
-from your commits and appends one deduplicated footer.
+from your commits and appends one deduplicated footer. End the description with
+a `---` line so that footer sits below a separator.
 
 ### Branch Naming
 
