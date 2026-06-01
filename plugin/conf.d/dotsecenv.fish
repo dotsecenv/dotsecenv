@@ -138,6 +138,18 @@ function _dotsecenv_is_trusted
     return 1
 end
 
+# Check if directory is trusted in the persistent file ONLY (always-trusted)
+# Returns 0 if always-trusted, 1 if not in the persistent file
+function _dotsecenv_is_trusted_always
+    set -l dir $argv[1]
+    if test -f "$DOTSECENV_TRUSTED_DIRS_FILE"
+        if grep -qxF "$dir" "$DOTSECENV_TRUSTED_DIRS_FILE" 2>/dev/null
+            return 0
+        end
+    end
+    return 1
+end
+
 # Add directory to persistent trusted list
 function _dotsecenv_trust_always
     set -l dir $argv[1]
@@ -158,8 +170,13 @@ function _dotsecenv_deny_session
 end
 
 # Prompt user for trust decision
+# Optional second arg replaces the default "found .secenv" lead line
 function _dotsecenv_prompt_trust
     set -l dir $argv[1]
+    set -l lead "dotsecenv: found .secenv in $dir"
+    if test (count $argv) -gt 1; and test -n "$argv[2]"
+        set lead "$argv[2]"
+    end
 
     # Only prompt if we have a TTY
     if not isatty stdin
@@ -167,7 +184,7 @@ function _dotsecenv_prompt_trust
         return 1
     end
 
-    echo "dotsecenv: found .secenv in $dir" >&2
+    echo "$lead" >&2
     read -P "Load secrets? [y]es / [n]o / [a]lways: " response
 
     switch (string lower "$response")
@@ -196,8 +213,10 @@ function _dotsecenv_parse_line
         return 1
     end
 
-    # Trim leading whitespace
-    set line (string trim -l "$line")
+    # Strip a trailing CR (CRLF files), then trim both ends, so secret
+    # placeholders like {dotsecenv/} keep a clean closing brace before matching.
+    set line (string replace -r '\r$' '' -- "$line")
+    set line (string trim -- "$line")
 
     # Match KEY=VALUE pattern
     if string match -qr '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$' "$line"
@@ -220,9 +239,9 @@ function _dotsecenv_parse_line
             set -l secret_name (string replace -r '^\{dotsecenv/(.*)\}$' '$1' "$value")
             # Validate: no additional slashes, valid secret name format
             if test -z "$secret_name"
-                # Empty name like {dotsecenv/} - treat as plain value silently
-                set -g _DOTSECENV_PARSE_VALUE "$value"
-                set -g _DOTSECENV_PARSE_TYPE plain
+                # Empty name like {dotsecenv/} - treat same as {dotsecenv}
+                set -g _DOTSECENV_PARSE_VALUE "$_DOTSECENV_PARSE_KEY"
+                set -g _DOTSECENV_PARSE_TYPE secret_same
             else if string match -q "*/*" "$secret_name"
                 echo "dotsecenv: error: invalid syntax '$value' - only one '/' allowed" >&2
                 return 1
@@ -377,6 +396,115 @@ function _dotsecenv_dir_has_key
     return 1
 end
 
+# Load a single key from a directory's .secenv and track it.
+# Mirrors _dotsecenv_load_file but filtered to one target key, appending to the
+# per-directory tracking arrays so the key unloads correctly on leave.
+# Returns 0 if the key was loaded, 1 otherwise.
+function _dotsecenv_load_key
+    set -l dir $argv[1]
+    set -l target_key $argv[2]
+    set -l file "$dir/.secenv"
+    set -l dir_hash (_dotsecenv_dir_hash "$dir")
+
+    if not test -f "$file"
+        return 1
+    end
+
+    while read -l line
+        if _dotsecenv_parse_line "$line"
+            set -l key "$_DOTSECENV_PARSE_KEY"
+            set -l value "$_DOTSECENV_PARSE_VALUE"
+            set -l ptype "$_DOTSECENV_PARSE_TYPE"
+
+            if test "$key" != "$target_key"
+                continue
+            end
+
+            if test "$ptype" = plain
+                set -gx $key "$value"
+                set -g -a _DOTSECENV_LOADED_$dir_hash "$key"
+                return 0
+            else if test "$ptype" = secret_same; or test "$ptype" = secret_named
+                set -l secret_name "$value"
+                set -l secret_stderr_file (mktemp)
+                set -l secret_result (dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
+                set -l secret_status $status
+                if test $secret_status -eq 0
+                    set -gx $key "$secret_result"
+                    set -g -a _DOTSECENV_LOADED_$dir_hash "$key"
+                    set -g -a _DOTSECENV_SECRETS_$dir_hash "$key"
+                    set -g -a _DOTSECENV_SECRETS_LOADED "$key"
+                    test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
+                    if test (count $secret_result) -gt 1
+                        echo "dotsecenv: warning: $key contains newlines; use (string join \\n \$$key) to reconstruct the full value" >&2
+                    end
+                    rm -f "$secret_stderr_file"
+                    return 0
+                else
+                    echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
+                    cat "$secret_stderr_file" >&2
+                    rm -f "$secret_stderr_file"
+                    return 1
+                end
+            end
+            return 1
+        end
+    end <"$file"
+
+    return 1
+end
+
+# Detect keys in a directory's .secenv that are not yet loaded, then load them.
+# Always-trusted dirs (persistent file) load silently; otherwise re-prompt first.
+# Fast no-op when nothing changed, to avoid prompt-spam on benign re-triggers.
+function _dotsecenv_sync_new_keys
+    set -l dir $argv[1]
+    set -l file "$dir/.secenv"
+
+    if not test -f "$file"
+        return 0
+    end
+
+    # Collect keys present in the file but not currently loaded
+    set -l new_keys
+    while read -l line
+        if _dotsecenv_parse_line "$line"
+            if not _dotsecenv_dir_has_key "$dir" "$_DOTSECENV_PARSE_KEY"
+                set -a new_keys "$_DOTSECENV_PARSE_KEY"
+            end
+        end
+    end <"$file"
+
+    if test (count $new_keys) -eq 0
+        return 0
+    end
+
+    # Re-check perms: the file could have been made world-writable between loads
+    if not _dotsecenv_security_check "$file"
+        return 1
+    end
+
+    # Always-trusted dirs load silently; otherwise re-prompt before loading
+    if not _dotsecenv_is_trusted_always "$dir"
+        if not _dotsecenv_prompt_trust "$dir" "dotsecenv: new keys in $dir/.secenv: $new_keys"
+            return 0
+        end
+    end
+
+    set -l loaded 0
+    for key in $new_keys
+        if _dotsecenv_load_key "$dir" "$key"
+            set loaded (math $loaded + 1)
+        end
+    end
+
+    if test $loaded -gt 0
+        echo "dotsecenv: loaded $loaded new key(s) from $dir/.secenv" >&2
+    end
+
+    return 0
+end
+
 # Main function to process directory change (tree-scoped loading)
 # Note: old_dir kept for interface compatibility but unused (we use stack-based tracking)
 function _dotsecenv_on_cd
@@ -436,7 +564,9 @@ function _dotsecenv_on_cd
                 _dotsecenv_stack_pop
                 _dotsecenv_unload_dir "$top_dir"
             else
-                # Coming from a subdirectory - secrets already loaded, nothing to do
+                # Coming from a subdirectory - secrets already loaded, but pick up
+                # any keys appended to the .secenv since it was first loaded
+                _dotsecenv_sync_new_keys "$top_dir"
                 return 0
             end
         end
@@ -660,6 +790,11 @@ function dse
     switch $argv[1]
         case reload
             _dotsecenv_reload
+        case sync
+            # Pick up keys added to the current dir's .secenv without unloading.
+            # Fish only fires its cd hook on a real PWD change, so this is the
+            # manual path to ingest keys added to the current directory.
+            _dotsecenv_sync_new_keys "$PWD"
         case get
             dotsecenv secret get $argv[2..]
         case cp

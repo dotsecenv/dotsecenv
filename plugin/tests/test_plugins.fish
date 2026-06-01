@@ -740,6 +740,217 @@ function test_dse_up_no_ancestors
 end
 
 # ============================================================================
+# Trailing-whitespace / CRLF parsing tests (FIX B)
+# ============================================================================
+
+function test_parse_trailing_whitespace_secret
+    log "[fish] Testing {dotsecenv*} with trailing whitespace resolves as secret..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set result (fish --no-config -c "
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        _dotsecenv_parse_line 'DB_PASSWORD={dotsecenv} '
+        echo \"same|\$_DOTSECENV_PARSE_TYPE|\$_DOTSECENV_PARSE_VALUE\"
+        _dotsecenv_parse_line 'CLOUDFLARE_API_TOKEN={dotsecenv/}'
+        echo \"emptyclean|\$_DOTSECENV_PARSE_TYPE|\$_DOTSECENV_PARSE_VALUE\"
+        _dotsecenv_parse_line 'CLOUDFLARE_API_TOKEN={dotsecenv/} '
+        echo \"emptyspace|\$_DOTSECENV_PARSE_TYPE|\$_DOTSECENV_PARSE_VALUE\"
+        _dotsecenv_parse_line (printf 'CLOUDFLARE_API_TOKEN={dotsecenv/}\r')
+        echo \"emptycr|\$_DOTSECENV_PARSE_TYPE|\$_DOTSECENV_PARSE_VALUE\"
+        _dotsecenv_parse_line 'MY_VAR={dotsecenv/API_KEY} '
+        echo \"named|\$_DOTSECENV_PARSE_TYPE|\$_DOTSECENV_PARSE_VALUE\"
+    " 2>&1)
+
+    if string match -q "*same|secret_same|DB_PASSWORD*" "$result"; \
+        and string match -q "*emptyclean|secret_same|CLOUDFLARE_API_TOKEN*" "$result"; \
+        and string match -q "*emptyspace|secret_same|CLOUDFLARE_API_TOKEN*" "$result"; \
+        and string match -q "*emptycr|secret_same|CLOUDFLARE_API_TOKEN*" "$result"; \
+        and string match -q "*named|secret_named|API_KEY*" "$result"
+        pass "[fish] Trailing whitespace/CR and empty-name forms resolve as secrets"
+    else
+        fail "[fish] Trailing whitespace/CR mis-parsed, got: $result"
+    end
+end
+
+function test_load_crlf_empty_name_resolves
+    log "[fish] Testing end-to-end CRLF {dotsecenv/} loads resolved secret..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_crlf_empty"
+    mkdir -p "$test_dir"
+    printf 'API_KEY={dotsecenv/}\r\n' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    set config_dir "$TEMP_DIR/config_crlf"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir'
+        _dotsecenv_on_cd '' '$test_dir'
+        echo \$API_KEY
+    " 2>&1)
+
+    if string match -q "*mock-api-key-12345*" "$result"; and not string match -q "*{dotsecenv/}*" "$result"
+        pass "[fish] CRLF {dotsecenv/} resolved to secret value"
+    else
+        fail "[fish] CRLF {dotsecenv/} not resolved, got: $result"
+    end
+end
+
+# ============================================================================
+# Reload / new-key detection tests (FIX A)
+# ============================================================================
+
+function test_sync_new_key_always_trusted
+    log "[fish] Testing new key auto-loads in always-trusted dir (no prompt)..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_sync_always"
+    mkdir -p "$test_dir"
+
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    set config_dir "$TEMP_DIR/config_sync_always"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    # Fish only fires its hook on a real PWD change, so use dse reload / direct
+    # sync to ingest the newly-appended key.
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir'
+        _dotsecenv_on_cd '' '$test_dir'
+        echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
+        _dotsecenv_sync_new_keys '$test_dir'
+        echo 'DB='\$DB_PASSWORD'|API='\$API_KEY
+    " 2>&1)
+
+    if string match -q "*DB=super-secret-password|API=mock-api-key-12345*" "$result"; and not string match -q "*Load secrets*" "$result"
+        pass "[fish] Always-trusted new key auto-loaded without prompt"
+    else
+        fail "[fish] Always-trusted new key not auto-loaded, got: $result"
+    end
+end
+
+function test_sync_no_new_keys_noop
+    log "[fish] Testing no new keys means no prompt and no spurious load line..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_sync_noop"
+    mkdir -p "$test_dir"
+
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    set config_dir "$TEMP_DIR/config_sync_noop"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir'
+        _dotsecenv_on_cd '' '$test_dir'
+        _dotsecenv_sync_new_keys '$test_dir'
+        _dotsecenv_sync_new_keys '$test_dir'
+        echo MARKER
+    " 2>&1)
+
+    if not string match -q "*new key(s)*" "$result"; and not string match -q "*Load secrets*" "$result"; and string match -q "*MARKER*" "$result"
+        pass "[fish] No-op sync produces no prompt and no load-spam"
+    else
+        fail "[fish] No-op sync produced unexpected output, got: $result"
+    end
+end
+
+function test_sync_new_key_unload_integrity
+    log "[fish] Testing synced new key is tracked and unloads on leaving tree..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_sync_unload"
+    mkdir -p "$test_dir/project"
+    mkdir -p "$test_dir/other"
+
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/project/.secenv"
+    chmod 644 "$test_dir/project/.secenv"
+
+    set config_dir "$TEMP_DIR/config_sync_unload"
+    mkdir -p "$config_dir"
+    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir/project'
+        echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
+        _dotsecenv_sync_new_keys '$test_dir/project'
+        cd '$test_dir/other'
+        echo 'DB='(test -n \"\$DB_PASSWORD\"; and echo \$DB_PASSWORD; or echo unset)'|API='(test -n \"\$API_KEY\"; and echo \$API_KEY; or echo unset)
+    " 2>&1)
+
+    if string match -q "*DB=unset|API=unset*" "$result"
+        pass "[fish] Synced key tracked and unloaded on leave"
+    else
+        fail "[fish] Synced key leaked on leave, got: $result"
+    end
+end
+
+function test_reload_ingests_new_key
+    log "[fish] Testing 'dse reload' ingests a key added to an already-loaded dir..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_reload_newkey"
+    mkdir -p "$test_dir/project"
+
+    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/project/.secenv"
+    chmod 644 "$test_dir/project/.secenv"
+
+    set config_dir "$TEMP_DIR/config_reload_newkey"
+    mkdir -p "$config_dir"
+    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir/project'
+        echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
+        dse reload
+        echo 'DB='\$DB_PASSWORD'|API='\$API_KEY
+    " 2>&1)
+
+    if string match -q "*DB=super-secret-password|API=mock-api-key-12345*" "$result"
+        pass "[fish] 'dse reload' ingests newly-added key"
+    else
+        fail "[fish] 'dse reload' did not ingest new key, got: $result"
+    end
+end
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -786,6 +997,16 @@ function main
     test_dse_up_multiple_ancestors
     test_dse_up_skips_already_loaded
     test_dse_up_no_ancestors
+
+    # FIX B: trailing-whitespace / CRLF parsing
+    test_parse_trailing_whitespace_secret
+    test_load_crlf_empty_name_resolves
+
+    # FIX A: reload / new-key detection
+    test_sync_new_key_always_trusted
+    test_sync_no_new_keys_noop
+    test_sync_new_key_unload_integrity
+    test_reload_ingests_new_key
 
     cleanup
 
