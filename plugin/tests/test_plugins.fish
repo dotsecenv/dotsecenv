@@ -113,7 +113,7 @@ APP_NAME="My Application"' >"$test_dir/.env"
     set mock_path (create_mock_dotsecenv)
 
     # Run fish with the plugin loaded
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -142,7 +142,7 @@ function test_parse_secret_same_name
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -171,7 +171,7 @@ function test_parse_secret_named
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -200,7 +200,7 @@ function test_missing_secret_warning
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -229,7 +229,7 @@ function test_security_check_world_writable
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -259,7 +259,7 @@ SECRET_VAR={dotsecenv/API_KEY}' >"$test_dir/.env"
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -276,13 +276,92 @@ SECRET_VAR={dotsecenv/API_KEY}' >"$test_dir/.env"
     end
 end
 
+function test_load_unload_message_split
+    log "[fish] Testing env var(s)/secret(s) messages split on load and unload..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_msg_split/project"
+    mkdir -p "$test_dir"
+    mkdir -p "$TEMP_DIR/test_msg_split/other"
+
+    echo 'APP_ENV=production
+NODE_ENV=staging
+DB_URL={dotsecenv/DB_PASSWORD}
+SVC_KEY={dotsecenv/API_KEY}' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    set config_dir "$TEMP_DIR/config_msg_split"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir'
+        cd '$TEMP_DIR/test_msg_split/other'
+    " 2>&1)
+
+    set -l ok 1
+    string match -q "*loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV*" "$result"; or set ok 0
+    string match -q "*loaded 2 secret(s) from .secenv: DB_URL, SVC_KEY*" "$result"; or set ok 0
+    string match -q "*unloaded 2 env var(s): APP_ENV, NODE_ENV*" "$result"; or set ok 0
+    string match -q "*unloaded 2 secret(s): DB_URL, SVC_KEY*" "$result"; or set ok 0
+
+    if test $ok -eq 1
+        pass "[fish] Plain vars and secrets reported on separate lines"
+    else
+        fail "[fish] Message split incorrect, got: $result"
+    end
+end
+
+function test_empty_secenv_no_message
+    log "[fish] Testing an empty .secenv produces no load message..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_empty_secenv"
+    mkdir -p "$test_dir"
+    printf '' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    set config_dir "$TEMP_DIR/config_empty_secenv"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir'
+        echo MARKER
+    " 2>&1)
+
+    set -l ok 1
+    string match -q "*MARKER*" "$result"; or set ok 0
+    string match -q "*loaded*" "$result"; and set ok 0
+    string match -q "*env var(s)*" "$result"; and set ok 0
+    string match -q "*secret(s)*" "$result"; and set ok 0
+
+    if test $ok -eq 1
+        pass "[fish] Empty .secenv produces no load message"
+    else
+        fail "[fish] Empty .secenv produced unexpected output, got: $result"
+    end
+end
+
 function test_alias_dse
     log "[fish] Testing 'dse' function..."
     set TESTS_RUN (math $TESTS_RUN + 1)
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         type dse
@@ -301,7 +380,7 @@ function test_alias_dse_get
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         dse get API_KEY
@@ -331,7 +410,7 @@ DATABASE_PORT=5432
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -362,7 +441,7 @@ UNQUOTED=helloworld' >"$test_dir/.env"
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -401,7 +480,7 @@ function test_tree_scope_persist_in_subdir
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -437,7 +516,7 @@ function test_tree_scope_unload_on_leave
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -477,7 +556,7 @@ function test_tree_scope_nested_secenv
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -513,7 +592,7 @@ function test_tree_scope_sibling_navigation
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -549,7 +628,7 @@ function test_tree_scope_no_reload_from_subdir
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -587,7 +666,7 @@ function test_multiline_warning
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish -c "
+    set result (fish --no-config -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -975,6 +1054,8 @@ function main
     test_missing_secret_warning
     test_security_check_world_writable
     test_two_phase_loading
+    test_load_unload_message_split
+    test_empty_secenv_no_message
     test_alias_dse
     test_alias_dse_get
     test_comments_and_empty_lines

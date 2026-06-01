@@ -468,6 +468,104 @@ EOF
     fi
 }
 
+test_load_unload_message_split() {
+    local shell="$1"
+    log "[$shell] Testing env var(s)/secret(s) messages split on load and unload..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_msg_split/project"
+    mkdir -p "$test_dir"
+    mkdir -p "$TEMP_DIR/test_msg_split/other"
+
+    # 2 plain vars + 2 secret references
+    cat >"$test_dir/.secenv" <<'EOF'
+APP_ENV=production
+NODE_ENV=staging
+DB_URL={dotsecenv/DB_PASSWORD}
+SVC_KEY={dotsecenv/API_KEY}
+EOF
+    chmod 644 "$test_dir/.secenv"
+
+    local config_dir="$TEMP_DIR/config_msg_split"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir'
+            _dotsecenv_chpwd_hook
+            cd '$TEMP_DIR/test_msg_split/other'
+            _dotsecenv_chpwd_hook
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir'
+            cd '$TEMP_DIR/test_msg_split/other'
+        " 2>&1)
+    fi
+
+    if [[ "$result" == *"loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV"* &&
+        "$result" == *"loaded 2 secret(s) from .secenv: DB_URL, SVC_KEY"* &&
+        "$result" == *"unloaded 2 env var(s): APP_ENV, NODE_ENV"* &&
+        "$result" == *"unloaded 2 secret(s): DB_URL, SVC_KEY"* ]]; then
+        pass "[$shell] Plain vars and secrets reported on separate lines"
+    else
+        fail "[$shell] Message split incorrect, got: $result"
+    fi
+}
+
+test_empty_secenv_no_message() {
+    local shell="$1"
+    log "[$shell] Testing an empty .secenv produces no load message..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_empty_secenv"
+    mkdir -p "$test_dir"
+    : >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    local config_dir="$TEMP_DIR/config_empty_secenv"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir'
+            _dotsecenv_chpwd_hook
+            echo MARKER
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir'
+            echo MARKER
+        " 2>&1)
+    fi
+
+    if [[ "$result" == *"MARKER"* && "$result" != *"loaded"* && "$result" != *"env var(s)"* && "$result" != *"secret(s)"* ]]; then
+        pass "[$shell] Empty .secenv produces no load message"
+    else
+        fail "[$shell] Empty .secenv produced unexpected output, got: $result"
+    fi
+}
+
 test_alias_dse() {
     local shell="$1"
     log "[$shell] Testing 'dse' alias..."
@@ -1757,6 +1855,8 @@ main() {
         test_missing_secret_warning "bash"
         test_security_check_world_writable "bash"
         test_two_phase_loading "bash"
+        test_load_unload_message_split "bash"
+        test_empty_secenv_no_message "bash"
         test_alias_dse "bash"
         test_alias_dse_get "bash"
         test_comments_and_empty_lines "bash"
@@ -1796,6 +1896,8 @@ main() {
             test_missing_secret_warning "zsh"
             test_security_check_world_writable "zsh"
             test_two_phase_loading "zsh"
+            test_load_unload_message_split "zsh"
+            test_empty_secenv_no_message "zsh"
             test_alias_dse "zsh"
             test_alias_dse_get "zsh"
             test_comments_and_empty_lines "zsh"
