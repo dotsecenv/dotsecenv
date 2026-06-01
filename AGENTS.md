@@ -229,7 +229,8 @@ What the script does NOT do — handle manually if needed:
   Write the description the way you want the commit body to read: Markdown
   headings and prose, not a bulleted list of commits. Leave attribution out of
   the description; GitHub adds the `Co-authored-by:` footer from the commit
-  trailers.
+  trailers. End the description with a `---` line so that footer is set off by
+  a separator.
 - **Branches:** `feat/*`, `fix/*`, `docs/*`, etc. (see `CONTRIBUTING.md`).
 - **PRs only:** All changes land on `main` through pull requests. Don't
   push commits directly to `main`, even when your account holds a bypass

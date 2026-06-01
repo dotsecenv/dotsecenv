@@ -40,3 +40,8 @@ so leave attribution out of the description. -->
 ## Screenshots
 
 <!-- If applicable, add screenshots to help explain your changes -->
+
+<!-- Keep the line below as the last line: it separates the Co-authored-by
+footer that GitHub appends to the squash commit. -->
+
+---
