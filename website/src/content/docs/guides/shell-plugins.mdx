@@ -5,127 +5,23 @@ description: Automatic secret loading with shell plugins for Bash, Zsh, and Fish
 
 import { Tabs, TabItem, Aside, Steps } from "@astrojs/starlight/components";
 
-The dotsecenv shell plugins automatically load secrets from `.secenv` files when you `cd` into a directory. When you leave, they unload automatically, keeping your environment clean.
+The dotsecenv shell plugin loads secrets from a `.secenv` file when you `cd` into a directory, and unloads them when you leave. Your secrets stay in environment variables for as long as you work in the project, and your environment goes back to clean when you walk away.
 
-## How It Works
+This guide builds one `.secenv` file step by step. Each section shows the exact lines you would have at that point, so you can follow along in your own project.
 
-1. On `cd` into a directory, the plugin checks for a `.secenv` file.
-2. It runs a security check: the file must be owned by you (or root) and not world-writable.
-3. You're prompted to allow loading (your choice can be remembered).
-4. Plain variables are loaded first, then secrets are fetched from your vault.
-5. Secrets are tree-scoped: they remain loaded in subdirectories and only unload when you leave the tree entirely.
+Here is the file we will end up with:
 
-```text
-~/project $ cd myapp/
-dotsecenv: found .secenv in /home/user/myapp
-Load secrets? [y]es / [n]o / [a]lways: y
-dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
-
-~/project/myapp $ cd src/         # Secrets persist in subdirectories
-~/project/myapp/src $ cd ../..    # Leave the tree
-dotsecenv: unloaded 2 secret(s): DATABASE_URL, API_KEY
+```bash title=".secenv"
+# Example .secenv for the dotsecenv shell plugin
+APP_ENV=production
+NODE_ENV=production
+DATABASE_URL={dotsecenv}
+PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL}
 ```
 
-<Aside type="tip" title="Security Benefit">
-  Using `.secenv` files keeps your secrets in environment variables (memory)
-  rather than written to disk in plaintext files. See [Protecting .secenv
-  Files](/concepts/threat-model/#protecting-secenv-files) in the Threat Model
-  for details.
-</Aside>
+## Install the plugin
 
-### Tree-Scoped Loading
-
-Secrets are **tree-scoped**, meaning they persist while you navigate within subdirectories:
-
-```text
-~/project $ cd myapp/
-dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
-
-~/project/myapp $ cd src/components/
-# Secrets still available - we're in the myapp tree
-
-~/project/myapp/src/components $ echo $DATABASE_URL
-postgres://...
-
-~/project/myapp/src/components $ cd ~/other-project/
-dotsecenv: unloaded 2 secret(s): DATABASE_URL, API_KEY
-# Secrets unloaded - we left the myapp tree
-```
-
-This behavior is ideal for common workflows where you navigate between source files while keeping your secrets loaded.
-
-### Two Ways to Load Secrets
-
-There are two workflows depending on how you reach your working directory:
-
-**Option 1: Navigate through the parent directory**
-
-If you `cd` into the directory containing `.secenv` first, secrets auto-load and persist as you navigate deeper:
-
-```text
-~ $ cd myapp/                # .secenv loads here
-dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
-
-~/myapp $ cd terraform/      # Secrets persist; still in the myapp tree
-~/myapp/terraform $ echo $DATABASE_URL
-postgres://...               # Available!
-```
-
-**Option 2: Jump directly to a subdirectory, then run `dse up`**
-
-If you open a terminal directly in a subdirectory (or jump there with `cd`), the parent's `.secenv` was never traversed, so secrets aren't loaded. Use `dse up` to walk up the directory tree and load ancestor `.secenv` files:
-
-```text
-~ $ cd myapp/terraform/      # Jumped directly; parent .secenv not loaded
-~/myapp/terraform $ echo $DATABASE_URL
-                              # Empty; secrets not loaded
-
-~/myapp/terraform $ dse up    # Walk up, find and load ancestor .secenv files
-dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
-
-~/myapp/terraform $ echo $DATABASE_URL
-postgres://...               # Now available!
-```
-
-<Aside type="tip">
-  `dse up` is especially useful for tmux panes, IDE terminal tabs, or any
-  situation where your shell starts in a subdirectory without first visiting
-  the parent.
-</Aside>
-
-### Nested .secenv Files
-
-If a subdirectory has its own `.secenv`, secrets **layer on top** of the parent:
-
-```text
-~/project $ cd myapp/
-dotsecenv: loaded 1 secret(s) from .secenv: DATABASE_URL
-
-~/project/myapp $ cd prod/
-dotsecenv: loaded 1 secret(s) from .secenv: API_KEY
-# Both DATABASE_URL (from parent) and API_KEY (from prod) are available
-
-~/project/myapp/prod $ cd ..
-dotsecenv: unloaded 1 secret(s): API_KEY
-# prod's API_KEY unloaded, parent's DATABASE_URL remains
-```
-
-If a child directory defines the same variable as the parent, the child's value takes precedence. When you leave the child, the parent's value is restored (re-fetched from the vault for security).
-
-### Re-entry Reloads Fresh
-
-When you return to a directory with `.secenv`, secrets are **reloaded fresh** from your vault:
-
-```text
-~/project/myapp $ cd ~/other-project/
-dotsecenv: unloaded 2 secret(s): DATABASE_URL, API_KEY
-
-~/other-project $ cd ~/project/myapp/
-dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
-# Fresh reload ensures you get the latest values
-```
-
-## Installation
+Pick your shell. Each method gives you the auto-load behavior and the `dse` command.
 
 <Tabs>
   <TabItem label="Zsh">
@@ -179,292 +75,315 @@ dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, API_KEY
   </TabItem>
 </Tabs>
 
-## The `dse` Command
+Open a new shell, then create a starter `.secenv` in your project. Start with one plain variable so you have something to load:
 
-The plugins provide the `dse` command with subcommands for common operations:
-
-| Command        | Description                                       |
-| -------------- | ------------------------------------------------- |
-| `dse`          | Shorthand for `dotsecenv` (pass-through)          |
-| `dse get NAME` | Shorthand for `dotsecenv secret get NAME`         |
-| `dse cp NAME`  | Copy a secret directly to clipboard               |
-| `dse reload`   | Reload secrets in the current directory            |
-| `dse up [DIR]` | Load ancestor `.secenv` files above current directory |
-
-### Pass-through to `dotsecenv`
-
-Use `dse` as a shorthand for the `dotsecenv` command:
-
-```bash
-# Instead of:
-dotsecenv vault describe
-
-# Use:
-dse vault describe
+```bash title="~/myapp/.secenv"
+APP_ENV=production
 ```
 
-### `dse get`: quick secret retrieval
-
-Retrieve a secret with minimal typing:
+To confirm the plugin is active, check that `dse` is a shell function:
 
 ```bash
-# Instead of:
-dotsecenv secret get DATABASE_PASSWORD
-
-# Use:
-dse get DATABASE_PASSWORD
+type dse   # should report a function, not "not found"
 ```
 
-### `dse cp`: copy to clipboard
+## First load and the trust prompt
 
-Copy a secret directly to your clipboard without displaying it:
+The plugin never loads a file you have not approved. The first time you `cd` into a directory with a `.secenv`, it asks.
 
-```bash
-dse cp API_KEY
-# Output: dotsecenv: secret copied to clipboard
+Add a second plain variable so the prompt has more to report:
+
+```bash title="~/myapp/.secenv"
+APP_ENV=production
+NODE_ENV=production
 ```
 
-<Aside type="tip">
-  This is safer than piping to `pbcopy` manually since the secret is never
-  displayed on screen or saved to shell history.
-</Aside>
-
-Clipboard support:
-
-- **macOS**: Uses `pbcopy` (built-in)
-- **Wayland**: Uses `wl-copy`
-- **X11**: Uses `xclip` or `xsel`
-
-### `dse reload`: reload current directory
-
-<Aside type="note" title="Available in v0.5.1+">
-  `dse reload` predates v0.5.1, but the "clear secret stack and re-fetch" semantics described below were introduced in v0.5.1. Older versions only re-ran the loader without clearing previously-loaded secrets.
-</Aside>
-
-Re-trigger secret loading for the current directory without leaving and re-entering:
-
-```bash
-dse reload
-```
-
-This is useful when:
-
-- You've added new secrets to your vault
-- You've modified the `.secenv` file
-- A secret fetch failed and you want to retry
-
-### `dse up`: load ancestor secrets
-
-<Aside type="note" title="Available in v0.5.0+">
-  Introduced in v0.5.0.
-</Aside>
-
-When you jump directly into a subdirectory, parent `.secenv` files aren't loaded because the plugin only auto-loads on `cd` into the exact directory containing the file. `dse up` fixes this by walking up the directory tree, finding all ancestor `.secenv` files, and loading them root-first:
-
-```bash
-dse up
-```
-
-The command:
-
-1. Walks up from the current directory to the **git root** (or filesystem root if not in a git repo)
-2. Collects all directories containing `.secenv` files
-3. Loads them **root-first** (topmost ancestor first), preserving correct layering
-4. Skips any ancestors whose secrets are already loaded
-
-You can specify a custom boundary directory to limit how far up the walk goes:
-
-```bash
-dse up /home/user/projects  # Stop walking at this directory
-```
-
-## Trust System
-
-The plugin uses a trust system to prevent malicious `.secenv` files from auto-loading secrets:
-
-### Trust Prompt Options
-
-When you `cd` into a directory with an untrusted `.secenv`:
+Now `cd` into the project:
 
 ```text
-dotsecenv: found .secenv in /path/to/project
-Load secrets? [y]es / [n]o / [a]lways:
+~ $ cd myapp/
+dotsecenv: found .secenv in /home/user/myapp
+Load secrets? [y]es / [n]o / [a]lways: y
+dotsecenv: loaded 2 secret(s) from .secenv: APP_ENV, NODE_ENV
 ```
+
+Your answer decides what happens:
 
 | Option             | Behavior                           |
 | ------------------ | ---------------------------------- |
-| **y** / **yes**    | Load secrets for this session only |
-| **n** / **no**     | Skip loading for this session      |
-| **a** / **always** | Permanently trust this directory   |
+| `y` / `yes`        | Load for this session only         |
+| `n` / `no`         | Skip loading for this session      |
+| `a` / `always`     | Remember this directory and stop asking |
 
-### Persistent Trust
-
-Directories trusted with "always" are saved to:
-
-```text
-~/.config/dotsecenv/trusted_dirs
-```
-
-To remove trust:
+Answering `a` records the directory in `~/.config/dotsecenv/trusted_dirs`. To stop trusting it, delete that line:
 
 ```bash
-# Edit the file and remove the directory path
-vim ~/.config/dotsecenv/trusted_dirs
+vim ~/.config/dotsecenv/trusted_dirs   # remove the directory's path
 ```
 
-## Security Checks
-
-Before loading any file, the plugin performs security checks:
-
-1. **Ownership**: File must be owned by you or root
-2. **Permissions**: File must not be world-writable
-
-If a file fails these checks:
+Before any load, the plugin checks the file. It must be owned by you or root, and it must not be world-writable. A file that fails is refused:
 
 ```text
-dotsecenv: refusing to load /path/.secenv - not owned by current user or root
-dotsecenv: refusing to load /path/.secenv - world-writable
+dotsecenv: refusing to load /home/user/myapp/.secenv - world-writable
 ```
 
-<Aside type="tip" title="Fixing Permissions">
+Fix the file and the next load goes through:
 
 ```bash
-# Fix ownership
-chown $(whoami) .secenv
-
-# Fix permissions (remove world-write)
-chmod o-w .secenv
+chown "$(whoami)" .secenv   # take ownership
+chmod o-w .secenv           # drop world-write
 ```
 
+<Aside type="tip" title="Why use .secenv at all">
+  Secrets loaded this way live in environment variables in memory, not in a plaintext file on disk. See [Protecting .secenv Files](/concepts/threat-model/#protecting-secenv-files) in the Threat Model.
 </Aside>
 
-## File Format
+## Plain values and secret references
 
-The `.secenv` file uses a simple `KEY=value` format with the `{dotsecenv}` syntax for loading secrets:
+A `.secenv` line is either a plain value or a reference to your vault. Plain values are written verbatim. References use the `{dotsecenv}` syntax, and the plugin fetches them from your vault at load time.
 
-```bash
-# Load secret with matching name
-DATABASE_PASSWORD={dotsecenv}
+Add a secret reference for the database URL:
 
-# Load secret with different name
-DB_PASS={dotsecenv/DATABASE_PASSWORD}
-
-# Plain values work too
+```bash title="~/myapp/.secenv"
+APP_ENV=production
 NODE_ENV=production
-
-# Load from a namespace
-API_KEY={dotsecenv/production::API_KEY}
+DATABASE_URL={dotsecenv}
 ```
 
-See [Your First Secret](/tutorials/first-secret/) for more details on file syntax.
+`DATABASE_URL={dotsecenv}` means "load the vault secret named `DATABASE_URL` into the variable `DATABASE_URL`." The name on the left and the name in the vault match, so you can leave the braces empty.
 
-### Generating a `.secenv`
+Reload the directory to pick up the new line:
 
-Instead of writing these lines by hand, `dotsecenv init secenv` builds them from your vaults. In a terminal it opens a picker (one tab per vault, `space` to select); with `--all` it adds every reference at once. It writes references only, never values, and skips keys already in the file. See [`init secenv`](/reference/#init-secenv) in the CLI reference.
+```text
+~/myapp $ cd .                # or: dse reload
+dotsecenv: loaded 3 secret(s) from .secenv: APP_ENV, NODE_ENV, DATABASE_URL
+
+~/myapp $ echo $DATABASE_URL
+postgres://...
+```
+
+To pull a vault secret into a variable with a different name, put the vault name in the braces:
 
 ```bash
-cd ~/my-project
-dotsecenv init secenv          # pick interactively
-dotsecenv init secenv --all    # add everything from your vaults
+DB_PASS={dotsecenv/DATABASE_PASSWORD}   # vault key DATABASE_PASSWORD -> $DB_PASS
 ```
 
-### `.env` vs `.secenv`
+## Namespaced references
 
-The dotsecenv plugin **only** handles `.secenv` files. This is intentional. We don't reinvent the wheel.
+A namespace selects a specific vault when a secret name exists in more than one. Write the namespace before the key with `::`.
 
-Tools like [direnv](https://direnv.net/), [autoenv](https://github.com/hyperupcall/autoenv), and [zsh-autoenv](https://github.com/Tarrasch/zsh-autoenv) have been managing `.env` files for years. They're mature, battle-tested, and do their job well. There's no reason for dotsecenv to duplicate that functionality or force you to learn subtle differences in behavior.
+Add a reference that reads the `DATABASE_URL` secret from the `prod` vault into a separate variable:
 
-**Use them together:**
-
-| File      | Tool                  | Purpose                     |
-| --------- | --------------------- | --------------------------- |
-| `.env`    | direnv, autoenv, etc. | Non-sensitive configuration |
-| `.secenv` | dotsecenv             | Secrets from your vault     |
-
-<Aside type="tip" title="Recommended setup">
-Install both [direnv](https://direnv.net/) and dotsecenv. Let each tool do what it does best:
-
-```bash
-# .env: handled by direnv
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-LOG_LEVEL=debug
-
-# .secenv: handled by dotsecenv
-DATABASE_PASSWORD={dotsecenv}
-API_KEY={dotsecenv/production::API_KEY}
+```bash title="~/myapp/.secenv"
+APP_ENV=production
+NODE_ENV=production
+DATABASE_URL={dotsecenv}
+PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL}
 ```
 
-This separation keeps your non-sensitive config in `.env` (version-controlled, no prompts) and your actual secrets in `.secenv` (vault-backed, trust-prompted).
+`{dotsecenv/prod::DATABASE_URL}` reads the `DATABASE_URL` key from the `prod` namespace and loads it into `PROD_DB_PASSWORD`. Now `DATABASE_URL` and `PROD_DB_PASSWORD` can hold different values from different vaults.
 
+```text
+~/myapp $ dse reload
+dotsecenv: loaded 4 secret(s) from .secenv: APP_ENV, NODE_ENV, DATABASE_URL, PROD_DB_PASSWORD
+```
+
+## Tree-scoped loading
+
+Secrets are tree-scoped. Once loaded, they stay loaded while you work in subdirectories, and unload only when you leave the project tree.
+
+This is the full example file from here on:
+
+```bash title="~/myapp/.secenv"
+APP_ENV=production
+NODE_ENV=production
+DATABASE_URL={dotsecenv}
+PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL}
+```
+
+Navigate down into the project and the secrets follow you. Step out of the tree and they unload:
+
+```text
+~ $ cd myapp/
+dotsecenv: loaded 4 secret(s) from .secenv: APP_ENV, NODE_ENV, DATABASE_URL, PROD_DB_PASSWORD
+
+~/myapp $ cd src/components/
+~/myapp/src/components $ echo $DATABASE_URL
+postgres://...                 # still loaded; same tree
+
+~/myapp/src/components $ cd ~/other-project/
+dotsecenv: unloaded 4 secret(s): APP_ENV, NODE_ENV, DATABASE_URL, PROD_DB_PASSWORD
+```
+
+Auto-loading happens when you `cd` through the directory that holds the `.secenv`. If your shell starts straight inside a subdirectory, for example a tmux pane or an editor terminal, the parent file was never crossed, so nothing loaded. Run `dse up` to walk up the tree and load ancestor files:
+
+```text
+~ $ cd myapp/src/components/    # opened directly here; parent .secenv not crossed
+~/myapp/src/components $ echo $DATABASE_URL
+                               # empty
+
+~/myapp/src/components $ dse up
+dotsecenv: loaded 4 secret(s) from .secenv: APP_ENV, NODE_ENV, DATABASE_URL, PROD_DB_PASSWORD
+
+~/myapp/src/components $ echo $DATABASE_URL
+postgres://...
+```
+
+A subdirectory can have its own `.secenv`. Its variables layer on top of the parent's. Suppose `prod/` adds one secret:
+
+```bash title="~/myapp/prod/.secenv"
+API_KEY={dotsecenv/prod::API_KEY}
+```
+
+Entering `prod/` adds `API_KEY` to what the parent already loaded. Leaving `prod/` unloads only `API_KEY`:
+
+```text
+~/myapp $ cd prod/
+dotsecenv: loaded 1 secret(s) from .secenv: API_KEY
+# parent's 4 plus prod's API_KEY are all available here
+
+~/myapp/prod $ cd ..
+dotsecenv: unloaded 1 secret(s): API_KEY
+# API_KEY gone; the parent's 4 remain
+```
+
+When a child sets a variable that the parent already set, the child wins while you are inside it. On the way out, the parent's value is fetched again from the vault and restored.
+
+<Aside type="tip">
+  Returning to a directory reloads its secrets fresh from the vault, so you always get current values after a rotation, without leaving and re-entering by hand.
 </Aside>
 
-## Loading Order
+## Reference syntax
 
-When loading a `.secenv` file:
+The forms you can write on the right side of a `.secenv` line:
 
-<Steps>
-  1. **Phase 1**: Load plain variables (any `KEY=value` without `{dotsecenv}`)
-  2. **Phase 2**: Fetch and load secrets (any `KEY={dotsecenv}` or `KEY=
-  {dotsecenv / name}`)
-</Steps>
+| Reference                          | Loads                                              |
+| ---------------------------------- | -------------------------------------------------- |
+| `KEY=value`                        | Plain value, written as-is                         |
+| `KEY={dotsecenv}`                  | Vault secret named `KEY` into `$KEY`               |
+| `KEY={dotsecenv/OTHER}`            | Vault secret named `OTHER` into `$KEY`             |
+| `KEY={dotsecenv/ns::OTHER}`        | Secret `OTHER` from namespace `ns` into `$KEY`     |
 
-This ensures plain variables are available immediately, while secrets are fetched from your vault.
+Mapped onto the running example:
+
+```bash title="~/myapp/.secenv"
+APP_ENV=production                              # plain value
+NODE_ENV=production                             # plain value
+DATABASE_URL={dotsecenv}                        # vault key DATABASE_URL
+PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL} # prod namespace, key DATABASE_URL
+```
+
+Loading runs in two phases. Plain values load first so they are available right away, then references are fetched from the vault. With the file above, `APP_ENV` and `NODE_ENV` are set before `DATABASE_URL` and `PROD_DB_PASSWORD` are fetched.
+
+You do not have to type these lines by hand. `dotsecenv init secenv` builds them from your vaults, writing references only and never values, and skips keys already present. In a terminal it opens a picker, one tab per vault, `space` to select. With `--all` it adds every reference at once. See [`init secenv`](/reference/#init-secenv) in the CLI reference.
+
+```bash
+cd ~/myapp
+dotsecenv init secenv          # pick interactively
+dotsecenv init secenv --all    # add every vault reference
+```
+
+<Aside type="tip" title="Keep .env and .secenv separate">
+  The plugin handles `.secenv` only. Put non-sensitive config in `.env` and let [direnv](https://direnv.net/) or [autoenv](https://github.com/hyperupcall/autoenv) load it; keep vault-backed secrets in `.secenv`. Run both together.
+
+  ```bash
+  # .env: handled by direnv
+  DATABASE_HOST=localhost
+  DATABASE_PORT=5432
+
+  # .secenv: handled by dotsecenv
+  DATABASE_URL={dotsecenv}
+  PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL}
+  ```
+</Aside>
+
+## The dse command
+
+The plugin adds `dse`, a short front end for everyday work against the same `.secenv`.
+
+```bash title="~/myapp/.secenv"
+APP_ENV=production
+NODE_ENV=production
+DATABASE_URL={dotsecenv}
+PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL}
+```
+
+| Command          | What it does                                          |
+| ---------------- | ----------------------------------------------------- |
+| `dse`            | Pass-through to `dotsecenv`                            |
+| `dse get NAME`   | Short form of `dotsecenv secret get NAME`             |
+| `dse cp NAME`    | Copy a secret straight to the clipboard               |
+| `dse reload`     | Reload the current directory's secrets                |
+| `dse up [DIR]`   | Load ancestor `.secenv` files above the current one   |
+
+`dse` on its own forwards to `dotsecenv`:
+
+```bash
+dse vault describe       # same as: dotsecenv vault describe
+```
+
+`dse get` reads one secret. For a value referenced by the example file:
+
+```bash
+dse get DATABASE_URL     # same as: dotsecenv secret get DATABASE_URL
+```
+
+`dse cp` copies a secret to the clipboard without printing it, so it never lands on screen or in shell history:
+
+```bash
+dse cp PROD_DB_PASSWORD
+# dotsecenv: secret copied to clipboard
+```
+
+Clipboard backends: `pbcopy` on macOS, `wl-copy` on Wayland, `xclip` or `xsel` on X11.
+
+`dse reload` re-runs the loader for the current directory. Use it after you edit the `.secenv`, after you change a secret in the vault, or to retry a fetch that failed:
+
+```text
+~/myapp $ dse reload
+dotsecenv: loaded 4 secret(s) from .secenv: APP_ENV, NODE_ENV, DATABASE_URL, PROD_DB_PASSWORD
+```
+
+<Aside type="note" title="dse reload semantics (v0.5.1+)">
+  Since v0.5.1, `dse reload` clears the current secret stack and re-fetches. Earlier versions re-ran the loader without clearing what was already loaded.
+</Aside>
+
+`dse up` walks from the current directory toward the git root (or the filesystem root if you are not in a repo), collects every ancestor that holds a `.secenv`, and loads them root-first so layering stays correct. Ancestors already loaded are skipped. Pass a directory to stop the walk early:
+
+```bash
+dse up                   # walk to the git root
+dse up /home/user        # stop the walk at this directory
+```
+
+`dse up` was introduced in v0.5.0.
 
 ## Troubleshooting
 
-### Secrets not loading on `cd`
+Secrets did not load when you entered the directory:
 
-1. Check the plugin is loaded:
+<Steps>
+1. Confirm the plugin is active with `type dse`. It should report a function.
+2. Check the file with `ls -la .secenv`. Confirm you own it and it is not world-writable.
+3. Run `dse reload` to load it by hand.
+</Steps>
 
-   ```bash
-   type dse  # Should show it's a function
-   ```
-
-2. Verify `.secenv` exists and has correct permissions:
-
-   ```bash
-   ls -la .secenv
-   ```
-
-3. Try manual reload:
-
-   ```bash
-   dse reload
-   ```
-
-### "No TTY for trust prompt"
-
-The trust prompt requires an interactive terminal. This happens when:
-
-- Running in a script
-- Running in a non-interactive shell
-
-Solution: Pre-trust the directory:
+The prompt never appears and you see `No TTY for trust prompt`. The trust prompt needs an interactive terminal, so scripts and non-interactive shells cannot answer it. Pre-trust the directory instead:
 
 ```bash
-echo "/path/to/project" >> ~/.config/dotsecenv/trusted_dirs
+echo "/home/user/myapp" >> ~/.config/dotsecenv/trusted_dirs
 ```
 
-### Secret fetch errors
-
-If a secret fails to fetch, you'll see:
+A reference failed to resolve:
 
 ```text
-dotsecenv: error fetching secret 'SECRET_NAME' for VAR:
+dotsecenv: error fetching secret 'DATABASE_URL' for DATABASE_URL:
 <error details>
 ```
 
-Common causes:
+Common causes: the secret is not in the vault, the GPG agent is not running, or the vault is locked. Confirm the secret exists with `dse get DATABASE_URL`, then `dse reload`.
 
-- Secret doesn't exist in vault
-- GPG agent not running
-- Vault locked
+## Next steps
 
----
-
-## Next Steps
-
-- [Your First Secret](/tutorials/first-secret/): learn `.secenv` file syntax
-- [CLI Reference](/reference/): full command documentation
-- [Threat Model](/concepts/threat-model/): understand the trust model
+- [Your First Secret](/tutorials/first-secret/): the `.secenv` file syntax in detail
+- [CLI Reference](/reference/): every command
+- [Threat Model](/concepts/threat-model/): the trust model behind the plugin
