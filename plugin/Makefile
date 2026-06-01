@@ -30,7 +30,11 @@ test-zsh:
 .PHONY: test-fish
 test-fish:
 	@echo "Running fish shell plugin tests..."
-	@./tests/test_plugins.sh --fish-only
+	@if command -v fish >/dev/null 2>&1; then \
+		fish ./tests/test_plugins.fish; \
+	else \
+		echo "fish not found, skipping fish tests"; \
+	fi
 
 .PHONY: test
 test: test-plugins test-managers test-managers-remote
