@@ -17,11 +17,22 @@ permissions: {}
 
 jobs:
   shell-tests:
-    name: Shell tests (${{ matrix.os }})
+    name: Shell tests (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          # Ubuntu covers both fish majors via the fish-shell PPAs. macOS
+          # (Homebrew) only ships the current major, so it tracks fish 4.x.
+          - os: ubuntu-latest
+            label: ubuntu / fish 3.x
+            fish_ppa: ppa:fish-shell/release-3
+          - os: ubuntu-latest
+            label: ubuntu / fish 4.x
+            fish_ppa: ppa:fish-shell/release-4
+          - os: macos-latest
+            label: macos / fish 4.x
     permissions:
       contents: read
     defaults:
@@ -38,13 +49,16 @@ jobs:
       - name: Install fish (Ubuntu)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-add-repository ppa:fish-shell/release-3 -y
+          sudo apt-add-repository ${{ matrix.fish_ppa }} -y
           sudo apt-get update
           sudo apt-get install -y fish
+          fish --version
 
       - name: Install fish (macOS)
         if: runner.os == 'macOS'
-        run: brew install fish
+        run: |
+          brew install fish
+          fish --version
 
       - name: Install bash 5 (macOS)
         if: runner.os == 'macOS'
