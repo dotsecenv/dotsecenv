@@ -55,6 +55,25 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 		return resolveErr
 	}
 
+	// The vault must already exist before storing a secret. 'identity add' may
+	// lazily create or populate a vault, but 'secret store' must not. Fail early
+	// when the target vault did not load (its file is missing) so the misleading
+	// identity auto-add warnings never print.
+	targetAvailable := false
+	for _, v := range c.vaultResolver.GetAvailableVaultPathsWithIndices() {
+		if v.Index == targetIndex {
+			targetAvailable = true
+			break
+		}
+	}
+	if !targetAvailable {
+		requested := fromIndex
+		if requested <= 0 {
+			requested = targetIndex + 1
+		}
+		return NewError(fmt.Sprintf("vault %d does not exist; run 'dotsecenv init vault -v %d' first", requested, requested), ExitVaultError)
+	}
+
 	if ensureErr := c.ensureIdentityInVault(fp, targetIndex); ensureErr != nil {
 		return ensureErr
 	}
