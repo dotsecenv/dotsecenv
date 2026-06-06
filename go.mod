@@ -1,6 +1,6 @@
 module github.com/dotsecenv/dotsecenv
 
-go 1.26.2
+go 1.26.4
 
 require (
 	charm.land/bubbletea/v2 v2.0.7

@@ -11,6 +11,6 @@
 #         and .github/workflows/deploy-website.yml
 
 [tools]
-go = "1.26"
+go = "1.26.4"
 node = "25"
 pnpm = "11"
