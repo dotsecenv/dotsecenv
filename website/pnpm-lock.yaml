@@ -44,7 +44,7 @@ importers:
         version: 10.4.1
       eslint-plugin-mdx:
         specifier: ^3.6.2
-        version: 3.7.1(eslint@10.4.1)
+        version: 3.8.1(eslint@10.4.1)
       markdownlint-cli:
         specifier: ^0.48.0
         version: 0.48.0
@@ -1286,8 +1286,8 @@ packages:
     resolution: {integrity: sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==}
     engines: {node: '>=12'}
 
-  eslint-mdx@3.7.1:
-    resolution: {integrity: sha512-EBPfh1p4hHPX2o3Rd4UfpkfKrb+Bb/DkH0fZaR5XPug2G7gig43+d7Z2IWb+nqxjMlkD8qhjYLstb3NwNdhyyg==}
+  eslint-mdx@3.8.1:
+    resolution: {integrity: sha512-hnsqWwMOHqUANwxWEGt8XbwABPEr5sTOolAzqyUDFdlERpqjFE/icylb+mJl60VICL+kLbbvXWbnFLWZdTqJ2g==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       eslint: '>=8.0.0'
@@ -1296,8 +1296,8 @@ packages:
       remark-lint-file-extension:
         optional: true
 
-  eslint-plugin-mdx@3.7.1:
-    resolution: {integrity: sha512-G7Wqce+roWW35pQ/160UJiZdEWEyeR9LLaujDRnSV0O8SLHU6yHrK8C8kJLNtcBuU/AFd54zheefqZOyUr1aiA==}
+  eslint-plugin-mdx@3.8.1:
+    resolution: {integrity: sha512-4OLgotfBxUDc1f6ihXSagT/1+JCCUABA/2r6Kzl6gqFftg4dCV0wBfdwFo6X6UO/FzTHr3g6mVt+6prRXffc/Q==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       eslint: '>=8.0.0'
@@ -1309,10 +1309,6 @@ packages:
   eslint-visitor-keys@3.4.3:
     resolution: {integrity: sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
-
-  eslint-visitor-keys@4.2.1:
-    resolution: {integrity: sha512-Uhdk5sfqcee/9H/rCOJikYz67o0a2Tw2hGRPOG2Y1R2dg7brRe1uG0yaNQDHu+TO/uQPF/5eCapvYSmHUjt7JQ==}
-    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
   eslint-visitor-keys@5.0.1:
     resolution: {integrity: sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA==}
@@ -1327,10 +1323,6 @@ packages:
     peerDependenciesMeta:
       jiti:
         optional: true
-
-  espree@10.4.0:
-    resolution: {integrity: sha512-j6PAQ2uUr79PZhBjP5C5fhl8e39FmRnOjsD5lGnWrFU8i2G776tBK7+nP8KuQUTTyAZUwfQqXAgrVH5MbH9CYQ==}
-    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
   espree@11.2.0:
     resolution: {integrity: sha512-7p3DrVEIopW1B1avAGLuCSh1jubc01H2JHc8B4qqGblmg5gI9yumBgACjWo4JlIc04ufug4xJ3SQI8HkS/Rgzw==}
@@ -4070,12 +4062,12 @@ snapshots:
 
   escape-string-regexp@5.0.0: {}
 
-  eslint-mdx@3.7.1(eslint@10.4.1):
+  eslint-mdx@3.8.1(eslint@10.4.1):
     dependencies:
       acorn: 8.16.0
       acorn-jsx: 5.3.2(acorn@8.16.0)
       eslint: 10.4.1
-      espree: 10.4.0
+      espree: 11.2.0
       estree-util-visit: 2.0.0
       remark-mdx: 3.1.1
       remark-parse: 11.0.0
@@ -4089,10 +4081,10 @@ snapshots:
       - bluebird
       - supports-color
 
-  eslint-plugin-mdx@3.7.1(eslint@10.4.1):
+  eslint-plugin-mdx@3.8.1(eslint@10.4.1):
     dependencies:
       eslint: 10.4.1
-      eslint-mdx: 3.7.1(eslint@10.4.1)
+      eslint-mdx: 3.8.1(eslint@10.4.1)
       mdast-util-from-markdown: 2.0.3
       mdast-util-mdx: 3.0.0
       micromark-extension-mdxjs: 3.0.0
@@ -4115,8 +4107,6 @@ snapshots:
       estraverse: 5.3.0
 
   eslint-visitor-keys@3.4.3: {}
-
-  eslint-visitor-keys@4.2.1: {}
 
   eslint-visitor-keys@5.0.1: {}
 
@@ -4154,12 +4144,6 @@ snapshots:
       optionator: 0.9.4
     transitivePeerDependencies:
       - supports-color
-
-  espree@10.4.0:
-    dependencies:
-      acorn: 8.16.0
-      acorn-jsx: 5.3.2(acorn@8.16.0)
-      eslint-visitor-keys: 4.2.1
 
   espree@11.2.0:
     dependencies:
