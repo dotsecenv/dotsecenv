@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../.. && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd)"
 CL="$ROOT/website/src/content/docs/changelog.mdx"
 
 command -v git >/dev/null 2>&1 || { echo "error: git not found on PATH" >&2; exit 2; }
@@ -44,7 +44,7 @@ done < <(git -C "$ROOT" log "${LAST}..HEAD" --pretty='%s')
 echo
 if [ "$missing" -ne 0 ]; then
   echo "RESULT: ${missing} commit(s) since ${LAST} are not in 'Upcoming'." >&2
-  echo "Add an entry for each (see skills/changelog/SKILL.md) before releasing." >&2
+  echo "Add an entry for each (see .claude/skills/changelog/SKILL.md) before releasing." >&2
   exit 1
 fi
 echo "RESULT: 'Upcoming' covers every commit since ${LAST}."

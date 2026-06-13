@@ -54,7 +54,7 @@ List merged PRs since the last release tag that are not yet under "Next
 release":
 
 ```bash
-bash skills/changelog/assess.sh
+bash .claude/skills/changelog/assess.sh
 ```
 
 It exits non-zero when commits since the last tag are missing. Add the missing
@@ -65,7 +65,7 @@ GitHub adds to squash-merge subjects.)
 
 In the PR that cuts `vX.Y.Z`:
 
-1. Run `bash skills/changelog/assess.sh` and add any missing entries.
+1. Run `bash .claude/skills/changelog/assess.sh` and add any missing entries.
 2. Rename the header `## Upcoming` -> `## vX.Y.Z`, and replace
    `_Unreleased_` with `_<Month Day, Year>_` (today's date).
 3. Remove any subsection that ended up with no entries.
