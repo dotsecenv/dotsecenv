@@ -31,7 +31,7 @@ LDFLAGS := -X main.version=$$(git describe --tags --always --dirty) -X main.comm
 
 .PHONY: clean
 clean:
-	@rm -rf bin/ build/ dist/ docs/ man/ completions/
+	@rm -rf bin/ build/ dist/
 	echo "Reinitializing dotsecenv vault..."
 	go clean -testcache
 	
@@ -197,21 +197,21 @@ update:
 .PHONY: completions
 completions: build
 	@echo "Generating shell completions..."
-	@mkdir -p completions
-	@bin/dotsecenv completion bash > completions/dotsecenv.bash
-	@bin/dotsecenv completion zsh > completions/dotsecenv.zsh
-	@bin/dotsecenv completion fish > completions/dotsecenv.fish
-	@bin/dotsecenv completion powershell > completions/dotsecenv.ps1
+	@mkdir -p build/completions
+	@bin/dotsecenv completion bash > build/completions/dotsecenv.bash
+	@bin/dotsecenv completion zsh > build/completions/dotsecenv.zsh
+	@bin/dotsecenv completion fish > build/completions/dotsecenv.fish
+	@bin/dotsecenv completion powershell > build/completions/dotsecenv.ps1
 
 .PHONY: docs
 docs:
 	@echo "Generating markdown documentation..."
-	@go run -tags gendocs ./cmd/dotsecenv markdown -o docs/cli
+	@go run -tags gendocs ./cmd/dotsecenv markdown -o build/cli
 
 .PHONY: man
 man:
 	@echo "Generating man pages..."
-	@go run -tags gendocs ./cmd/dotsecenv -o man/man1
+	@go run -tags gendocs ./cmd/dotsecenv -o build/man/man1
 
 .PHONY: plugin
 plugin:
