@@ -1,0 +1,214 @@
+---
+title: Org-wide Keypair in CI
+description: Share one CI decryption keypair across many repositories with a GitHub organization secret and a repo-access policy.
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="Runnable example">
+A complete bootstrap walkthrough plus the matching `.github/workflows/deploy.yml` ships at [`examples/07-org-wide-keypair/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/07-org-wide-keypair) on the CLI repo.
+</Aside>
+
+## Goal
+
+Run one CI decryption keypair across every repository in a GitHub organization. The private key lives in a single organization secret, `ORG_GPG_PRIVATE_KEY`, scoped to the repos that need it. Each repo's workflow imports the same key, logs in by its fingerprint, and decrypts that repo's committed vault.
+
+This is the org-wide alternative to the repo-scoped pattern in [CI/CD Secrets](/tutorials/ci-cd-secrets/), where every repository carries its own `GPG_PRIVATE_KEY` repository secret. Read [Key Scope](/concepts/key-scope/) to decide which model fits before you commit to one.
+
+## Prerequisites
+
+- [Getting Started](/getting-started/) completed
+- Owner or admin access to the GitHub organization (organization secrets need it)
+- A developer machine with `gpg` and `dotsecenv` installed
+
+## Steps
+
+<Steps>
+
+1. **Generate one CI key for the whole org**
+
+   Create a single no-passphrase identity. GitHub Actions cannot answer a pinentry prompt, so the CI key carries no passphrase.
+
+   ```bash
+   dotsecenv identity create \
+     --algo RSA4096 \
+     --name "CI (acme-org)" \
+     --email "ci@acme.example" \
+     --no-passphrase
+   ```
+
+   Capture its fingerprint. Every repo's workflow logs in with this exact value.
+
+   ```bash
+   ORG_FP=$(gpg --list-secret-keys --with-colons "ci@acme.example" \
+     | awk -F: '/^fpr:/ { print $10; exit }')
+   echo "$ORG_FP"
+   ```
+
+2. **Export the private key ASCII-armored**
+
+   ```bash
+   gpg --armor --export-secret-keys "$ORG_FP" > /tmp/org-ci.asc
+   ```
+
+   The output is the `-----BEGIN PGP PRIVATE KEY BLOCK-----` text imported as-is in CI. Do not base64-encode it.
+
+3. **Store it as an organization secret**
+
+   <Tabs>
+   <TabItem label="gh CLI">
+
+   Scope the secret to selected repositories so it never reaches repos that don't need it.
+
+   ```bash
+   gh secret set ORG_GPG_PRIVATE_KEY \
+     --org acme-org \
+     --visibility selected \
+     --repos app-api,app-web,jobs-runner \
+     < /tmp/org-ci.asc
+   ```
+
+   </TabItem>
+   <TabItem label="Web UI">
+
+   Go to the organization: **Settings > Secrets and variables > Actions > New organization secret**.
+
+   - Name: `ORG_GPG_PRIVATE_KEY`
+   - Value: paste the contents of `/tmp/org-ci.asc`
+   - Repository access: **Selected repositories**, then pick the repos that decrypt the vault
+
+   </TabItem>
+   </Tabs>
+
+   Wipe the export from disk once it is stored:
+
+   ```bash
+   shred -u /tmp/org-ci.asc
+   ```
+
+   <Aside type="caution" title="Blast radius">
+   One org key is one key to compromise. Anyone who can read `ORG_GPG_PRIVATE_KEY` can decrypt every secret that key is a recipient of, across every repo it touches. Keep the repository-access list as small as the set of repos that genuinely share the key, and rotate on any suspected exposure. [Key Scope](/concepts/key-scope/) walks through the trade-off against per-repo keys.
+   </Aside>
+
+4. **Share each repo's secrets to the org CI fingerprint**
+
+   The org key only decrypts what it is a recipient of. In every repo whose vault CI must read, grant the org fingerprint from a developer machine that already holds the secrets:
+
+   ```bash
+   dotsecenv secret share DATABASE_URL "$ORG_FP"
+   dotsecenv secret share DEPLOY_TOKEN "$ORG_FP"
+   ```
+
+   Commit the updated vault:
+
+   ```bash
+   git add .dotsecenv/vault
+   git commit -m "ci: grant org CI identity access to deploy secrets"
+   git push
+   ```
+
+   Repeat per repository. The fingerprint is the same everywhere; only the vault contents differ.
+
+5. **Reference the same import, login, and decrypt steps in each repo**
+
+   The workflow is identical to the repo-scoped pattern except the secret name. Save this at `.github/workflows/deploy.yml` in each repo:
+
+   ```yaml
+   name: deploy
+
+   on:
+     push:
+       branches: [main]
+     workflow_dispatch: {}
+
+   permissions:
+     contents: read
+
+   jobs:
+     deploy:
+       runs-on: ubuntu-latest
+       env:
+         GNUPGHOME: ${{ runner.temp }}/gnupg
+       steps:
+         - name: Checkout repository
+           uses: actions/checkout@v4
+
+         - name: Install dotsecenv
+           uses: dotsecenv/dotsecenv@v0
+           with:
+             version: latest
+             verify-provenance: true
+
+         - name: Import GPG private key
+           env:
+             ORG_GPG_PRIVATE_KEY: ${{ secrets.ORG_GPG_PRIVATE_KEY }}
+           run: |
+             mkdir -p "$GNUPGHOME"
+             chmod 700 "$GNUPGHOME"
+             echo "$ORG_GPG_PRIVATE_KEY" | gpg --batch --import
+             FP=$(gpg --list-secret-keys --with-colons \
+               | awk -F: '/^fpr:/ { print $10; exit }')
+             echo "DOTSECENV_FP=$FP" >> "$GITHUB_ENV"
+
+         - name: Initialise dotsecenv
+           run: |
+             dotsecenv init config -v .dotsecenv/vault
+             dotsecenv login "$DOTSECENV_FP"
+
+         - name: Decrypt secrets
+           run: |
+             set -euo pipefail
+             for SECRET in DATABASE_URL DEPLOY_TOKEN; do
+               VALUE=$(dotsecenv secret get "$SECRET")
+               echo "::add-mask::$VALUE"
+               {
+                 echo "$SECRET<<__DOTSECENV_EOF__"
+                 echo "$VALUE"
+                 echo "__DOTSECENV_EOF__"
+               } >> "$GITHUB_ENV"
+             done
+
+         - name: Run deploy
+           run: |
+             echo "DATABASE_URL is set: ${DATABASE_URL:+yes}"
+             echo "DEPLOY_TOKEN is set: ${DEPLOY_TOKEN:+yes}"
+             # ./scripts/deploy.sh
+   ```
+
+   `secrets.ORG_GPG_PRIVATE_KEY` resolves to the organization secret in every repo on the access list. No per-repo secret setup is needed.
+
+</Steps>
+
+## Expected result
+
+Each repo's run logs the install, the import, a login against the org fingerprint, and masked `***` for every decrypted value:
+
+```text
+Run dotsecenv login <fingerprint>
+... Login successful! ...
+DATABASE_URL is set: yes
+DEPLOY_TOKEN is set: yes
+```
+
+Adding a repo to the key is two moves: add it to the secret's repository-access list, then `secret share` that repo's secrets to `$ORG_FP` and commit.
+
+## Org-wide vs repo-scoped
+
+| | Org-wide (`ORG_GPG_PRIVATE_KEY`) | Repo-scoped (`GPG_PRIVATE_KEY`) |
+|---|---|---|
+| Where the key lives | One organization secret | One repository secret per repo |
+| Adding a repo | Add to access list, share + commit | Generate key, set repo secret, share + commit |
+| Rotation | Rotate one key, re-share in every repo | Rotate per repo independently |
+| Blast radius | Every repo on the access list | One repo |
+
+Pick per-repo keys when repos must stay isolated from each other. Pick one org key when a fleet of repos shares the same CI identity and you want a single place to rotate. See [Key Scope](/concepts/key-scope/) for the full reasoning.
+
+## Per-environment keys
+
+To gate production behind a separate key, suffix the secret name and use one org secret per environment: `ORG_GPG_PRIVATE_KEY_PROD`, `ORG_GPG_PRIVATE_KEY_STAGING`. Reference the matching name in each environment's job and store the production key behind a GitHub deployment-environment approval gate.
+
+## Next steps
+
+- [CI/CD Secrets](/tutorials/ci-cd-secrets/) -- the repo-scoped alternative with one key per repository
+- [Key Scope](/concepts/key-scope/) -- choosing between org-wide and repo-scoped keys
+- [GitHub Action](/guides/github-action/) -- full reference for the `dotsecenv/dotsecenv` action

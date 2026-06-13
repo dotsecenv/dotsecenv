@@ -1,93 +1,75 @@
 ---
 title: Revoke Access
-description: Remove access to a secret and understand revocation caveats
+description: Remove an identity from a secret and understand revocation limits
 ---
 
 import { Steps, Aside } from "@astrojs/starlight/components";
 
 <Aside type="tip" title="Runnable example">
-The full share + revoke + rotate flow (with the access-after-revoke caveat demonstrated end-to-end) ships at [`examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/02-team-share-revoke) on the CLI repo.
+The [revoke phase of `examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/blob/main/examples/02-team-share-revoke/run.sh#L130) demonstrates this end-to-end: Alice revokes Bob, rotates the value, and Bob can still read the old entry but not the new one. `./run.sh` runs it in an isolated tempdir.
 </Aside>
 
 ## Goal
 
-Revoke someone's access to a secret. Understand what revocation does and doesn't protect against.
+Remove an identity from a secret's recipient set, and understand why rotation is what actually invalidates the value.
 
 ## Prerequisites
 
-- A secret shared with at least one other identity
-- Understanding of [how sharing works](/tutorials/share-secret/)
+- A secret shared with at least one other identity ([Share a Secret](/tutorials/share-secret/))
 
 ## Steps
 
 <Steps>
 
-1. **List current access**
+1. **Check who can decrypt the secret**
 
-   See who has access to a secret:
-
-   ```bash
-   dotsecenv vault describe
-   ```
-
-   Look for the `available_to` field:
-
-   ```text
-   DATABASE_PASSWORD
-     available_to: [YOUR_FINGERPRINT, TEAMMATE_FINGERPRINT]
-   ```
-
-2. **Revoke access**
-
-   Remove a specific identity's access:
+   The recipient set lives in the `available_to` field, which `--all --json` exposes (newest entry first):
 
    ```bash
-   dotsecenv secret revoke DATABASE_PASSWORD TEAMMATE_FINGERPRINT
+   dotsecenv secret get API_KEY --all --json | jq '.[0].available_to'
+   # ["YOUR_FINGERPRINT", "TEAMMATE_FINGERPRINT"]
    ```
 
-   Or revoke from all vaults:
+2. **Revoke the identity**
+
+   Remove a fingerprint from the recipient set for future writes:
 
    ```bash
-   dotsecenv secret revoke DATABASE_PASSWORD TEAMMATE_FINGERPRINT --all
+   dotsecenv secret revoke API_KEY TEAMMATE_FINGERPRINT
    ```
 
-3. **Verify revocation**
+   Revoke from every vault that holds the secret with `--all`:
 
    ```bash
-   dotsecenv vault describe
+   dotsecenv secret revoke API_KEY TEAMMATE_FINGERPRINT --all
    ```
 
-   The identity should no longer appear in `available_to`:
+3. **Rotate the value**
 
-   ```text
-   DATABASE_PASSWORD
-     available_to: [YOUR_FINGERPRINT]
-   ```
-
-4. **Rotate the secret value** (Critical!)
-
-   <Aside type="danger" title="Essential security step">
-     Revoking access **does not** prevent the revoked user from accessing the
-     **previous** value. They already decrypted it.
+   <Aside type="danger" title="Revoke is forward-only">
+   Revoking does not reach a teammate who already decrypted the value. They still know it, and the append-only vault keeps the prior ciphertext they were a recipient of. Revocation only removes them from the recipient set for **future** writes. To invalidate the value for real, rotate it: store a new value and change it at its source (issue a new API key, reset the database password).
    </Aside>
 
-   Store a new value:
+   Store a fresh value. The new entry is encrypted only to the remaining recipients:
 
    ```bash
-   echo "new-secret-value" | dotsecenv secret store DATABASE_PASSWORD
+   echo "new-secret-value" | dotsecenv secret store API_KEY
    ```
 
-   This creates a new entry that the revoked user cannot access.
+4. **Confirm the new entry excludes them**
 
-5. **Update systems using the secret**
+   ```bash
+   dotsecenv secret get API_KEY --all --json | jq '.[0].available_to'
+   # ["YOUR_FINGERPRINT"]
+   ```
 
-   Update your database, API keys, or other systems to use the new value.
+5. **Update systems and commit**
 
-6. **Commit the changes**
+   Roll the new value out to whatever consumes it, then commit:
 
    ```bash
    git add vault
-   git commit -m "Revoke access and rotate DATABASE_PASSWORD"
+   git commit -m "Revoke API_KEY access and rotate"
    git push
    ```
 
@@ -95,84 +77,59 @@ Revoke someone's access to a secret. Understand what revocation does and doesn't
 
 ## Expected Result
 
-After revocation + rotation:
+- The revoked teammate **cannot** decrypt the **new** value.
+- The revoked teammate **can still** decrypt the **old** value from vault history.
+- `secret get` for the revoked teammate falls back to the most recent entry they were a recipient of (the pre-rotation value), and `secret get --all` produces decryption errors for the rotated entry they no longer hold a key for.
 
-- The revoked user **cannot** decrypt the **new** secret value
-- The revoked user **can still** decrypt the **old** value (from vault history)
-- Your vault shows only authorized identities for new values
-
-```bash
-dotsecenv vault describe
-# DATABASE_PASSWORD
-#   available_to: [YOUR_FINGERPRINT]
-#   values: 2 (latest accessible to you)
-```
+Example 02 shows exactly this: after revoke + rotate, Bob's `secret get` prints the old value, and his `secret get --all` warns it cannot decrypt the rotated entry that was only ever encrypted to Alice.
 
 ## What Revocation Does NOT Do
 
-<Aside type="caution" title="Understanding revocation limits">
-  Revocation in dotsecenv (and any GPG-based system) has inherent limitations:
-</Aside>
+| Revocation prevents       | Revocation does NOT prevent            |
+| ------------------------- | -------------------------------------- |
+| Decrypting future values  | Decrypting values already shared       |
+| Membership in new entries | Reading old entries from vault history |
+| Reading rotated values    | Copies of values they already decrypted |
 
-| Revocation protects against | Revocation does NOT protect against |
-| --------------------------- | ----------------------------------- |
-| Future secret values        | Previously shared values            |
-| New secrets                 | Old values they already decrypted   |
-| Access to new entries       | Copy/paste of decrypted values      |
+### Why
 
-### Why is this the case?
-
-1. GPG is asymmetric encryption: once a value is encrypted for a key, only that key can decrypt it.
-2. The vault is append-only: old entries remain readable to the original recipients.
-3. There is no time travel: you can't retroactively change who could decrypt a past value.
+1. GPG is asymmetric: once a value is encrypted to a key, only that key decrypts it.
+2. The vault is append-only: old entries stay readable to their original recipients, including in the repo's `git` history.
+3. There is no time travel: you cannot retroactively change who could decrypt a past value.
 
 ### What to do about it
 
-1. Always rotate secrets after revoking access.
-2. Treat revocation as a signal that you need to change the value.
+1. Rotate the secret after revoking.
+2. Treat revocation as the trigger to change the value at its source.
 3. Update downstream systems with the new credentials.
 
 ## Variations
 
-### Revoke all access to all secrets
+### Revoke from every secret
 
-Remove an identity completely:
+`secret revoke` takes one secret name per call. To strip an identity from all of them, loop over the key list that `secret get` (no arguments) prints:
 
 ```bash
-# Revoke from all secrets
-for secret in $(dotsecenv vault describe --json | jq -r '.[].secrets[].key' | sort -u); do
-  dotsecenv secret revoke "$secret" FINGERPRINT --all
+for s in $(dotsecenv secret get); do
+  dotsecenv secret revoke "$s" FINGERPRINT --all
 done
 ```
 
+Then rotate each value, since the revoke alone leaves prior ciphertext intact.
+
 ### Audit access history
 
-The vault preserves full history. View who had access to each version:
+The vault keeps full history. Inspect who was a recipient of each version:
 
 ```bash
-dotsecenv secret get DATABASE_PASSWORD --all --json | jq '.values[] | {timestamp, available_to}'
+dotsecenv secret get API_KEY --all --json | jq '.[] | {added_at, available_to, signed_by}'
 ```
-
-### Revoke from all secrets
-
-If someone should no longer have any access:
-
-```bash
-# Revoke from all existing secrets in all vaults
-dotsecenv secret revoke "*" FINGERPRINT --all
-```
-
-<Aside type="note">
-  Revoking access doesn't delete their access to previously shared values. It
-  only prevents them from decrypting future values. To fully clean up the vault,
-  run `vault doctor` after revoking all access.
-</Aside>
 
 ---
 
 ## Complete offboarding checklist
 
-For the full runbook covering scope inventory, batch revoke, source rotation, error handling, and the append-only caveats, see [Offboard a Departing Team Member](/runbooks/team-member-offboarding/).
+For the full runbook covering scope inventory, batch revoke, source rotation, and error handling, see [Offboard a Departing Team Member](/runbooks/team-member-offboarding/).
 
 At a glance:
 
@@ -180,14 +137,16 @@ At a glance:
 FINGERPRINT="THEIR_FINGERPRINT"
 
 # 1. Revoke from every secret in every vault
-dotsecenv secret revoke "*" "$FINGERPRINT" --all
+for s in $(dotsecenv secret get); do
+  dotsecenv secret revoke "$s" "$FINGERPRINT" --all
+done
 
 # 2. Rotate each secret at its source (production-critical first)
 echo "new-prod-db-password" | dotsecenv secret store DATABASE_PASSWORD
 echo "new-prod-api-key"     | dotsecenv secret store API_KEY
 # ... continue for staging and dev
 
-# 3. Confirm the leaver no longer appears in any current recipient list
+# 3. Confirm the leaver is gone from every current recipient set
 dotsecenv vault describe --json \
   | jq --arg fp "$FINGERPRINT" \
        '.[].secrets[] | select((.available_to // []) | index($fp)) | .key'
@@ -203,30 +162,25 @@ git push
 
 ## Troubleshooting
 
-**Can they still see secrets?**
+**Can they still read secrets?**
 
-If they have the old vault file, yes. The vault is encrypted but the entries for their key still exist. They can decrypt old values.
-
-This is why **rotating secrets is essential** after revocation.
+If they kept the old vault file, they can still decrypt every entry their fingerprint was a recipient of. That is the append-only contract, and it is why rotating the value is the real fix.
 
 **Vault getting large?**
 
-Revoked entries and old values accumulate. Run doctor to check and optionally defragment:
+Old entries accumulate. Check vault health and optionally defragment:
 
 ```bash
 dotsecenv vault doctor
 ```
 
-The doctor command checks vault health and offers to defragment if needed.
-
 <Aside type="caution">
-  Defragmenting removes old entries. This breaks access to historical values but
-  doesn't affect current values.
+Defragmenting removes old entries. It breaks access to historical values but does not affect current ones.
 </Aside>
 
 ---
 
 ## Next Steps
 
-- [Threat Model](/concepts/threat-model/): understand what dotsecenv protects against
-- [Architecture](/concepts/architecture/): how the vault and encryption work
+- [Threat Model](/concepts/threat-model/): what dotsecenv protects against
+- [Vault Format](/concepts/vault-format/): how the append-only vault and recipient sets work

@@ -21,10 +21,12 @@ Use [Offboard a Departing Team Member](/runbooks/team-member-offboarding/) inste
 
 1. **Generate or import a replacement identity.** If the compromised key is yours, generate a new pair (`gpg --full-generate-key`), publish the new public key, and have each teammate import it.
 
-2. **Revoke the compromised fingerprint from every affected secret.** Quote the wildcard so the shell does not expand it.
+2. **Revoke the compromised fingerprint from every affected secret.** `secret revoke` takes one secret name per call, so loop over the key list that `secret get` (no arguments) prints.
 
    ```bash
-   dotsecenv secret revoke "*" <COMPROMISED_FP> --all
+   for s in $(dotsecenv secret get); do
+     dotsecenv secret revoke "$s" <COMPROMISED_FP> --all
+   done
    ```
 
 3. **Add the replacement recipient.**
@@ -55,6 +57,10 @@ Use [Offboard a Departing Team Member](/runbooks/team-member-offboarding/) inste
 
 </Steps>
 
+## Blast radius: repo-scoped vs org-wide keys
+
+The scope of the compromised key sets the scope of the rotation. A repo-scoped CI key (`GPG_PRIVATE_KEY`) only decrypts one repository's vault, so revoke, re-share, and source-rotate stay contained to that repo. An org-wide key (`ORG_GPG_PRIVATE_KEY`) decrypts every vault that listed it as a recipient, so you must run the runbook against each affected repo: revoke the fingerprint, share the replacement, rotate the secret at its source, and commit in every one. Track the full list before you start so none are missed. See [Key Scope](/concepts/key-scope/) for the trade-offs.
+
 ## What you cannot do
 
 - **Erase a leaked entry from the vault file.** Append-only by design. Rewriting `git` history with `git filter-repo` is possible, but anyone who already cloned the repo still has the old data and the compromised key still decrypts it.
@@ -65,5 +71,6 @@ Use [Offboard a Departing Team Member](/runbooks/team-member-offboarding/) inste
 - Runbook: [Offboard a Departing Team Member](/runbooks/team-member-offboarding/)
 - Tutorial: [Revoke Access](/tutorials/revoke-access/)
 - Concept: [Vault Format — append-only semantics](/concepts/vault-format/#append-only-semantics)
+- Concept: [Key Scope](/concepts/key-scope/)
 - Concept: [Threat Model](/concepts/threat-model/)
 - Runnable example: [`examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/02-team-share-revoke)
