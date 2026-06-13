@@ -12,13 +12,13 @@ When documenting CI/CD, use the canonical secret names and always state whether 
 
 ## Changelog Generation
 
-The changelog (`src/content/docs/changelog.mdx`) builds up continuously: every PR adds a one-line entry under the standing `## Upcoming` section, and the release PR stamps that section to the version tag. The `changelog` skill (`../skills/changelog/SKILL.md`) drives this; this section is the reference for format and the release stamp.
+The changelog (`src/content/docs/changelog.mdx`) builds up continuously: every PR adds a one-line entry under the standing `## Upcoming` section, and the release PR stamps that section to the version tag. The `changelog` skill (`../.claude/skills/changelog/SKILL.md`) drives this; this section is the reference for format and the release stamp.
 
 **Per PR:** add one line under `## Upcoming`, in the subsection for the PR's type (see the table below), ending with the PR number.
 
 **At release (in the release PR):**
 
-1. From the repo root, run `bash skills/changelog/assess.sh` to list any merged PRs since the last tag that are missing from "Upcoming", and add an entry for each. This is the "assess all commits since the last release" step.
+1. From the repo root, run `bash .claude/skills/changelog/assess.sh` to list any merged PRs since the last tag that are missing from "Upcoming", and add an entry for each. This is the "assess all commits since the last release" step.
 2. Rename `## Upcoming` to `## vX.Y.Z` and replace `_Unreleased_` with `_Month Day, Year_` (today's date). Drop any subsection left empty.
 3. Open a fresh, empty `## Upcoming` section at the top for the next cycle.
 

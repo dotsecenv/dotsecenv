@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../.. && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd)"
 REF="$ROOT/website/src/content/docs/reference.mdx"
 
 command -v go >/dev/null 2>&1 || { echo "error: go toolchain not found on PATH" >&2; exit 2; }

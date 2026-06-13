@@ -30,7 +30,8 @@ end-to-end test harness verified by network-namespace + strace in CI.
 | `pkg/dotsecenv/`    | Public packages: `config/`, `crypto/`, `gpg/`, `identity/`, `output/`, `policy/`, `vault/`. |
 | `contrib/`          | `terraform-credentials-dotsecenv` Bash credentials helper for Terraform/OpenTofu. |
 | `demos/`            | `demo.sh` for asciinema recording (driven by `make demo`).                     |
-| `skills/`           | Claude Code skills (`secenv/SKILL.md`, `secrets/SKILL.md`).                    |
+| `skills/`           | Claude Code skills shipped in the plugin (`secenv/SKILL.md`, `secrets/SKILL.md`). |
+| `.claude/skills/`   | Maintainer-only skills, NOT shipped to plugin installers (`changelog/`, `cli-reference-drift/`). |
 | `.claude-plugin/`   | Claude Code plugin manifest (`plugin.json`, `marketplace.json`).               |
 | `scripts/`          | `install.sh`, `e2e.sh`, `e2e-install.sh`, `e2e-terraform.sh`, `sandbox.sh`, `notarize-macos.sh`, `generate_release_key.sh`. |
 | `.github/workflows/` | CI + release: `ci.yml` (Go DAG), `ci-plugin.yml`, `ci-website.yml`, `ci-release.yml` (goreleaser snapshot), `e2e-hermetic.yml`, `e2e-install.yml`, `e2e-action-post-release.yml` (reusable, post-release action smoke), `lint-workflows.yml` (actionlint), `release.yml`, `deploy-website.yml`. |
@@ -233,10 +234,10 @@ What the script does NOT do — handle manually if needed:
   a separator.
 - **Changelog:** every PR adds one line to the `## Upcoming` section of
   `website/src/content/docs/changelog.mdx` (use the `changelog` skill,
-  `skills/changelog/SKILL.md`), in the subsection for its type (`feat` ->
+  `.claude/skills/changelog/SKILL.md`), in the subsection for its type (`feat` ->
   Features, `fix` -> Bug Fixes, else Other), ending with the PR number. Release
   notes build up per PR; the release PR stamps "Upcoming" to the tag.
-  `bash skills/changelog/assess.sh` reports any merged PRs missing from it.
+  `bash .claude/skills/changelog/assess.sh` reports any merged PRs missing from it.
 - **Branches:** `feat/*`, `fix/*`, `docs/*`, etc. (see `CONTRIBUTING.md`).
 - **PRs only:** All changes land on `main` through pull requests. Don't
   push commits directly to `main`, even when your account holds a bypass
@@ -249,8 +250,8 @@ What the script does NOT do — handle manually if needed:
 - **Linters:** `golangci-lint` v2.11.4 — pinned because v2.12.x had a
   checksum mismatch on release. Don't bump back to `latest` without verifying.
 - **Releases:** Triggered by pushing a signed semver tag. Before tagging, run
-  the CLI reference drift check (`bash skills/cli-reference-drift/check.sh`; see
-  `skills/cli-reference-drift/SKILL.md`) and resolve any drift. Use
+  the CLI reference drift check (`bash .claude/skills/cli-reference-drift/check.sh`; see
+  `.claude/skills/cli-reference-drift/SKILL.md`) and resolve any drift. Use
   [`releasetools-cli`](https://github.com/releasetools/cli):
 
   ```bash
