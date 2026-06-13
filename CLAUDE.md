@@ -2,6 +2,7 @@
 
 ## Release new version
 
+- **Pre-release gate:** run the CLI reference drift check and resolve any drift before tagging — `bash skills/cli-reference-drift/check.sh` (see [skills/cli-reference-drift/SKILL.md](skills/cli-reference-drift/SKILL.md)). The website CLI reference (`website/src/content/docs/reference.mdx`) is hand-curated and must stay in sync with the binary.
 - When asked to release, use `rt git::release --major --sign --push vX.Y.Z` where X.Y.Z is the version to release
 - Then push the tag to the origin
 
