@@ -11,10 +11,62 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Features
+
+- `init secenv` bootstraps a `.secenv` file from your existing vaults (#183)
+
+### Bug Fixes
+
+- Shell plugin: reload secrets on directory re-entry, fix the `{dotsecenv/}` literal regression, and fail fast when the store is unavailable (#190)
+- Shell plugin reports plain env vars and secrets on separate lines (#192)
+
 ### Other
 
+- Add a CLI reference drift check, gated before release, so the website reference stays in sync with the binary (#211)
 - Release notes now build up continuously under "Upcoming": a new `changelog` skill adds a one-line entry per PR and stamps the section at release time (#212)
 - The `changelog` and `cli-reference-drift` maintainer skills moved to `.claude/skills/`, so the published plugin now ships only the `secenv` and `secrets` skills to installers (#213)
+- Backfill the changelog for the v0.6.2 through v0.6.16 releases and the unreleased PRs since (#214)
+- Standardize CI keypair naming and document key scope (#208)
+- Document the squash-merge commit message and PR description conventions (#194, #195)
+- Scope the agent vendoring rule to atomic major upgrades in their own PR (#186, #188)
+- Add a blog post on signed monorepo releases with GitHub Workflows (#173, #174)
+- Fix the fish plugin test suite and run it in CI on fish 3.x and 4.x (#193)
+- Unify Expressive Code frame corners and border color on the website (#191)
+- Update Astro and Starlight for the website build (#175, #179, #200, #201, #202, #206, #207, #209)
+- Update lint tooling: eslint, typescript-eslint, eslint-plugin-mdx (#172, #176, #181, #182, #196, #198, #205)
+- Update Go modules: x/crypto (security), x/term, and bubbletea/lipgloss v2 (#178, #187, #197, #204)
+- Update GitHub Actions and the Go toolchain: checkout, harden-runner, goreleaser-action, Go 1.26.4 (#177, #180, #199)
+- Update the sharp image library (#210)
+- Renovate lock file maintenance (#171)
+
+---
+
+## v0.6.16
+
+_May 18, 2026_
+
+Covers releases v0.6.2 through v0.6.16, most of which moved packaging into the monorepo and hardened the release pipeline.
+
+### Features
+
+- Distribution packages now live in the monorepo and publish on release (#136, #152)
+- Smoke-test `brew install` right after the homebrew-tap push (#135)
+
+### Bug Fixes
+
+- Fix website rendering and performance (#165)
+- Harden release verification: import `key.asc` before verifying historical assets, wait on homebrew-tap CI and the CDN, and fix the Linux arm64 checksum (#148, #168)
+
+### Other
+
+- Retract v0.6.10 and v0.6.11, and add retraction tooling (#151)
+- Sign release pushes via `releasetools/actions/signed-push`, commit the homebrew-tap cask over GraphQL, and tag the tap at the release version (#160, #161, #163)
+- SHA-pin every third-party action, set least-privilege `GITHUB_TOKEN` permissions, and drop unused scopes across workflows (#147, #167, #169)
+- Add a single required `ci-merge-gate` status check and verify drift in satellite repos (#153, #156, #159, #166)
+- Prune packages by keeping the last patch of the last N minors, and link get.dotsecenv.com on publish (#162, #170)
+- Restructure CI workflows, add a release pre-flight check, and ignore `.claude/settings.local.json` (#142, #146, #149, #150, #158)
+- Close docs gaps in the GPG agent, offboarding, and multi-env FIPS guidance (#157)
+- Update dependencies: astro, @astrojs/starlight, starlight-llms-txt, typescript-eslint, harden-runner, x/term (#138, #139, #140, #141, #143, #144, #145)
 
 ---
 
