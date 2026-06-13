@@ -600,6 +600,12 @@ This adds a deletion marker to the secret. The secret will no longer be returned
 The deletion is a soft delete. The secret's history is preserved in the vault file. Use `vault doctor` (which offers defragmentation) to permanently remove deleted secrets.
 </Aside>
 
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--ignore-not-found` | Exit successfully if the secret is not found or already deleted (handy for idempotent scripts and CI) |
+
 **Examples:**
 
 ```bash
@@ -611,6 +617,9 @@ dotsecenv secret forget -v 2 prod::API_KEY
 
 # Delete using vault path
 dotsecenv secret forget -v ./project/vault SECRET_NAME
+
+# Idempotent delete: succeed even if the secret is absent or already deleted
+dotsecenv secret forget --ignore-not-found DATABASE_PASSWORD
 ```
 
 **Behavior after deletion:**
@@ -755,29 +764,6 @@ Health checks:
 Status: warning
 
 Upgrade vault .dotsecenv/vault from v1 to v2? [y/N]:
-```
-
-### vault upgrade
-
-Upgrade vault file format to the latest version.
-
-```bash
-dotsecenv vault upgrade [flags]
-```
-
-When `behavior.require_explicit_vault_upgrade` is set to `true` in your config, automatic vault upgrades are disabled. Use this command to explicitly upgrade vault formats.
-
-**Examples:**
-
-```bash
-# Upgrade vault (prompts if multiple vaults configured)
-dotsecenv vault upgrade
-
-# Upgrade specific vault
-dotsecenv vault upgrade -v 1
-
-# Upgrade vault at path
-dotsecenv vault upgrade -v ./project/vault
 ```
 
 ### vault upgrade

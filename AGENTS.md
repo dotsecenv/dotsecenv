@@ -242,7 +242,9 @@ What the script does NOT do — handle manually if needed:
   through existing tests are the only exception.
 - **Linters:** `golangci-lint` v2.11.4 — pinned because v2.12.x had a
   checksum mismatch on release. Don't bump back to `latest` without verifying.
-- **Releases:** Triggered by pushing a signed semver tag. Use
+- **Releases:** Triggered by pushing a signed semver tag. Before tagging, run
+  the CLI reference drift check (`bash skills/cli-reference-drift/check.sh`; see
+  `skills/cli-reference-drift/SKILL.md`) and resolve any drift. Use
   [`releasetools-cli`](https://github.com/releasetools/cli):
 
   ```bash
