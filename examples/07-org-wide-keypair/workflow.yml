@@ -1,25 +1,33 @@
-# examples/03-ci-cd-github-action/workflow.yml
+# examples/07-org-wide-keypair/workflow.yml
 #
 # A complete, copy-pasteable GitHub Actions workflow that:
 #   1. Installs dotsecenv from a verified release using the dotsecenv/dotsecenv
 #      composite action.
-#   2. Imports a CI-only GPG private key from a repository secret.
-#   3. Decrypts secrets out of the project's checked-in vault into job-scoped
+#   2. Imports a shared, ORG-WIDE CI GPG private key from a GitHub
+#      ORGANIZATION secret (ORG_GPG_PRIVATE_KEY).
+#   3. Decrypts secrets out of this repo's checked-in vault into job-scoped
 #      environment variables (and `$GITHUB_ENV` for downstream steps).
 #   4. Hands the decrypted secrets to a deploy step.
 #
-# Save this file at: .github/workflows/deploy.yml in your application repo.
+# This is the org-wide counterpart to examples/03-ci-cd-github-action. The only
+# difference is the secret's scope: one key is shared across many repos.
 #
-# Required GitHub repository secrets:
-#   - GPG_PRIVATE_KEY  : ASCII-armored private key for the CI
-#                                  identity. Generated once on a developer
-#                                  machine and added as a sealed repo secret.
-#                                  See README.md for the bootstrap procedure.
+# Save this file at: .github/workflows/deploy.yml in each participating repo.
 #
-# Required vault state in the repo:
+# Required GitHub ORGANIZATION secret (NOT a repository secret):
+#   - ORG_GPG_PRIVATE_KEY  : ASCII-armored private key for the SHARED org CI
+#                            identity. Generated once on a developer machine
+#                            and set as an organization secret scoped to an
+#                            explicit list of repos (Settings -> Secrets and
+#                            variables -> Actions, at the org level, with
+#                            "Selected repositories"). The same key is read by
+#                            every repo on that list. See README.md for the
+#                            bootstrap procedure.
+#
+# Required vault state in each repo:
 #   - .dotsecenv/vault           : the encrypted vault file, committed to git.
-#   - The CI identity's public key must be on the vault's recipient list for
-#     every secret this workflow needs (use `dotsecenv secret share` from a
+#   - The org CI identity's public key must be on the vault's recipient list
+#     for every secret this workflow needs (use `dotsecenv secret share` from a
 #     developer machine to grant CI access).
 
 name: deploy
@@ -64,21 +72,21 @@ jobs:
           verify-provenance: true
 
       # ---------------------------------------------------------------------
-      # 3. Import the CI identity's private key and warm up gpg-agent.
+      # 3. Import the org CI identity's private key and warm up gpg-agent.
       #
       #    The private key is generated ONCE on a developer machine with
-      #    `dotsecenv identity create --no-passphrase` (CI-only mode), then
-      #    added to the repo as a sealed secret called
-      #    GPG_PRIVATE_KEY. The "no-passphrase" choice is what makes
+      #    `dotsecenv identity create --no-passphrase` (CI-only mode), then set
+      #    as the ORGANIZATION secret ORG_GPG_PRIVATE_KEY, shared across the
+      #    repos on its access list. The "no-passphrase" choice is what makes
       #    decryption non-interactive; protect the secret accordingly.
       # ---------------------------------------------------------------------
       - name: Import GPG private key
         env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          ORG_GPG_PRIVATE_KEY: ${{ secrets.ORG_GPG_PRIVATE_KEY }}
         run: |
           mkdir -p "$GNUPGHOME"
           chmod 700 "$GNUPGHOME"
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "$ORG_GPG_PRIVATE_KEY" | gpg --batch --import
           # Capture the fingerprint of the freshly-imported key for `login`.
           FP=$(gpg --list-secret-keys --with-colons \
             | awk -F: '/^fpr:/ { print $10; exit }')

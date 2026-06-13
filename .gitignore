@@ -5,9 +5,6 @@
 bin/
 build/
 dist/
-docs/
-man/
-completions/
 
 # Docusaurus
 website/node_modules

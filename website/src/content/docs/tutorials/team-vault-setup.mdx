@@ -10,7 +10,7 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 </Aside>
 
 <Aside type="tip" title="Runnable example">
-A two-identity reference flow ships at [`examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/02-team-share-revoke) on the CLI repo. It uses isolated `GNUPGHOME` directories to model the "one key per machine" pattern this tutorial follows at scale.
+A three-environment reference flow ships at [`examples/06-multi-environment-fips/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/06-multi-environment-fips) on the CLI repo. It builds one vault per environment (`vault-dev`, `vault-staging`, `vault-prod`), assigns identities per role, and gates access through each vault's recipient list. It uses isolated `GNUPGHOME` directories to model the "one key per machine" pattern this tutorial follows at scale.
 </Aside>
 
 ## Goal
@@ -87,7 +87,7 @@ For a teammate's perspective on joining an existing vault, see [Team Onboarding]
    Each `identity add` writes a signed identity entry to the vault. The pre-flight `gpg --fingerprint` call fails fast if a public key is missing from your keyring before any vault changes happen.
 
    <Aside type="tip">
-   If you maintain multiple vaults (e.g., `dev` and `prod`), append `--all` to register each identity in every configured vault: `dotsecenv identity add "$fp" --all`.
+   If you maintain a vault per environment (`dev`, `staging`, `prod`), append `--all` to register each identity in every configured vault: `dotsecenv identity add "$fp" --all`. For per-environment access subsets, see [Identity per role](#identity-per-role-not-per-environment) below.
    </Aside>
 
 5. **Store your first secret**
@@ -148,34 +148,56 @@ After this tutorial:
 
 ## Variations
 
-### Multiple vaults (e.g., `dev` and `prod`)
+### Multiple vaults (dev / staging / prod)
 
-Run `init vault` once per environment, then add identities with `--all`:
+Give each environment its own vault file. The same `DATABASE_PASSWORD` key can live in every vault with a different value. Run `init vault` once per environment, then add identities with `--all` if everyone reads every environment:
 
 ```bash
-dotsecenv init vault -v ~/.config/dotsecenv/vault-dev
-dotsecenv init vault -v ~/.config/dotsecenv/vault-prod
+dotsecenv init vault -v .dotsecenv/vault-dev
+dotsecenv init vault -v .dotsecenv/vault-staging
+dotsecenv init vault -v .dotsecenv/vault-prod
 for fp in "${TEAM_FPS[@]}"; do
   dotsecenv identity add "$fp" --all
 done
 ```
 
-`--all` adds the identity to every configured vault in one call.
-
-### Different access lists per environment
-
-If only some teammates should access prod, register only their fingerprints in the prod vault:
+`--all` adds the identity to every configured vault in one call. Store secrets per vault with `-v`:
 
 ```bash
-PROD_FPS=("YOUR_FP" "ALICE_FP")  # smaller subset
-for fp in "${PROD_FPS[@]}"; do
-  dotsecenv identity add "$fp" -v ~/.config/dotsecenv/vault-prod
+echo "postgres://dev.local/app"       | dotsecenv secret store DATABASE_URL -v .dotsecenv/vault-dev
+echo "postgres://staging.internal/app" | dotsecenv secret store DATABASE_URL -v .dotsecenv/vault-staging
+echo "postgres://prod.internal/app"    | dotsecenv secret store DATABASE_URL -v .dotsecenv/vault-prod
+```
+
+### Identity per role, not per environment
+
+Access is gated by each vault's recipient list, not by the identities themselves. Register one identity per person, then add only the right subset to each environment vault. To keep production off developer laptops, add only the ops fingerprints to `vault-prod`:
+
+```bash
+# Developers read dev + staging.
+for fp in "${DEV_FPS[@]}"; do
+  dotsecenv identity add "$fp" -v .dotsecenv/vault-dev
+  dotsecenv identity add "$fp" -v .dotsecenv/vault-staging
+done
+
+# Ops reads staging + prod.
+for fp in "${OPS_FPS[@]}"; do
+  dotsecenv identity add "$fp" -v .dotsecenv/vault-staging
+  dotsecenv identity add "$fp" -v .dotsecenv/vault-prod
 done
 ```
 
-### CI-only identities
+A fingerprint absent from a vault's recipient list has no session key for that vault's entries. `secret get -v <vault>` exits non-zero without printing plaintext. That is the cryptographic enforcement, independent of file permissions.
 
-Generate a dedicated CI key and register its fingerprint as a team member. See [GitHub Action integration](/guides/github-action/) for the full CI pattern.
+### CI-only identities, one per environment
+
+Generate a dedicated CI key per environment and register each fingerprint in its matching vault. In GitHub Actions, store each ASCII-armored private key as a repository secret named per environment:
+
+- `GPG_PRIVATE_KEY_DEV` → recipient on `vault-dev`
+- `GPG_PRIVATE_KEY_STAGING` → recipient on `vault-staging`
+- `GPG_PRIVATE_KEY_PROD` → recipient on `vault-prod`
+
+A matrix job imports the right key per environment and decrypts only that environment's vault. See [Multi-environment Vaults](/guides/multi-environment/) for the full matrix workflow and [GitHub Action integration](/guides/github-action/) for the action reference.
 
 ## Troubleshooting
 

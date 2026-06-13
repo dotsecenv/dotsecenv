@@ -33,10 +33,12 @@ Use [Rotate a Compromised GPG Key](/runbooks/rotate-compromised-key/) instead.
 
    Order the worklist by blast radius: production credentials first.
 
-2. **Revoke in one pass.** Quote the wildcard so the shell does not expand it.
+2. **Revoke from every secret.** `secret revoke` takes one secret name per call, so loop over the key list that `secret get` (no arguments) prints.
 
    ```bash
-   dotsecenv secret revoke "*" "$LEAVER_FP" --all
+   for s in $(dotsecenv secret get); do
+     dotsecenv secret revoke "$s" "$LEAVER_FP" --all
+   done
    ```
 
 3. **Verify.** Re-run the inventory from step 1. The output should be empty.
@@ -64,7 +66,7 @@ Use [Rotate a Compromised GPG Key](/runbooks/rotate-compromised-key/) instead.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `secret revoke ... --all` says "no matching secret" | Wildcard not quoted; shell expanded `*` to local filenames | Quote it: `"*"` |
+| `secret revoke NAME ...` says "no matching secret" | The name is misspelled or absent from this vault | List exact names with `dotsecenv secret get` (no args) and revoke those |
 | `vault describe` is missing a vault you expected | Vault path not in `vault:` config, or blocked by policy | Add it with `-v` once, or list it under `vault:` in `~/.config/dotsecenv/config.yaml` |
 | Decrypt failure when rotating | Your own login fingerprint was accidentally revoked from this secret | `dotsecenv secret share SECRET YOUR_FP --all`, then re-run `secret store` |
 | Revoke succeeds in some vaults, fails in others | A vault file is read-only or owned by another user | Run revoke per vault with `-v` and a writeable path |

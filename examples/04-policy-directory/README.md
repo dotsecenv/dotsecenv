@@ -142,6 +142,7 @@ so the only safe behaviour is to fail closed.
 
 ## Related
 
-- Concepts: <https://dotsecenv.com/concepts/policy-directory/>
+- Tutorial: <https://dotsecenv.com/tutorials/apply-a-policy/>
+- Concepts: <https://dotsecenv.com/concepts/security-policies/>
 - FIPS / compliance: <https://dotsecenv.com/concepts/compliance/>
 - README "Policy Directory" section in this repo (the canonical reference).

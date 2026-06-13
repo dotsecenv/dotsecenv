@@ -9,9 +9,9 @@
 # ASCII-armored private key for that environment's CI identity.
 #
 # Repository secrets required:
-#   DOTSECENV_GPG_PRIVATE_KEY_DEV       (the CI identity for dev)
-#   DOTSECENV_GPG_PRIVATE_KEY_STAGING   (the CI identity for staging)
-#   DOTSECENV_GPG_PRIVATE_KEY_PROD      (the CI identity for production)
+#   GPG_PRIVATE_KEY_DEV       (the CI identity for dev)
+#   GPG_PRIVATE_KEY_STAGING   (the CI identity for staging)
+#   GPG_PRIVATE_KEY_PROD      (the CI identity for production)
 #
 # Vault layout in the repo:
 #   .dotsecenv/vault-dev
@@ -68,13 +68,13 @@ jobs:
         include:
           - env: dev
             vault: .dotsecenv/vault-dev
-            secret_name: DOTSECENV_GPG_PRIVATE_KEY_DEV
+            secret_name: GPG_PRIVATE_KEY_DEV
           - env: staging
             vault: .dotsecenv/vault-staging
-            secret_name: DOTSECENV_GPG_PRIVATE_KEY_STAGING
+            secret_name: GPG_PRIVATE_KEY_STAGING
           - env: production
             vault: .dotsecenv/vault-prod
-            secret_name: DOTSECENV_GPG_PRIVATE_KEY_PROD
+            secret_name: GPG_PRIVATE_KEY_PROD
 
     env:
       GNUPGHOME: ${{ runner.temp }}/gnupg
