@@ -1,0 +1,90 @@
+---
+title: Key Scope
+description: Choosing between an org-wide and a repo-scoped CI keypair, and what each choice costs you.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+A dotsecenv CI keypair is the identity a GitHub Actions job logs in as to decrypt the committed vault. You can give every repository its own keypair, or share one keypair across many repositories. The choice is a tradeoff between blast radius and bootstrap cost.
+
+## Two scopes
+
+A **repo-scoped** keypair is one CI/decryption keypair per repository. Each repo carries its own private key in its own secret, shared to the secrets in that repo's vault and nothing else.
+
+An **org-wide** keypair is one keypair shared across many repositories. A single private key decrypts the vaults of every repo that lists it as a recipient. You bootstrap the key once and reuse it everywhere.
+
+The vault mechanics are identical either way. Scope is only a question of how many vaults a single private key can open.
+
+## Blast radius
+
+| | Repo-scoped | Org-wide |
+| --- | --- | --- |
+| A leaked key exposes | Secrets in one repo's vault | Secrets in every repo that shared to the key |
+| Rotation cost | Re-key one repo | Re-key every repo that used it |
+| Bootstrap cost | Once per repo | Once, then reuse |
+| Convenience | Lower (repeat the setup) | Higher (set up once) |
+| Least privilege | Strong (key opens one vault) | Weak (key opens many) |
+
+A leaked repo-scoped key is contained to a single repository. A leaked org-wide key is a fleet-wide incident. See [Threat Model](/concepts/threat-model/) for what a compromised private key lets an attacker do, and for the keychain and AI-agent vectors that make leaks plausible.
+
+## Naming convention
+
+The secret name signals which scope you intend.
+
+| Scope | Secret name | Passphrase variant |
+| --- | --- | --- |
+| Repo-scoped (default) | `GPG_PRIVATE_KEY` | `GPG_PASSPHRASE` |
+| Org-wide | `ORG_GPG_PRIVATE_KEY` | `ORG_GPG_PASSPHRASE` |
+
+Per-environment keys suffix the name: `GPG_PRIVATE_KEY_DEV`, `GPG_PRIVATE_KEY_STAGING`, `GPG_PRIVATE_KEY_PROD`, and likewise `ORG_GPG_PRIVATE_KEY_PROD` for an org-wide production key. The unsuffixed name is the single-environment default.
+
+Private keys are stored ASCII-armored, exactly as `gpg --armor --export-secret-keys <FP>` emits them. Import in the workflow with `echo "$KEY" | gpg --batch --import`. Do not base64-encode the key.
+
+If the CI key carries a passphrase, map the passphrase secret to the env var the binary reads:
+
+```yaml
+env:
+  DOTSECENV_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+```
+
+The current examples use `--no-passphrase` CI keys, so the passphrase variant is optional. Always log in by fingerprint: `dotsecenv login <FINGERPRINT>`.
+
+<Aside type="caution" title="The name is intent, not enforcement">
+  The `ORG_` prefix does not grant org-wide access. GitHub does.
+</Aside>
+
+## GitHub enforces the real scope
+
+The secret name documents intent. The actual scope comes from **where the secret is defined** in GitHub.
+
+A **repository secret** is visible only to workflows in that one repository. A repo-scoped key belongs here.
+
+An **organization secret** is defined once at the org level with a repository-access policy (all repos, private repos, or a selected list). Every repo the policy covers can read it. An org-wide key belongs here.
+
+So a key named `ORG_GPG_PRIVATE_KEY` stored as a repository secret is reachable by exactly one repo; the name lies about its reach. A key named `GPG_PRIVATE_KEY` stored as an org secret with broad access is reachable by the whole fleet, whatever the name suggests. Name the secret to match where you put it. GitHub decides the reach.
+
+## Choosing a scope
+
+Prefer the narrowest scope that works. Repo-scoped keys are the least-privilege default: one key opens one vault, a leak is contained, and rotation touches one repo.
+
+Reach for an org-wide key only when re-bootstrapping every repository is the cost you are trying to avoid: many repos, one platform team, the same CI identity everywhere. You are trading a larger blast radius for not repeating the setup. Per-environment suffixes keep that trade narrower for production. An org-wide `ORG_GPG_PRIVATE_KEY_PROD` can be a separate key from the dev/staging one, so a leaked non-prod key never touches production vaults.
+
+## Collision caveat
+
+The bare name `GPG_PRIVATE_KEY` is also what [`crazy-max/ghaction-import-gpg`](https://github.com/crazy-max/ghaction-import-gpg) and GoReleaser use for **release signing**. A repository that both signs releases and runs dotsecenv in CI will have two unrelated keys fighting for the same secret name. Rename one. The dotsecenv side can move to a suffixed or `ORG_`-prefixed name; the release-signing side has its own configuration knob.
+
+## Rotation
+
+Rotation cost follows scope.
+
+Rotating a **repo-scoped** key is contained to one repository: generate a new key, `secret share` the repo's secrets to its fingerprint, commit the updated vault, and replace the repository secret. Nothing outside that repo changes.
+
+Rotating an **org-wide** key is a fan-out. Every repository that shared secrets to the old key has to re-grant: run `secret share` to the new fingerprint and commit the updated vault in each repo. Then re-import the new private key wherever it lives: the org secret, plus any per-environment variants. Until every repo is re-shared and the org secret is replaced, you are running with a key you meant to retire. This fan-out is the standing cost of the convenience an org-wide key buys.
+
+## See also
+
+- [Threat Model](/concepts/threat-model/) — what a compromised private key exposes, and how keys leak.
+- [Security Policies](/concepts/security-policies/) — pin algorithm and vault-path floors that apply regardless of which key a job uses.
+- [CI/CD Secrets tutorial](/tutorials/ci-cd-secrets/) — the repo-scoped CI workflow, step by step.
+- Repo-scoped example: [`examples/03-ci-cd-github-action`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/03-ci-cd-github-action).
+- Org-wide example: [`examples/07-org-wide-keypair`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/07-org-wide-keypair).

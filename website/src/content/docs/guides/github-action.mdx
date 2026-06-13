@@ -192,7 +192,7 @@ The `init-config` input controls whether `dotsecenv init config` runs after inst
     ```yaml
     - uses: dotsecenv/dotsecenv@v0
       with:
-        init-config: '--login <GPG_KEY>'
+        init-config: '--login <FINGERPRINT>'
     ```
   </TabItem>
 
@@ -216,6 +216,13 @@ The `init-config` input controls whether `dotsecenv init config` runs after inst
     ```
   </TabItem>
 </Tabs>
+
+<Aside type="note" title="Key scope">
+  The CI key you import can be repo-scoped (a repository secret named
+  `GPG_PRIVATE_KEY`, one key per repo) or org-wide (an organization secret
+  named `ORG_GPG_PRIVATE_KEY`, one key shared across repos). See
+  [Key Scope](/concepts/key-scope/) for the trade-offs.
+</Aside>
 
 ### Disabling Provenance Verification
 

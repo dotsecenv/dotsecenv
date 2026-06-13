@@ -253,6 +253,26 @@ What the script does NOT do — handle manually if needed:
   `release.yml` workflow runs hermetic e2e first, then GoReleaser, then
   notarizes Darwin archives, then re-signs checksums, then triggers downstream
   repos (`packages`, `homebrew-tap`, `plugin`, `website`).
+- **Secret naming (CI/CD vault-decryption secrets).** A user feeds a GPG
+  private key into CI so dotsecenv can decrypt the committed vault. Name it by
+  SCOPE:
+  - Repo-scoped (default, a repository secret): `GPG_PRIVATE_KEY` (plus
+    `GPG_PASSPHRASE` if the key is passphrase-protected).
+  - Org-wide (shared across repos, an organization secret):
+    `ORG_GPG_PRIVATE_KEY` (plus `ORG_GPG_PASSPHRASE`).
+  - Per-environment: suffix `_DEV`/`_STAGING`/`_PROD`.
+  - Keys are ASCII-armored, never base64. Log in by fingerprint
+    (`dotsecenv login <FINGERPRINT>`); `DOTSECENV_FINGERPRINT` was removed, so
+    don't reintroduce it. A passphrase secret maps to the binary's
+    `DOTSECENV_PASSPHRASE` env var.
+  - When documenting CI, always say whether a key is repo-scoped or org-wide.
+    See the Key Scope concept page
+    (`website/src/content/docs/concepts/key-scope.mdx`).
+  - **Separate role, leave as-is:** `release.yml` and the `packages` repo's
+    `publish.yml` use `secrets.GPG_PRIVATE_KEY` / `GPG_PASSPHRASE` for the
+    maintainers' **sign-only** release key (the crazy-max/GoReleaser
+    convention). It shares the bare name with a repo-scoped vault key but is a
+    different role; don't rename the release secrets.
 - **Hooks:** Managed by [lefthook](https://github.com/evilmartians/lefthook).
   `make hooks` installs them. **Don't bypass with `--no-verify`** — fix the
   lint or test failure instead.
@@ -356,6 +376,11 @@ reasoning about behavior. They are also what reviewers will check.
   across fragments; scalar fields are last-fragment-wins in lexical order
   (Unix `*.d` convention: `00-base, 50-team, 99-overrides`). See
   [CLAUDE.md](./CLAUDE.md) and the README's "Policy Directory" section.
+- **CI secret naming.** A vault-decryption keypair is `GPG_PRIVATE_KEY`
+  (repo-scoped) or `ORG_GPG_PRIVATE_KEY` (org-wide), with `_PASSPHRASE` and
+  per-env `_DEV/_STAGING/_PROD` variants. The release workflows' sign-only
+  `secrets.GPG_PRIVATE_KEY`/`GPG_PASSPHRASE` are a separate role, left
+  unchanged. See the "Secret naming" entry under Conventions.
 - **Multi-recipient PGP encryption.** A single `value` entry carries one
   ciphertext encrypted to multiple recipients (the union of fingerprints
   in `available_to`). Sharing or revoking access re-encrypts only that

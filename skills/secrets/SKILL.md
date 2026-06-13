@@ -192,7 +192,7 @@ dotsecenv secret forget SECRET_NAME
 When the user describes removing a departing team member's GPG key, follow the [Offboard a Departing Team Member runbook](https://dotsecenv.com/runbooks/team-member-offboarding/). The shape of the workflow:
 
 1. **Inventory.** List every secret whose `available_to` includes the leaver's fingerprint via `dotsecenv vault describe --json`. The jq filter is `'.[].secrets[] | select((.available_to // []) | index($fp)) | .key'`.
-2. **Revoke in one pass.** `dotsecenv secret revoke "*" FINGERPRINT --all`. The wildcard must be quoted.
+2. **Revoke from every secret.** `secret revoke` takes one name per call; loop over the keys `secret get` (no args) prints: `for s in $(dotsecenv secret get); do dotsecenv secret revoke "$s" FINGERPRINT --all; done`.
 3. **Verify.** Re-run the inventory query; expected output is empty.
 4. **Rotate at the source.** For each affected secret, generate a new credential at the originating system (DB, IDP, cloud provider, API issuer), then `echo "new-value" | dotsecenv secret store SECRET_NAME`. Production-critical first.
 5. **Confirm.** `dotsecenv vault doctor` + `dotsecenv vault describe`.

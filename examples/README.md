@@ -14,19 +14,21 @@ reference see `dotsecenv --help` or the man pages installed by
 
 ## Index
 
-| #  | Example                                                  | What it shows                                                                | Prereqs                              |
-| -- | -------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------ |
-| 01 | [quickstart](./01-quickstart/)                           | `init config` -> `init vault` -> `login` -> `secret store` -> `secret get`   | `dotsecenv`, `gpg`                   |
-| 02 | [team-share-revoke](./02-team-share-revoke/)             | Multi-recipient encryption with two ephemeral identities; share, then revoke | `dotsecenv`, `gpg`                   |
-| 03 | [ci-cd-github-action](./03-ci-cd-github-action/)         | Use the `dotsecenv/dotsecenv` GitHub Action to install and decrypt in CI     | A GitHub repo, a CI-only GPG key     |
-| 04 | [policy-directory](./04-policy-directory/)               | Drop YAML fragments into `/etc/dotsecenv/policy.d/` to constrain users       | Root or fakeroot for `/etc/...`      |
-| 05 | [secenv-shell-plugin](./05-secenv-shell-plugin/)         | Reference `.secenv` file demonstrating every supported placeholder syntax    | The dotsecenv shell plugin installed |
+| #  | Example | What it shows | Spine tutorial |
+| -- | ------- | ------------- | -------------- |
+| 01 | [quickstart](./01-quickstart/) | `init config` -> `init vault` -> `login` -> `secret store` -> `secret get` | [Your First Secret](https://dotsecenv.com/tutorials/first-secret/) |
+| 02 | [team-share-revoke](./02-team-share-revoke/) | Multi-recipient encryption with two ephemeral identities; share, then revoke | [Share a Secret](https://dotsecenv.com/tutorials/share-secret/) |
+| 03 | [ci-cd-github-action](./03-ci-cd-github-action/) | Repo-scoped CI: install and decrypt via the GitHub Action (`GPG_PRIVATE_KEY`) | [CI/CD Secrets](https://dotsecenv.com/tutorials/ci-cd-secrets/) |
+| 04 | [policy-directory](./04-policy-directory/) | Drop YAML fragments into `/etc/dotsecenv/policy.d/` to constrain users | [Apply a Security Policy](https://dotsecenv.com/tutorials/apply-a-policy/) |
+| 05 | [secenv-shell-plugin](./05-secenv-shell-plugin/) | Reference `.secenv` file demonstrating every supported placeholder syntax | [Reloading Secrets](https://dotsecenv.com/tutorials/reload-secrets/) |
+| 06 | [multi-environment-fips](./06-multi-environment-fips/) | Vault-per-environment under FIPS 186-5 policy; per-env CI keys (`GPG_PRIVATE_KEY_DEV`...) | [Team Vault Setup](https://dotsecenv.com/tutorials/team-vault-setup/) |
+| 07 | [org-wide-keypair](./07-org-wide-keypair/) | Org-wide CI: one keypair shared across repos via an organization secret (`ORG_GPG_PRIVATE_KEY`) | [Org-wide Keypair in CI](https://dotsecenv.com/tutorials/org-wide-keypair/) |
 
-Examples 01 and 02 ship a `run.sh` that executes the full flow end to end in
-an ephemeral working directory. Examples 03, 04, and 05 are configuration
-artifacts (a workflow YAML, two policy fragments, a `.secenv` file) — they
-ship with a `README.md` that explains how to install and use them, but there
-is nothing to "run".
+Examples 01, 02, and 06 ship a `run.sh` that executes the full flow end to
+end in an ephemeral working directory. Examples 03, 04, 05, and 07 are
+configuration artifacts (workflow YAML, policy fragments, a `.secenv` file)
+that ship with a `README.md` explaining how to install and use them; there is
+nothing to "run".
 
 ## Safety conventions
 
@@ -47,6 +49,24 @@ borrowed from `scripts/sandbox.sh` and `demos/demo.sh`:
 - Example keys use `--no-passphrase` (CI-only mode) so the scripts do not
   block on a pinentry prompt. Do not use `--no-passphrase` for real keys —
   see <https://dotsecenv.com/concepts/threat-model/> for why.
+
+## Secret naming
+
+The CI examples (03, 06, 07) store a GPG private key as a GitHub Actions
+secret so dotsecenv can decrypt the committed vault. The secret name encodes
+the key's scope:
+
+| Scope                 | Where it lives                      | Secret name                                |
+| --------------------- | ----------------------------------- | ------------------------------------------ |
+| Repo-scoped (default) | a repository secret                 | `GPG_PRIVATE_KEY`                          |
+| Org-wide              | an organization secret              | `ORG_GPG_PRIVATE_KEY`                      |
+| Per-environment       | a repository secret per environment | `GPG_PRIVATE_KEY_DEV` / `_STAGING` / `_PROD` |
+
+Add `GPG_PASSPHRASE` (or `ORG_GPG_PASSPHRASE`) only when the key carries a
+passphrase. Keys are ASCII-armored (`gpg --armor --export-secret-keys`), never
+base64. Log in by fingerprint (`dotsecenv login <FINGERPRINT>`). Prefer the
+narrowest scope that works: an org-wide key that leaks exposes every repo's
+vault it is a recipient of. See <https://dotsecenv.com/concepts/key-scope/>.
 
 ## Running an example
 
