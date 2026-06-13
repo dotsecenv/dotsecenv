@@ -12,62 +12,36 @@ When documenting CI/CD, use the canonical secret names and always state whether 
 
 ## Changelog Generation
 
-When asked to update the changelog for a new release:
+The changelog (`src/content/docs/changelog.mdx`) builds up continuously: every PR adds a one-line entry under the standing `## Upcoming` section, and the release PR stamps that section to the version tag. The `changelog` skill (`../skills/changelog/SKILL.md`) drives this; this section is the reference for format and the release stamp.
 
-1. **Get version tags** from the dotsecenv repo:
-   ```bash
-   cd ../dotsecenv
-   git fetch --tags
-   LATEST=$(git describe --tags --abbrev=0)
-   PREV=$(git tag -l "v*" --sort=-version:refname | sed -n '2p')
-   ```
+**Per PR:** add one line under `## Upcoming`, in the subsection for the PR's type (see the table below), ending with the PR number.
 
-2. **Get commit logs** between tags from both repos:
-   ```bash
-   # dotsecenv commits
-   cd ../dotsecenv
-   git log $PREV..$LATEST --oneline
+**At release (in the release PR):**
 
-   # plugin commits (skip if tags don't exist in plugin for older releases)
-   cd ../plugin
-   git fetch --tags
-   if git rev-parse "$PREV" >/dev/null 2>&1 && git rev-parse "$LATEST" >/dev/null 2>&1; then
-     git log $PREV..$LATEST --oneline
-   fi
-   ```
+1. From the repo root, run `bash skills/changelog/assess.sh` to list any merged PRs since the last tag that are missing from "Upcoming", and add an entry for each. This is the "assess all commits since the last release" step.
+2. Rename `## Upcoming` to `## vX.Y.Z` and replace `_Unreleased_` with `_Month Day, Year_` (today's date). Drop any subsection left empty.
+3. Open a fresh, empty `## Upcoming` section at the top for the next cycle.
 
-3. **Get release date**:
-   ```bash
-   cd ../dotsecenv
-   git log -1 --format='%B %d, %Y' $LATEST
-   ```
-
-4. **Group commits** by type:
-   - `feat:` → **Features**
-   - `fix:` → **Bug Fixes**
-   - Everything else → **Other**
-   - Commits from **dotsecenv** use `#N` for issue/PR references
-   - Commits from **plugin** use `plugin#N` for issue/PR references
-
-5. **Update changelog**: Add new version section at the top of `src/content/docs/changelog.mdx` (after the intro paragraph, before the first version entry)
+Plugin changes live in the separate `plugin` repo; reference them as `plugin#N` when they belong in a dotsecenv release note.
 
 ### Changelog Entry Format
 
 ```mdx
----
+## Upcoming
 
-## vX.Y.Z
-*Month Day, Year*
+_Unreleased_
 
 ### Features
-- Feature description here
+- Feature description here (#PR)
 
 ### Bug Fixes
-- Fix description here
+- Fix description here (#PR)
 
 ### Other
-- Other changes here
+- Other changes here (#PR)
 ```
+
+At release, `## Upcoming` / `_Unreleased_` becomes `## vX.Y.Z` / `_Month Day, Year_`, and a fresh empty `## Upcoming` is opened above it.
 
 ### Commit Message Convention
 

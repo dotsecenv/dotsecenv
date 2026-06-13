@@ -231,6 +231,12 @@ What the script does NOT do — handle manually if needed:
   the description; GitHub adds the `Co-authored-by:` footer from the commit
   trailers. End the description with a `---` line so that footer is set off by
   a separator.
+- **Changelog:** every PR adds one line to the `## Upcoming` section of
+  `website/src/content/docs/changelog.mdx` (use the `changelog` skill,
+  `skills/changelog/SKILL.md`), in the subsection for its type (`feat` ->
+  Features, `fix` -> Bug Fixes, else Other), ending with the PR number. Release
+  notes build up per PR; the release PR stamps "Upcoming" to the tag.
+  `bash skills/changelog/assess.sh` reports any merged PRs missing from it.
 - **Branches:** `feat/*`, `fix/*`, `docs/*`, etc. (see `CONTRIBUTING.md`).
 - **PRs only:** All changes land on `main` through pull requests. Don't
   push commits directly to `main`, even when your account holds a bypass
