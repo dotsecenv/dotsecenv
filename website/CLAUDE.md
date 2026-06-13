@@ -8,6 +8,8 @@ Keep the focus on the tool. Do not prescribe company policy, comms channels, esc
 
 Match the terse, direct voice of existing pages. The Tier-3 offboarding section in `../skills/secrets/SKILL.md` is the compact-runbook reference: numbered steps in `<Steps>`, one-sentence explanations, single `<Aside>` for the load-bearing caveat (append-only, recipient set, etc.).
 
+When documenting CI/CD, use the canonical secret names and always state whether a key is repo-scoped or org-wide. A vault-decryption keypair is `GPG_PRIVATE_KEY` repo-scoped (a repository secret) or `ORG_GPG_PRIVATE_KEY` org-wide (an organization secret), with `_PASSPHRASE` and per-environment `_DEV/_STAGING/_PROD` variants; keys are ASCII-armored, never base64; log in by fingerprint (`dotsecenv login <FINGERPRINT>`, never `DOTSECENV_FINGERPRINT`). See [Key Scope](src/content/docs/concepts/key-scope.mdx).
+
 ## Changelog Generation
 
 When asked to update the changelog for a new release:

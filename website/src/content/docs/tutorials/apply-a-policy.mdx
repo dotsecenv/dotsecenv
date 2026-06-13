@@ -1,0 +1,98 @@
+---
+title: Apply a Security Policy
+description: Install policy.d fragments to constrain every dotsecenv user on a machine.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="Available in v0.6.0+">
+  The policy directory and the `dotsecenv policy` subcommand were introduced in v0.6.0. On earlier versions, `/etc/dotsecenv/policy.d/` is ignored and `dotsecenv policy` does not exist.
+</Aside>
+
+<Aside type="tip" title="Runnable example">
+A two-fragment baseline (`00-corp-baseline.yaml` + `99-team-overrides.yaml`) with install commands and a merge-rule walkthrough ships at [`examples/04-policy-directory/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/04-policy-directory) on the CLI repo.
+</Aside>
+
+## Goal
+
+Drop YAML fragments into `/etc/dotsecenv/policy.d/` so an admin can constrain every dotsecenv user on a machine, then verify the merged result with `dotsecenv policy validate`.
+
+## Prerequisites
+
+- dotsecenv v0.6.0 or later
+- `sudo` on the host (fragments must be owned by root)
+- The two fragments from [`examples/04-policy-directory/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/04-policy-directory): `00-corp-baseline.yaml` and `99-team-overrides.yaml`
+
+## Steps
+
+<Steps>
+
+1. **Create the policy directory**
+
+   It must be owned by root and not writable by anyone else, or dotsecenv refuses to start.
+
+   ```bash
+   sudo install -d -o root -g root -m 0755 /etc/dotsecenv/policy.d
+   ```
+
+2. **Install the baseline fragment**
+
+   `00-corp-baseline.yaml` sets the org-wide floor: FIPS-grade `approved_algorithms`, two `approved_vault_paths` patterns, and two `behavior.*` flags.
+
+   ```bash
+   sudo install -m 0644 -o root -g root \
+     00-corp-baseline.yaml /etc/dotsecenv/policy.d/00-corp-baseline.yaml
+   ```
+
+3. **Install the team override**
+
+   `99-team-overrides.yaml` loads last. It pins `gpg.program` and appends one more `approved_vault_paths` pattern.
+
+   ```bash
+   sudo install -m 0644 -o root -g root \
+     99-team-overrides.yaml /etc/dotsecenv/policy.d/99-team-overrides.yaml
+   ```
+
+4. **Validate the merge**
+
+   ```bash
+   dotsecenv policy validate
+   # ✓ policy valid (2 fragment(s) in /etc/dotsecenv/policy.d)
+   ```
+
+   This command does not load user config or open vaults, so it keeps working when the policy is broken and you need to inspect it.
+
+5. **Inspect the effective policy**
+
+   ```bash
+   dotsecenv policy list
+   ```
+
+   Each field is annotated with the fragment it came from. `approved_vault_paths` shows the deduped union of both files; `gpg.program` shows `99-team-overrides.yaml` (last fragment to set a scalar wins).
+
+</Steps>
+
+## How the two fragments combine
+
+Filename order follows the Unix `*.d` convention (`00-base`, `50-team`, `99-overrides`), and that ordering does two different jobs depending on the field:
+
+- **Allow-list fields** (`approved_algorithms`, `approved_vault_paths`) take the **union** across fragments. The baseline's two vault patterns plus the override's one give three approved paths. Order does not matter here, and a later fragment cannot remove an entry an earlier one added.
+- **Scalar fields** (`gpg.program`, `behavior.*`) take the **last value set** in lexical order. `99-` outranks `00-`, so the override's `gpg.program` wins. The baseline's `behavior.*` flags survive because no later fragment touched them.
+
+## Exit codes
+
+`policy validate` returns a distinct exit code per failure category, so a CI job on the repo that ships your fragments can tell them apart:
+
+| Condition | Exit code |
+|---|---|
+| Valid policy (or no `policy.d/` at all) | `0` |
+| Empty allow-list (`approved_algorithms: []`) | `1` (General error) |
+| Forbidden key (`login:`, `vault:`) or malformed YAML | `2` (Configuration error) |
+| Insecure permissions or an unreadable fragment | `8` (Access denied) |
+
+Policy is fail-closed. While a fragment is broken, every dotsecenv command on the machine refuses to run, including a routine `secret get`. A partially-readable policy directory is indistinguishable from tampering, so dotsecenv stops rather than fall back to user-only config. Fix or remove the offending file, then re-run `dotsecenv policy validate` until it returns `0`.
+
+## Next steps
+
+- [Security Policies](/concepts/security-policies/) -- the full merge contract, user-vs-policy intersection, `--json` output, and path-matching rules.
+- [Team Vault Setup](/tutorials/team-vault-setup/) -- pin the same `approved_algorithms` fragment across development, staging, and production.

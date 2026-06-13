@@ -137,9 +137,9 @@ rather than rewriting the corporate baseline.
 
 Copy `ci.yml` to `.github/workflows/deploy.yml` in your application
 repo and configure three repo secrets:
-`DOTSECENV_GPG_PRIVATE_KEY_DEV`,
-`DOTSECENV_GPG_PRIVATE_KEY_STAGING`,
-`DOTSECENV_GPG_PRIVATE_KEY_PROD`.
+`GPG_PRIVATE_KEY_DEV`,
+`GPG_PRIVATE_KEY_STAGING`,
+`GPG_PRIVATE_KEY_PROD`.
 
 ## Files
 

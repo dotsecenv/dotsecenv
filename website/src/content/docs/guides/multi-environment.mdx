@@ -68,7 +68,7 @@ A regulated deployment usually wants both: the policy fragment for algorithm enf
 The companion [`ci.yml`](https://github.com/dotsecenv/dotsecenv/blob/main/examples/06-multi-environment-fips/ci.yml) in the example directory shows a GitHub Actions layout that:
 
 1. Validates the policy fragment once per push with `dotsecenv policy validate`. The job fails fast on any of the distinct exit codes (1 for empty allow-list, 2 for malformed fragment, 8 for insecure permissions).
-2. Fans out a matrix job over `dev` / `staging` / `production`. Each matrix entry imports a different repo-secret-stored private key (`DOTSECENV_GPG_PRIVATE_KEY_DEV` and friends) and points at the matching vault file.
+2. Fans out a matrix job over `dev` / `staging` / `production`. Each matrix entry imports a different repo-secret-stored private key (`GPG_PRIVATE_KEY_DEV` and friends) and points at the matching vault file.
 3. Runs `dotsecenv vault doctor --json` per environment before any `secret get` call, so a fragmented or stale vault fails the job before it can leak partial state.
 
 The pattern works the same on GitLab CI, Buildkite, CircleCI, and self-hosted Jenkins. The only platform-specific pieces are the secret-storage syntax and the runner image.

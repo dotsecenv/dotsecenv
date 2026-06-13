@@ -7,6 +7,10 @@ secrets in GitHub repository secrets.
 
 ## What this demonstrates
 
+This is the **repo-scoped** pattern: one CI key per repository, exported as
+the repository secret `GPG_PRIVATE_KEY`. For one key shared across many repos,
+see the org-wide counterpart in [`../07-org-wide-keypair/`](../07-org-wide-keypair/).
+
 - Calling the `dotsecenv/dotsecenv@v0` composite action with provenance
   verification enabled (SHA-256 checksums, GPG signature on
   `checksums.txt`, and the Sigstore attestation on the archive).
@@ -53,9 +57,9 @@ FP=$(gpg --list-secret-keys --with-colons "ci@your-org.example" \
 gpg --armor --export-secret-keys "$FP" > /tmp/dotsecenv-ci.asc
 
 # 3. Add the contents of /tmp/dotsecenv-ci.asc as a GitHub repo secret named
-#    DOTSECENV_GPG_PRIVATE_KEY. Two ways:
+#    GPG_PRIVATE_KEY. Two ways:
 #       a. Settings -> Secrets and variables -> Actions -> New repository secret
-#       b. gh CLI:  gh secret set DOTSECENV_GPG_PRIVATE_KEY < /tmp/dotsecenv-ci.asc
+#       b. gh CLI:  gh secret set GPG_PRIVATE_KEY < /tmp/dotsecenv-ci.asc
 
 # 4. Wipe the file from disk.
 shred -u /tmp/dotsecenv-ci.asc
@@ -128,7 +132,7 @@ piped through `::add-mask::` before `$GITHUB_ENV`.
   secret can decrypt every vault entry the key is a recipient of. Keep the
   secret tightly scoped (per repo, per environment) and rotate periodically.
 - Use environment-scoped secrets for production. GitHub's "deployment
-  environments" let you put `DOTSECENV_GPG_PRIVATE_KEY` behind a manual
+  environments" let you put `GPG_PRIVATE_KEY` behind a manual
   approval gate before it is exposed to the deploy job.
 - Grant the minimum recipient set. Only `secret share` to the CI key for the
   secrets CI actually needs; everything else stays encrypted to humans only.
@@ -137,6 +141,9 @@ piped through `::add-mask::` before `$GITHUB_ENV`.
 
 ## Related
 
+- Concept: Key Scope (repo-scoped vs org-wide):
+  <https://dotsecenv.com/concepts/key-scope/>
+- Org-wide counterpart example: [../07-org-wide-keypair/](../07-org-wide-keypair/)
 - Tutorial: <https://dotsecenv.com/tutorials/ci-cd-secrets/>
 - Guide: <https://dotsecenv.com/guides/github-action/>
 - Action source and inputs reference: [`action.yml`](../../action.yml) at
