@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	charm.land/bubbletea/v2 v2.0.7
-	charm.land/lipgloss/v2 v2.0.3
+	charm.land/lipgloss/v2 v2.0.4
 	github.com/ProtonMail/go-crypto v1.4.1
 	github.com/ProtonMail/gopenpgp/v3 v3.4.1
 	github.com/spf13/cobra v1.10.2
