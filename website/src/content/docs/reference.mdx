@@ -597,7 +597,7 @@ dotsecenv secret forget SECRET [flags]
 This adds a deletion marker to the secret. The secret will no longer be returned by `secret get` and will be shown as deleted in `vault describe`.
 
 <Aside type="note">
-The deletion is a soft delete. The secret's history is preserved in the vault file. Use `vault doctor` (which offers defragmentation) to permanently remove deleted secrets.
+The deletion is a soft delete. The secret's history is preserved in the vault file. Use `vault compact` to permanently remove deleted secrets and drop superseded value versions.
 </Aside>
 
 **Options:**
@@ -717,6 +717,10 @@ Run health checks on vaults and the GPG environment, and fix issues.
 dotsecenv vault doctor [flags]
 ```
 
+<Aside type="tip">
+`dotsecenv doctor` is a top-level alias for `dotsecenv vault doctor`, following the `brew doctor` / `flutter doctor` convention. Both accept the same flags.
+</Aside>
+
 Performs the following checks:
 
 - **GPG agent availability** - verifies gpg-agent is running
@@ -766,6 +770,58 @@ Status: warning
 Upgrade vault .dotsecenv/vault from v1 to v2? [y/N]:
 ```
 
+### vault compact
+
+Drop superseded secret values to shrink a vault.
+
+```bash
+dotsecenv vault compact [flags]
+```
+
+For each secret, compaction keeps the newest value every current identity can decrypt (exactly what `secret get` returns for that identity) and drops the rest. Deleted secrets are removed entirely. Values readable only by revoked fingerprints fall away, since no current identity reaches them.
+
+Compaction never decrypts. It reads only access lists (`available_to` fingerprints) and value order, then rewrites the file preserving every kept value verbatim, so signatures stay valid. Identities are never touched.
+
+Without `--yes`, the command prints the plan and asks for confirmation before writing. Confirmation is skipped automatically in CI.
+
+:::caution
+Compaction rewrites the vault file. Back it up first (`cp <vault> <vault>.bak`). To make a former recipient's old ciphertext unreadable, rotate the secret at its source; compaction drops unreachable versions but does not re-encrypt anything.
+:::
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--yes` | Skip the confirmation prompt |
+| `--json` | Output as JSON (writes only when combined with `--yes`) |
+
+**Examples:**
+
+```bash
+# Show the plan, then confirm before writing
+dotsecenv vault compact
+
+# Compact without prompting (also auto-skips the prompt in CI)
+dotsecenv vault compact --yes
+
+# Preview the plan as JSON without writing
+dotsecenv vault compact --json
+
+# Compact a specific vault
+dotsecenv vault compact -v 1
+```
+
+**Sample output:**
+
+```text
+Vault: ~/.local/share/dotsecenv/vault
+Compaction plan (metadata only, no decryption):
+  AWS_KEY: 5 -> 1 value(s)
+  DB_PASSWORD: 4 -> 1 value(s)
+  TEMP_TOKEN: 2 value(s) -> removed (deleted)
+Total: 11 -> 2 value(s); 1 deleted secret(s) removed
+```
+
 ### vault upgrade
 
 Upgrade vault file format to the latest version.
@@ -788,6 +844,35 @@ dotsecenv vault upgrade -v 1
 # Upgrade vault at path
 dotsecenv vault upgrade -v ./project/vault
 ```
+
+---
+
+## doctor
+
+Run health checks on vaults and the GPG environment. This is a top-level alias for [`vault doctor`](#vault-doctor), following the `brew doctor` / `flutter doctor` convention.
+
+```bash
+dotsecenv doctor [flags]
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--fix` | Auto-fix issues without prompting |
+| `--json` | Output as JSON |
+
+**Examples:**
+
+```bash
+# Run health checks
+dotsecenv doctor
+
+# Auto-fix issues without prompting
+dotsecenv doctor --fix
+```
+
+See [`vault doctor`](#vault-doctor) for the full list of checks and sample output.
 
 ---
 
