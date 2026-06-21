@@ -122,6 +122,24 @@ func parseVaultSpec(configPath string, vaultPaths []string) (vaultPath string, f
 	return vaultSpec, 0, nil
 }
 
+// parseVaultSpecScoped parses the -v spec and adjusts the session scope so the
+// result resolves correctly inside the command.
+//
+// For an index (-v N), it clears globalOpts.VaultPaths so createCLI loads the
+// full configured list; the returned fromIndex is then resolved against that
+// list. For a path (-v /path), it leaves VaultPaths in place so createCLI loads
+// exactly that vault. Call this BEFORE createCLI.
+func parseVaultSpecScoped() (vaultPath string, fromIndex int, err error) {
+	vaultPath, fromIndex, err = parseVaultSpec(globalOpts.ConfigPath, globalOpts.VaultPaths)
+	if err != nil {
+		return "", 0, err
+	}
+	if fromIndex != 0 {
+		globalOpts.VaultPaths = []string{}
+	}
+	return vaultPath, fromIndex, nil
+}
+
 // printVaultList prints the list of configured vaults to the given writer
 func printVaultList(configPath string, w io.Writer) {
 	cfgPath := configPath
