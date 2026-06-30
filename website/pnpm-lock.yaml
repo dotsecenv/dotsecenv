@@ -27,8 +27,8 @@ importers:
         specifier: ^0.35.0
         version: 0.35.1
       starlight-blog:
-        specifier: ^0.26.1
-        version: 0.26.1(@astrojs/starlight@0.40.0(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0))(typescript@6.0.3))(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0))
+        specifier: ^0.27.0
+        version: 0.27.0(@astrojs/starlight@0.40.0(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0))(typescript@6.0.3))(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0))
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.0
@@ -94,6 +94,16 @@ packages:
       '@astrojs/markdown-satteri':
         optional: true
 
+  '@astrojs/mdx@7.0.0':
+    resolution: {integrity: sha512-LKwNA8nnLtEM0auoP6OfH/UnlKe1Ub59qZjbcYkZjPBGw6PkJewWkA/1qwLpECvV6gMDd6TR6eqV9p/VYZrcrQ==}
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      '@astrojs/markdown-satteri': ^0.3.1-alpha.0
+      astro: ^7.0.0-alpha.0
+    peerDependenciesMeta:
+      '@astrojs/markdown-satteri':
+        optional: true
+
   '@astrojs/prism@4.0.2':
     resolution: {integrity: sha512-KTivpmnz6lDsC6o9H4+DNm2SrE/GHzw8cNAvEJwAvUT+eoaEnn/4NtbDNfRRaxaJHdp15gf+tfHAWiXR4wB3BA==}
     engines: {node: '>=22.12.0'}
@@ -142,6 +152,55 @@ packages:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
+  '@bruits/satteri-darwin-arm64@0.9.3':
+    resolution: {integrity: sha512-dRUZZrdwh1asfTOyM1nDNmzolhnHtlIFpqYrl1Tdd3YVcaebKmrfJgGL7NAoGPjbEwYmZxaugrxA0uzw83c0dw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@bruits/satteri-darwin-x64@0.9.3':
+    resolution: {integrity: sha512-wgNCTRp2hPSpNMGFv5A4+6+VXgRJIlBZ7XKb3iwjV8YjRWNIjzE5zV2fUeYynyZYVRkuJ9aYFqQmWhc1e5H+UQ==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@bruits/satteri-linux-arm64-gnu@0.9.3':
+    resolution: {integrity: sha512-A/pWy8Jb/PhDYc2/JFuYh06gFJcsfBUBDl81YydGYBrL/Z4nItDfhNDNOibyeSN/lKKDRlycIHEIajjErk00sQ==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@bruits/satteri-linux-arm64-musl@0.9.3':
+    resolution: {integrity: sha512-L6YxmyOSickzo4pE5WmZfNTJnjX0MtgKOsuwQfNZECTx9Ir5vl2B37EIwnxe2AybuPPHl+FqVQtthNDUdH4Vgg==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@bruits/satteri-linux-x64-gnu@0.9.3':
+    resolution: {integrity: sha512-RgH6GPihg9Lzs2yHUsMjqiLxfLyOdmBty8sg9pBY9B4CBnvdOzvg8vklqN+C4qrEEdA9TwpbDpHr1AshLKyRpw==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@bruits/satteri-linux-x64-musl@0.9.3':
+    resolution: {integrity: sha512-BeWhVORjNTIomePznUKiMbHZTqC0j7sMXZFsISmbX+po5d33KLkqBqKh6K332CHJ8KUmCWx16FfPjwsoysttQg==}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@bruits/satteri-wasm32-wasi@0.9.3':
+    resolution: {integrity: sha512-dFNcOHKWV2cztCPnYTn7kZ9D7kNOt8N239z5ysFkNHLxJrfK7zaKIXQbfXYN32C+JoVFqAcTIOeWH2+VnsCOHg==}
+    engines: {node: '>=14.0.0'}
+    cpu: [wasm32]
+
+  '@bruits/satteri-win32-arm64-msvc@0.9.3':
+    resolution: {integrity: sha512-VnwjBHiAra/PNNEza8eSZdQiG4A3PtTJJwUDtOPAc6iTs0BWZwZX8+OPUZE7//yQCBhgvEMcI8vpwsAwCb6qGQ==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@bruits/satteri-win32-x64-msvc@0.9.3':
+    resolution: {integrity: sha512-Dsoe4reWe69MyILmMwU6iISIceTW7YIFqbyym7haf9DhUvqkYfMAyp7GMM21JzV0SpG9A2BwzFVP7iq9mmxrpA==}
+    cpu: [x64]
+    os: [win32]
+
   '@capsizecss/unpack@4.0.1':
     resolution: {integrity: sha512-CuNiSqg7+e1cO/GjffyMOm5Tt2jUF9CWHHnvQ/UkqvtkGfHdgwEC0wpmq7fkN3gxwpRnrAN0WzO3vREKmNolMQ==}
     engines: {node: '>=18'}
@@ -158,11 +217,17 @@ packages:
     resolution: {integrity: sha512-kzyuwOAQnXJNLS9PSyrk0CWk35nWJW/zl/6KvnTBMFK65gm7U1/Z5BqjxeapjZCIhQcM/DsrEmcbRwDyXyXK4A==}
     engines: {node: '>=14'}
 
+  '@emnapi/core@1.11.1':
+    resolution: {integrity: sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ==}
+
   '@emnapi/runtime@1.11.0':
     resolution: {integrity: sha512-55coeOFKHv1ywEcUXJtWU5f+Jr/W5tZDvZig8DLKSwUN1JpROQ4rk/SNOQiFWmaR/VKF4zuFyW1B8JduOSv6Pg==}
 
   '@emnapi/runtime@1.11.1':
     resolution: {integrity: sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw==}
+
+  '@emnapi/wasi-threads@1.2.2':
+    resolution: {integrity: sha512-c95qOXkHdydNKhscBTebqEC1CVAZpyqOfVfBzQ1qgzyl3gfeldUjIggDbIZgDKsHLgnsM+igH7TJ/eAasaVuMA==}
 
   '@esbuild/aix-ppc64@0.27.7':
     resolution: {integrity: sha512-EKX3Qwmhz1eMdEJokhALr0YiD0lhQNwDqkPYyPhiSwKrh7/4KRjQc04sZ8db+5DVVnZ1LmbNDI1uAMPEUBnQPg==}
@@ -718,6 +783,12 @@ packages:
   '@mdx-js/mdx@3.1.1':
     resolution: {integrity: sha512-f6ZO2ifpwAQIpzGWaBQT2TXxPv6z3RBzQKpVftEWN78Vl/YweF1uwussDx8ECAXVtr3Rs89fKyG9YlzUs9DyGQ==}
 
+  '@napi-rs/wasm-runtime@1.1.6':
+    resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
+    peerDependencies:
+      '@emnapi/core': ^1.7.1
+      '@emnapi/runtime': ^1.7.1
+
   '@nodable/entities@2.1.1':
     resolution: {integrity: sha512-Pig3HxDIoMgjdEH8OCf/dkcTmLFjJRjWuq8jSnklu284/TKOPibSRERmOykiwmyXTtv61mP+44f3GMx0tLAyjg==}
 
@@ -987,6 +1058,9 @@ packages:
     peerDependencies:
       solid-js: ^1.6.12
 
+  '@tybys/wasm-util@0.10.3':
+    resolution: {integrity: sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==}
+
   '@types/braces@3.0.5':
     resolution: {integrity: sha512-SQFof9H+LXeWNz8wDe7oN5zu7ket0qwMu5vZubW4GCJ8Kkeh6nBWUz87+KTz/G3Kqsrp0j/W253XJb3KMEeg3w==}
 
@@ -1189,10 +1263,6 @@ packages:
     resolution: {integrity: sha512-6omy7MJeOPwxdYH5+eL3zFIY9MhuDRUMuASuCx/eXNrHGUogq9ZHdx19A428KtWhLVuXVcLt7Klw5fxqASAHmg==}
     peerDependencies:
       astro: ^5.0.0 || ^6.0.0-alpha
-
-  astro-remote@0.3.4:
-    resolution: {integrity: sha512-jL5skNQLA0YBc1R3bVGXyHew3FqGqsT7AgLzWAVeTLzFkwVMUYvs4/lKJSmS7ygcF1GnHnoKG6++8GL9VtWwGQ==}
-    engines: {node: '>=18.14.1'}
 
   astro@6.4.8:
     resolution: {integrity: sha512-KK5lX90uU9EeVaTjINyj3sy9/NFXVa59aowaqbWBDDKLXZh4rr7GwIaCFYVetE22MJtsCNFerQXn0vlCLmpP/Q==}
@@ -1931,31 +2001,6 @@ packages:
     resolution: {integrity: sha512-xMUI3ChBuRuxuLF4ENvCZyS8z/+Jly1coUcZwErKLIB3sDj7ojpaTBa1e9YVPhSN4jGEIjYGQCldbTJS/hqS+A==}
     engines: {node: '>=22'}
 
-  marked-footnote@1.4.0:
-    resolution: {integrity: sha512-fZTxAhI1TcLEs5UOjCfYfTHpyKGaWQevbxaGTEA68B51l7i87SctPFtHETYqPkEN0ka5opvy4Dy1l/yXVC+hmg==}
-    peerDependencies:
-      marked: '>=7.0.0'
-
-  marked-plaintify@1.1.1:
-    resolution: {integrity: sha512-r3kMKArhfo2H3lD4ctFq/OJTzM0uNvXHh7FBTI1hMDpf4Ac1djjtq4g8NfTBWMxWLmaEz3KL1jCkLygik3gExA==}
-    peerDependencies:
-      marked: '>=13.0.0'
-
-  marked-smartypants@1.1.12:
-    resolution: {integrity: sha512-Z0QL2GpihbSeG5aaCrQxMEoqvngMftF/gq1SrdlCnbecUSrX3HYgPtCZzCW+OyNe2ideQqaFdxfGryqQX1MBDA==}
-    peerDependencies:
-      marked: '>=4 <19'
-
-  marked@12.0.2:
-    resolution: {integrity: sha512-qXUm7e/YKFoqFPYPa3Ukg9xlI5cyAtGmyEIzMfW//m6kXwCy2Ps9DYf5ioijFKQ8qyuscrHoY04iJGctu2Kg0Q==}
-    engines: {node: '>= 18'}
-    hasBin: true
-
-  marked@17.0.6:
-    resolution: {integrity: sha512-gB0gkNafnonOw0obSTEGZTT86IuhILt2Wfx0mWH/1Au83kybTayroZ/V6nS25mN7u8ASy+5fMhgB3XPNrOZdmA==}
-    engines: {node: '>= 20'}
-    hasBin: true
-
   mdast-util-definitions@6.0.0:
     resolution: {integrity: sha512-scTllyX6pnYNZH/AIp/0ePz6s4cZtARxImwoPJ7kS42n+MnVsI4XbnG6d4ibehRIldYMWM2LD7ImQblVhUejVQ==}
 
@@ -2340,9 +2385,6 @@ packages:
     resolution: {integrity: sha512-y+WKFlBR8BGXnsNlIHFGPZmyDf3DFMoLhaflAnyZgV6rG6xu+JwesTo2Q9R6XwYmtmwAFCkAk3e35jEdoeh/3g==}
     engines: {node: '>=10'}
 
-  property-information@7.1.0:
-    resolution: {integrity: sha512-TwEZ+X+yCJmYfL7TPUOcvBZ4QfoT5YenQiJuX//0th53DE6w0xxLEtfK3iyryQFddXuvkIk51EEgrJQ0WJkOmQ==}
-
   property-information@7.2.0:
     resolution: {integrity: sha512-IAtzIB6sUiWaJYrX9smp3V46pBGbBeLFRGdh25kg1334VcBlD8HzhPeNIWQH9zhGmo2itIe25EHt9dQP7G5hmg==}
 
@@ -2472,6 +2514,9 @@ packages:
   safe-buffer@5.2.1:
     resolution: {integrity: sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==}
 
+  satteri@0.9.3:
+    resolution: {integrity: sha512-2XfBh89LCnBMFkNOeVKkBLelAZcIA17VLHsgJum1tJ2fXiPZDN/TDXv4ku46rFOQXYd41LJ0kiZh5gPqExcCsg==}
+
   sax@1.6.0:
     resolution: {integrity: sha512-6R3J5M4AcbtLUdZmRv2SygeVaM7IhrLXu9BmnOGmmACak8fiUtOsYNWUS4uK7upbmHIBbLBeFeI//477BKLBzA==}
     engines: {node: '>=11.0.0'}
@@ -2523,10 +2568,6 @@ packages:
     engines: {node: '>=20.19.5', npm: '>=10.8.2'}
     hasBin: true
 
-  smartypants@0.2.2:
-    resolution: {integrity: sha512-TzobUYoEft/xBtb2voRPryAUIvYguG0V7Tt3de79I1WfXgCwelqVsGuZSnu3GFGRZhXR90AeEYIM+icuB/S06Q==}
-    hasBin: true
-
   smol-toml@1.6.1:
     resolution: {integrity: sha512-dWUG8F5sIIARXih1DTaQAX4SsiTXhInKf1buxdY9DIg4ZYPZK5nGM1VRIYmEbDbsHt7USo99xSLFu5Q1IqTmsg==}
     engines: {node: '>= 18'}
@@ -2563,11 +2604,11 @@ packages:
   spdx-license-ids@3.0.23:
     resolution: {integrity: sha512-CWLcCCH7VLu13TgOH+r8p1O/Znwhqv/dbb6lqWy67G+pT1kHmeD/+V36AVb/vq8QMIQwVShJ6Ssl5FPh0fuSdw==}
 
-  starlight-blog@0.26.1:
-    resolution: {integrity: sha512-c2aLtkVTNFKHDJrh1DwlxBj+VyOrLqJeHmGkKKHwL6oowUoaqUiC/vyOZLXNmZL1kcYI0hgHDw1t4G/lkg8mZg==}
+  starlight-blog@0.27.0:
+    resolution: {integrity: sha512-eCYT0VusgXXwmDfiTiQMUMjhfJAbtnEq5J0Wit37ut9t/LvBd8Oi9yQwe0kmY6wvH2yU905mNO6FJDZeryWtFw==}
     engines: {node: '>=22.12.0'}
     peerDependencies:
-      '@astrojs/starlight': '>=0.38.0'
+      '@astrojs/starlight': '>=0.41.0'
 
   starlight-contextual-menu@0.1.5:
     resolution: {integrity: sha512-MYQ6eFDIBBnKrEh3XqR7RZ6YDJ641ADmrSjj93d+cVJGPvrCHrd6VYiKeehhczsrn6GqjaCCFAn4xUd69gcfcQ==}
@@ -3077,6 +3118,26 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@astrojs/mdx@7.0.0(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0))':
+    dependencies:
+      '@astrojs/internal-helpers': 0.10.0
+      '@astrojs/markdown-remark': 7.2.0
+      '@mdx-js/mdx': 3.1.1
+      acorn: 8.17.0
+      astro: 6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0)
+      es-module-lexer: 2.1.0
+      estree-util-visit: 2.0.0
+      hast-util-to-html: 9.0.5
+      piccolore: 0.1.3
+      rehype-raw: 7.0.0
+      remark-gfm: 4.0.1
+      remark-smartypants: 3.0.2
+      source-map: 0.7.6
+      unist-util-visit: 5.1.0
+      vfile: 6.0.3
+    transitivePeerDependencies:
+      - supports-color
+
   '@astrojs/prism@4.0.2':
     dependencies:
       prismjs: 1.30.0
@@ -3157,6 +3218,37 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
+  '@bruits/satteri-darwin-arm64@0.9.3':
+    optional: true
+
+  '@bruits/satteri-darwin-x64@0.9.3':
+    optional: true
+
+  '@bruits/satteri-linux-arm64-gnu@0.9.3':
+    optional: true
+
+  '@bruits/satteri-linux-arm64-musl@0.9.3':
+    optional: true
+
+  '@bruits/satteri-linux-x64-gnu@0.9.3':
+    optional: true
+
+  '@bruits/satteri-linux-x64-musl@0.9.3':
+    optional: true
+
+  '@bruits/satteri-wasm32-wasi@0.9.3':
+    dependencies:
+      '@emnapi/core': 1.11.1
+      '@emnapi/runtime': 1.11.1
+      '@napi-rs/wasm-runtime': 1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
+    optional: true
+
+  '@bruits/satteri-win32-arm64-msvc@0.9.3':
+    optional: true
+
+  '@bruits/satteri-win32-x64-msvc@0.9.3':
+    optional: true
+
   '@capsizecss/unpack@4.0.1':
     dependencies:
       fontkitten: 1.0.3
@@ -3175,12 +3267,23 @@ snapshots:
 
   '@ctrl/tinycolor@4.2.0': {}
 
+  '@emnapi/core@1.11.1':
+    dependencies:
+      '@emnapi/wasi-threads': 1.2.2
+      tslib: 2.8.1
+    optional: true
+
   '@emnapi/runtime@1.11.0':
     dependencies:
       tslib: 2.8.1
     optional: true
 
   '@emnapi/runtime@1.11.1':
+    dependencies:
+      tslib: 2.8.1
+    optional: true
+
+  '@emnapi/wasi-threads@1.2.2':
     dependencies:
       tslib: 2.8.1
     optional: true
@@ -3559,7 +3662,7 @@ snapshots:
       '@types/estree-jsx': 1.0.5
       '@types/hast': 3.0.4
       '@types/mdx': 2.0.13
-      acorn: 8.16.0
+      acorn: 8.17.0
       collapse-white-space: 2.1.0
       devlop: 1.1.0
       estree-util-is-identifier-name: 3.0.0
@@ -3568,7 +3671,7 @@ snapshots:
       hast-util-to-jsx-runtime: 2.3.6
       markdown-extensions: 2.0.0
       recma-build-jsx: 1.0.0
-      recma-jsx: 1.0.1(acorn@8.16.0)
+      recma-jsx: 1.0.1(acorn@8.17.0)
       recma-stringify: 1.0.0
       rehype-recma: 1.0.0
       remark-mdx: 3.1.1
@@ -3582,6 +3685,13 @@ snapshots:
       vfile: 6.0.3
     transitivePeerDependencies:
       - supports-color
+
+  '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
+    dependencies:
+      '@emnapi/core': 1.11.1
+      '@emnapi/runtime': 1.11.1
+      '@tybys/wasm-util': 0.10.3
+    optional: true
 
   '@nodable/entities@2.1.1': {}
 
@@ -3802,6 +3912,11 @@ snapshots:
   '@solid-primitives/utils@6.4.0(solid-js@1.9.13)':
     dependencies:
       solid-js: 1.9.13
+
+  '@tybys/wasm-util@0.10.3':
+    dependencies:
+      tslib: 2.8.1
+    optional: true
 
   '@types/braces@3.0.5': {}
 
@@ -4025,14 +4140,6 @@ snapshots:
       canvaskit-wasm: 0.41.1
       deterministic-object-hash: 2.0.2
       entities: 8.0.0
-
-  astro-remote@0.3.4:
-    dependencies:
-      entities: 4.5.0
-      marked: 12.0.2
-      marked-footnote: 1.4.0(marked@12.0.2)
-      marked-smartypants: 1.1.12(marked@12.0.2)
-      ultrahtml: 1.6.0
 
   astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0):
     dependencies:
@@ -4338,7 +4445,7 @@ snapshots:
   esast-util-from-js@2.0.1:
     dependencies:
       '@types/estree-jsx': 1.0.5
-      acorn: 8.16.0
+      acorn: 8.17.0
       esast-util-from-estree: 2.0.0
       vfile-message: 4.0.3
 
@@ -4757,7 +4864,7 @@ snapshots:
       hast-util-whitespace: 3.0.0
       html-void-elements: 3.0.0
       mdast-util-to-hast: 13.2.1
-      property-information: 7.1.0
+      property-information: 7.2.0
       space-separated-tokens: 2.0.2
       stringify-entities: 4.0.4
       zwitch: 2.0.4
@@ -5024,23 +5131,6 @@ snapshots:
       string-width: 8.2.1
     transitivePeerDependencies:
       - supports-color
-
-  marked-footnote@1.4.0(marked@12.0.2):
-    dependencies:
-      marked: 12.0.2
-
-  marked-plaintify@1.1.1(marked@17.0.6):
-    dependencies:
-      marked: 17.0.6
-
-  marked-smartypants@1.1.12(marked@12.0.2):
-    dependencies:
-      marked: 12.0.2
-      smartypants: 0.2.2
-
-  marked@12.0.2: {}
-
-  marked@17.0.6: {}
 
   mdast-util-definitions@6.0.0:
     dependencies:
@@ -5725,8 +5815,6 @@ snapshots:
       err-code: 2.0.3
       retry: 0.12.0
 
-  property-information@7.1.0: {}
-
   property-information@7.2.0: {}
 
   punycode.js@2.3.1: {}
@@ -5754,10 +5842,10 @@ snapshots:
       estree-util-build-jsx: 3.0.1
       vfile: 6.0.3
 
-  recma-jsx@1.0.1(acorn@8.16.0):
+  recma-jsx@1.0.1(acorn@8.17.0):
     dependencies:
-      acorn: 8.16.0
-      acorn-jsx: 5.3.2(acorn@8.16.0)
+      acorn: 8.17.0
+      acorn-jsx: 5.3.2(acorn@8.17.0)
       estree-util-to-js: 2.0.0
       recma-parse: 1.0.0
       recma-stringify: 1.0.0
@@ -5968,6 +6056,23 @@ snapshots:
 
   safe-buffer@5.2.1: {}
 
+  satteri@0.9.3:
+    dependencies:
+      '@types/estree-jsx': 1.0.5
+      '@types/hast': 3.0.4
+      '@types/mdast': 4.0.4
+      '@types/unist': 3.0.3
+    optionalDependencies:
+      '@bruits/satteri-darwin-arm64': 0.9.3
+      '@bruits/satteri-darwin-x64': 0.9.3
+      '@bruits/satteri-linux-arm64-gnu': 0.9.3
+      '@bruits/satteri-linux-arm64-musl': 0.9.3
+      '@bruits/satteri-linux-x64-gnu': 0.9.3
+      '@bruits/satteri-linux-x64-musl': 0.9.3
+      '@bruits/satteri-wasm32-wasi': 0.9.3
+      '@bruits/satteri-win32-arm64-msvc': 0.9.3
+      '@bruits/satteri-win32-x64-msvc': 0.9.3
+
   sax@1.6.0: {}
 
   semver@7.8.4: {}
@@ -6070,8 +6175,6 @@ snapshots:
       arg: 5.0.2
       sax: 1.6.0
 
-  smartypants@0.2.2: {}
-
   smol-toml@1.6.1: {}
 
   solid-js@1.9.13:
@@ -6106,24 +6209,23 @@ snapshots:
 
   spdx-license-ids@3.0.23: {}
 
-  starlight-blog@0.26.1(@astrojs/starlight@0.40.0(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0))(typescript@6.0.3))(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0)):
+  starlight-blog@0.27.0(@astrojs/starlight@0.40.0(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0))(typescript@6.0.3))(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0)):
     dependencies:
       '@astrojs/markdown-remark': 7.2.0
-      '@astrojs/mdx': 5.0.6(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0))
+      '@astrojs/mdx': 7.0.0(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0))
       '@astrojs/rss': 4.0.18
       '@astrojs/starlight': 0.40.0(astro@6.4.8(@types/node@24.13.0)(rollup@4.62.2)(yaml@2.9.0))(typescript@6.0.3)
-      astro-remote: 0.3.4
       github-slugger: 2.0.0
       hast-util-from-html: 2.0.3
       hast-util-to-html: 9.0.5
       hast-util-to-string: 3.0.1
-      marked: 17.0.6
-      marked-plaintify: 1.1.1(marked@17.0.6)
       mdast-util-mdx-expression: 2.0.1
+      satteri: 0.9.3
       unist-util-is: 6.0.1
       unist-util-remove: 4.0.0
       unist-util-visit: 5.1.0
     transitivePeerDependencies:
+      - '@astrojs/markdown-satteri'
       - astro
       - supports-color
 
