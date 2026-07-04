@@ -18,7 +18,7 @@
   "dependencies": {
     "@astrojs/starlight": "^0.40.0",
     "asciinema-player": "^3.13.5",
-    "astro": "^6.0.0",
+    "astro": "^7.0.0",
     "astro-og-canvas": "^0.13.0",
     "canvaskit-wasm": "^0.41.0",
     "sharp": "^0.35.0",
