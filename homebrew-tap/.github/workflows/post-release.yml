@@ -1,0 +1,31 @@
+# Source of truth: dotsecenv/dotsecenv at
+# homebrew-tap/.github/workflows/post-release.yml. The release pipeline
+# (update-homebrew-tap in dotsecenv/dotsecenv's release.yml) pushes this file to
+# dotsecenv/homebrew-tap on each release. Edit it in the monorepo, not in the tap
+# repo — direct edits there are overwritten on the next release.
+name: Homebrew install
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-install:
+    name: Test Homebrew Installation
+    runs-on: macos-latest
+    steps:
+      - name: Tap dotsecenv/homebrew-tap
+        run: brew tap dotsecenv/tap
+
+      # Newer Homebrew (HOMEBREW_REQUIRE_TAP_TRUST, on by default on GitHub's
+      # hardened runners) refuses to load a third-party tap's cask until it is
+      # trusted. Default end-user Homebrew doesn't require this; the runner does.
+      - name: Trust the dotsecenv/tap cask
+        run: brew trust --cask dotsecenv/tap/dotsecenv
+
+      - name: Install dotsecenv
+        run: brew install dotsecenv
+
+      - name: Verify installation
+        run: dotsecenv version
