@@ -558,6 +558,11 @@ jobs:
           # Ensure the latest cask is fetched (no stale cache from a previous run)
           brew untap dotsecenv/tap 2>/dev/null || true
           brew tap dotsecenv/tap
+          # Newer Homebrew (with HOMEBREW_REQUIRE_TAP_TRUST, on by default on
+          # GitHub's hardened runners) refuses to load a third-party tap's cask
+          # until it is trusted. Default end-user Homebrew doesn't require this;
+          # the CI runner does. Trust the cask so the smoke-test can proceed.
+          brew trust --cask dotsecenv/tap/dotsecenv
           # Match the install command users actually run; brew auto-resolves to
           # the cask in dotsecenv/tap.
           brew install dotsecenv
