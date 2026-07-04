@@ -359,6 +359,47 @@ jobs:
         with:
           path: monorepo
 
+      # Sync the tap's own CI (post-release.yml) from the monorepo source of
+      # truth BEFORE pushing the cask, so the cask commit's post-release run uses
+      # the just-synced workflow. Same server-signed GraphQL push as the cask
+      # (commit-cask-via-graphql.sh takes a generic repo path + local file).
+      #
+      # Pushing a file under .github/workflows/ requires the RELEASE App to have
+      # `workflows: write` on homebrew-tap (the cask push only needs contents).
+      # Until that's granted the push is rejected, so this step warns and
+      # continues rather than breaking the release; make it strict once the
+      # permission is in place.
+      - name: Sync tap CI from monorepo
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SOURCE_SHA: ${{ github.sha }}
+          PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          SRC="monorepo/homebrew-tap/.github/workflows/post-release.yml"
+          DEST=".github/workflows/post-release.yml"
+          if [ ! -f "$SRC" ]; then
+            echo "::error::tap CI source not found: $SRC"; exit 1
+          fi
+          if diff -q "$SRC" "$DEST" >/dev/null 2>&1; then
+            echo "Tap CI already in sync; nothing to push."
+            exit 0
+          fi
+          cp "$SRC" "$DEST"
+          BODY="$(printf 'Source-Commit: dotsecenv/dotsecenv@%s\nSource-SHA: %s\nSource-Path: homebrew-tap/.github/workflows/post-release.yml\nPublished-By: %s\n' \
+            "$SOURCE_SHA" "$SOURCE_SHA" "$PUBLISHED_BY")"
+          if TAP_REPO=dotsecenv/homebrew-tap \
+             TAP_BRANCH=main \
+             CASK_PATH=.github/workflows/post-release.yml \
+             CASK_FILE="$DEST" \
+             HEADLINE="ci: sync post-release.yml from monorepo (${{ github.ref_name }})" \
+             BODY="$BODY" \
+             monorepo/scripts/release/commit-cask-via-graphql.sh; then
+            echo "Tap CI synced to homebrew-tap main."
+          else
+            echo "::warning::Could not push tap CI to homebrew-tap — the RELEASE App likely lacks 'workflows: write' there. Release continues; the tap's existing CI runs. Grant the permission to enable CI sync."
+          fi
+
       - name: Download updated checksums
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
