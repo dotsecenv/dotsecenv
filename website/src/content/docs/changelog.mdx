@@ -11,6 +11,12 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+---
+
+## v0.7.0
+
+_July 4, 2026_
+
 ### Features
 
 - `vault compact` drops superseded secret-value versions and removes deleted secrets, shrinking a vault without decrypting anything; a new `vault` skill drives it (#223)
@@ -36,11 +42,11 @@ _Unreleased_
 - Add a blog post on signed monorepo releases with GitHub Workflows (#173, #174)
 - Fix the fish plugin test suite and run it in CI on fish 3.x and 4.x (#193)
 - Unify Expressive Code frame corners and border color on the website (#191)
-- Update Astro and Starlight for the website build (#175, #179, #200, #201, #202, #206, #207, #209)
-- Update lint tooling: eslint, typescript-eslint, eslint-plugin-mdx (#172, #176, #181, #182, #196, #198, #205)
-- Update Go modules: x/crypto (security), x/term, and bubbletea/lipgloss v2 (#178, #187, #197, #204)
-- Update GitHub Actions and the Go toolchain: checkout, harden-runner, goreleaser-action, Go 1.26.4 (#177, #180, #199)
-- Update the sharp image library (#210)
+- Update Astro and Starlight for the website build, plus astro-og-canvas and asciinema-player (#175, #179, #200, #201, #202, #206, #207, #209, #217, #224, #226, #228, #230, #233, #236)
+- Update lint tooling: eslint, typescript-eslint, eslint-plugin-mdx, markdownlint-cli (#172, #176, #181, #182, #196, #198, #205, #216, #219, #220, #227, #232)
+- Update Go modules: x/crypto (security), x/term, and bubbletea/lipgloss v2 (#178, #187, #197, #204, #215, #235)
+- Update GitHub Actions and the Go toolchain: checkout, harden-runner, setup-go, goreleaser-action, pnpm/action-setup, attest-build-provenance, Go 1.26.4 (#177, #180, #199, #218, #221, #229, #231, #234)
+- Update the sharp image library (#210, #225)
 - Fix a duplicated `semver` key in the website pnpm lockfile that broke `pnpm install` (#238)
 - Renovate lock file maintenance (#171)
 
