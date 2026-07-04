@@ -7,6 +7,16 @@
 - When asked to release, use `rt git::release --major --sign --push vX.Y.Z` where X.Y.Z is the version to release
 - Then push the tag to the origin
 
+## Satellite repositories (plugin, packages)
+
+`plugin/` and `packages/` in this monorepo are the **source of truth**. CI mirrors them to their standalone satellite repos (`dotsecenv/plugin`, `dotsecenv/packages`). Never edit the satellites directly and never accept PRs there; edits made on a satellite are overwritten by the next publish.
+
+- **On release**, `.github/workflows/release.yml` (`publish-plugin` / `publish-packages`) pushes the source dir to the satellite's `main` and tags it with the release version.
+- **Ad-hoc** (Renovate updates, doc fixes that don't warrant a release), run the `Publish Satellites` workflow (`.github/workflows/publish-satellites.yml`, `workflow_dispatch`); it pushes without tagging.
+- Both use `releasetools/actions/signed-push` and stamp `Source-Commit`, `Source-SHA`, `Source-Path` (and `Source-Tag` on release) into the satellite commit body.
+
+A bug reported on a satellite (e.g. `dotsecenv/plugin#29` about `conf.d/dotsecenv.fish`) is fixed here under `plugin/` with a matching `plugin/tests/` change, and reaches the satellite on the next publish. `plugin/AGENTS.md` states this in the satellite for anyone landing there. Reference satellite issues/PRs as `plugin#N` / `packages#N`. The plugin test suite is `make -C plugin test-plugins` (bash/zsh/fish).
+
 ## Policy directory conventions
 
 - Policy fragments live at `/etc/dotsecenv/policy.d/*.yaml`, owned `root:root`, mode `0644` or stricter
