@@ -19,6 +19,7 @@ _Unreleased_
 
 ### Bug Fixes
 
+- Shell plugins (fish, bash, zsh): stay silent in non-interactive shells, so `fish -c` and scripts no longer leak `dotsecenv:` diagnostics into captured command output (fixes Emacs/Magit "invalid object name" errors) (plugin#29, #237)
 - `vault doctor -v N` now targets the Nth configured vault instead of erroring for any index above 1 (#223)
 - Shell plugin: reload secrets on directory re-entry, fix the `{dotsecenv/}` literal regression, and fail fast when the store is unavailable (#190)
 - Shell plugin reports plain env vars and secrets on separate lines (#192)

@@ -168,7 +168,7 @@ run_with_plugin_zsh() {
     local cmd="$*"
 
     # Run zsh with the plugin sourced, preserving existing PATH
-    zsh -c "
+    zsh -i -f -c "
         export PATH='$mock_path:$PATH'
         export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -216,7 +216,7 @@ EOF
             echo \"\$DATABASE_HOST|\$DATABASE_PORT|\$APP_NAME\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -263,7 +263,7 @@ EOF
             echo \"\$DB_PASSWORD\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -310,7 +310,7 @@ EOF
             echo \"\$MY_API_KEY\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -357,7 +357,7 @@ EOF
             echo \"VAR=\$MISSING_SECRET\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -404,7 +404,7 @@ EOF
             echo \"VAR=\${UNSAFE_VAR:-unset}\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -453,7 +453,7 @@ EOF
             echo \"\$PLAIN_VAR|\$SECRET_VAR\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -505,7 +505,7 @@ EOF
             _dotsecenv_chpwd_hook
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -551,7 +551,7 @@ test_empty_secenv_no_message() {
             echo MARKER
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -582,7 +582,7 @@ test_alias_dse() {
             type dse
         " 2>&1)
     else
-        result=$(zsh -c "
+        result=$(zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             type dse
@@ -612,7 +612,7 @@ test_alias_dse_get() {
             dse get API_KEY
         " 2>&1)
     else
-        result=$(zsh -c "
+        result=$(zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             dse get API_KEY
@@ -663,7 +663,7 @@ EOF
             echo \"\$DATABASE_HOST|\$DATABASE_PORT\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -712,7 +712,7 @@ EOF
             echo \"\$DOUBLE_QUOTED|\$SINGLE_QUOTED|\$UNQUOTED\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -766,7 +766,7 @@ EOF
             echo \"\$DB_PASSWORD\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/parent'
@@ -818,7 +818,7 @@ EOF
             echo \"VAR=\${DB_PASSWORD:-unset}\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/project'
@@ -878,7 +878,7 @@ EOF
             echo \"\$DB_PASSWORD|\$API_KEY\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/parent'
@@ -932,7 +932,7 @@ EOF
             echo \"\$DB_PASSWORD\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/parent'
@@ -986,7 +986,7 @@ EOF
             echo \"\$DB_PASSWORD\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/project'
@@ -1037,7 +1037,7 @@ EOF
             _dotsecenv_chpwd_hook
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -1087,7 +1087,7 @@ EOF
             echo \"\$DB_PASSWORD\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/project/terraform/modules'
@@ -1141,7 +1141,7 @@ EOF
             echo \"\$APP_ENV|\$DB_PASSWORD\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/root/project/src'
@@ -1191,7 +1191,7 @@ EOF
             echo \"\$DB_PASSWORD\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/project'
@@ -1233,7 +1233,7 @@ test_dse_up_no_ancestors() {
             dse up '$test_dir'
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/project/src'
@@ -1311,7 +1311,7 @@ MOCK_EOF
             echo \"before_secret=\$before_secret|after_secret=\$DB_PASSWORD|before_plain=\$before_plain|after_plain=\$APP_NAME\"
         " 2>/dev/null)
     else
-        result=$(zsh -c "
+        result=$(zsh -i -f -c "
             export PATH='$mock_dir:$PATH'
             export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config_reload'
             mkdir -p '$TEMP_DIR/config_reload'
@@ -1382,7 +1382,7 @@ EOF
             echo \"before_env=\$before_env|after_env=\$APP_ENV|before_pw=\$before_pw|after_pw=\$DB_PASSWORD|stack=\${_DOTSECENV_SOURCE_STACK[*]}\"
         " 2>/dev/null)
     else
-        result=$(zsh -c "
+        result=$(zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config_reload_stack'
             mkdir -p '$TEMP_DIR/config_reload_stack'
@@ -1420,7 +1420,7 @@ _parse_one() {
             echo \"\$_DOTSECENV_PARSE_TYPE|\$_DOTSECENV_PARSE_VALUE\"
         " _ "$line" 2>&1
     else
-        zsh -c "
+        zsh -i -f -c "
             source '$SHELL_DIR/_dotsecenv_core.sh'
             _dotsecenv_parse_line \"\$1\"
             echo \"\$_DOTSECENV_PARSE_TYPE|\$_DOTSECENV_PARSE_VALUE\"
@@ -1488,7 +1488,7 @@ test_load_crlf_empty_name_resolves() {
             echo \"\$API_KEY\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -1545,7 +1545,7 @@ EOF
             echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -1599,7 +1599,7 @@ EOF
             echo MARKER
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir'
@@ -1654,7 +1654,7 @@ EOF
             echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/project'
@@ -1706,7 +1706,7 @@ EOF
             echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/project'
@@ -1761,7 +1761,7 @@ EOF
             echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
         " 2>&1)
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -c "
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             _dotsecenv_trust_session '$test_dir'
@@ -1823,6 +1823,55 @@ EOF
     fi
 }
 
+# Regression: a NON-interactive shell (editor/script that captures output) must
+# emit nothing when the plugin is sourced and a directory with an untrusted
+# .secenv is entered. See dotsecenv/plugin#29. Note this test deliberately does
+# NOT pass -i (zsh) or call the hook explicitly (bash): it exercises the real
+# non-interactive path.
+test_noninteractive_silent() {
+    local shell="$1"
+    log "[$shell] Testing non-interactive shell stays silent (plugin#29)..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_noninteractive_$shell"
+    mkdir -p "$test_dir"
+    echo 'FOO=bar' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    # Fresh config dir with no trusted_dirs -> the dir is untrusted. In an
+    # interactive shell this path prints "skipping ... no TTY for trust prompt";
+    # a non-interactive shell must stay silent so captured output isn't corrupted.
+    local config_dir="$TEMP_DIR/config_noninteractive_$shell"
+    mkdir -p "$config_dir"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir'
+            echo MARKER
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -f -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir'
+            echo MARKER
+        " 2>&1)
+    fi
+
+    if [[ "$result" == "MARKER" ]]; then
+        pass "[$shell] Non-interactive shell emits no dotsecenv output"
+    else
+        fail "[$shell] Non-interactive shell leaked output, got: $result"
+    fi
+}
+
 # ============================================================================
 # Main
 # ============================================================================
@@ -1880,6 +1929,7 @@ main() {
         test_sync_new_key_unload_integrity "bash"
         test_reload_ingests_new_key "bash"
         test_sync_new_key_not_always_trusted_no_autoload "bash"
+        test_noninteractive_silent "bash"
         test_bash_cd_dot_asymmetry "bash"
     fi
 
@@ -1921,6 +1971,7 @@ main() {
             test_sync_new_key_unload_integrity "zsh"
             test_reload_ingests_new_key "zsh"
             test_sync_new_key_not_always_trusted_no_autoload "zsh"
+            test_noninteractive_silent "zsh"
         else
             warn "Zsh not found, skipping zsh tests"
         fi

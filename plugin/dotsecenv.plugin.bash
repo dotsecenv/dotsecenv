@@ -52,5 +52,11 @@ elif [[ "$PROMPT_COMMAND" != *"_dotsecenv_prompt_hook"* ]]; then
     PROMPT_COMMAND="_dotsecenv_prompt_hook;$PROMPT_COMMAND"
 fi
 
-# Process current directory on plugin load (initial shell startup)
-_dotsecenv_chpwd_hook
+# Process current directory on plugin load, interactive shells only. Sourcing
+# this file in a non-interactive shell (a script, or `bash -c`) must not emit
+# diagnostics or spawn the dotsecenv CLI, which would corrupt captured output.
+# See dotsecenv/plugin#29. (The PROMPT_COMMAND hook above is already
+# interactive-only, since PROMPT_COMMAND runs only before an interactive prompt.)
+case $- in
+*i*) _dotsecenv_chpwd_hook ;;
+esac

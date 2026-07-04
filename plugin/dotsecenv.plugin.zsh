@@ -28,6 +28,10 @@ typeset -g _DOTSECENV_PREV_PWD=""
 
 # Hook function for directory changes
 _dotsecenv_chpwd_hook() {
+    # Stay silent in non-interactive shells. zsh fires chpwd on `cd` even under
+    # `zsh -c`, and auto-loading there pollutes captured output and needlessly
+    # spawns the dotsecenv CLI. See dotsecenv/plugin#29.
+    [[ -o interactive ]] || return
     local old_dir="$_DOTSECENV_PREV_PWD"
     _DOTSECENV_PREV_PWD="$PWD"
     _dotsecenv_on_cd "$old_dir" "$PWD"
@@ -42,5 +46,6 @@ reloadsecenv() {
 autoload -Uz add-zsh-hook
 add-zsh-hook chpwd _dotsecenv_chpwd_hook
 
-# Process current directory on plugin load (initial shell startup)
+# Process current directory on plugin load (interactive shells only; the hook
+# self-guards via [[ -o interactive ]]). See dotsecenv/plugin#29.
 _dotsecenv_chpwd_hook

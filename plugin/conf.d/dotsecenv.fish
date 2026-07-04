@@ -732,6 +732,12 @@ end
 
 # Hook function called on directory change
 function _dotsecenv_cd_hook --on-variable PWD
+    # Only act in interactive sessions. conf.d snippets are sourced by *every*
+    # fish session, including `fish -c …` used by editors/scripts/CI. Emitting
+    # our diagnostics (or spawning `dotsecenv secret get`) there pollutes any
+    # captured stdout+stderr. See dotsecenv/plugin#29.
+    status is-interactive; or return
+
     set -l old_dir "$_DOTSECENV_PREV_PWD"
     set -l new_dir "$PWD"
 
@@ -840,6 +846,11 @@ function dse
     end
 end
 
-# Process current directory on plugin load
+# Process current directory on plugin load.
+# Guarded on interactivity: conf.d is sourced by non-interactive `fish -c …`
+# too, and auto-loading there both pollutes captured output and needlessly
+# spawns the dotsecenv CLI. Interactive sessions still load on startup.
 set -g _DOTSECENV_PREV_PWD ""
-_dotsecenv_on_cd "" "$PWD"
+if status is-interactive
+    _dotsecenv_on_cd "" "$PWD"
+end

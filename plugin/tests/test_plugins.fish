@@ -97,6 +97,38 @@ fi' >"$mock_dir/dotsecenv"
     echo $mock_dir
 end
 
+# Regression: a NON-interactive fish (`fish -c`, as used by editors like Emacs
+# and by scripts/CI) must emit nothing when conf.d loads and a directory with an
+# untrusted .secenv is entered. See dotsecenv/plugin#29. Note this test does NOT
+# pass -i: it exercises the real non-interactive path that the bug reported.
+function test_noninteractive_silent
+    log "[fish] Testing non-interactive shell stays silent (plugin#29)..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_noninteractive"
+    mkdir -p "$test_dir"
+    echo 'FOO=bar' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    set mock_path (create_mock_dotsecenv)
+
+    # No trusted_dirs -> untrusted. Interactively this prints "skipping ... no
+    # TTY for trust prompt"; non-interactively it must stay silent.
+    set result (fish --no-config -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config-noninteractive'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        cd '$test_dir'
+        echo MARKER
+    " 2>&1)
+
+    if test "$result" = MARKER
+        pass "[fish] Non-interactive shell emits no dotsecenv output"
+    else
+        fail "[fish] Non-interactive shell leaked output, got: $result"
+    end
+end
+
 # ============================================================================
 # Test Functions
 # ============================================================================
@@ -116,7 +148,7 @@ APP_NAME="My Application"' >"$test_dir/.secenv"
     set mock_path (create_mock_dotsecenv)
 
     # Run fish with the plugin loaded
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -146,7 +178,7 @@ function test_parse_secret_same_name
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -176,7 +208,7 @@ function test_parse_secret_named
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -206,7 +238,7 @@ function test_missing_secret_warning
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -236,7 +268,7 @@ function test_security_check_world_writable
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -267,7 +299,7 @@ SECRET_VAR={dotsecenv/API_KEY}' >"$test_dir/.secenv"
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -305,7 +337,7 @@ SVC_KEY={dotsecenv/API_KEY}' >"$test_dir/.secenv"
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -342,7 +374,7 @@ function test_empty_secenv_no_message
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -370,7 +402,7 @@ function test_alias_dse
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         type dse
@@ -389,7 +421,7 @@ function test_alias_dse_get
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         dse get API_KEY
@@ -419,7 +451,7 @@ DATABASE_PORT=5432
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -451,7 +483,7 @@ UNQUOTED=helloworld' >"$test_dir/.secenv"
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
@@ -491,7 +523,7 @@ function test_tree_scope_persist_in_subdir
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -527,7 +559,7 @@ function test_tree_scope_unload_on_leave
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -567,7 +599,7 @@ function test_tree_scope_nested_secenv
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -603,7 +635,7 @@ function test_tree_scope_sibling_navigation
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -639,7 +671,7 @@ function test_tree_scope_no_reload_from_subdir
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -677,7 +709,7 @@ function test_multiline_warning
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -713,7 +745,7 @@ function test_dse_up_basic
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -750,7 +782,7 @@ function test_dse_up_multiple_ancestors
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -783,7 +815,7 @@ function test_dse_up_skips_already_loaded
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -813,7 +845,7 @@ function test_dse_up_no_ancestors
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -837,7 +869,7 @@ function test_parse_trailing_whitespace_secret
     log "[fish] Testing {dotsecenv*} with trailing whitespace resolves as secret..."
     set TESTS_RUN (math $TESTS_RUN + 1)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         _dotsecenv_parse_line 'DB_PASSWORD={dotsecenv} '
         echo \"same|\$_DOTSECENV_PARSE_TYPE|\$_DOTSECENV_PARSE_VALUE\"
@@ -873,7 +905,7 @@ function test_load_crlf_empty_name_resolves
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -912,7 +944,7 @@ function test_sync_new_key_always_trusted
 
     # Fish only fires its hook on a real PWD change, so use dse reload / direct
     # sync to ingest the newly-appended key.
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -947,7 +979,7 @@ function test_sync_no_new_keys_noop
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -983,7 +1015,7 @@ function test_sync_new_key_unload_integrity
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -1018,7 +1050,7 @@ function test_reload_ingests_new_key
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -c "
+    set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
@@ -1095,6 +1127,9 @@ function main
     test_sync_no_new_keys_noop
     test_sync_new_key_unload_integrity
     test_reload_ingests_new_key
+
+    # Regression: non-interactive shells stay silent (plugin#29)
+    test_noninteractive_silent
 
     cleanup
 
