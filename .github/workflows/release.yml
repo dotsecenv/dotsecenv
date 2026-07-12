@@ -364,41 +364,44 @@ jobs:
         with:
           path: monorepo
 
-      # Sync the tap's own CI (post-release.yml) from the monorepo source of
-      # truth BEFORE pushing the cask, so the cask commit's post-release run uses
-      # the just-synced workflow. Same server-signed GraphQL push as the cask
-      # (commit-cask-via-graphql.sh takes a generic repo path + local file).
-      # Requires the RELEASE App to have `workflows: write` on homebrew-tap
-      # (scoped on the token above). No-op when the tap is already in sync;
-      # otherwise a push failure hard-fails the release so a broken/rejected sync
-      # is never shipped silently.
-      - name: Sync tap CI from monorepo
+      # Sync the tap's synced files (its CI workflow and README) from the
+      # monorepo source of truth BEFORE pushing the cask, so the cask commit's
+      # post-release run uses the just-synced workflow. Same server-signed
+      # GraphQL push as the cask (commit-cask-via-graphql.sh takes a generic
+      # repo path + local file), one commit per drifted file. Requires the
+      # RELEASE App to have `workflows: write` on homebrew-tap (scoped on the
+      # token above). No-op when the tap is already in sync; otherwise a push
+      # failure hard-fails the release so a broken/rejected sync is never
+      # shipped silently.
+      - name: Sync tap CI and README from monorepo
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SOURCE_SHA: ${{ github.sha }}
           PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          SRC="monorepo/homebrew-tap/.github/workflows/post-release.yml"
-          DEST=".github/workflows/post-release.yml"
-          if [ ! -f "$SRC" ]; then
-            echo "::error::tap CI source not found: $SRC"; exit 1
-          fi
-          if diff -q "$SRC" "$DEST" >/dev/null 2>&1; then
-            echo "Tap CI already in sync; nothing to push."
-            exit 0
-          fi
-          cp "$SRC" "$DEST"
-          BODY="$(printf 'Source-Commit: dotsecenv/dotsecenv@%s\nSource-SHA: %s\nSource-Path: homebrew-tap/.github/workflows/post-release.yml\nPublished-By: %s\n' \
-            "$SOURCE_SHA" "$SOURCE_SHA" "$PUBLISHED_BY")"
-          TAP_REPO=dotsecenv/homebrew-tap \
-          TAP_BRANCH=main \
-          CASK_PATH=.github/workflows/post-release.yml \
-          CASK_FILE="$DEST" \
-          HEADLINE="ci: sync post-release.yml from monorepo (${{ github.ref_name }})" \
-          BODY="$BODY" \
-          monorepo/scripts/release/commit-cask-via-graphql.sh
-          echo "Tap CI synced to homebrew-tap main."
+          for path in .github/workflows/post-release.yml README.md; do
+            SRC="monorepo/homebrew-tap/${path}"
+            DEST="${path}"
+            if [ ! -f "$SRC" ]; then
+              echo "::error::tap sync source not found: $SRC"; exit 1
+            fi
+            if diff -q "$SRC" "$DEST" >/dev/null 2>&1; then
+              echo "${path}: already in sync; nothing to push."
+              continue
+            fi
+            cp "$SRC" "$DEST"
+            BODY="$(printf 'Source-Commit: dotsecenv/dotsecenv@%s\nSource-SHA: %s\nSource-Path: homebrew-tap/%s\nPublished-By: %s\n' \
+              "$SOURCE_SHA" "$SOURCE_SHA" "$path" "$PUBLISHED_BY")"
+            TAP_REPO=dotsecenv/homebrew-tap \
+            TAP_BRANCH=main \
+            CASK_PATH="$path" \
+            CASK_FILE="$DEST" \
+            HEADLINE="ci: sync ${path} from monorepo (${{ github.ref_name }})" \
+            BODY="$BODY" \
+            monorepo/scripts/release/commit-cask-via-graphql.sh
+            echo "${path}: synced to homebrew-tap main."
+          done
 
       - name: Download updated checksums
         env:
@@ -599,10 +602,11 @@ jobs:
           # Ensure the latest cask is fetched (no stale cache from a previous run)
           brew untap dotsecenv/tap 2>/dev/null || true
           brew tap dotsecenv/tap
-          # Newer Homebrew (with HOMEBREW_REQUIRE_TAP_TRUST, on by default on
-          # GitHub's hardened runners) refuses to load a third-party tap's cask
-          # until it is trusted. Default end-user Homebrew doesn't require this;
-          # the CI runner does. Trust the cask so the smoke-test can proceed.
+          # Since Homebrew 6.0.0 (June 2026) tap trust is mandatory for
+          # everyone: brew refuses to load a third-party tap's cask until the
+          # tap or the cask is trusted. This mirrors the documented install
+          # flow (docs show `brew trust dotsecenv/tap`; CI trusts only the
+          # cask, the narrower grant).
           brew trust --cask dotsecenv/tap/dotsecenv
           # Match the install command users actually run; brew auto-resolves to
           # the cask in dotsecenv/tap.
@@ -626,6 +630,18 @@ jobs:
 
       - name: Smoke a basic command
         run: dotsecenv help > /dev/null
+
+      - name: Verify shell plugins installed
+        run: |
+          set -euo pipefail
+          PLUGIN_DIR="$(brew --prefix)/share/dotsecenv/plugin"
+          for f in dotsecenv.plugin.zsh dotsecenv.plugin.bash _dotsecenv_core.sh conf.d/dotsecenv.fish; do
+            if [ ! -f "${PLUGIN_DIR}/${f}" ]; then
+              echo "::error::shell plugin file missing from cask install: ${PLUGIN_DIR}/${f}"
+              exit 1
+            fi
+          done
+          echo "All shell plugin files present in ${PLUGIN_DIR}"
 
   # Tag dotsecenv/homebrew-tap at the release version once `brew install`
   # has been proven to work against the just-pushed cask. Lightweight tag

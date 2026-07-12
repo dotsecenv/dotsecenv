@@ -18,9 +18,10 @@ jobs:
       - name: Tap dotsecenv/homebrew-tap
         run: brew tap dotsecenv/tap
 
-      # Newer Homebrew (HOMEBREW_REQUIRE_TAP_TRUST, on by default on GitHub's
-      # hardened runners) refuses to load a third-party tap's cask until it is
-      # trusted. Default end-user Homebrew doesn't require this; the runner does.
+      # Since Homebrew 6.0.0 (June 2026) tap trust is mandatory for everyone:
+      # brew refuses to load a third-party tap's cask until the tap or the
+      # cask is trusted. Docs show `brew trust dotsecenv/tap`; CI trusts only
+      # the cask, the narrower grant.
       - name: Trust the dotsecenv/tap cask
         run: brew trust --cask dotsecenv/tap/dotsecenv
 
@@ -29,3 +30,23 @@ jobs:
 
       - name: Verify installation
         run: dotsecenv version
+
+      - name: Verify shell plugins installed
+        run: |
+          set -euo pipefail
+          # This workflow also runs on sync pushes that precede the cask
+          # update, when the tapped cask may predate plugin packaging. Only
+          # verify when the installed cask declares the plugin artifacts.
+          CASK_FILE="$(brew --repository)/Library/Taps/dotsecenv/homebrew-tap/Casks/dotsecenv.rb"
+          if ! grep -q "share/dotsecenv/plugin" "$CASK_FILE"; then
+            echo "Cask does not ship shell plugins yet; skipping verification."
+            exit 0
+          fi
+          PLUGIN_DIR="$(brew --prefix)/share/dotsecenv/plugin"
+          for f in dotsecenv.plugin.zsh dotsecenv.plugin.bash _dotsecenv_core.sh conf.d/dotsecenv.fish; do
+            if [ ! -f "${PLUGIN_DIR}/${f}" ]; then
+              echo "::error::shell plugin file missing from cask install: ${PLUGIN_DIR}/${f}"
+              exit 1
+            fi
+          done
+          echo "All shell plugin files present in ${PLUGIN_DIR}"

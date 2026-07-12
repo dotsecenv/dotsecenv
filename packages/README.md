@@ -181,10 +181,11 @@ sudo mv dotsecenv /usr/local/bin/
 
 ## macOS (Homebrew)
 
-MacOS builds are also available via Homebrew. Add the tap and install:
+MacOS builds are also available via Homebrew. Add the tap, trust it (required since Homebrew 6.0), and install:
 
 ```bash
 brew tap dotsecenv/tap
+brew trust dotsecenv/tap
 brew install dotsecenv
 ```
 
