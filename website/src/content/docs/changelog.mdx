@@ -13,17 +13,17 @@ _Unreleased_
 
 ### Features
 
-- The Homebrew cask now installs the zsh/bash/fish shell plugins to `$(brew --prefix)/share/dotsecenv/plugin/`, matching the Linux packages
+- The Homebrew cask now installs the zsh/bash/fish shell plugins to `$(brew --prefix)/share/dotsecenv/plugin/`, matching the Linux packages (#253)
 
 ### Bug Fixes
 
-- `secret get` now tells apart a secret that does not exist ("not found in any vault") from one that exists but your identity cannot read ("access denied", with the share command to request access)
-- The shell plugin prints a fetch error once per secret; other keys mapped to the same failed secret get a one-line notice instead of a repeated error
+- `secret get` now tells apart a secret that does not exist ("not found in any vault") from one that exists but your identity cannot read ("access denied", with the share command to request access) (#253)
+- The shell plugin prints a fetch error once per secret; other keys mapped to the same failed secret get a one-line notice instead of a repeated error (#253)
 
 ### Other
 
-- Homebrew install docs now include the `brew trust dotsecenv/tap` step that Homebrew 6.0 requires for third-party taps
-- The Homebrew tap's README is now maintained in the monorepo and synced to the tap on release
+- Homebrew install docs now include the `brew trust dotsecenv/tap` step that Homebrew 6.0 requires for third-party taps (#253)
+- The Homebrew tap's README is now maintained in the monorepo and synced to the tap on release (#253)
 - Pin pnpm to 11.11.0 in the website CI workflows; pnpm 11.12.0 breaks the setup action's self-update (#254)
 
 ---
