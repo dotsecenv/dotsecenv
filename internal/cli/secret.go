@@ -27,6 +27,13 @@ type SecretValueJSON struct {
 	SignedBy    string      `json:"signed_by,omitempty"`
 }
 
+// accessDeniedMessage builds the error message for a secret that exists in a
+// vault but whose value cannot be read by the given identity. Kept distinct
+// from the not-found message so callers can tell the two cases apart.
+func accessDeniedMessage(secretKey, fp string) string {
+	return fmt.Sprintf("access denied: secret '%s' exists but your identity (%s) has no access to it; ask someone with access to run: dotsecenv secret share %s %s", secretKey, fp, secretKey, fp)
+}
+
 // smartJSONValue returns a json.RawMessage if the value is a JSON object or array,
 // otherwise returns the plain string. This avoids double-escaping stored JSON.
 func smartJSONValue(s string) interface{} {
@@ -432,8 +439,10 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		// any-vault lookup and let GPG agent determine decryptability.
 		// The user may have a different key in the agent than the logged-in identity.
 		var errGet error
+		notGranted := false
 		secret, errGet = c.vaultResolver.GetAccessibleSecretFromAnyVault(secretKey, fp)
 		if errGet != nil {
+			notGranted = true
 			secret, errGet = c.vaultResolver.GetSecretFromAnyVault(secretKey, c.output.Stderr())
 			if errGet != nil {
 				return NewError(fmt.Sprintf("secret '%s' not found in any vault", secretKey), ExitVaultError)
@@ -456,6 +465,9 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 
 		plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 		if decErr != nil {
+			if notGranted {
+				return NewError(accessDeniedMessage(secretKey, fp), ExitAccessDenied)
+			}
 			return NewError(fmt.Sprintf("failed to decrypt secret: %v", decErr), ExitGPGError)
 		}
 		decryptedValues = append(decryptedValues, string(plaintext))
@@ -568,6 +580,7 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 		// Try fingerprint-matched access first, fall back to latest value
 		// and let GPG agent determine if we can decrypt.
 		val := manager.GetAccessibleSecretValue(fp, key)
+		notGranted := val == nil
 		if val == nil {
 			val = &secretObj.Values[len(secretObj.Values)-1]
 		}
@@ -579,6 +592,9 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 
 		plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 		if decErr != nil {
+			if notGranted {
+				return NewError(accessDeniedMessage(key, fp), ExitAccessDenied)
+			}
 			return NewError(fmt.Sprintf("failed to decrypt secret: %v", decErr), ExitGPGError)
 		}
 		decryptedValues = append(decryptedValues, string(plaintext))
@@ -626,6 +642,7 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 	var mostRecentValue *vault.SecretValue
 	var mostRecentTime time.Time
 	var mostRecentVaultPath string
+	secretExists := false
 
 	entries := c.vaultResolver.GetConfig().Entries
 
@@ -639,6 +656,7 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 		if secretObj.IsDeleted() {
 			continue
 		}
+		secretExists = true
 
 		for j := range secretObj.Values {
 			val := &secretObj.Values[j]
@@ -663,6 +681,9 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 	}
 
 	if mostRecentValue == nil {
+		if secretExists {
+			return NewError(accessDeniedMessage(key, fp), ExitAccessDenied)
+		}
 		return NewError(fmt.Sprintf("secret '%s' not found in any vault", key), ExitVaultError)
 	}
 

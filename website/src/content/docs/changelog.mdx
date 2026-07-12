@@ -11,6 +11,11 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Bug Fixes
+
+- `secret get` now tells apart a secret that does not exist ("not found in any vault") from one that exists but your identity cannot read ("access denied", with the share command to request access)
+- The shell plugin prints a fetch error once per secret; other keys mapped to the same failed secret get a one-line notice instead of a repeated error
+
 ### Other
 
 - Pin pnpm to 11.11.0 in the website CI workflows; pnpm 11.12.0 breaks the setup action's self-update (#254)

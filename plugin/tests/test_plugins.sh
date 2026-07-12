@@ -372,6 +372,56 @@ EOF
     fi
 }
 
+test_missing_secret_error_deduped() {
+    local shell="$1"
+    log "[$shell] Testing missing secret error printed once for multiple keys..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_missing_secret_dedupe"
+    mkdir -p "$test_dir"
+
+    # Two keys mapping to the same missing secret
+    cat >"$test_dir/.secenv" <<'EOF'
+MISSING_SECRET={dotsecenv}
+TF_VAR_MISSING={dotsecenv/MISSING_SECRET}
+EOF
+    chmod 644 "$test_dir/.secenv"
+
+    # Pre-trust the directory
+    local config_dir="$TEMP_DIR/config"
+    mkdir -p "$config_dir"
+    echo "$test_dir" >"$config_dir/trusted_dirs"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    if [[ "$shell" == "bash" ]]; then
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/_dotsecenv_core.sh'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd '$test_dir'
+            _dotsecenv_chpwd_hook
+        " 2>&1)
+    else
+        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            cd '$test_dir'
+        " 2>&1)
+    fi
+
+    local error_count
+    error_count=$(printf '%s\n' "$result" | grep -c "error fetching secret 'MISSING_SECRET'" || true)
+
+    if [[ "$error_count" == "1" && "$result" == *"TF_VAR_MISSING not set (secret 'MISSING_SECRET' failed above)"* ]]; then
+        pass "[$shell] Missing secret error printed once, second key got a short notice"
+    else
+        fail "[$shell] Expected 1 full error and a short notice, got ($error_count errors): $result"
+    fi
+}
+
 test_security_check_world_writable() {
     local shell="$1"
     log "[$shell] Testing security check (world-writable)..."
@@ -1902,6 +1952,7 @@ main() {
         test_parse_secret_same_name "bash"
         test_parse_secret_named "bash"
         test_missing_secret_warning "bash"
+        test_missing_secret_error_deduped "bash"
         test_security_check_world_writable "bash"
         test_two_phase_loading "bash"
         test_load_unload_message_split "bash"
@@ -1944,6 +1995,7 @@ main() {
             test_parse_secret_same_name "zsh"
             test_parse_secret_named "zsh"
             test_missing_secret_warning "zsh"
+            test_missing_secret_error_deduped "zsh"
             test_security_check_world_writable "zsh"
             test_two_phase_loading "zsh"
             test_load_unload_message_split "zsh"

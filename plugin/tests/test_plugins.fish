@@ -256,6 +256,39 @@ function test_missing_secret_warning
     end
 end
 
+function test_missing_secret_error_deduped
+    log "[fish] Testing missing secret error printed once for multiple keys..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_missing_secret_dedupe"
+    mkdir -p "$test_dir"
+
+    # Two keys mapping to the same missing secret
+    printf 'MISSING_SECRET={dotsecenv}\nTF_VAR_MISSING={dotsecenv/MISSING_SECRET}\n' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    set mock_path (create_mock_dotsecenv)
+
+    set result (fish --no-config -i -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
+        mkdir -p '$TEMP_DIR/config'
+        echo '$test_dir' >'$TEMP_DIR/config/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        # cd alone triggers the --on-variable PWD hook; calling _dotsecenv_on_cd
+        # as well would run a second load and defeat the single-error assertion
+        cd '$test_dir'
+    " 2>&1)
+
+    set error_count (printf '%s\n' $result | grep -c "error fetching secret 'MISSING_SECRET'")
+
+    if test "$error_count" = 1; and string match -q "*TF_VAR_MISSING not set (secret 'MISSING_SECRET' failed above)*" "$result"
+        pass "[fish] Missing secret error printed once, second key got a short notice"
+    else
+        fail "[fish] Expected 1 full error and a short notice, got ($error_count errors): $result"
+    end
+end
+
 function test_security_check_world_writable
     log "[fish] Testing security check (world-writable)..."
     set TESTS_RUN (math $TESTS_RUN + 1)
@@ -1095,6 +1128,7 @@ function main
     test_parse_secret_same_name
     test_parse_secret_named
     test_missing_secret_warning
+    test_missing_secret_error_deduped
     test_security_check_world_writable
     test_two_phase_loading
     test_load_unload_message_split

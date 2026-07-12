@@ -307,6 +307,10 @@ _dotsecenv_load_file() {
     # Variable name for tracking loaded vars for this directory
     local vars_var="_DOTSECENV_LOADED_${dir_hash}"
 
+    # Space-delimited list of secret names that failed to fetch during this
+    # load, so the same secret mapped to multiple keys errors in full only once
+    local failed_secrets=" "
+
     local line
     while IFS= read -r line || [[ -n "$line" ]]; do
         if _dotsecenv_parse_line "$line"; then
@@ -323,6 +327,13 @@ _dotsecenv_load_file() {
             elif [[ "$phase" == "2" && ("$ptype" == "secret_same" || "$ptype" == "secret_named") ]]; then
                 # Phase 2: load secrets via dotsecenv CLI
                 local secret_name="$value"
+
+                # This secret already failed during this load; the full error
+                # printed then, so a one-line notice is enough for this key
+                if [[ "$failed_secrets" == *" $secret_name "* ]]; then
+                    echo "dotsecenv: $key not set (secret '$secret_name' failed above)" >&2
+                    continue
+                fi
 
                 # Fetch secret from vault (capture stderr separately to preserve secret value)
                 # Note: Initialize to empty to prevent zsh from printing existing values on re-declaration
@@ -341,6 +352,7 @@ _dotsecenv_load_file() {
                 else
                     echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
                     cat "$secret_stderr_file" >&2
+                    failed_secrets="${failed_secrets}${secret_name} "
                 fi
                 rm -f "$secret_stderr_file"
             fi
