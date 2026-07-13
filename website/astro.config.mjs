@@ -30,7 +30,7 @@ export default defineConfig({
           description:
             'Secure secrets management CLI that encrypts environment variables at rest using GPG, making them safe to commit to version control.',
           details:
-            'dotsecenv encrypts environment variables at rest using GPG and AES-256-GCM, storing them in vault files that are safe to commit to git. Documentation follows the Diataxis framework: Tutorials walk through tasks, Concepts explain the security model and architecture, Guides cover integrations (shell plugins, GitHub Actions, Terraform, Claude Code), and Reference documents the CLI surface.',
+            'dotsecenv encrypts environment variables at rest using GPG and AES-256-GCM, storing them in vault files that are safe to commit to git. Documentation follows the Diataxis framework: Tutorials walk through tasks, Concepts explain the security model and architecture, Guides cover integrations (shell plugins, GitHub Actions, Terraform, git credentials, Claude Code), and Reference documents the CLI surface.',
           // Surface index, getting-started, and the CLI reference at the top of llms.txt.
           promote: ['index*', 'getting-started*', 'reference*'],
           // Keep the blog out of the small/full bundles to save context budget.
@@ -52,7 +52,7 @@ export default defineConfig({
             {
               label: 'Guides',
               description:
-                'Integration guides: shell plugins, GitHub Action, Terraform credentials helper, Claude Code, plus the how-to lookup page.',
+                'Integration guides: shell plugins, GitHub Action, Terraform credentials helper, git credentials helper, Claude Code, plus the how-to lookup page.',
               paths: ['guides/**', 'how-to'],
             },
             {
@@ -201,6 +201,7 @@ export default defineConfig({
             { label: 'Shell Plugins', slug: 'guides/shell-plugins' },
             { label: 'GitHub Action', slug: 'guides/github-action' },
             { label: 'Terraform & OpenTofu', slug: 'guides/terraform-credentials-helper' },
+            { label: 'Git Credentials', slug: 'guides/git-credential-helper' },
             { label: 'Claude Code', slug: 'guides/claude-code' },
             { label: 'GPG Agent', slug: 'guides/gpg-agent' },
             { label: 'Multi-environment Vaults', slug: 'guides/multi-environment' },
