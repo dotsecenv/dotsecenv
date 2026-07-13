@@ -5,14 +5,14 @@ name: CI
 #   test (matrix) ─┐
 #                  ├─► e2e (matrix)
 #                  ├─► e2e-terraform
-#   build-docs ────┤
+#   build-docs ────┤─► e2e-git-credential
 #                  ├─► e2e-action-default-args
 #                  └─► e2e-action-init-config
 #
 # `test` and `build-docs` are the two roots — both fast, both build the
 # binary, and they run in parallel so the slower of the two sets the
 # critical path's first stage. Everything downstream gates on BOTH.
-# Single-os (ubuntu) jobs: e2e-terraform, e2e-action-*, build-docs.
+# Single-os (ubuntu) jobs: e2e-terraform, e2e-git-credential, e2e-action-*, build-docs.
 # Matrix (ubuntu+macos): test, e2e.
 #
 # Scoped to Go-related changes via `paths:` allowlist below — touches to
@@ -176,6 +176,20 @@ jobs:
       - run: terraform version
 
       - run: make build e2e-terraform
+
+  e2e-git-credential:
+    name: E2E Git Credential Helper
+    needs: [test, build-docs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16  # v6.5.0
+        with:
+          go-version-file: "go.mod"
+          cache-dependency-path: "go.sum"
+
+      - run: make build e2e-git-credential
 
   e2e-action-default-args:
     name: E2E Action default-args

@@ -12,6 +12,7 @@ help:
 	@echo "  make test-race      - Run tests with race condition detection"
 	@echo "  make e2e            - Run end-to-end tests using bin/dotsecenv"
 	@echo "  make e2e-terraform  - Run Terraform credentials helper E2E tests"
+	@echo "  make e2e-git-credential - Run git credential helper E2E tests"
 	@echo "  make e2e-install    - Run install.sh E2E tests (requires network)"
 	@echo "  make sandbox        - Create an interactive sandbox environment"
 	@echo "  make demo           - Run demo recording in sandbox (requires asciinema)"
@@ -24,7 +25,7 @@ help:
 	@echo "  make install-tools  - Install all dev tools"
 
 .PHONY: all
-all: clean update build lint test test-race e2e e2e-terraform e2e-install completions docs man plugin
+all: clean update build lint test test-race e2e e2e-terraform e2e-git-credential e2e-install completions docs man plugin
 
 # Common ldflags for version info
 LDFLAGS := -X main.version=$$(git describe --tags --always --dirty) -X main.commit=$$(git rev-parse --short HEAD) -X main.date=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -125,6 +126,30 @@ e2e-terraform:
 	bash ./e2e-terraform.sh && \
 	rm -rf "$$E2E_HOME" && \
 	echo "Terraform e2e tests passed, cleaned up $$E2E_HOME"
+
+# Git credential helper E2E tests
+# Requires bin/dotsecenv, contrib/, git, and jq to exist
+.PHONY: e2e-git-credential
+e2e-git-credential:
+	@echo "Running git credential helper e2e tests..."
+	@E2E_HOME=$$(mktemp -d) && \
+	mkdir -p "$$E2E_HOME/.gnupg" "$$E2E_HOME/.config" "$$E2E_HOME/.local/share" "$$E2E_HOME/.local/state" "$$E2E_HOME/.cache" "$$E2E_HOME/bin" "$$E2E_HOME/contrib" && \
+	chmod 700 "$$E2E_HOME/.gnupg" && \
+	cp bin/dotsecenv "$$E2E_HOME/bin/" && \
+	cp contrib/git-credential-dotsecenv "$$E2E_HOME/contrib/" && \
+	cp scripts/e2e-git-credential.sh "$$E2E_HOME/" && \
+	echo "E2E environment: $$E2E_HOME" && \
+	cd "$$E2E_HOME" && \
+	HOME="$$E2E_HOME" \
+	PATH="$$E2E_HOME/bin:$$PATH" \
+	GNUPGHOME="$$E2E_HOME/.gnupg" \
+	XDG_CONFIG_HOME="$$E2E_HOME/.config" \
+	XDG_DATA_HOME="$$E2E_HOME/.local/share" \
+	XDG_STATE_HOME="$$E2E_HOME/.local/state" \
+	XDG_CACHE_HOME="$$E2E_HOME/.cache" \
+	bash ./e2e-git-credential.sh && \
+	rm -rf "$$E2E_HOME" && \
+	echo "Git credential e2e tests passed, cleaned up $$E2E_HOME"
 
 # Install script E2E tests (requires network)
 .PHONY: e2e-install
