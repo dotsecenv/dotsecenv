@@ -148,8 +148,11 @@ mise use github:dotsecenv/dotsecenv
 
 ```bash
 brew tap dotsecenv/tap
+brew trust dotsecenv/tap
 brew install dotsecenv
 ```
+
+Homebrew 6.0 requires trusting third-party taps before installing from them. If an existing install fails with `Refusing to load cask dotsecenv/tap/dotsecenv from untrusted tap`, run `brew trust dotsecenv/tap` once. To trust only the cask instead of the whole tap, use `brew trust --cask dotsecenv/tap/dotsecenv`.
 
 #### Linux Package Managers
 
@@ -362,6 +365,14 @@ You can install zsh/bash/fish plugins with:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
 ```
+
+If you installed dotsecenv with Homebrew or a Linux package, the plugin files are already on disk — source the one for your shell from its config file:
+
+| Shell | Homebrew (macOS/Linux)                                             | Linux Packages (deb/rpm/Arch)                       |
+| ----- | ------------------------------------------------------------------ | --------------------------------------------------- |
+| Zsh   | `$(brew --prefix)/share/dotsecenv/plugin/dotsecenv.plugin.zsh`     | `/usr/share/dotsecenv/plugin/dotsecenv.plugin.zsh`  |
+| Bash  | `$(brew --prefix)/share/dotsecenv/plugin/dotsecenv.plugin.bash`    | `/usr/share/dotsecenv/plugin/dotsecenv.plugin.bash` |
+| Fish  | `$(brew --prefix)/share/dotsecenv/plugin/conf.d/dotsecenv.fish`    | `/usr/share/dotsecenv/plugin/conf.d/dotsecenv.fish` |
 
 For plugin manager installation and additional details, see [github.com/dotsecenv/plugin#installation](https://github.com/dotsecenv/plugin#installation).
 

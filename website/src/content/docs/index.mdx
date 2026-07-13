@@ -68,8 +68,11 @@ curl -fsSL https://get.dotsecenv.com/install.sh | bash
   <TabItem label="macOS (Homebrew)">
     ```bash
     brew tap dotsecenv/tap
+    brew trust dotsecenv/tap
     brew install dotsecenv
     ```
+
+    Homebrew 6.0 requires trusting third-party taps; see the [installation guide](/tutorials/installation/) for details.
   </TabItem>
 
   <TabItem label="Ubuntu/Debian">

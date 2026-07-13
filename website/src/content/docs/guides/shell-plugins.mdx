@@ -23,8 +23,16 @@ PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL}
 
 Pick your shell. Each method gives you the auto-load behavior and the `dse` command.
 
+If you installed dotsecenv with Homebrew or a Linux package, the plugin files are already on disk: under `$(brew --prefix)/share/dotsecenv/plugin/` for Homebrew, `/usr/share/dotsecenv/plugin/` for deb/rpm/Arch.
+
 <Tabs>
   <TabItem label="Zsh">
+    **Homebrew / Linux package** — add to `~/.zshrc`:
+    ```bash
+    source "$(brew --prefix)/share/dotsecenv/plugin/dotsecenv.plugin.zsh"   # Homebrew
+    source /usr/share/dotsecenv/plugin/dotsecenv.plugin.zsh                 # deb/rpm/Arch
+    ```
+
     **Oh-My-Zsh:**
     ```bash
     git clone https://github.com/dotsecenv/plugin.git \
@@ -49,7 +57,13 @@ Pick your shell. Each method gives you the auto-load behavior and the `dse` comm
   </TabItem>
 
   <TabItem label="Bash">
-    Add to your `~/.bashrc`:
+    **Homebrew / Linux package** — add to `~/.bashrc`:
+    ```bash
+    source "$(brew --prefix)/share/dotsecenv/plugin/dotsecenv.plugin.bash"  # Homebrew
+    source /usr/share/dotsecenv/plugin/dotsecenv.plugin.bash                # deb/rpm/Arch
+    ```
+
+    **Manual** — add to your `~/.bashrc`:
     ```bash
     source /path/to/dotsecenv.plugin.bash
     ```
@@ -62,6 +76,12 @@ Pick your shell. Each method gives you the auto-load behavior and the `dse` comm
   </TabItem>
 
   <TabItem label="Fish">
+    **Homebrew / Linux package** — add to `~/.config/fish/config.fish`:
+    ```bash
+    source (brew --prefix)/share/dotsecenv/plugin/conf.d/dotsecenv.fish    # Homebrew
+    source /usr/share/dotsecenv/plugin/conf.d/dotsecenv.fish               # deb/rpm/Arch
+    ```
+
     **Fisher:**
     ```bash
     fisher install dotsecenv/plugin

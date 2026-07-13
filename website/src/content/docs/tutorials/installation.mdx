@@ -63,10 +63,17 @@ Install dotsecenv on your system and verify it's working correctly.
      <TabItem label="macOS (Homebrew)">
        ```bash
        brew tap dotsecenv/tap
+       brew trust dotsecenv/tap
        brew install dotsecenv
        ```
 
-       This automatically installs shell completions.
+       This automatically installs shell completions, and places the shell plugins (automatic `.env`/`.secenv` loading) under `$(brew --prefix)/share/dotsecenv/plugin/`. To enable one, see the [shell plugins guide](/guides/shell-plugins/#install-the-plugin).
+
+       Homebrew 6.0 (June 2026) refuses to load formulae and casks from third-party taps until you trust them. `brew trust dotsecenv/tap` covers everything the tap ships; to trust only the dotsecenv cask, run `brew trust --cask dotsecenv/tap/dotsecenv` instead. A one-off install with the fully-qualified name (`brew install dotsecenv/tap/dotsecenv`) also works and trusts just that cask.
+
+       <Aside type="note" title="Upgrading from an older install">
+       If you tapped dotsecenv before Homebrew 6.0, `brew upgrade` fails with `Refusing to load cask dotsecenv/tap/dotsecenv from untrusted tap dotsecenv/tap`. Run `brew trust dotsecenv/tap` once and upgrade again.
+       </Aside>
      </TabItem>
 
      <TabItem label="macOS (Binary)">
@@ -415,6 +422,7 @@ Homebrew casks automatically handle quarantine removal, so Gatekeeper warnings a
   <TabItem label="Homebrew">
     ```bash
     brew uninstall dotsecenv
+    brew untrust dotsecenv/tap
     brew untap dotsecenv/tap
     ```
   </TabItem>

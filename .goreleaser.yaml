@@ -81,12 +81,29 @@ homebrew_casks:
     description: "Safe environment secrets — encrypted at rest, ready to commit, easy to share."
     dependencies:
       - formula: gnupg
+    # Install the shell plugins (shipped inside the release archive under
+    # plugin/) to a stable path, mirroring the Linux packages'
+    # /usr/share/dotsecenv/plugin/. HOMEBREW_PREFIX interpolates at cask
+    # load time; artifact-declared files are removed on `brew uninstall`.
+    custom_block: |
+      artifact "plugin/dotsecenv.plugin.zsh", target: "#{HOMEBREW_PREFIX}/share/dotsecenv/plugin/dotsecenv.plugin.zsh"
+      artifact "plugin/dotsecenv.plugin.bash", target: "#{HOMEBREW_PREFIX}/share/dotsecenv/plugin/dotsecenv.plugin.bash"
+      artifact "plugin/_dotsecenv_core.sh", target: "#{HOMEBREW_PREFIX}/share/dotsecenv/plugin/_dotsecenv_core.sh"
+      artifact "plugin/conf.d/dotsecenv.fish", target: "#{HOMEBREW_PREFIX}/share/dotsecenv/plugin/conf.d/dotsecenv.fish"
     caveats: |
         For bash completions, install bash-completion:
           brew install bash-completion@2
 
-        To enable a shell plugin (automatic .env/.secenv loading), see:
-          https://github.com/dotsecenv/plugin
+        To enable automatic .env/.secenv loading, add the plugin for your
+        shell to its config file:
+          zsh (~/.zshrc):
+            source "$(brew --prefix)/share/dotsecenv/plugin/dotsecenv.plugin.zsh"
+          bash (~/.bashrc):
+            source "$(brew --prefix)/share/dotsecenv/plugin/dotsecenv.plugin.bash"
+          fish (~/.config/fish/config.fish):
+            source (brew --prefix)/share/dotsecenv/plugin/conf.d/dotsecenv.fish
+
+        Details: https://dotsecenv.com/guides/shell-plugins/
     manpages:
       - man/man1/dotsecenv.1
       - man/man1/dotsecenv-completion.1

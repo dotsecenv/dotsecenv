@@ -46,8 +46,11 @@ You need a GPG key. Most developers already have one for signing git commits. If
      <TabItem label="macOS (Homebrew)">
        ```bash
        brew tap dotsecenv/tap
+       brew trust dotsecenv/tap
        brew install dotsecenv
        ```
+
+       Homebrew 6.0 requires trusting third-party taps; see the [installation reference](/tutorials/installation/) for details.
      </TabItem>
      <TabItem label="Linux (apt)">
        ```bash

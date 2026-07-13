@@ -1485,6 +1485,66 @@ func TestSecretGet_FallbackNotFound(t *testing.T) {
 	}
 }
 
+// TestSecretGet_ExistsButNotAccessible tests that when a secret exists but the
+// logged-in identity has no access and the GPG agent cannot decrypt it either,
+// the error is "access denied" (with the identity named) rather than "not found".
+func TestSecretGet_ExistsButNotAccessible(t *testing.T) {
+	t.Setenv("DOTSECENV_CONFIG", "")
+
+	loggedInFP := "LOGGED_IN_FP"
+	otherFP := "OTHER_FP"
+
+	mockVaultResolver := NewMockVaultResolver()
+	// Secret is encrypted for otherFP, NOT the logged-in identity
+	mockVaultResolver.Secrets[0] = map[string]vault.Secret{
+		"HCLOUD_TOKEN": {
+			Key: "HCLOUD_TOKEN",
+			Values: []vault.SecretValue{
+				{AddedAt: time.Now().UTC(), Value: "c2VjcmV0", AvailableTo: []string{otherFP}},
+			},
+		},
+	}
+	mockVaultResolver.VaultPaths = []string{"/vault.yaml"}
+	mockVaultResolver.VaultEntries = []vault.VaultEntry{{Path: "/vault.yaml"}}
+
+	mockGPGClient := &MockGPGClientWithDecrypt{
+		MockGPGClient: NewMockGPGClient(),
+		DecryptFunc: func(ciphertext []byte, fingerprint string) ([]byte, error) {
+			return nil, fmt.Errorf("gpg: decryption failed: No secret key")
+		},
+	}
+
+	mockConfig := config.Config{
+		ApprovedAlgorithms: []config.ApprovedAlgorithm{{Algo: "RSA", MinBits: 2048}},
+		Login:              newTestSignedLogin(t, loggedInFP),
+	}
+
+	stdoutBuf := &bytes.Buffer{}
+	stderrBuf := &bytes.Buffer{}
+
+	cli := &CLI{
+		config:        mockConfig,
+		vaultResolver: mockVaultResolver,
+		gpgClient:     mockGPGClient,
+		stdin:         strings.NewReader(""),
+		output:        output.NewHandler(stdoutBuf, stderrBuf),
+	}
+
+	err := cli.SecretGet("HCLOUD_TOKEN", false, false, false, "", 0)
+	switch {
+	case err == nil:
+		t.Fatal("Expected error for inaccessible secret")
+	case err.ExitCode != ExitAccessDenied:
+		t.Errorf("Expected ExitAccessDenied, got exit code: %d", err.ExitCode)
+	case !strings.Contains(err.Message, "access denied"):
+		t.Errorf("Expected 'access denied' in error message, got: %s", err.Message)
+	case !strings.Contains(err.Message, "exists"):
+		t.Errorf("Expected message to say the secret exists, got: %s", err.Message)
+	case !strings.Contains(err.Message, loggedInFP):
+		t.Errorf("Expected message to name the identity, got: %s", err.Message)
+	}
+}
+
 // TestSecretGet_JSONOutput_AllMode_IncludesAvailableToAndSignedBy verifies that
 // `secret get NAME --all --json` exposes per-value available_to and signed_by,
 // which are required for auditing access control across versions.

@@ -275,6 +275,10 @@ function _dotsecenv_load_file
         return 0
     end
 
+    # Secret names that failed to fetch during this load, so the same secret
+    # mapped to multiple keys errors in full only once
+    set -l failed_secrets
+
     while read -l line
         if _dotsecenv_parse_line "$line"
             set -l key "$_DOTSECENV_PARSE_KEY"
@@ -293,6 +297,13 @@ function _dotsecenv_load_file
                 # Phase 2: load secrets via dotsecenv CLI
                 set -l secret_name "$value"
 
+                # This secret already failed during this load; the full error
+                # printed then, so a one-line notice is enough for this key
+                if contains -- "$secret_name" $failed_secrets
+                    echo "dotsecenv: $key not set (secret '$secret_name' failed above)" >&2
+                    continue
+                end
+
                 # Fetch secret from vault (capture stderr separately to preserve secret value)
                 set -l secret_stderr_file (mktemp)
                 set -l secret_result (dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
@@ -310,6 +321,7 @@ function _dotsecenv_load_file
                 else
                     echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
                     cat "$secret_stderr_file" >&2
+                    set -a failed_secrets "$secret_name"
                 end
                 rm -f "$secret_stderr_file"
             end
