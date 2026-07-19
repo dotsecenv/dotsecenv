@@ -155,7 +155,7 @@ runs:
 
     - name: Set up Go
       if: inputs.build-from-source == 'true'
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@v7
       with:
         go-version-file: "${{ steps.checkout.outputs.dir }}/go.mod"
         # Disable module caching: the source is cloned into ${{ runner.temp }},
