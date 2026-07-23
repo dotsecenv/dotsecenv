@@ -14,6 +14,7 @@ _Unreleased_
 ### Features
 
 - The Homebrew cask now installs the zsh/bash/fish shell plugins to `$(brew --prefix)/share/dotsecenv/plugin/`, matching the Linux packages (#253)
+- Add `contrib/git-credential-dotsecenv`, a git credential helper that stores HTTPS credentials encrypted in your vault and preserves OAuth `oauth_refresh_token`/`password_expiry_utc` fields so it can back a generator like git-credential-oauth (no stored PAT); the deb/rpm/Arch packages and install.sh install it to a `PATH` directory (#255)
 
 ### Bug Fixes
 

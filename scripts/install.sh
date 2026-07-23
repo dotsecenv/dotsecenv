@@ -45,6 +45,7 @@ VERSION="${VERSION:-latest}"
 INSTALL_DIR="${INSTALL_DIR:-}"
 INSTALL_SHELL_PLUGIN="${INSTALL_SHELL_PLUGIN:-1}"
 INSTALL_TF_CREDENTIALS_HELPER="${INSTALL_TF_CREDENTIALS_HELPER:-1}"
+INSTALL_GIT_CREDENTIALS_HELPER="${INSTALL_GIT_CREDENTIALS_HELPER:-1}"
 INSTALL_COMPLETIONS="${INSTALL_COMPLETIONS:-1}"
 INSTALL_MAN_PAGES="${INSTALL_MAN_PAGES:-1}"
 SYSTEM_INSTALL="${SYSTEM_INSTALL:-0}"
@@ -608,6 +609,40 @@ TFEOF
 }
 
 # ---------------------------------------------------------------------------
+# Git credential helper
+# ---------------------------------------------------------------------------
+install_git_credential_helper() {
+    local tmp_dir="$1"
+
+    info "Installing git credential helper..."
+
+    local helper_src="${tmp_dir}/contrib/git-credential-dotsecenv"
+    if [ ! -f "${helper_src}" ]; then
+        warn "Git credential helper not found in archive; skipping"
+        return 0
+    fi
+
+    # git resolves git-credential-* on PATH; install alongside the binary.
+    local dest="${INSTALL_DIR}/git-credential-dotsecenv"
+    if need_sudo "${INSTALL_DIR}" 2>/dev/null; then
+        maybe_sudo install -m 755 "${helper_src}" "${dest}"
+    else
+        install -m 755 "${helper_src}" "${dest}"
+    fi
+    success "Git credential helper installed to ${dest}"
+
+    printf "\n"
+    printf "${BLUE}==>${RESET} Enable it with:\n"
+    cat <<'GITEOF'
+
+    git config --global credential.helper dotsecenv
+
+GITEOF
+    printf "  Requires ${BOLD}jq${RESET}. For OAuth without a stored token, also add a\n"
+    printf "  generator such as git-credential-oauth (configured last).\n"
+}
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print_summary() {
@@ -642,6 +677,7 @@ print_summary() {
         printf "  Shell plugin: ${plugin_summary_dir}/\n"
     fi
     [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ] && printf "  TF helper:    ${tf_dir}/\n"
+    [ "${INSTALL_GIT_CREDENTIALS_HELPER}" = "1" ] && printf "  Git helper:   ${INSTALL_DIR}/git-credential-dotsecenv\n"
     printf "\n"
     printf "  Get started:  ${BOLD}dotsecenv --help${RESET}\n"
     printf "\n"
@@ -669,6 +705,10 @@ parse_args() {
                 INSTALL_TF_CREDENTIALS_HELPER=1; shift ;;
             --no-install-tf-credentials-helper)
                 INSTALL_TF_CREDENTIALS_HELPER=0; shift ;;
+            --install-git-credentials-helper)
+                INSTALL_GIT_CREDENTIALS_HELPER=1; shift ;;
+            --no-install-git-credentials-helper)
+                INSTALL_GIT_CREDENTIALS_HELPER=0; shift ;;
             --install-completions)
                 INSTALL_COMPLETIONS=1; shift ;;
             --no-install-completions)
@@ -696,6 +736,7 @@ Options:
   --install-dir DIR                  Install binary to DIR (default: ~/.local/bin)
   --[no-]install-shell-plugin        Install shell plugin (default: yes)
   --[no-]install-tf-credentials-helper  Install Terraform helper (default: yes)
+  --[no-]install-git-credentials-helper Install git credential helper (default: yes)
   --[no-]install-completions         Install shell completions (default: yes)
   --[no-]install-man-pages           Install man pages (default: yes)
   --system                           Install system-wide (/usr/local/bin, shared
@@ -705,7 +746,8 @@ Options:
 
 Environment variables:
   VERSION, INSTALL_DIR, INSTALL_SHELL_PLUGIN, INSTALL_TF_CREDENTIALS_HELPER,
-  INSTALL_COMPLETIONS, INSTALL_MAN_PAGES, SYSTEM_INSTALL, VERIFY
+  INSTALL_GIT_CREDENTIALS_HELPER, INSTALL_COMPLETIONS, INSTALL_MAN_PAGES,
+  SYSTEM_INSTALL, VERIFY
 USAGE
                 exit 0
                 ;;
@@ -750,6 +792,10 @@ main() {
 
     if [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ]; then
         install_tf_helper "${tmp_dir}"
+    fi
+
+    if [ "${INSTALL_GIT_CREDENTIALS_HELPER}" = "1" ]; then
+        install_git_credential_helper "${tmp_dir}"
     fi
 
     print_summary
