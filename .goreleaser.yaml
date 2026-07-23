@@ -146,6 +146,8 @@ nfpms:
       - gnupg
     suggests:
       - bash-completion
+      # jq is required by the bundled git-credential-dotsecenv helper
+      - jq
     rpm:
       packager: DotSecEnv <release@dotsecenv.com>
       signature:
