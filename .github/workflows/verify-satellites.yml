@@ -75,7 +75,7 @@ jobs:
       # Satellite goes first because we may need to read its Source-SHA
       # trailer to decide which monorepo commit to compare against.
       - name: Checkout ${{ matrix.repo }} satellite
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: ${{ matrix.repo }}
           path: satellite
@@ -110,7 +110,7 @@ jobs:
           echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout monorepo @ ${{ steps.sha.outputs.sha }}
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: ${{ steps.sha.outputs.sha }}
           path: monorepo
