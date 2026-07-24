@@ -26,7 +26,7 @@ echo "==> Initializing vault"
 mkdir -p "$XDG_DATA_HOME/dotsecenv"
 "$BIN" init config
 # Strip config to a single vault so the helper works without -v in non-TTY
-sed -i.bak '/^  - .dotsecenv\/vault$/d; /^  - \/var\/lib\/dotsecenv\/vault$/d' "$XDG_CONFIG_HOME/dotsecenv/config"
+sed -i.bak '/^  - \.dotsecenv\/vault$/d; /^  - \/var\/lib\/dotsecenv\/vault$/d' "$XDG_CONFIG_HOME/dotsecenv/config"
 rm -f "$XDG_CONFIG_HOME/dotsecenv/config.bak"
 "$BIN" init vault -v "$XDG_DATA_HOME/dotsecenv/vault"
 KEY=$(gpg --list-keys --with-colons git@test | awk -F: '/^fpr:/{print $10; exit}')
