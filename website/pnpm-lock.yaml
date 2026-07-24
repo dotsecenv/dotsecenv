@@ -10,16 +10,16 @@ importers:
     dependencies:
       '@astrojs/starlight':
         specifier: ^0.41.0
-        version: 0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3)
+        version: 0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3)
       asciinema-player:
         specifier: ^3.13.5
         version: 3.17.0
       astro:
         specifier: ^7.0.0
-        version: 7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
+        version: 7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
       astro-og-canvas:
         specifier: ^0.13.0
-        version: 0.13.0(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))
+        version: 0.13.0(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))
       canvaskit-wasm:
         specifier: ^0.41.0
         version: 0.41.1
@@ -28,7 +28,7 @@ importers:
         version: 0.35.3(@types/node@24.13.3)
       starlight-blog:
         specifier: ^0.28.0
-        version: 0.28.0(@astrojs/markdown-satteri@0.3.3)(@astrojs/starlight@0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3)
+        version: 0.28.0(@astrojs/markdown-satteri@0.3.3)(@astrojs/starlight@0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3)
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.0
@@ -50,13 +50,13 @@ importers:
         version: 0.49.1(supports-color@9.4.0)
       starlight-contextual-menu:
         specifier: ^0.1.5
-        version: 0.1.5(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(starlight-markdown@0.1.5(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)))
+        version: 0.1.5(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(starlight-markdown@0.1.5(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)))
       starlight-llms-txt:
         specifier: ^0.11.0
-        version: 0.11.0(@astrojs/markdown-satteri@0.3.3)(@astrojs/starlight@0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)
+        version: 0.11.0(@astrojs/markdown-satteri@0.3.3)(@astrojs/starlight@0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)
       starlight-markdown:
         specifier: ^0.1.5
-        version: 0.1.5(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))
+        version: 0.1.5(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))
       typescript-eslint:
         specifier: ^8.57.2
         version: 8.64.0(eslint@10.7.0(supports-color@9.4.0))(supports-color@9.4.0)(typescript@6.0.3)
@@ -1138,8 +1138,8 @@ packages:
     peerDependencies:
       astro: ^5.0.0 || ^6.0.0 || ^7.0.0
 
-  astro@7.1.0:
-    resolution: {integrity: sha512-jXHNZXpO0HOuANLwv5uLg5WFXFmIMyDTMlokIb8sv10y8QItOFaikwrqvp6+Pe0MSqvp+aO7V1SfVriFcCEKgA==}
+  astro@7.1.3:
+    resolution: {integrity: sha512-4dhPyAAXthf3xLEYnG8SeL7yr/nTPPABfY7e9YF0yuO+vK9Xp+8Q5j4xzsmL3GueukQv4oNwGNTBepLOiDGeJA==}
     engines: {node: '>=22.12.0', npm: '>=9.6.5', pnpm: '>=7.1.0'}
     hasBin: true
     peerDependencies:
@@ -1254,9 +1254,9 @@ packages:
   cookie-es@1.2.3:
     resolution: {integrity: sha512-lXVyvUvrNXblMqzIRrxHb57UUVmqsSWlxqt3XIjCkUP0wDAf6uicO6KMbEgYrMNtEvWgWHwe42CKxPu9MYAnWw==}
 
-  cookie@1.1.1:
-    resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
-    engines: {node: '>=18'}
+  cookie@2.0.1:
+    resolution: {integrity: sha512-yuToqVvRrj6pfDXREyQAAv8SkAEk/8GS3jQRTiUMm66TVtBYmqQeoEjL2Lmq8Rpo6271vH76InTChTitEAm65w==}
+    engines: {node: '>=22'}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -2154,11 +2154,6 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
-  nanoid@3.3.15:
-    resolution: {integrity: sha512-y7Wygv/7mEOvxTuEQDB8StXdMRBWf1kR/tlhAzBRUFkB2jfcLOAxO/SHmOO2zgz1pVgK29/kyupn059/bCHdjA==}
-    engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
-    hasBin: true
-
   nanoid@3.3.16:
     resolution: {integrity: sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -2167,8 +2162,8 @@ packages:
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
 
-  neotraverse@0.6.18:
-    resolution: {integrity: sha512-Z4SmBUweYa09+o6pG+eASabEpP6QkQ70yHj351pQoEXIs8uHbaU2DWVmzBANKgflPa47A50PtB2+NgRpQvr7vA==}
+  neotraverse@1.0.1:
+    resolution: {integrity: sha512-WmmLty1YWwJl9yZi77v2dVIV6X2kuYV8YYBI/G3LWGKdGHmHUvL1z7FW0iDvEvGAwNEoc5x1tOOOyDnf5jJw/w==}
     engines: {node: '>= 10'}
 
   nlcst-to-string@4.0.0:
@@ -2314,10 +2309,6 @@ packages:
   postcss-selector-parser@6.1.4:
     resolution: {integrity: sha512-bIoJLOmjCO1S9XdY/DcnR5hJxvrDir1PbGChrzXG3vw0/FOliy/fA3dmdhQ441kah4gKv+TwckGzex6wNS5cnQ==}
     engines: {node: '>=4'}
-
-  postcss@8.5.17:
-    resolution: {integrity: sha512-J7EF+8X+CzRPaJPOv9Ck2wNWJvGnnl3PcNPAdGg6GTLjyVpyQ0yATMSXRFRV01BviT/9Gwuc3rjEyJbDJG9a4w==}
-    engines: {node: ^10 || ^12 || >=14}
 
   postcss@8.5.22:
     resolution: {integrity: sha512-KBDEIpLrvpv16pp3K0Fw+UCoZfopFjjgeB+0tA/aaThfEE74kKDLrgg603YvOWJyg3+WYtyq3xYsQWsIyZlPqQ==}
@@ -3095,13 +3086,13 @@ snapshots:
       hast-util-from-html: 2.0.3
       satteri: 0.9.5
 
-  '@astrojs/mdx@7.0.2(@astrojs/markdown-satteri@0.3.3)(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)':
+  '@astrojs/mdx@7.0.2(@astrojs/markdown-satteri@0.3.3)(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)':
     dependencies:
       '@astrojs/internal-helpers': 0.10.1
       '@astrojs/markdown-remark': 7.2.1(supports-color@9.4.0)
       '@mdx-js/mdx': 3.1.1(supports-color@9.4.0)
       acorn: 8.17.0
-      astro: 7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
+      astro: 7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
       es-module-lexer: 2.3.0
       estree-util-visit: 2.0.0
       hast-util-to-html: 9.0.5
@@ -3133,17 +3124,17 @@ snapshots:
       stream-replace-string: 2.0.0
       zod: 4.4.3
 
-  '@astrojs/starlight@0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3)':
+  '@astrojs/starlight@0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3)':
     dependencies:
       '@astrojs/markdown-satteri': 0.3.3
-      '@astrojs/mdx': 7.0.2(@astrojs/markdown-satteri@0.3.3)(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)
+      '@astrojs/mdx': 7.0.2(@astrojs/markdown-satteri@0.3.3)(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)
       '@astrojs/sitemap': 3.7.3
       '@pagefind/default-ui': 1.5.2
       '@types/hast': 3.0.5
       '@types/js-yaml': 4.0.9
       '@types/mdast': 4.0.4
-      astro: 7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
-      astro-expressive-code: 0.44.0(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))
+      astro: 7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
+      astro-expressive-code: 0.44.0(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))
       bcp-47: 2.1.1
       hast-util-from-html: 2.0.3
       hast-util-select: 6.0.4
@@ -3393,8 +3384,8 @@ snapshots:
       hast-util-to-html: 9.0.5
       hast-util-to-text: 4.0.2
       hastscript: 9.0.1
-      postcss: 8.5.17
-      postcss-nested: 6.2.0(postcss@8.5.17)
+      postcss: 8.5.22
+      postcss-nested: 6.2.0(postcss@8.5.22)
       unist-util-visit: 5.1.0
       unist-util-visit-parents: 6.0.2
 
@@ -4012,20 +4003,20 @@ snapshots:
 
   astring@1.9.0: {}
 
-  astro-expressive-code@0.44.0(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)):
+  astro-expressive-code@0.44.0(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)):
     dependencies:
-      astro: 7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
+      astro: 7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
       rehype-expressive-code: 0.44.0
       url-extras: 0.1.0
 
-  astro-og-canvas@0.13.0(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)):
+  astro-og-canvas@0.13.0(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)):
     dependencies:
-      astro: 7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
+      astro: 7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
       canvaskit-wasm: 0.41.1
       deterministic-object-hash: 2.0.2
       entities: 8.0.0
 
-  astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0):
+  astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0):
     dependencies:
       '@astrojs/compiler-rs': 0.3.1(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)
       '@astrojs/internal-helpers': 0.10.1
@@ -4041,7 +4032,7 @@ snapshots:
       ci-info: 4.4.0
       clsx: 2.1.1
       common-ancestor-path: 2.0.0
-      cookie: 1.1.1
+      cookie: 2.0.1
       devalue: 5.8.2
       diff: 8.0.4
       dset: 3.1.4
@@ -4058,7 +4049,7 @@ snapshots:
       magic-string: 0.30.21
       magicast: 0.5.3
       mrmime: 2.0.1
-      neotraverse: 0.6.18
+      neotraverse: 1.0.1
       obug: 2.1.4
       p-limit: 7.3.1
       p-queue: 9.3.3
@@ -4201,7 +4192,7 @@ snapshots:
 
   cookie-es@1.2.3: {}
 
-  cookie@1.1.1: {}
+  cookie@2.0.1: {}
 
   cross-spawn@7.0.6:
     dependencies:
@@ -5562,13 +5553,11 @@ snapshots:
 
   ms@2.1.3: {}
 
-  nanoid@3.3.15: {}
-
   nanoid@3.3.16: {}
 
   natural-compare@1.4.0: {}
 
-  neotraverse@0.6.18: {}
+  neotraverse@1.0.1: {}
 
   nlcst-to-string@4.0.0:
     dependencies:
@@ -5724,21 +5713,15 @@ snapshots:
 
   picomatch@4.0.5: {}
 
-  postcss-nested@6.2.0(postcss@8.5.17):
+  postcss-nested@6.2.0(postcss@8.5.22):
     dependencies:
-      postcss: 8.5.17
+      postcss: 8.5.22
       postcss-selector-parser: 6.1.4
 
   postcss-selector-parser@6.1.4:
     dependencies:
       cssesc: 3.0.0
       util-deprecate: 1.0.2
-
-  postcss@8.5.17:
-    dependencies:
-      nanoid: 3.3.15
-      picocolors: 1.1.1
-      source-map-js: 1.2.1
 
   postcss@8.5.22:
     dependencies:
@@ -6124,12 +6107,12 @@ snapshots:
 
   spdx-license-ids@3.0.23: {}
 
-  starlight-blog@0.28.0(@astrojs/markdown-satteri@0.3.3)(@astrojs/starlight@0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3):
+  starlight-blog@0.28.0(@astrojs/markdown-satteri@0.3.3)(@astrojs/starlight@0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3):
     dependencies:
       '@astrojs/markdown-remark': 7.2.1(supports-color@9.4.0)
-      '@astrojs/mdx': 7.0.2(@astrojs/markdown-satteri@0.3.3)(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)
+      '@astrojs/mdx': 7.0.2(@astrojs/markdown-satteri@0.3.3)(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)
       '@astrojs/rss': 4.0.19
-      '@astrojs/starlight': 0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3)
+      '@astrojs/starlight': 0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3)
       github-slugger: 2.0.0
       hast-util-from-html: 2.0.3
       hast-util-to-html: 9.0.5
@@ -6146,18 +6129,18 @@ snapshots:
       - supports-color
       - typescript
 
-  starlight-contextual-menu@0.1.5(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(starlight-markdown@0.1.5(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))):
+  starlight-contextual-menu@0.1.5(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(starlight-markdown@0.1.5(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))):
     dependencies:
-      astro: 7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
-      starlight-markdown: 0.1.5(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))
+      astro: 7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
+      starlight-markdown: 0.1.5(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))
 
-  starlight-llms-txt@0.11.0(@astrojs/markdown-satteri@0.3.3)(@astrojs/starlight@0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0):
+  starlight-llms-txt@0.11.0(@astrojs/markdown-satteri@0.3.3)(@astrojs/starlight@0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0):
     dependencies:
-      '@astrojs/mdx': 7.0.2(@astrojs/markdown-satteri@0.3.3)(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)
-      '@astrojs/starlight': 0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3)
+      '@astrojs/mdx': 7.0.2(@astrojs/markdown-satteri@0.3.3)(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)
+      '@astrojs/starlight': 0.41.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0))(supports-color@9.4.0)(typescript@6.0.3)
       '@types/hast': 3.0.4
       '@types/micromatch': 4.0.10
-      astro: 7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
+      astro: 7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
       github-slugger: 2.0.0
       hast-util-select: 6.0.4
       micromatch: 4.0.8
@@ -6171,9 +6154,9 @@ snapshots:
       - '@astrojs/markdown-satteri'
       - supports-color
 
-  starlight-markdown@0.1.5(astro@7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)):
+  starlight-markdown@0.1.5(astro@7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)):
     dependencies:
-      astro: 7.1.0(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
+      astro: 7.1.3(@astrojs/markdown-remark@7.2.1(supports-color@9.4.0))(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.2)(@types/node@24.13.3)(yaml@2.9.0)
 
   stream-replace-string@2.0.0: {}
 
