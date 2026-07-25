@@ -85,7 +85,14 @@ homebrew_casks:
     # plugin/) to a stable path, mirroring the Linux packages'
     # /usr/share/dotsecenv/plugin/. HOMEBREW_PREFIX interpolates at cask
     # load time; artifact-declared files are removed on `brew uninstall`.
+    #
+    # The git credential helper needs a `binary` stanza, not an `artifact`:
+    # git resolves git-credential-* by searching PATH, and `binary` symlinks
+    # into HOMEBREW_PREFIX/bin, which brew relinks on upgrade. Without this the
+    # cask stages the helper into the version-scoped Caskroom and nothing puts
+    # it on PATH, so `credential.helper dotsecenv` never resolves.
     custom_block: |
+      binary "contrib/git-credential-dotsecenv"
       artifact "plugin/dotsecenv.plugin.zsh", target: "#{HOMEBREW_PREFIX}/share/dotsecenv/plugin/dotsecenv.plugin.zsh"
       artifact "plugin/dotsecenv.plugin.bash", target: "#{HOMEBREW_PREFIX}/share/dotsecenv/plugin/dotsecenv.plugin.bash"
       artifact "plugin/_dotsecenv_core.sh", target: "#{HOMEBREW_PREFIX}/share/dotsecenv/plugin/_dotsecenv_core.sh"
