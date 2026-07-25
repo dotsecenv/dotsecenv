@@ -1,0 +1,20 @@
+{
+  "enabledPlugins": {
+    "claude-blog@agricidaniel-blog": true,
+    "technical-docs@dotsecenv-project-local": true
+  },
+  "extraKnownMarketplaces": {
+    "agricidaniel-blog": {
+      "source": {
+        "source": "github",
+        "repo": "AgriciDaniel/claude-blog"
+      }
+    },
+    "dotsecenv-project-local": {
+      "source": {
+        "source": "directory",
+        "path": "./.claude/marketplace"
+      }
+    }
+  }
+}

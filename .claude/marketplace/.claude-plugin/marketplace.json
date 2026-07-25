@@ -1,0 +1,26 @@
+{
+  "name": "dotsecenv-project-local",
+  "owner": {
+    "name": "dotsecenv"
+  },
+  "metadata": {
+    "description": "Project-local marketplace wrapping third-party plugin repos that ship no marketplace manifest of their own"
+  },
+  "plugins": [
+    {
+      "name": "technical-docs",
+      "source": {
+        "source": "github",
+        "repo": "danielrosehill/Claude-Technical-Docs-Plugin"
+      },
+      "description": "Technical documentation workflow: README authoring, reference docs, changelogs, tech-stack capture, markdown conversion, fix-note archival",
+      "author": {
+        "name": "Daniel Rosehill"
+      },
+      "homepage": "https://github.com/danielrosehill/Claude-Technical-Docs-Plugin",
+      "license": "MIT",
+      "category": "documentation",
+      "keywords": ["documentation", "readme", "api-reference", "changelog"]
+    }
+  ]
+}
