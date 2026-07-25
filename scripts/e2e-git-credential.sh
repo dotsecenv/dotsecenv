@@ -25,9 +25,8 @@ echo "==> Generating test key"
 echo "==> Initializing vault"
 mkdir -p "$XDG_DATA_HOME/dotsecenv"
 "$BIN" init config
-# Strip config to a single vault so the helper works without -v in non-TTY
-sed -i.bak '/^  - \.dotsecenv\/vault$/d; /^  - \/var\/lib\/dotsecenv\/vault$/d' "$XDG_CONFIG_HOME/dotsecenv/config"
-rm -f "$XDG_CONFIG_HOME/dotsecenv/config.bak"
+# Deliberately keep the default multi-vault config: the helper must pin the home
+# vault itself. Stripping the config here would hide the regression test 13 covers.
 "$BIN" init vault -v "$XDG_DATA_HOME/dotsecenv/vault"
 KEY=$(gpg --list-keys --with-colons git@test | awk -F: '/^fpr:/{print $10; exit}')
 "$BIN" login "$KEY"
@@ -148,6 +147,31 @@ if printf 'protocol=https\nhost=gitlab.com\n\n' | "$HELPER" bogus 2>/dev/null; t
     fail "unsupported operation should exit non-zero"
 else
     pass "unsupported operation exits non-zero"
+fi
+
+# Test 13: a repo with its own committed vault must not break store/erase.
+# Without an explicit -v the helper aborts here with "multiple vaults configured
+# and no terminal available", and a failed erase leaves a revoked credential live.
+((TESTS_RUN++)) || true
+proj="$PWD/projrepo"
+mkdir -p "$proj"
+(cd "$proj" && "$OLDPWD/$BIN" init vault -v .dotsecenv/vault >/dev/null 2>&1)
+h="proj.example"
+store_rc=0
+(cd "$proj" && printf 'protocol=https\nhost=%s\nusername=me\npassword=pv-1\n\n' "$h" \
+    | "$OLDPWD/$HELPER" store) >/dev/null 2>&1 || store_rc=$?
+proj_get=$(cd "$proj" && printf 'protocol=https\nhost=%s\n\n' "$h" | "$OLDPWD/$HELPER" get 2>/dev/null || true)
+erase_rc=0
+(cd "$proj" && printf 'protocol=https\nhost=%s\n\n' "$h" | "$OLDPWD/$HELPER" erase) >/dev/null 2>&1 || erase_rc=$?
+after_erase=$(cd "$proj" && printf 'protocol=https\nhost=%s\n\n' "$h" | "$OLDPWD/$HELPER" get 2>/dev/null || true)
+# The token must never be written into the committable project vault.
+leaked=0
+grep -q 'HTTPS_SLASH_PROJ' "$proj/.dotsecenv/vault" 2>/dev/null && leaked=1
+if [ "$store_rc" -eq 0 ] && echo "$proj_get" | grep -q 'password=pv-1' \
+    && [ "$erase_rc" -eq 0 ] && [ -z "$after_erase" ] && [ "$leaked" -eq 0 ]; then
+    pass "store/get/erase work in a repo that has its own vault"
+else
+    fail "repo-local vault broke the helper: store_rc=$store_rc get='$proj_get' erase_rc=$erase_rc after_erase='$after_erase' leaked=$leaked"
 fi
 
 echo ""
