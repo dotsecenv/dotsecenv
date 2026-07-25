@@ -13,5 +13,10 @@ website/.docusaurus
 website/.cache
 
 # Claude
+# A user-global ignore may exclude **/.claude/; re-include it here so the
+# shared project config and skills stay tracked.
+!.claude/
 .claude/settings.local.json
+# Claude Code fetches this plugin from GitHub on install; not vendored.
+.claude/marketplace/technical-docs/
 .worktrees/
