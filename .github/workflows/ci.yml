@@ -5,7 +5,8 @@ name: CI
 #   test (matrix) ─┐
 #                  ├─► e2e (matrix)
 #                  ├─► e2e-terraform
-#   build-docs ────┤─► e2e-git-credential
+#                  ├─► e2e-git-credential
+#   build-docs ────┤
 #                  ├─► e2e-action-default-args
 #                  └─► e2e-action-init-config
 #
