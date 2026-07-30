@@ -79,7 +79,7 @@ func TestSecretPut_WithVaultPath(t *testing.T) {
 	}
 
 	// Use -v flag
-	putErr := cli.SecretPut("MY_SECRET", vaultPath, 0, "")
+	putErr := cli.SecretPut("MY_SECRET", vaultPath, 0, "", StoreSharePrompt)
 	if putErr != nil {
 		t.Fatalf("SecretPut with -v failed unexpectedly: %v", putErr)
 	}
@@ -151,7 +151,7 @@ func TestSecretPut_WithFromIndex(t *testing.T) {
 	}
 
 	// Test --from 2 (index 1)
-	err := cli.SecretPut("MY_SECRET", "", 2, "")
+	err := cli.SecretPut("MY_SECRET", "", 2, "", StoreSharePrompt)
 	if err != nil {
 		t.Fatalf("SecretPut with --from 2 failed unexpectedly: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestSecretPut_FromIndexOutOfRange(t *testing.T) {
 	}
 
 	// Test -v 4 (out of range)
-	err := cli.SecretPut("MY_SECRET", "", 4, "")
+	err := cli.SecretPut("MY_SECRET", "", 4, "", StoreSharePrompt)
 	switch {
 	case err == nil:
 		t.Fatalf("Expected SecretPut with -v 4 to fail, but it succeeded")
@@ -605,7 +605,7 @@ func TestSecretPut_BlockedByDeleted(t *testing.T) {
 	}
 
 	// Try to put to a deleted secret
-	putErr := cli.SecretPut("DELETED_SECRET", vaultPath, 0, "")
+	putErr := cli.SecretPut("DELETED_SECRET", vaultPath, 0, "", StoreSharePrompt)
 	switch {
 	case putErr == nil:
 		t.Fatal("SecretPut should fail for deleted secret")

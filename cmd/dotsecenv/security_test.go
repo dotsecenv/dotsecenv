@@ -197,15 +197,13 @@ func TestIssue_RevokeWithoutAccess(t *testing.T) {
 	// 3. Share with C
 	_, _, _ = runCmdWithEnv(env, "-c", configPathA, "secret", "share", "SEC1", fpC)
 
-	// 4. A updates secret (v4) -> Only A has access
-	cmd = exec.Command(binaryPath, "-c", configPathA, "secret", "store", "SEC1")
-	cmd.Env = append(filteredEnv(), env...)
-	cmd.Stdin = strings.NewReader("v4")
-	_ = cmd.Run()
+	// 4. A revokes B -> latest value is available to A and C only.
+	// (secret store carries the recipient set forward, so an explicit revoke
+	// is what removes B from the latest value.)
+	_, _, _ = runCmdWithEnv(env, "-c", configPathA, "secret", "revoke", "SEC1", fpB)
 
 	// 5. B tries to revoke C.
-	// B has access to v2 and v3.
-	// B does NOT have access to v4 (latest).
+	// B has access to earlier values but NOT to the latest one.
 	// B tries to revoke C from SEC1.
 	_, stderr, err := runCmdWithEnv(env, "-c", configPathB, "secret", "revoke", "SEC1", fpC)
 

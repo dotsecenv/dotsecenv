@@ -53,6 +53,8 @@ Use [Rotate a Compromised GPG Key](/runbooks/rotate-compromised-key/) instead.
    echo "<new-value>" | dotsecenv secret store SECRET_NAME
    ```
 
+   The new value is encrypted to everyone still on the recipient list, so remaining teammates and CI keep access without re-sharing.
+
 5. **Commit.**
 
    ```bash

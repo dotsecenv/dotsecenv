@@ -35,7 +35,16 @@ Keys are case-insensitive and normalized when stored:
   - Key name part: UPPERCASE
 
 The secret value is read from stdin. Use -v to specify which vault
-to store the secret in (either a path or 1-based index).`,
+to store the secret in (either a path or 1-based index).
+
+Storing over an existing secret keeps its current recipient set: the new
+value is encrypted to every fingerprint on the latest entry's available_to,
+not just yours. When that set includes other identities, store warns and,
+if a terminal is available, asks for confirmation.
+
+Options:
+  --share     Keep the recipient set without warning or confirmation
+  --no-share  Encrypt the new value only to your identity`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if err := cobra.ExactArgs(1)(cmd, args); err != nil {
 			return err
@@ -90,13 +99,24 @@ to store the secret in (either a path or 1-based index).`,
 		}
 		defer func() { _ = cli.Close() }()
 
-		exitErr := cli.SecretPut(secretKey, vaultPath, fromIndex, preReadValue)
+		shareMode := clilib.StoreSharePrompt
+		if secretPutShare {
+			shareMode = clilib.StoreShareAlways
+		} else if secretPutNoShare {
+			shareMode = clilib.StoreShareNever
+		}
+
+		exitErr := cli.SecretPut(secretKey, vaultPath, fromIndex, preReadValue, shareMode)
 		exitWithError(exitErr)
 	},
 }
 
 // secret store flags
-var secretPutJSON bool
+var (
+	secretPutJSON    bool
+	secretPutShare   bool
+	secretPutNoShare bool
+)
 
 // secret get flags
 var (
@@ -371,6 +391,9 @@ or 1-based index).`,
 func init() {
 	// secret store flags
 	secretPutCmd.Flags().BoolVar(&secretPutJSON, "json", false, "Validate stdin is valid JSON before storing")
+	secretPutCmd.Flags().BoolVar(&secretPutShare, "share", false, "Keep the existing recipient set without warning or confirmation")
+	secretPutCmd.Flags().BoolVar(&secretPutNoShare, "no-share", false, "Encrypt the new value only to your identity")
+	secretPutCmd.MarkFlagsMutuallyExclusive("share", "no-share")
 
 	// secret get flags
 	secretGetCmd.Flags().BoolVar(&secretGetAll, "all", false, "Retrieve all values")

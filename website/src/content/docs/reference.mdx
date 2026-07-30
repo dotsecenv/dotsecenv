@@ -493,6 +493,20 @@ Store an encrypted secret value.
 dotsecenv secret store SECRET [flags]
 ```
 
+Storing over an existing secret keeps its current recipient set: the new value is encrypted to every fingerprint on the latest entry's `available_to`, not just yours. Rotating a shared secret therefore never removes anyone's access. To narrow access, use `secret revoke` (before or after storing).
+
+When the kept recipient set includes identities other than yours, `secret store` warns and lists them. With a terminal attached it then asks for confirmation; declining cancels the store without writing anything. Without a terminal (piped input, CI) it proceeds after the warning. The `--share` and `--no-share` flags skip both the warning and the confirmation.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--share` | Keep the existing recipient set without warning or confirmation |
+| `--no-share` | Encrypt the new value only to your identity |
+| `--json` | Validate that stdin is valid JSON before storing |
+
+`--share` and `--no-share` are mutually exclusive. Note that `--no-share` does not revoke anything by itself: prior entries stay readable to their recipients, and reads by those identities fall back to the newest entry they can decrypt.
+
 **Secret key formats:**
 
 - Namespaced: `namespace::KEY_NAME` (e.g., `myapp::DATABASE_URL`)
@@ -522,6 +536,12 @@ cat ~/.ssh/private_key | dotsecenv secret store SSH_PRIVATE_KEY
 
 # Store in specific vault
 echo "value" | dotsecenv secret store -v ./vault SECRET_NAME
+
+# Rotate a shared secret, keeping the recipient set, without prompting
+echo "new-value" | dotsecenv secret store --share DATABASE_PASSWORD
+
+# Rotate a shared secret for yourself only
+echo "new-value" | dotsecenv secret store --no-share DATABASE_PASSWORD
 ```
 
 ### secret share
