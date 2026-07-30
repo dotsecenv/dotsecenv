@@ -241,7 +241,8 @@ func TestSecretStore_ShareFlag_SkipsWarning(t *testing.T) {
 		t.Errorf("--share must not print the shared-secret warning:\n%s", stderr.String())
 	}
 
-	newValue := mock.Secrets[0]["DATABASE_URL"].Values[0]
+	stored := mock.Secrets[0]["DATABASE_URL"]
+	newValue := stored.Values[len(stored.Values)-1]
 	if len(newValue.AvailableTo) != 2 {
 		t.Errorf("available_to = %v, want both recipients", newValue.AvailableTo)
 	}
