@@ -11,6 +11,12 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+---
+
+## v0.8.0
+
+_July 31, 2026_
+
 ### Features
 
 - `secret store` now warns when the secret being overwritten is shared, lists who keeps access, and asks for confirmation when a terminal is attached; new `--share` and `--no-share` flags skip the prompt and keep the recipient set or encrypt to your identity only (#277)
@@ -21,6 +27,9 @@ _Unreleased_
 - `secret store` on an existing secret now keeps the current recipient set: the new value is encrypted to everyone on the latest entry's `available_to`, so rotating a shared secret no longer silently locks out CI and teammates (#277)
 - `secret get` now tells apart a secret that does not exist ("not found in any vault") from one that exists but your identity cannot read ("access denied", with the share command to request access) (#253)
 - The shell plugin prints a fetch error once per secret; other keys mapped to the same failed secret get a one-line notice instead of a repeated error (#253)
+- Update Starlight Blog to v0.28.x (#256)
+- Update Bubble Tea to v2.0.8 (#245)
+- Update `golang.org/x/term` to v0.45.0 (#252)
 
 ### Other
 
@@ -28,6 +37,28 @@ _Unreleased_
 - The Homebrew tap's README is now maintained in the monorepo and synced to the tap on release (#253)
 - Pin pnpm to 11.11.0 in the website CI workflows; pnpm 11.12.0 breaks the setup action's self-update (#254)
 - The repo now tracks its Claude Code plugin config in `.claude/`, so contributors get the `claude-blog` and `technical-docs` plugins without wiring them up by hand (#270)
+- Update Astro to v7.1.4 (#274)
+- Update ESLint to v10.8.0 (#276)
+- Update Starlight to v0.41.4 (#271)
+- Update pnpm to v11.17.0 (#272)
+- Group Astro ecosystem dependency updates into one Renovate PR (#273)
+- Update Fontsource packages to v5.3.0 (#269)
+- Update Astro to v7.1.3 (#259)
+- Update pnpm to v11.15.1 (#267)
+- Update typescript-eslint to v8.65.0 (#268)
+- Apply the Astro v7.1.0 security update (#265)
+- Update `actions/checkout` to v7.0.1 (#266)
+- Update ESLint to v10.7.0 (#257)
+- Update pnpm to v11.13.1 (#258)
+- Update typescript-eslint to v8.64.0 (#260)
+- Update `actions/setup-node` to v7 (#262)
+- Update markdownlint-cli to v0.49.1 (#263)
+- Update `actions/setup-go` to v7 (#264)
+- Update Starlight to v0.41.3 (#246)
+- Update typescript-eslint to v8.63.0 (#248)
+- Update `step-security/harden-runner` to v2.20.0 (#249)
+- Update Go to v1.26.5 (#250)
+- Update Astro to v7.0.7 (#251)
 
 ---
 
