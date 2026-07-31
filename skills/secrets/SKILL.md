@@ -187,6 +187,8 @@ dotsecenv secret revoke SECRET_NAME FINGERPRINT --all
 dotsecenv secret forget SECRET_NAME
 ```
 
+`secret store` on an existing secret keeps its current recipient set: the new value is encrypted to every fingerprint on the latest entry's `available_to`. When that set includes other identities, store warns and (with a terminal) asks for confirmation. Pass `--share` to keep the set without prompting, or `--no-share` to encrypt only to the current identity. Rotation never silently narrows access, so never advise re-sharing after a rotation; removing someone is `secret revoke`.
+
 ## Departed teammate offboarding
 
 When the user describes removing a departing team member's GPG key, follow the [Offboard a Departing Team Member runbook](https://dotsecenv.com/runbooks/team-member-offboarding/). The shape of the workflow:

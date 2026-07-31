@@ -393,7 +393,11 @@ reasoning about behavior. They are also what reviewers will check.
 - **Multi-recipient PGP encryption.** A single `value` entry carries one
   ciphertext encrypted to multiple recipients (the union of fingerprints
   in `available_to`). Sharing or revoking access re-encrypts only that
-  value entry; previous entries are preserved verbatim.
+  value entry; previous entries are preserved verbatim. `secret store` on
+  an existing key carries the latest entry's recipient set forward (warning
+  and prompting when others are on it; `--share`/`--no-share` skip the
+  prompt), so rotation never silently narrows access — narrowing is
+  `secret revoke`'s job, or an explicit `--no-share`.
 - **No identity in policy.** `login` and `vault` are forbidden keys in
   policy fragments — identity is per-user (cryptographically bound to a
   private key) and policy must not erase user vaults. See the policy
