@@ -1,0 +1,40 @@
+{
+  "name": "dotsecenv",
+  "version": "0.8.0",
+  "description": "Manage GPG-encrypted environment secrets using the dotsecenv CLI",
+  "author": {
+    "name": "dotsecenv",
+    "url": "https://dotsecenv.com"
+  },
+  "homepage": "https://dotsecenv.com",
+  "repository": "https://github.com/dotsecenv/dotsecenv",
+  "license": "Apache-2.0",
+  "keywords": [
+    "secrets",
+    "gpg",
+    "encryption",
+    "environment",
+    "dotenv",
+    "security",
+    "vault"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "dotsecenv",
+    "shortDescription": "Manage encrypted secrets",
+    "longDescription": "Safely create and troubleshoot .secenv files, manage GPG-encrypted secrets with dotsecenv, and inspect or maintain vaults.",
+    "developerName": "dotsecenv",
+    "category": "Security",
+    "capabilities": [
+      "Create and troubleshoot .secenv files",
+      "Manage encrypted secrets safely",
+      "Inspect and maintain dotsecenv vaults"
+    ],
+    "websiteURL": "https://dotsecenv.com",
+    "defaultPrompt": [
+      "Help me create a safe .secenv file.",
+      "List my secret names without decrypting values.",
+      "Inspect and diagnose my dotsecenv vault."
+    ]
+  }
+}

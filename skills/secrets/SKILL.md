@@ -50,7 +50,7 @@ If gpg-agent is not running, tell the user:
 
 ### GPG Configuration Assessment
 
-After confirming the binary and agent are available, read the GPG agent config to assess whether Claude can perform GPG operations in this session:
+After confirming the binary and agent are available, read the GPG agent config to assess whether the agent can perform GPG operations in this session:
 
 ```bash
 # Read gpg-agent config
@@ -62,16 +62,16 @@ gpgconf --list-options gpg-agent 2>/dev/null | grep pinentry-program
 
 **Evaluate the pinentry program:**
 
-| Pinentry Program      | Claude Can Use It?                                      | Reason                                                                                                                                |
-| --------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `pinentry-mac`        | Yes (if passphrase is in Keychain or gpg-agent cache)   | GUI-based, independent of terminal. Shows a dialog if cache is cold — Claude cannot interact with it but the user can dismiss it.     |
-| `pinentry-gnome3`     | Yes (if display server available and passphrase cached) | GUI-based, needs DISPLAY/WAYLAND_DISPLAY. Same caching behavior as pinentry-mac.                                                      |
-| `pinentry-qt`         | Yes (if display server available and passphrase cached) | GUI-based, needs DISPLAY/WAYLAND_DISPLAY.                                                                                             |
-| `pinentry-tty`        | **No**                                                  | Requires terminal input. Claude Code's Bash tool has stdin=/dev/null and no controlling terminal. Fails with "Operation cancelled".   |
-| `pinentry-curses`     | **No**                                                  | Requires terminal input. Fails with "Inappropriate ioctl for device" or competes with Claude Code's terminal renderer for keystrokes. |
-| No config / not found | **Depends**                                             | System default is used — check `gpgconf --list-options gpg-agent` to see which pinentry is resolved.                                  |
+| Pinentry Program      | Agent Can Use It?                                       | Reason                                                                                                                     |
+| --------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `pinentry-mac`        | Yes (if passphrase is in Keychain or gpg-agent cache)   | GUI-based, independent of terminal. Shows a dialog if cache is cold; the user must handle it.                              |
+| `pinentry-gnome3`     | Yes (if display server available and passphrase cached) | GUI-based, needs DISPLAY/WAYLAND_DISPLAY. Same caching behavior as pinentry-mac.                                           |
+| `pinentry-qt`         | Yes (if display server available and passphrase cached) | GUI-based, needs DISPLAY/WAYLAND_DISPLAY.                                                                                  |
+| `pinentry-tty`        | **No**                                                  | Requires terminal input that a non-interactive or sandboxed agent shell cannot provide. Fails with "Operation cancelled". |
+| `pinentry-curses`     | **No**                                                  | Requires terminal input. Fails with "Inappropriate ioctl for device" or competes with the host terminal UI for keystrokes. |
+| No config / not found | **Depends**                                             | System default is used; check `gpgconf --list-options gpg-agent` to see which pinentry is resolved.                         |
 
-**Why TTY pinentry cannot work:** Claude Code's Bash tool spawns subprocesses with stdin connected to `/dev/null` and no controlling terminal (`/dev/tty` returns "Device not configured"). Terminal-based pinentry programs (pinentry-tty, pinentry-curses) need to read from a terminal to accept the passphrase. Even if `GPG_TTY` is set to the parent's TTY device, Claude Code's Ink renderer is already reading from that same device, creating contention — keystrokes are consumed by Ink, never reaching pinentry.
+**Why TTY pinentry cannot work:** Non-interactive or sandboxed agent shells commonly run commands without interactive stdin or a controlling terminal. Terminal-based pinentry programs (`pinentry-tty`, `pinentry-curses`) need a terminal to accept the passphrase. Even if `GPG_TTY` points to the parent's TTY device, the host terminal UI may already be reading from it, so pinentry never receives the keystrokes.
 
 **Check for recommended hardening options:**
 
@@ -81,16 +81,16 @@ If any of these are missing from `gpg-agent.conf`, advise the user to add them:
 - `default-cache-ttl` — if absent or very high (>3600), suggest setting to `3600` (1 hour). Controls how long gpg-agent keeps the passphrase after last use.
 - `max-cache-ttl` — if absent or very high (>14400), suggest setting to `14400` (4 hours). Hard cap on passphrase retention regardless of use.
 
-**Determine if Claude can operate:**
+**Determine if the agent can operate:**
 
 After reading the config, set your mental model:
 
-- **CAN_DECRYPT = true** if: pinentry is GUI-based (pinentry-mac, pinentry-gnome3, pinentry-qt) AND the passphrase is likely cached (cache TTLs suggest recent use is retained)
-- **CAN_DECRYPT = false** if: pinentry is terminal-based (pinentry-tty, pinentry-curses) OR on headless Linux with no display server
+- **AGENT_CAN_DECRYPT = true** if: pinentry is GUI-based (pinentry-mac, pinentry-gnome3, pinentry-qt) AND the passphrase is likely cached (cache TTLs suggest recent use is retained)
+- **AGENT_CAN_DECRYPT = false** if: pinentry is terminal-based (pinentry-tty, pinentry-curses) OR on headless Linux with no display server
 
-If CAN_DECRYPT is false, tell the user upfront:
+If AGENT_CAN_DECRYPT is false, tell the user upfront:
 
-> Your GPG pinentry is configured for terminal input (`pinentry-tty`/`pinentry-curses`), which cannot work from Claude Code's Bash tool. You have two options:
+> Your GPG pinentry is configured for terminal input (`pinentry-tty`/`pinentry-curses`), which cannot work from the current agent shell. You have two options:
 >
 > 1. Switch to a GUI pinentry (e.g., `pinentry-mac` on macOS, `pinentry-gnome3` on Linux)
 > 2. Pre-cache your passphrase before asking me to decrypt: `! gpg --sign --local-user YOUR_FINGERPRINT </dev/null`
