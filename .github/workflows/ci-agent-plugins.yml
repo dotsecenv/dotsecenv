@@ -36,7 +36,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
         with:
-          version: "0.12.0"
+          version: "0.12.1"
           enable-cache: false
 
       - name: Check Python entry points
