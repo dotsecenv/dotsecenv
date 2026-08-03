@@ -11,8 +11,9 @@ permissions:
   attestations: write
 
 jobs:
-  # Fail fast if a release for this tag already exists with assets.
-  # Surfaces tag-moves (same tag re-pushed onto a different commit) in
+  # Fail fast if the agent plugin versions differ from the tag or a release
+  # for this tag already exists with assets. Surfaces tag-moves (same tag
+  # re-pushed onto a different commit) in
   # seconds rather than 4+ minutes into goreleaser's upload phase, which
   # would 422 with `already_exists` on every asset. All downstream jobs
   # depend on this (directly or transitively) so we don't burn runner
@@ -25,6 +26,15 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          version: "0.11.16"
+          enable-cache: false
+
       - name: Verify no existing release for tag
         env:
           GH_TOKEN: ${{ github.token }}
@@ -49,6 +59,11 @@ jobs:
           fi
 
           echo "::notice::Release ${TAG} exists with no assets (likely partial prior failure); proceeding."
+
+      - name: Verify agent plugin versions match release tag
+        run: |
+          expected="${GITHUB_REF_NAME#v}"
+          uv run --script scripts/validate-agent-plugins.py "$expected"
 
   # Reusable hermetic E2E (harden-runner + strace network-syscall
   # verification). Single source of truth in e2e-hermetic.yml — used by
@@ -89,6 +104,7 @@ jobs:
           - ci.yml
           - e2e-install.yml
           - ci-plugin.yml
+          - ci-agent-plugins.yml
           - ci-website.yml
           - lint-workflows.yml
     steps:

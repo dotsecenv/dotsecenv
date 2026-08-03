@@ -10,7 +10,7 @@ description: >
 
 # .secenv File Interpretation Skill
 
-This skill teaches you how to read, write, and debug `.secenv` files and their relationship to dotsecenv vaults and config. For CLI operations (storing, retrieving, sharing secrets), defer to the `/dotsecenv:secrets` skill.
+This skill teaches you how to read, write, and debug `.secenv` files and their relationship to dotsecenv vaults and config. For CLI operations (storing, retrieving, sharing secrets), defer to the bundled `secrets` skill.
 
 ## .secenv File Format
 
@@ -151,7 +151,7 @@ When a secret referenced in `.secenv` fails to load:
    ```
 
 3. **Check if any vault paths are relative** (like `.dotsecenv/vault`)
-4. If relative, the vault must exist in the **same directory as the `.secenv` file**, not in the current working directory of the Claude session
+4. If relative, the vault must exist in the **same directory as the `.secenv` file**, not in the current working directory of the agent session
 5. **Check if the vault file exists** at the resolved path:
 
    ```bash
@@ -176,7 +176,7 @@ When a secret referenced in `.secenv` fails to load:
 1. Read the config file and list all vault paths
 2. For each relative path, explain that it resolves relative to where the shell plugin runs (the `.secenv` directory)
 3. Check if the vault file actually exists at the expected location
-4. If the user needs to create a vault: defer to `/dotsecenv:secrets` — that's an `init` operation
+4. If the user needs to create a vault: defer to the bundled `secrets` skill — that's an `init` operation
 
 ### Editing a .secenv File
 

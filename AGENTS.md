@@ -16,7 +16,8 @@ pure-Go (no CGO) and built against Go 1.26's native FIPS 140-3 module
 (`GOFIPS140=v1.26.0`), with [SLSA Build Level 3](https://slsa.dev/) provenance
 attestations.
 
-This repo also ships a Claude Code plugin (`.claude-plugin/`), a GitHub Action
+This repo also ships Claude Code and Codex plugin manifests (`.claude-plugin/`,
+`.codex-plugin/`), a GitHub Action
 (`action.yml`), a Terraform credentials helper (`contrib/`), and a hermetic
 end-to-end test harness verified by network-namespace + strace in CI.
 
@@ -30,11 +31,12 @@ end-to-end test harness verified by network-namespace + strace in CI.
 | `pkg/dotsecenv/`    | Public packages: `config/`, `crypto/`, `gpg/`, `identity/`, `output/`, `policy/`, `vault/`. |
 | `contrib/`          | `terraform-credentials-dotsecenv` Bash credentials helper for Terraform/OpenTofu. |
 | `demos/`            | `demo.sh` for asciinema recording (driven by `make demo`).                     |
-| `skills/`           | Claude Code skills shipped in the plugin (`secenv/SKILL.md`, `secrets/SKILL.md`). |
+| `skills/`           | Shared Claude Code and Codex plugin skills (`secenv/`, `secrets/`, `vault/`).     |
 | `.claude/skills/`   | Maintainer-only skills, NOT shipped to plugin installers (`changelog/`, `cli-reference-drift/`). |
 | `.claude-plugin/`   | Claude Code plugin manifest (`plugin.json`, `marketplace.json`).               |
-| `scripts/`          | `install.sh`, `e2e.sh`, `e2e-install.sh`, `e2e-terraform.sh`, `sandbox.sh`, `notarize-macos.sh`, `generate_release_key.sh`. |
-| `.github/workflows/` | CI + release: `ci.yml` (Go DAG), `ci-plugin.yml`, `ci-website.yml`, `ci-release.yml` (goreleaser snapshot), `e2e-hermetic.yml`, `e2e-install.yml`, `e2e-action-post-release.yml` (reusable, post-release action smoke), `lint-workflows.yml` (actionlint), `release.yml`, `deploy-website.yml`. |
+| `.codex-plugin/`    | Codex plugin manifest (`plugin.json`); loads the shared root `skills/` tree.    |
+| `scripts/`          | Install/e2e/release helpers plus agent-plugin version and validation scripts.   |
+| `.github/workflows/` | CI + release: `ci.yml` (Go DAG), `ci-agent-plugins.yml`, `ci-plugin.yml`, `ci-website.yml`, `ci-release.yml` (goreleaser snapshot), `e2e-hermetic.yml`, `e2e-install.yml`, `e2e-action-post-release.yml` (reusable, post-release action smoke), `lint-workflows.yml` (actionlint), `release.yml`, `deploy-website.yml`. |
 | `vendor/`           | Vendored Go dependencies (used by `make build` for hermetic builds).           |
 | `action.yml`        | Composite GitHub Action for installing dotsecenv in CI.                        |
 | `.goreleaser.yaml`  | Release pipeline (signs, attests, packages deb/rpm/archlinux).                 |
@@ -63,6 +65,7 @@ make hooks           # installs lefthook git hooks
 | Unit + integration tests      | `make test` — `go test -v -p 1 ./...`                          |
 | Tests with race detector      | `make test-race`                                               |
 | End-to-end tests (CLI)        | `make build e2e` — `bin/dotsecenv` must exist; runs `scripts/e2e.sh` in an isolated `mktemp -d` HOME with its own GPG, XDG, and PATH. |
+| Agent plugin packaging        | `uv run --script scripts/validate-agent-plugins.py && uv run --script scripts/test-agent-plugins.py` |
 | E2E for Terraform helper      | `make build e2e-terraform`                                     |
 | E2E for `install.sh` (network needed) | `make e2e-install`                                             |
 | Snapshot release build        | `make release-test` (skips sign, publish, nfpm). Run before merging changes to `.goreleaser.yaml`, `Makefile` release targets, or `tools.go` version pins. CI auto-runs it via `ci-release.yml` when those paths change. |
@@ -90,6 +93,7 @@ area triggers only that workflow:
   `tools.go`, or the workflow file. Run `make release-test` locally
   before merging PRs that touch any of those.
 - **`ci-plugin.yml`** — shell tests under `plugin/`, scoped to `plugin/**`.
+- **`ci-agent-plugins.yml`** — validates the shared Claude Code/Codex plugin manifests, canonical skills, and version helper.
 - **`ci-website.yml`** — Astro build under `website/`, scoped to `website/**`.
 - **`e2e-install.yml`** — exercises `scripts/install.sh` against real GH
   releases. Scoped to `scripts/install.sh` + `scripts/e2e-install.sh`.
@@ -114,8 +118,8 @@ area triggers only that workflow:
   `workflow_dispatch` — releasing is reserved for signed semver tags).
   Its `wait-ci`
   job blocks `goreleaser` until each path-scoped CI workflow (ci.yml,
-  e2e-install.yml, ci-plugin.yml, ci-website.yml, lint-workflows.yml) has
-  passed on the tagged SHA — or warns-and-proceeds if a workflow's path
+  e2e-install.yml, ci-plugin.yml, ci-agent-plugins.yml, ci-website.yml,
+  lint-workflows.yml) has passed on the tagged SHA — or warns-and-proceeds if a workflow's path
   filter excluded the commit. `ci-release.yml` is intentionally omitted
   from the gate (its goreleaser snapshot duplicates the `goreleaser` job
   about to run). See the workflow's top-of-file DAG comment for stage layout.
@@ -128,6 +132,7 @@ bypassed for manual dispatches:
 
 ```bash
 gh workflow run ci.yml --ref my-branch
+gh workflow run ci-agent-plugins.yml --ref my-branch
 gh workflow run e2e-hermetic.yml --ref my-branch
 gh workflow run ci-release.yml --ref my-branch
 # etc.
@@ -249,8 +254,10 @@ What the script does NOT do — handle manually if needed:
   through existing tests are the only exception.
 - **Linters:** `golangci-lint` v2.11.4 — pinned because v2.12.x had a
   checksum mismatch on release. Don't bump back to `latest` without verifying.
-- **Releases:** Triggered by pushing a signed semver tag. Before tagging, run
-  the CLI reference drift check (`bash .claude/skills/cli-reference-drift/check.sh`; see
+- **Releases:** Triggered by pushing a signed semver tag. Before tagging, sync
+  the two agent plugin manifests with `uv run --script scripts/set-plugin-version.py X.Y.Z`,
+  validate them with `uv run --script scripts/validate-agent-plugins.py X.Y.Z`, then run the
+  CLI reference drift check (`bash .claude/skills/cli-reference-drift/check.sh`; see
   `.claude/skills/cli-reference-drift/SKILL.md`) and resolve any drift. Use
   [`releasetools-cli`](https://github.com/releasetools/cli):
 
@@ -285,8 +292,9 @@ What the script does NOT do — handle manually if needed:
 - **Hooks:** Managed by [lefthook](https://github.com/evilmartians/lefthook).
   `make hooks` installs them. **Don't bypass with `--no-verify`** — fix the
   lint or test failure instead.
-- **`pnpm` / Node tooling:** Not applicable here; this is a Go-only project.
-  Don't add `package.json` or Node toolchain.
+- **`pnpm` / Node tooling:** Not applicable to the CLI; don't add `package.json`
+  or a Node toolchain. The agent-plugin metadata helpers are dependency-free
+  PEP 723 Python scripts run in isolation with `uv`.
 
 ## Don't do X
 
@@ -349,9 +357,10 @@ making changes that look like they might violate them.
 | Team-lead vault setup tutorial   | <https://dotsecenv.com/tutorials/team-vault-setup/> |
 | Audit trail concepts and queries | <https://dotsecenv.com/concepts/audit-trail/>   |
 | GPG agent operational reference  | <https://dotsecenv.com/guides/gpg-agent/>       |
-| Claude Code skill: `.secenv` files | [skills/secenv/SKILL.md](./skills/secenv/SKILL.md) |
-| Claude Code skill: vault ops     | [skills/secrets/SKILL.md](./skills/secrets/SKILL.md) |
-| Plugin manifest                  | [.claude-plugin/plugin.json](./.claude-plugin/plugin.json) |
+| Agent skill: `.secenv` files     | [skills/secenv/SKILL.md](./skills/secenv/SKILL.md) |
+| Agent skill: secret operations   | [skills/secrets/SKILL.md](./skills/secrets/SKILL.md) |
+| Agent skill: vault maintenance   | [skills/vault/SKILL.md](./skills/vault/SKILL.md) |
+| Plugin manifests                 | [.claude-plugin/plugin.json](./.claude-plugin/plugin.json), [.codex-plugin/plugin.json](./.codex-plugin/plugin.json) |
 | Composite GitHub Action          | [action.yml](./action.yml)                      |
 | Release pipeline                 | [.goreleaser.yaml](./.goreleaser.yaml)          |
 
