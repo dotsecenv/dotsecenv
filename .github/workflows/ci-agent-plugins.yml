@@ -8,9 +8,9 @@ on:
       - ".claude-plugin/**"
       - ".codex-plugin/**"
       - "skills/**"
-      - "scripts/set-plugin-version.sh"
-      - "scripts/validate-agent-plugins.sh"
-      - "scripts/test-agent-plugins.sh"
+      - "scripts/set-plugin-version.py"
+      - "scripts/validate-agent-plugins.py"
+      - "scripts/test-agent-plugins.py"
       - ".github/workflows/ci-agent-plugins.yml"
   pull_request:
     branches: [main]
@@ -18,9 +18,9 @@ on:
       - ".claude-plugin/**"
       - ".codex-plugin/**"
       - "skills/**"
-      - "scripts/set-plugin-version.sh"
-      - "scripts/validate-agent-plugins.sh"
-      - "scripts/test-agent-plugins.sh"
+      - "scripts/set-plugin-version.py"
+      - "scripts/validate-agent-plugins.py"
+      - "scripts/test-agent-plugins.py"
       - ".github/workflows/ci-agent-plugins.yml"
 
 permissions:
@@ -33,14 +33,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: Check shell syntax
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          version: "0.11.16"
+          enable-cache: false
+
+      - name: Check Python entry points
         run: |
-          bash -n scripts/set-plugin-version.sh
-          bash -n scripts/validate-agent-plugins.sh
-          bash -n scripts/test-agent-plugins.sh
+          uv run --script scripts/set-plugin-version.py --help
+          uv run --script scripts/validate-agent-plugins.py --help
 
       - name: Validate packaging
-        run: scripts/validate-agent-plugins.sh
+        run: uv run --script scripts/validate-agent-plugins.py
 
       - name: Test version synchronization
-        run: scripts/test-agent-plugins.sh
+        run: uv run --script scripts/test-agent-plugins.py

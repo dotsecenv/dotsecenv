@@ -949,10 +949,13 @@ Before creating a signed release tag, update and validate both manifests, then
 commit the result:
 
 ```bash
-scripts/set-plugin-version.sh X.Y.Z
-scripts/validate-agent-plugins.sh X.Y.Z
+uv run --script scripts/set-plugin-version.py X.Y.Z
+uv run --script scripts/validate-agent-plugins.py X.Y.Z
 git diff --check
 ```
+
+The scripts declare no third-party Python dependencies; `uv` supplies a suitable
+Python runtime and runs them in isolation.
 
 The release workflow repeats the version check against the tag and stops before
 publishing if either manifest differs. It never edits tagged source or moves a

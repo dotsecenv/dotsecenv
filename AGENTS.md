@@ -65,7 +65,7 @@ make hooks           # installs lefthook git hooks
 | Unit + integration tests      | `make test` — `go test -v -p 1 ./...`                          |
 | Tests with race detector      | `make test-race`                                               |
 | End-to-end tests (CLI)        | `make build e2e` — `bin/dotsecenv` must exist; runs `scripts/e2e.sh` in an isolated `mktemp -d` HOME with its own GPG, XDG, and PATH. |
-| Agent plugin packaging        | `scripts/validate-agent-plugins.sh && scripts/test-agent-plugins.sh`            |
+| Agent plugin packaging        | `uv run --script scripts/validate-agent-plugins.py && uv run --script scripts/test-agent-plugins.py` |
 | E2E for Terraform helper      | `make build e2e-terraform`                                     |
 | E2E for `install.sh` (network needed) | `make e2e-install`                                             |
 | Snapshot release build        | `make release-test` (skips sign, publish, nfpm). Run before merging changes to `.goreleaser.yaml`, `Makefile` release targets, or `tools.go` version pins. CI auto-runs it via `ci-release.yml` when those paths change. |
@@ -255,8 +255,8 @@ What the script does NOT do — handle manually if needed:
 - **Linters:** `golangci-lint` v2.11.4 — pinned because v2.12.x had a
   checksum mismatch on release. Don't bump back to `latest` without verifying.
 - **Releases:** Triggered by pushing a signed semver tag. Before tagging, sync
-  the two agent plugin manifests with `scripts/set-plugin-version.sh X.Y.Z`,
-  validate them with `scripts/validate-agent-plugins.sh X.Y.Z`, then run the
+  the two agent plugin manifests with `uv run --script scripts/set-plugin-version.py X.Y.Z`,
+  validate them with `uv run --script scripts/validate-agent-plugins.py X.Y.Z`, then run the
   CLI reference drift check (`bash .claude/skills/cli-reference-drift/check.sh`; see
   `.claude/skills/cli-reference-drift/SKILL.md`) and resolve any drift. Use
   [`releasetools-cli`](https://github.com/releasetools/cli):
@@ -292,8 +292,9 @@ What the script does NOT do — handle manually if needed:
 - **Hooks:** Managed by [lefthook](https://github.com/evilmartians/lefthook).
   `make hooks` installs them. **Don't bypass with `--no-verify`** — fix the
   lint or test failure instead.
-- **`pnpm` / Node tooling:** Not applicable here; this is a Go-only project.
-  Don't add `package.json` or Node toolchain.
+- **`pnpm` / Node tooling:** Not applicable to the CLI; don't add `package.json`
+  or a Node toolchain. The agent-plugin metadata helpers are dependency-free
+  PEP 723 Python scripts run in isolation with `uv`.
 
 ## Don't do X
 
