@@ -41,6 +41,15 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
 class PluginValidator:
     def __init__(self, repo_root: Path, expected: str | None) -> None:
         self.repo_root = repo_root.resolve()
@@ -52,11 +61,14 @@ class PluginValidator:
     def load_object(self, relative_path: str) -> dict[str, Any] | None:
         path = self.repo_root / relative_path
         try:
-            value = json.loads(path.read_text(encoding="utf-8"))
+            value = json.loads(
+                path.read_text(encoding="utf-8"),
+                object_pairs_hook=reject_duplicate_keys,
+            )
         except OSError as error:
             self.errors.append(f"cannot read {relative_path}: {error}")
             return None
-        except json.JSONDecodeError as error:
+        except (json.JSONDecodeError, ValueError) as error:
             self.errors.append(f"invalid JSON in {relative_path}: {error}")
             return None
         if not isinstance(value, dict):

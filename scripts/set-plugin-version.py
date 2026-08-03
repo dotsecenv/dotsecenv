@@ -160,20 +160,20 @@ def apply_updates(staged_updates: list[StagedUpdate]) -> None:
         for staged in staged_updates:
             os.replace(staged.staged_path, staged.pending.path)
             replaced.append(staged.pending)
-    except BaseException as update_error:
+    except OSError as update_error:
         rollback_errors: list[str] = []
         for pending in reversed(replaced):
             try:
                 rollback = stage_file(pending, pending.original)
                 os.replace(rollback, pending.path)
-            except BaseException as rollback_error:
+            except OSError as rollback_error:
                 rollback_errors.append(f"{pending.path}: {rollback_error}")
         if rollback_errors:
             raise SystemExit(
                 "plugin version update failed and rollback was incomplete: "
                 + "; ".join(rollback_errors)
-            ) from update_error
-        raise
+            ) from None
+        raise SystemExit(f"plugin version update failed: {update_error}") from None
     finally:
         for staged in staged_updates:
             staged.staged_path.unlink(missing_ok=True)

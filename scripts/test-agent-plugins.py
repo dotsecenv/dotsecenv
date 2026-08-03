@@ -6,11 +6,14 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
+from types import ModuleType
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -40,6 +43,10 @@ def new_fixture(test_root: Path, name: str) -> Path:
         fixture / "scripts" / "set-plugin-version.py",
     )
     shutil.copy2(
+        REPO_ROOT / "scripts" / "validate-agent-plugins.py",
+        fixture / "scripts" / "validate-agent-plugins.py",
+    )
+    shutil.copy2(
         REPO_ROOT / ".claude-plugin" / "plugin.json",
         fixture / ".claude-plugin" / "plugin.json",
     )
@@ -53,6 +60,13 @@ def new_fixture(test_root: Path, name: str) -> Path:
     )
     seed_manifest(fixture / ".claude-plugin" / "plugin.json")
     seed_manifest(fixture / ".codex-plugin" / "plugin.json")
+    for skill_name in ("secenv", "secrets", "vault"):
+        skill_dir = fixture / "skills" / skill_name
+        skill_dir.mkdir(parents=True)
+        shutil.copy2(
+            REPO_ROOT / "skills" / skill_name / "SKILL.md",
+            skill_dir / "SKILL.md",
+        )
     return fixture
 
 
@@ -71,6 +85,33 @@ def run_helper(fixture: Path, *arguments: str) -> subprocess.CompletedProcess[st
         capture_output=True,
         text=True,
     )
+
+
+def run_validator(fixture: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+    require(UV is not None, "uv is required to run the plugin validator tests")
+    return subprocess.run(
+        [
+            UV,
+            "run",
+            "--script",
+            str(fixture / "scripts" / "validate-agent-plugins.py"),
+            *arguments,
+        ],
+        cwd=fixture,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def load_version_module() -> ModuleType:
+    module_path = REPO_ROOT / "scripts" / "set-plugin-version.py"
+    spec = importlib.util.spec_from_file_location("set_plugin_version", module_path)
+    require(spec is not None and spec.loader is not None, "cannot load version helper")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def assert_success(result: subprocess.CompletedProcess[str]) -> None:
@@ -181,6 +222,58 @@ def test_failed_transaction(test_root: Path) -> None:
     require(not list(fixture.rglob("*.tmp")), "failed transaction left a staged file")
 
 
+def test_duplicate_manifest_keys(test_root: Path) -> None:
+    fixture = new_fixture(test_root, "duplicate-key")
+    manifest_path = fixture / ".codex-plugin/plugin.json"
+    contents = manifest_path.read_text(encoding="utf-8")
+    contents = contents.replace(
+        '"version": "0.8.0",',
+        '"version": "0.8.0",\n  "version": "0.8.1",',
+        1,
+    )
+    manifest_path.write_text(contents, encoding="utf-8")
+    result = run_validator(fixture)
+    require(result.returncode != 0, "validator accepted a duplicate manifest key")
+    require(
+        "duplicate JSON key: version" in result.stderr,
+        f"validator did not identify the duplicate key: {result.stderr}",
+    )
+
+
+def test_replace_failure_has_clean_error(test_root: Path) -> None:
+    module = load_version_module()
+    target = test_root / "replace-failure" / "plugin.json"
+    target.parent.mkdir()
+    target.write_text("original", encoding="utf-8")
+    pending = module.PendingUpdate(target, "original", "updated", 0o644)
+    staged_path = module.stage_file(pending, pending.updated)
+    staged = module.StagedUpdate(pending, staged_path)
+    original_replace = module.os.replace
+
+    def fail_replace(_source: Path, _target: Path) -> None:
+        raise OSError("synthetic replace failure")
+
+    module.os.replace = fail_replace
+    try:
+        try:
+            module.apply_updates([staged])
+        except SystemExit as error:
+            message = str(error)
+            require(
+                message == "plugin version update failed: synthetic replace failure",
+                f"unexpected replace failure message: {message}",
+            )
+            require(error.__cause__ is None, "replace failure retained an exception cause")
+            require(error.__suppress_context__, "replace failure would print a traceback")
+        else:
+            raise AssertionError("replace failure did not exit")
+    finally:
+        module.os.replace = original_replace
+
+    require(target.read_text(encoding="utf-8") == "original", "target was changed")
+    require(not staged_path.exists(), "failed replace left a staged file")
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory() as temporary_directory:
         test_root = Path(temporary_directory)
@@ -188,6 +281,8 @@ def main() -> None:
         test_prefixed_version(test_root)
         test_malformed_input(test_root)
         test_failed_transaction(test_root)
+        test_duplicate_manifest_keys(test_root)
+        test_replace_failure_has_clean_error(test_root)
     print("Agent plugin version helper tests passed")
 
 
