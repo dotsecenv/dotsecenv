@@ -23,7 +23,7 @@ Each entry in a vault is a JSONL line carrying signed metadata. The full schema 
 | `signature`    | identity, secret, value | Detached GPG signature over the entry hash                         |
 | `hash`         | identity, secret, value | SHA-256/SHA-512 of the entry's canonical form                      |
 
-Three operations write entries: `identity add` writes an identity entry; `secret store` writes a secret-definition entry the first time and a value entry every time; `secret share` and `secret revoke` write a new value entry with an updated `available_to`. `secret forget` writes a value entry with empty `available_to` and `deleted: true`.
+Three operations write entries: `identity add` writes an identity entry; `secret store` writes a secret-definition entry the first time and a value entry every time, carrying the previous entry's `available_to` forward; `secret share` and `secret revoke` write a new value entry with an updated `available_to`. `secret forget` writes a value entry with empty `available_to` and `deleted: true`.
 
 ## What append-only can and cannot prove
 

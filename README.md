@@ -467,7 +467,12 @@ dotsecenv validate --fix  # Attempt to fix issues
 - **XDG Compliance**: Respects XDG Base Directory Specification for configuration files
 - **JSON Output**: Machine-readable output format for scripting
 
-## Claude Code
+## Agent plugins
+
+The Claude Code and Codex plugins use the same bundled `secenv`, `secrets`, and
+`vault` skills.
+
+### Claude Code
 
 Install the dotsecenv plugin for [Claude Code](https://claude.ai/claude-code):
 
@@ -477,6 +482,18 @@ Install the dotsecenv plugin for [Claude Code](https://claude.ai/claude-code):
 ```
 
 See the [Claude Code guide](https://dotsecenv.com/guides/claude-code/) for details.
+
+### Codex
+
+Add the repository marketplace, then start Codex:
+
+```bash
+codex plugin marketplace add dotsecenv/dotsecenv
+codex
+```
+
+Enter `/plugins`, select `dotsecenv`, then install and enable it. Start a new
+session so Codex loads the bundled skills.
 
 ## Configuration
 
@@ -921,6 +938,29 @@ make build e2e
 make lint
 ```
 
+### Agent plugin packaging
+
+`.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` are thin host
+manifests over the canonical root `skills/` directory. Their versions match the
+CLI release version. The version in `.claude-plugin/marketplace.json` describes
+the marketplace catalog and changes independently.
+
+Before creating a signed release tag, update and validate both manifests, then
+commit the result:
+
+```bash
+uv run --script scripts/set-plugin-version.py X.Y.Z
+uv run --script scripts/validate-agent-plugins.py X.Y.Z
+git diff --check
+```
+
+The scripts declare no third-party Python dependencies; `uv` supplies a suitable
+Python runtime and runs them in isolation.
+
+The release workflow repeats the version check against the tag and stops before
+publishing if either manifest differs. It never edits tagged source or moves a
+tag.
+
 ### Releasing
 
 Releases are triggered by pushing a signed semver tag. Following GitHub Actions conventions, a major version tag (e.g., `v0`) should also be maintained to allow users to pin to a major version.
@@ -928,7 +968,7 @@ Releases are triggered by pushing a signed semver tag. Following GitHub Actions 
 The [releasetools-cli](https://github.com/releasetools/cli) simplifies this process:
 
 ```bash
-rt git::release --major --sign --force --push v0.1.2
+rt git::release --major --sign --push v0.1.2
 ```
 
 This creates both `v0.1.2` and `v0` tags pointing to the same commit, signs them, and pushes to the remote.

@@ -1,0 +1,51 @@
+name: CI Agent Plugins
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".claude-plugin/**"
+      - ".codex-plugin/**"
+      - "skills/**"
+      - "scripts/set-plugin-version.py"
+      - "scripts/validate-agent-plugins.py"
+      - "scripts/test-agent-plugins.py"
+      - ".github/workflows/ci-agent-plugins.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".claude-plugin/**"
+      - ".codex-plugin/**"
+      - "skills/**"
+      - "scripts/set-plugin-version.py"
+      - "scripts/validate-agent-plugins.py"
+      - "scripts/test-agent-plugins.py"
+      - ".github/workflows/ci-agent-plugins.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate agent plugins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          version: "0.11.16"
+          enable-cache: false
+
+      - name: Check Python entry points
+        run: |
+          uv run --script scripts/set-plugin-version.py --help
+          uv run --script scripts/validate-agent-plugins.py --help
+
+      - name: Validate packaging
+        run: uv run --script scripts/validate-agent-plugins.py
+
+      - name: Test version synchronization
+        run: uv run --script scripts/test-agent-plugins.py

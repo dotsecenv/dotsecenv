@@ -4,6 +4,7 @@
 
 - **Pre-release gate:** run the CLI reference drift check and resolve any drift before tagging — `bash .claude/skills/cli-reference-drift/check.sh` (see [.claude/skills/cli-reference-drift/SKILL.md](.claude/skills/cli-reference-drift/SKILL.md)). The website CLI reference (`website/src/content/docs/reference.mdx`) is hand-curated and must stay in sync with the binary.
 - **Changelog:** in the release PR, run `bash .claude/skills/changelog/assess.sh` to confirm every merged PR since the last tag is recorded, then stamp the `## Upcoming` section of `website/src/content/docs/changelog.mdx` to `vX.Y.Z` + date (see [.claude/skills/changelog/SKILL.md](.claude/skills/changelog/SKILL.md)).
+- **Agent plugin versions:** before tagging, run `uv run --script scripts/set-plugin-version.py X.Y.Z`, `uv run --script scripts/validate-agent-plugins.py X.Y.Z`, and `git diff --check`, then commit the synchronized `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` versions. The scripts have no third-party dependencies; `uv` supplies the Python runtime. The marketplace catalog version is independent.
 - When asked to release, use `rt git::release --major --sign --push vX.Y.Z` where X.Y.Z is the version to release
 - Then push the tag to the origin
 

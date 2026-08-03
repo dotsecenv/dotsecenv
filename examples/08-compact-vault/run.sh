@@ -92,9 +92,10 @@ echo "aws-v2" | "$BIN" -c "$CONFIG" secret store AWS_KEY
 echo "aws-v3" | "$BIN" -c "$CONFIG" secret store AWS_KEY
 echo "aws-v4" | "$BIN" -c "$CONFIG" secret store AWS_KEY
 
-# Share the latest of each with Bob. `secret store` encrypts only to the
-# logged-in identity, so we share last to make the newest value readable by
-# both Alice and Bob — then compaction collapses each secret to that one value.
+# Share the latest of each with Bob. The stores above were encrypted only to
+# Alice (a first-time store targets the storer; re-stores carry the recipient
+# set forward), so we share last to make the newest value readable by both
+# Alice and Bob — then compaction collapses each secret to that one value.
 echo "==> share the latest DB_PASSWORD and AWS_KEY with Bob"
 "$BIN" -c "$CONFIG" secret share DB_PASSWORD "$BOB_FP" >/dev/null
 "$BIN" -c "$CONFIG" secret share AWS_KEY "$BOB_FP" >/dev/null

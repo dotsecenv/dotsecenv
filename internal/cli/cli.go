@@ -47,8 +47,9 @@ type CLI struct {
 	gpgClient     gpg.Client
 	stdin         io.Reader
 	Silent        bool
-	output        *output.Handler // Unified output handler
-	hasTTY        func() bool     // Returns true if a controlling terminal is present
+	output        *output.Handler                                      // Unified output handler
+	hasTTY        func() bool                                          // Returns true if a controlling terminal is present
+	promptConfirm func(prompt string, stderr io.Writer) (bool, *Error) // y/n confirmation; nil means PromptConfirm
 }
 
 // Policy returns the loaded system policy. Empty Policy means no policy is enforced.

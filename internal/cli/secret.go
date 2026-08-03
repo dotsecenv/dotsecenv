@@ -46,7 +46,21 @@ func smartJSONValue(s string) interface{} {
 // SecretPut stores a secret in the vault.
 // If preReadValue is non-empty, it's used as the secret value (for piped input read before vault lock).
 // If preReadValue is empty, the secret is read from stdin (interactive TTY mode).
-func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadValue string) *Error {
+// StoreShareMode controls what SecretPut does when the secret being
+// overwritten is shared with other identities.
+type StoreShareMode int
+
+const (
+	// StoreSharePrompt warns that the new value stays shared and asks for
+	// confirmation when a terminal is available. This is the default.
+	StoreSharePrompt StoreShareMode = iota
+	// StoreShareAlways keeps the recipient set without warning (--share).
+	StoreShareAlways
+	// StoreShareNever encrypts only to the storer's identity (--no-share).
+	StoreShareNever
+)
+
+func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadValue string, shareMode StoreShareMode) *Error {
 	secretKey, normErr := vault.NormalizeSecretKey(secretKeyArg)
 	if normErr != nil {
 		return NewError(vault.FormatSecretKeyError(normErr), ExitValidationError)
@@ -90,7 +104,11 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 		return NewError(fmt.Sprintf("identity not found in vault: %s", fp), ExitAccessDenied)
 	}
 
-	// Check if secret exists and if we have access to the latest value
+	// Check if secret exists and if we have access to the latest value.
+	// When overwriting, the latest value's recipient set carries forward to the
+	// new entry: rotating a shared secret must not silently narrow access to
+	// just the storer. Narrowing the set is 'secret revoke'.
+	recipients := []string{fp}
 	existingSecret := c.vaultResolver.GetSecretByKeyFromVault(targetIndex, secretKey)
 	if existingSecret != nil && len(existingSecret.Values) > 0 {
 		// Check if secret has been deleted
@@ -101,6 +119,38 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 		if !slices.Contains(latestValue.AvailableTo, fp) {
 			return NewError(fmt.Sprintf("access denied: you do not have access to the latest value of secret '%s'", secretKey), ExitAccessDenied)
 		}
+		recipients = make([]string, len(latestValue.AvailableTo))
+		copy(recipients, latestValue.AvailableTo)
+		sort.Strings(recipients)
+	}
+
+	// Recipients other than the storer: the identities a re-store keeps sharing with.
+	others := make([]string, 0, len(recipients))
+	for _, recipientFP := range recipients {
+		if recipientFP != fp {
+			others = append(others, recipientFP)
+		}
+	}
+	if len(others) > 0 {
+		switch shareMode {
+		case StoreShareNever:
+			recipients = []string{fp}
+		case StoreShareAlways:
+			// Keep the carried-forward set without warning.
+		default:
+			if confirmErr := c.confirmSharedStore(secretKey, others); confirmErr != nil {
+				return confirmErr
+			}
+		}
+	}
+
+	recipientPublicKeys := make([]string, 0, len(recipients))
+	for _, recipientFP := range recipients {
+		recipientIdentity := c.vaultResolver.GetIdentityByFingerprint(recipientFP)
+		if recipientIdentity == nil {
+			return NewError(fmt.Sprintf("recipient identity not found: %s", recipientFP), ExitVaultError)
+		}
+		recipientPublicKeys = append(recipientPublicKeys, recipientIdentity.PublicKey)
 	}
 
 	var secretValue string
@@ -126,7 +176,7 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 
 	encryptedArmored, encErr := c.gpgClient.EncryptToRecipients(
 		[]byte(secretValue),
-		[]string{identity.PublicKey},
+		recipientPublicKeys,
 		nil,
 	)
 	if encErr != nil {
@@ -156,7 +206,7 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 	// Build secret value struct (without hash/signature)
 	newValue := vault.SecretValue{
 		AddedAt:     now,
-		AvailableTo: []string{fp},
+		AvailableTo: recipients,
 		SignedBy:    fp,
 		Value:       encryptedBase64,
 		Deleted:     false,
@@ -182,6 +232,43 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 	}
 
 	_, _ = fmt.Fprintf(c.output.Stdout(), "Secret '%s' stored successfully\n", secretKey)
+	return nil
+}
+
+// confirmSharedStore warns that re-storing a shared secret keeps its recipient
+// set and, when a terminal is available, asks for confirmation. Without a
+// terminal it proceeds after the warning so piped and CI stores keep working.
+func (c *CLI) confirmSharedStore(secretKey string, others []string) *Error {
+	stderr := c.output.Stderr()
+	_, _ = fmt.Fprintf(stderr, "warning: secret '%s' is shared; the new value stays readable by:\n", secretKey)
+	for _, otherFP := range others {
+		label := otherFP
+		if id := c.vaultResolver.GetIdentityByFingerprint(otherFP); id != nil && id.UID != "" {
+			label = fmt.Sprintf("%s (%s)", otherFP, id.UID)
+		}
+		_, _ = fmt.Fprintf(stderr, "  - %s\n", label)
+	}
+
+	hasTTY := c.hasTTY
+	if hasTTY == nil {
+		hasTTY = defaultHasTTY
+	}
+	if !hasTTY() {
+		_, _ = fmt.Fprintf(stderr, "warning: no terminal to confirm; keeping the recipient set (--share silences this warning, --no-share stores only for yourself)\n")
+		return nil
+	}
+
+	promptConfirm := c.promptConfirm
+	if promptConfirm == nil {
+		promptConfirm = PromptConfirm
+	}
+	confirmed, promptErr := promptConfirm("Keep sharing the new value with them?", stderr)
+	if promptErr != nil {
+		return promptErr
+	}
+	if !confirmed {
+		return NewError("store cancelled; re-run with --share to keep the recipient set or --no-share to store only for yourself", ExitGeneralError)
+	}
 	return nil
 }
 

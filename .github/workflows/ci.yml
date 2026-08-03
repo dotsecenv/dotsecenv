@@ -23,6 +23,7 @@ name: CI
 # local Go build needed).
 #
 # Sibling workflows, all path-scoped to their own area:
+#   ci-agent-plugins.yml — shared Claude Code/Codex plugin packaging
 #   ci-plugin.yml    — plugin/ shell tests
 #   ci-website.yml   — website/ Astro build
 #   ci-release.yml   — `make release-test` snapshot, on goreleaser-config changes
@@ -46,6 +47,9 @@ on:
       - "scripts/**"
       - "!scripts/install.sh"
       - "!scripts/e2e-install.sh"
+      - "!scripts/set-plugin-version.py"
+      - "!scripts/validate-agent-plugins.py"
+      - "!scripts/test-agent-plugins.py"
       - "contrib/**"
       - "examples/**"
       - "demos/**"
@@ -59,6 +63,7 @@ on:
       # (orthogonal scopes; they self-trigger).
       - ".github/workflows/**"
       - "!.github/workflows/ci-plugin.yml"
+      - "!.github/workflows/ci-agent-plugins.yml"
       - "!.github/workflows/ci-website.yml"
       - "!.github/workflows/deploy-website.yml"
   pull_request:
@@ -75,6 +80,9 @@ on:
       - "scripts/**"
       - "!scripts/install.sh"
       - "!scripts/e2e-install.sh"
+      - "!scripts/set-plugin-version.py"
+      - "!scripts/validate-agent-plugins.py"
+      - "!scripts/test-agent-plugins.py"
       - "contrib/**"
       - "examples/**"
       - "demos/**"
@@ -88,6 +96,7 @@ on:
       # (orthogonal scopes; they self-trigger).
       - ".github/workflows/**"
       - "!.github/workflows/ci-plugin.yml"
+      - "!.github/workflows/ci-agent-plugins.yml"
       - "!.github/workflows/ci-website.yml"
       - "!.github/workflows/deploy-website.yml"
 
