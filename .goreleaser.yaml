@@ -85,7 +85,14 @@ homebrew_casks:
     # plugin/) to a stable path, mirroring the Linux packages'
     # /usr/share/dotsecenv/plugin/. HOMEBREW_PREFIX interpolates at cask
     # load time; artifact-declared files are removed on `brew uninstall`.
+    #
+    # The git credential helper needs a `binary` stanza, not an `artifact`:
+    # git resolves git-credential-* by searching PATH, and `binary` symlinks
+    # into HOMEBREW_PREFIX/bin, which brew relinks on upgrade. Without this the
+    # cask stages the helper into the version-scoped Caskroom and nothing puts
+    # it on PATH, so `credential.helper dotsecenv` never resolves.
     custom_block: |
+      binary "contrib/git-credential-dotsecenv"
       artifact "plugin/dotsecenv.plugin.zsh", target: "#{HOMEBREW_PREFIX}/share/dotsecenv/plugin/dotsecenv.plugin.zsh"
       artifact "plugin/dotsecenv.plugin.bash", target: "#{HOMEBREW_PREFIX}/share/dotsecenv/plugin/dotsecenv.plugin.bash"
       artifact "plugin/_dotsecenv_core.sh", target: "#{HOMEBREW_PREFIX}/share/dotsecenv/plugin/_dotsecenv_core.sh"
@@ -146,6 +153,8 @@ nfpms:
       - gnupg
     suggests:
       - bash-completion
+      # jq is required by the bundled git-credential-dotsecenv helper
+      - jq
     rpm:
       packager: DotSecEnv <release@dotsecenv.com>
       signature:
@@ -172,6 +181,11 @@ nfpms:
         dst: /usr/share/fish/vendor_completions.d/dotsecenv.fish
       - src: contrib/terraform-credentials-dotsecenv
         dst: /usr/share/terraform/plugins/terraform-credentials-dotsecenv
+        file_info:
+          mode: 0755
+      # git resolves git-credential-* from PATH, so install into a PATH dir
+      - src: contrib/git-credential-dotsecenv
+        dst: /usr/bin/git-credential-dotsecenv
         file_info:
           mode: 0755
       - src: build/plugin/dotsecenv.plugin.zsh
