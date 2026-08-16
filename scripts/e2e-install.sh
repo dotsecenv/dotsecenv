@@ -475,6 +475,50 @@ run_test "--version invalid exits non-zero" bash -c "
 "
 
 # ===================================================================
+# L. Optional helper reporting
+# ===================================================================
+echo ""
+echo "==> L. Optional helper reporting"
+
+# Test 33: a release archive that predates the git credential helper leaves the
+# summary quiet about it. The installer skips the file it cannot find, and the
+# summary used to name a path that was never written.
+run_test "missing git helper stays out of the summary" bash -c "
+    source '${INSTALL_SCRIPT}'
+    tmp=\$(mktemp -d)
+    mkdir -p \"\$tmp/contrib\" \"\$tmp/bin\"
+    INSTALL_DIR=\"\$tmp/bin\"
+    install_git_credential_helper \"\$tmp\" >/dev/null 2>&1 || true
+    summary=\$(print_summary 2>&1)
+    rm -rf \"\$tmp\"
+    [ -z \"\${GIT_HELPER_TARGET}\" ] && ! echo \"\$summary\" | grep -q 'Git helper:'
+"
+
+# Test 34: when the archive does carry it, the summary names where it landed.
+run_test "installed git helper is named in the summary" bash -c "
+    source '${INSTALL_SCRIPT}'
+    tmp=\$(mktemp -d)
+    mkdir -p \"\$tmp/contrib\" \"\$tmp/bin\"
+    cp '${SCRIPT_DIR}/../contrib/git-credential-dotsecenv' \"\$tmp/contrib/\"
+    INSTALL_DIR=\"\$tmp/bin\"
+    install_git_credential_helper \"\$tmp\" >/dev/null 2>&1
+    summary=\$(print_summary 2>&1)
+    rm -rf \"\$tmp\"
+    [ -n \"\${GIT_HELPER_TARGET}\" ] && echo \"\$summary\" | grep -q 'Git helper:'
+"
+
+# Test 35: the same gate covers the Terraform helper, which skips identically.
+run_test "missing TF helper stays out of the summary" bash -c "
+    source '${INSTALL_SCRIPT}'
+    tmp=\$(mktemp -d)
+    mkdir -p \"\$tmp/contrib\"
+    install_tf_helper \"\$tmp\" >/dev/null 2>&1 || true
+    summary=\$(print_summary 2>&1)
+    rm -rf \"\$tmp\"
+    [ -z \"\${TF_HELPER_TARGET}\" ] && ! echo \"\$summary\" | grep -q 'TF helper:'
+"
+
+# ===================================================================
 # Final Report
 # ===================================================================
 echo ""
