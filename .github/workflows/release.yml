@@ -840,11 +840,13 @@ jobs:
       version: ${{ github.ref_name }}
 
   # ---------------------------------------------------------------------------
-  # Monorepo publish jobs (PR 1 of the monorepo migration).
-  # Additive only: old repository_dispatch fan-out above remains intact.
-  # `continue-on-error: true` so failures in these new jobs do not block the
-  # existing pipeline. Status-aware DAG (no draft, sidecar .release-sha,
-  # release-complete integrity gate) lands in PR 3.
+  # Monorepo publish jobs. Each pushes a source directory to its satellite repo
+  # and tags it with the release version.
+  #
+  # These are status-aware rather than best-effort: every job below gates on the
+  # release chain ahead of it with `needs:` plus `if: !failure() && !cancelled()`,
+  # so a half-finished release does not propagate to the satellites. Nothing here
+  # runs with continue-on-error.
   # ---------------------------------------------------------------------------
 
   publish-plugin:

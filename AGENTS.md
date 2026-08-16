@@ -41,7 +41,9 @@ end-to-end test harness verified by network-namespace + strace in CI.
 | `action.yml`        | Composite GitHub Action for installing dotsecenv in CI.                        |
 | `.goreleaser.yaml`  | Release pipeline (signs, attests, packages deb/rpm/archlinux).                 |
 | `lefthook.yml`      | Git hook config: `pre-commit` runs `make lint`, `pre-push` runs `make clean test build e2e`. |
-| `.mise.toml`        | Tool versions for [mise](https://mise.jdx.dev) (installs `dotsecenv` itself for downstream consumers). |
+| `mise.toml`         | Toolchain for working in this repo: go, node, pnpm. `mise install` at the root sets them up. |
+| `.mise.toml`        | Declares `dotsecenv` itself as a [mise](https://mise.jdx.dev) tool, for downstream consumers of this repo. |
+| `.mise.local.toml`  | Committed override that turns the above off, so working in the repo does not install a released `dotsecenv` over your build. |
 
 ## Build / test / lint / e2e
 
@@ -205,7 +207,9 @@ What the script does NOT do — handle manually if needed:
 
 ## Conventions
 
-- **Go version:** 1.26.2 (see `go.mod`). Go 1.26+ required.
+- **Go version:** `go.mod` carries the language version; `mise.toml` pins the
+  toolchain contributors install. They move independently, so read them rather
+  than a number written here.
 - **FIPS 140-3:** Release binaries set `GOFIPS140=v1.26.0` and `CGO_ENABLED=0`.
   The build is pure-Go; **don't add CGO dependencies**.
 - **Vendoring:** Dependencies are vendored. `make build` uses `-mod=vendor`.
