@@ -13,12 +13,11 @@ _Unreleased_
 
 ### Features
 
-- Add `contrib/git-credential-dotsecenv`, an experimental git credential helper that stores HTTPS credentials encrypted in your vault and preserves OAuth `oauth_refresh_token`/`password_expiry_utc` fields so it can back a generator like git-credential-oauth (no stored PAT); the deb/rpm/Arch packages and install.sh install it to a `PATH` directory (#255)
+- Add `contrib/git-credential-dotsecenv`, an experimental git credential helper that stores HTTPS credentials encrypted in your vault and preserves OAuth `oauth_refresh_token`/`password_expiry_utc` fields so it can back a generator like git-credential-oauth (no stored PAT); the deb/rpm/Arch packages and install.sh install it to a `PATH` directory, and `jq` is a package Recommends since `store` needs it. Point git at it with `git config --global --replace-all credential.helper "" && git config --global --add credential.helper dotsecenv`, which keeps the macOS keychain out of the chain. Needs git 2.41+ for the OAuth workflow (#255, #301, #304, #305)
 
 ### Bug Fixes
 
 - `install.sh` no longer reports a Terraform or git credential helper it skipped: both are absent from release archives older than the one that added them, and the summary now names only what it wrote. Installing the git credential helper also warns when git predates 2.41, where the OAuth workflow's `oauth_refresh_token` starts round-tripping (#302)
-- The git credential helper guide no longer claims the helper shipped in v0.8.0, and its macOS setup resets `credential.helper` instead of appending to it, so the Xcode-provided osxkeychain stops answering first and stops receiving a copy of every stored token (#304)
 
 ### Other
 
