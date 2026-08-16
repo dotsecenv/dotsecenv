@@ -339,6 +339,33 @@ else
     fail "space path failed: get='$sp_out' sp_keys=$sp_key"
 fi
 
+# Test 24: the .git suffix does not split a repository in two. git passes the
+# path as the remote spells it, so storing under `team/api.git` and fetching
+# under `team/api` used to miss and prompt again.
+((TESTS_RUN++)) || true
+printf 'protocol=https\nhost=suf.test\npath=team/api.git\nusername=u\npassword=tok-suffix\n\n' | "$HELPER" store 2>/dev/null
+suf_bare=$(printf 'protocol=https\nhost=suf.test\npath=team/api\n\n' | "$HELPER" get 2>/dev/null)
+suf_dot=$(printf 'protocol=https\nhost=suf.test\npath=team/api.git\n\n' | "$HELPER" get 2>/dev/null)
+suf_keys=$("$BIN" secret get 2>/dev/null | grep -c 'SUF_DOT_TEST' || true)
+if echo "$suf_bare" | grep -q '^password=tok-suffix$' && echo "$suf_dot" | grep -q '^password=tok-suffix$' \
+    && [ "$suf_keys" -eq 1 ]; then
+    pass "the .git suffix resolves to one entry"
+else
+    fail ".git suffix split the repository: bare='$suf_bare' dotgit='$suf_dot' keys=$suf_keys"
+fi
+
+# Test 25: a path of exactly `.git` keeps it. Trimming would leave nothing and
+# quietly widen the key from one repository to the whole host.
+((TESTS_RUN++)) || true
+printf 'protocol=https\nhost=bare.test\npath=.git\nusername=u\npassword=tok-dotgit\n\n' | "$HELPER" store 2>/dev/null
+only_dot=$(printf 'protocol=https\nhost=bare.test\npath=.git\n\n' | "$HELPER" get 2>/dev/null)
+host_wide=$(printf 'protocol=https\nhost=bare.test\n\n' | "$HELPER" get 2>/dev/null)
+if echo "$only_dot" | grep -q '^password=tok-dotgit$' && [ -z "$host_wide" ]; then
+    pass "a path of .git stays scoped to the path"
+else
+    fail ".git-only path mishandled: path='$only_dot' hostonly='$host_wide'"
+fi
+
 echo ""
 echo "==> Git credential helper E2E results"
 echo "Tests run:    $TESTS_RUN"
