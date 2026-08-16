@@ -3,22 +3,12 @@ package main_test
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
 )
-
-// skipIfNoGPG skips the test if GPG is not available
-func skipIfNoGPG(t *testing.T) {
-	t.Helper()
-	_, err := exec.LookPath("gpg")
-	if err != nil {
-		t.Skip("GPG not available, skipping test")
-	}
-}
 
 // configForTest represents the config file structure for test assertions
 type configForTest struct {
