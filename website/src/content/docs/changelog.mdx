@@ -11,6 +11,12 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+---
+
+## v0.9.0
+
+_August 17, 2026_
+
 ### Features
 
 - Add `contrib/git-credential-dotsecenv`, an experimental git credential helper that stores HTTPS credentials encrypted in your vault and preserves OAuth `oauth_refresh_token`/`password_expiry_utc` fields so it can back a generator like git-credential-oauth (no stored PAT); the deb/rpm/Arch packages and install.sh install it to a `PATH` directory, and `jq` is a package Recommends since `store` needs it. Point git at it with `git config --global --replace-all credential.helper "" && git config --global --add credential.helper dotsecenv`, which keeps the macOS keychain out of the chain. Needs git 2.41+ for the OAuth workflow (#255, #301, #304, #305)
@@ -29,6 +35,11 @@ _Unreleased_
 - Update GitHub Actions: checkout, setup-go, pnpm/action-setup, harden-runner, attest-build-provenance, setup-uv (#283, #290, #292, #293, #296, #299, #300)
 - Update the Go toolchain to 1.26.6 and uv (#284, #289, #298, #306)
 - Backfill the changelog for the dependency updates merged since v0.8.1 (#315)
+- Remove unreachable helpers from the internal CLI packages, along with a test that could never run (#311)
+- Remove the version-specific vault header marker constants and `HeaderMarkerForVersion`. None matched what a vault file actually contains; legacy markers are still recognised by prefix and v1 vaults still upgrade. This drops exported symbols from `pkg/dotsecenv/vault`, so a Go program importing that package directly may need a change (#312)
+- Remove the unused `InstallTabs` website component (#313)
+- Correct a `release.yml` comment that described the satellite publish jobs as best-effort when they gate on the release chain, and the Go version and mise files listed in AGENTS.md (#314)
+- Tidy stale checksums out of `go.sum` (#321)
 
 ---
 
