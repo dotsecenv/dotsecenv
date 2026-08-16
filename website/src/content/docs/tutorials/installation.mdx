@@ -290,6 +290,7 @@ Every setting can be configured via a CLI flag or an environment variable. CLI f
 | Completions | `--[no-]install-completions` | `INSTALL_COMPLETIONS` | `1` (yes) | Install shell completions for bash, zsh, and fish |
 | Man pages | `--[no-]install-man-pages` | `INSTALL_MAN_PAGES` | `1` (yes) | Install man pages |
 | TF credentials helper | `--[no-]install-tf-credentials-helper` | `INSTALL_TF_CREDENTIALS_HELPER` | `1` (yes) | Install the Terraform credentials helper |
+| Git credentials helper | `--[no-]install-git-credentials-helper` | `INSTALL_GIT_CREDENTIALS_HELPER` | `1` (yes) | Install the git credential helper next to the binary |
 | Verification | `--[no-]verify` | `VERIFY` | `1` (yes) | Verify SHA-256 checksums and GPG signatures |
 | Help | `-h`, `--help` | — | — | Show help and exit |
 
@@ -304,6 +305,7 @@ Every setting can be configured via a CLI flag or an environment variable. CLI f
 7. Installs man pages under `~/.local/share/man/man1/` by default (or system man directories with `--system`)
 8. Installs the shell plugin: clones to `~/.local/share/dotsecenv/plugin/` by default (or system share path with `--system`), and also integrates with detected plugin managers (Oh My Zsh, Zinit, Antidote, Oh My Bash, Fisher, Oh My Fish). Fish `conf.d` is linked automatically if fish is present.
 9. Installs the Terraform credentials helper to `~/.terraform.d/plugins/` by default (or system share path with `--system`). Skip with `--no-install-tf-credentials-helper`.
+10. Installs the git credential helper next to the binary, since git resolves `git-credential-*` from your `PATH`. Skip with `--no-install-git-credentials-helper`. Both helpers report only what they wrote, so a release that predates one of them leaves it out of the summary.
 
 #### Install Paths
 
@@ -314,6 +316,7 @@ Every setting can be configured via a CLI flag or an environment variable. CLI f
 | Man pages | `~/.local/share/man/man1/` | `/usr/local/share/man/man1/` | `/usr/local/share/man/man1/` |
 | Shell plugin | `~/.local/share/dotsecenv/plugin/` | `/usr/local/share/dotsecenv/plugin/` | `/usr/share/dotsecenv/plugin/` |
 | TF helper | `~/.terraform.d/plugins/` | `/usr/local/share/terraform/plugins/` | `/usr/share/terraform/plugins/` |
+| Git helper | `~/.local/bin/` | `/usr/local/bin/` | `/usr/local/bin/` |
 
 #### Examples
 
