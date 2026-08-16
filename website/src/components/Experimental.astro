@@ -1,0 +1,30 @@
+---
+/**
+ * Experimental - the standard notice for a feature that ships before its
+ * behavior has settled.
+ *
+ * Put it directly under the page's imports, above the first paragraph, so a
+ * reader meets it before following any instructions. Remove it in the same PR
+ * that makes the feature stable.
+ *
+ * Usage:
+ *   <Experimental />
+ *   <Experimental feature="The git credential helper" />
+ */
+import { Aside } from '@astrojs/starlight/components';
+
+interface Props {
+  /** What is experimental, as a sentence subject. Defaults to "This feature". */
+  feature?: string;
+}
+
+const { feature = 'This feature' } = Astro.props;
+---
+
+<Aside type="caution" title="Experimental">
+  <p>
+    {feature} is experimental. Its behavior and the shape of what it stores can change
+    in any release, with no deprecation period. Keep it away from critical workloads
+    until this notice is gone.
+  </p>
+</Aside>
