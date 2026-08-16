@@ -11,6 +11,14 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Bug Fixes
+
+- `install.sh` no longer reports a Terraform or git credential helper it skipped: both are absent from release archives older than the one that added them, and the summary now names only what it wrote. Installing the git credential helper also warns when git predates 2.41, where the OAuth workflow's `oauth_refresh_token` starts round-tripping (#302)
+
+### Other
+
+- Document `--[no-]install-git-credentials-helper` and `INSTALL_GIT_CREDENTIALS_HELPER` in the installation tutorial (#302)
+
 ---
 
 ## v0.8.1
