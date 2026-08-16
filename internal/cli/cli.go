@@ -284,12 +284,6 @@ func (c *CLI) Output() *output.Handler {
 	return c.output
 }
 
-// SetJSONMode enables or disables JSON output mode for the current command.
-// This creates a new handler with fresh warning collection.
-func (c *CLI) SetJSONMode(enabled bool) {
-	c.output = c.output.WithJSONMode(enabled)
-}
-
 // Close closes the vault and releases locks
 func (c *CLI) Close() error {
 	if c.vaultResolver != nil {

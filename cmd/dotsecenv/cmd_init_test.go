@@ -79,16 +79,6 @@ func TestInitConfig_HasBehaviorSection(t *testing.T) {
 	}
 }
 
-func TestInitConfig_LoginFlag(t *testing.T) {
-	// The --login flag now creates a signed login proof, which requires GPG
-	// to sign the proof. Skip this test if GPG is not available.
-	skipIfNoGPG(t)
-
-	// This test requires a real GPG key - we need to use e2e tests for proper validation
-	// For now, we just test the flag parsing without actual GPG operations
-	t.Skip("TestInitConfig_LoginFlag requires real GPG key - tested in e2e")
-}
-
 func TestInitConfig_BehaviorCommentsExist(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
