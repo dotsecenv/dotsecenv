@@ -133,7 +133,7 @@ fi
 # Test 10: stored secret names are dot-free (encoded)
 ((TESTS_RUN++)) || true
 key_list=$("$BIN" secret get 2>/dev/null || true)
-if echo "$key_list" | grep -qi 'HTTPS_SLASH_GITLAB_DOT_COM' && ! echo "$key_list" | grep -qi 'GITLAB\.COM'; then
+if echo "$key_list" | grep -qi 'HTTPS\.GITLAB_DOT_COM' && ! echo "$key_list" | grep -qi 'GITLAB\.COM'; then
     pass "secret names are dot-free (encoded)"
 else
     fail "expected encoded dot-free key, got keys: $key_list"
@@ -178,7 +178,7 @@ store_rc=0
     | DOTSECENV_CONFIG="$altcfg" "$OLDPWD/$HELPER" store) >/dev/null 2>&1 || store_rc=$?
 proj_get=$(cd "$proj" && printf 'protocol=https\nhost=%s\n\n' "$h" | DOTSECENV_CONFIG="$altcfg" "$OLDPWD/$HELPER" get 2>/dev/null || true)
 in_repo_vault=0
-grep -q 'HTTPS_SLASH_PROJ' "$proj/.dotsecenv/vault" 2>/dev/null && in_repo_vault=1
+grep -q 'HTTPS\.PROJ_DOT_EXAMPLE' "$proj/.dotsecenv/vault" 2>/dev/null && in_repo_vault=1
 erase_rc=0
 (cd "$proj" && printf 'protocol=https\nhost=%s\n\n' "$h" | DOTSECENV_CONFIG="$altcfg" "$OLDPWD/$HELPER" erase) >/dev/null 2>&1 || erase_rc=$?
 after_erase=$(cd "$proj" && printf 'protocol=https\nhost=%s\n\n' "$h" | DOTSECENV_CONFIG="$altcfg" "$OLDPWD/$HELPER" get 2>/dev/null || true)
@@ -279,6 +279,64 @@ if echo "$v6a" | grep -q '^password=p19a$' && echo "$v6b" | grep -q '^password=p
     pass "IPv6 host round-trips with brackets encoded by name"
 else
     fail "IPv6 host failed: 8443='$v6a' 9443='$v6b' bracket_keys=$v6key"
+fi
+
+# Test 20: credential.useHttpPath. git only sends `path` when it is on, so the
+# helper keys per repository. Nothing exercised this before.
+((TESTS_RUN++)) || true
+printf 'protocol=https\nhost=gh.test\npath=acme/api\nusername=u1\npassword=tok-api\n\n' | "$HELPER" store 2>/dev/null
+printf 'protocol=https\nhost=gh.test\npath=acme/web\nusername=u2\npassword=tok-web\n\n' | "$HELPER" store 2>/dev/null
+p_api=$(printf 'protocol=https\nhost=gh.test\npath=acme/api\n\n' | "$HELPER" get 2>/dev/null)
+p_web=$(printf 'protocol=https\nhost=gh.test\npath=acme/web\n\n' | "$HELPER" get 2>/dev/null)
+p_none=$(printf 'protocol=https\nhost=gh.test\n\n' | "$HELPER" get 2>/dev/null)
+if echo "$p_api" | grep -q '^password=tok-api$' && echo "$p_web" | grep -q '^password=tok-web$' \
+    && [ -z "$p_none" ]; then
+    pass "useHttpPath keys per repository"
+else
+    fail "useHttpPath failed: api='$p_api' web='$p_web' hostonly='$p_none'"
+fi
+
+# Test 21: erase under useHttpPath takes one repository, not the host.
+((TESTS_RUN++)) || true
+printf 'protocol=https\nhost=gh.test\npath=acme/api\n\n' | "$HELPER" erase 2>/dev/null
+e_api=$(printf 'protocol=https\nhost=gh.test\npath=acme/api\n\n' | "$HELPER" get 2>/dev/null)
+e_web=$(printf 'protocol=https\nhost=gh.test\npath=acme/web\n\n' | "$HELPER" get 2>/dev/null)
+if [ -z "$e_api" ] && echo "$e_web" | grep -q '^password=tok-web$'; then
+    pass "erase under useHttpPath is scoped to one repository"
+else
+    fail "erase hit the wrong scope: api='$e_api' web='$e_web'"
+fi
+
+# Test 22: a path and a username cannot bleed into each other. Encoding the
+# whole context in one pass made `path=p/u` and `path=p` + `username=u` the same
+# key, so an anonymous request for the first was answered with the second's
+# token. Components are encoded separately and joined on a dot for this reason.
+if command -v git >/dev/null 2>&1; then
+    ((TESTS_RUN++)) || true
+    printf '[credential "dotsecenv"]\n\tuseUsername = true\n' > "$HOME/.gitconfig"
+    printf 'protocol=https\nhost=b.test\npath=p\nusername=u\npassword=tok-p-u\n\n' | "$HELPER" store 2>/dev/null
+    bleed=$(printf 'protocol=https\nhost=b.test\npath=p/u\n\n' | "$HELPER" get 2>/dev/null)
+    scoped=$(printf 'protocol=https\nhost=b.test\npath=p\nusername=u\n\n' | "$HELPER" get 2>/dev/null)
+    rm -f "$HOME/.gitconfig"
+    if [ -z "$bleed" ] && echo "$scoped" | grep -q '^password=tok-p-u$'; then
+        pass "path and username components stay separate"
+    else
+        fail "component bleed: path=p/u got '$bleed', scoped got '$scoped'"
+    fi
+else
+    echo "  SKIP: git not installed, component boundary case not exercised"
+fi
+
+# Test 23: a space in a path round-trips. Some forges allow it (Azure DevOps
+# project names), and it used to fall through to the _OTHER_ catch-all.
+((TESTS_RUN++)) || true
+printf 'protocol=https\nhost=dev.test\npath=My Project/_git/api\nusername=u\npassword=tok-space\n\n' | "$HELPER" store 2>/dev/null
+sp_out=$(printf 'protocol=https\nhost=dev.test\npath=My Project/_git/api\n\n' | "$HELPER" get 2>/dev/null)
+sp_key=$("$BIN" secret get 2>/dev/null | grep -c '_SP_' || true)
+if echo "$sp_out" | grep -q '^password=tok-space$' && [ "$sp_key" -ge 1 ]; then
+    pass "space in a path round-trips and is encoded by name"
+else
+    fail "space path failed: get='$sp_out' sp_keys=$sp_key"
 fi
 
 echo ""
