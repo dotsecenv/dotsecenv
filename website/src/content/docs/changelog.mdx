@@ -18,10 +18,12 @@ _Unreleased_
 ### Bug Fixes
 
 - `install.sh` no longer reports a Terraform or git credential helper it skipped: both are absent from release archives older than the one that added them, and the summary now names only what it wrote. Installing the git credential helper also warns when git predates 2.41, where the OAuth workflow's `oauth_refresh_token` starts round-tripping (#302)
+- The git credential helper guide no longer claims the helper shipped in v0.8.0, and its macOS setup resets `credential.helper` instead of appending to it, so the Xcode-provided osxkeychain stops answering first and stops receiving a copy of every stored token (#304)
 
 ### Other
 
 - Document `--[no-]install-git-credentials-helper` and `INSTALL_GIT_CREDENTIALS_HELPER` in the installation tutorial (#302)
+- New `Experimental` website component carries one standard notice for features whose behavior can still change; the git credential helper guide is the first to use it (#304)
 
 ---
 
