@@ -265,6 +265,22 @@ else
     echo "  SKIP: git not installed, useUsername case not exercised"
 fi
 
+# Test 19: an IPv6 literal round-trips. git sends the brackets as part of the
+# host (host=[::1]:8443), so they are encoded by name rather than falling through
+# to the catch-all, and two ports on one address stay apart.
+((TESTS_RUN++)) || true
+printf 'protocol=https\nhost=[::1]:8443\nusername=u\npassword=p19a\n\n' | "$HELPER" store 2>/dev/null
+printf 'protocol=https\nhost=[::1]:9443\nusername=u\npassword=p19b\n\n' | "$HELPER" store 2>/dev/null
+v6a=$(printf 'protocol=https\nhost=[::1]:8443\n\n' | "$HELPER" get 2>/dev/null)
+v6b=$(printf 'protocol=https\nhost=[::1]:9443\n\n' | "$HELPER" get 2>/dev/null)
+v6key=$("$BIN" secret get 2>/dev/null | grep -c 'LBRK' || true)
+if echo "$v6a" | grep -q '^password=p19a$' && echo "$v6b" | grep -q '^password=p19b$' \
+    && [ "$v6key" -ge 1 ]; then
+    pass "IPv6 host round-trips with brackets encoded by name"
+else
+    fail "IPv6 host failed: 8443='$v6a' 9443='$v6b' bracket_keys=$v6key"
+fi
+
 echo ""
 echo "==> Git credential helper E2E results"
 echo "Tests run:    $TESTS_RUN"
