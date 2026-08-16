@@ -29,7 +29,7 @@ end-to-end test harness verified by network-namespace + strace in CI.
 | `internal/cli/`     | CLI command implementations, validators, interactive helpers, error mapping.   |
 | `internal/xdg/`     | XDG Base Directory resolution.                                                 |
 | `pkg/dotsecenv/`    | Public packages: `config/`, `crypto/`, `gpg/`, `identity/`, `output/`, `policy/`, `vault/`. |
-| `contrib/`          | `terraform-credentials-dotsecenv` Bash credentials helper for Terraform/OpenTofu. |
+| `contrib/`          | Bash helpers that plug dotsecenv into other tools: `terraform-credentials-dotsecenv` for Terraform/OpenTofu, `git-credential-dotsecenv` for git over HTTPS. |
 | `demos/`            | `demo.sh` for asciinema recording (driven by `make demo`).                     |
 | `skills/`           | Shared Claude Code and Codex plugin skills (`secenv/`, `secrets/`, `vault/`).     |
 | `.claude/skills/`   | Maintainer-only skills, NOT shipped to plugin installers (`changelog/`, `cli-reference-drift/`). |
@@ -243,6 +243,25 @@ What the script does NOT do — handle manually if needed:
   Features, `fix` -> Bug Fixes, else Other), ending with the PR number. Release
   notes build up per PR; the release PR stamps "Upcoming" to the tag.
   `bash .claude/skills/changelog/assess.sh` reports any merged PRs missing from it.
+- **Marking a feature experimental on the website:** use the shared
+  `Experimental` component, don't hand-roll an aside. Import it from
+  `website/src/components/Experimental.astro` and put it directly under the
+  page's imports, above the first paragraph, so a reader meets it before
+  following any instructions:
+
+  ```mdx
+  import Experimental from "../../../components/Experimental.astro";
+
+  <Experimental feature="The git credential helper" />
+  ```
+
+  `feature` is the sentence subject and defaults to "This feature". The notice
+  says the behavior and storage shape can change in any release with no
+  deprecation period, and to keep the feature off critical workloads. The
+  wording lives in one place so it reads the same everywhere; change the
+  component rather than the page. Drop the tag in the same PR that makes the
+  feature stable. Currently used by
+  `website/src/content/docs/guides/git-credential-helper.mdx`.
 - **Branches:** `feat/*`, `fix/*`, `docs/*`, etc. (see `CONTRIBUTING.md`).
 - **PRs only:** All changes land on `main` through pull requests. Don't
   push commits directly to `main`, even when your account holds a bypass
