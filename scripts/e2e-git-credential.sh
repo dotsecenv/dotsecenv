@@ -7,6 +7,11 @@ BIN="bin/dotsecenv"
 HELPER="contrib/git-credential-dotsecenv"
 chmod +x "$BIN" "$HELPER"
 
+# The helper reads credential.dotsecenv.useUsername through git. HOME and
+# XDG_CONFIG_HOME are already isolated by the Makefile; this closes the last
+# door, so a machine-wide /etc/gitconfig cannot change what the tests see.
+export GIT_CONFIG_NOSYSTEM=1
+
 if ! command -v jq >/dev/null 2>&1; then
     echo "jq is required for the git credential helper e2e tests" >&2
     exit 1
@@ -165,7 +170,7 @@ mkdir -p "$proj"
 (cd "$proj" && "$OLDPWD/$BIN" init vault -v .dotsecenv/vault >/dev/null 2>&1)
 altcfg="$PWD/git-credentials-config"
 DOTSECENV_CONFIG="$altcfg" "$BIN" init config >/dev/null 2>&1
-grep -v "$XDG_DATA_HOME/dotsecenv/vault" "$altcfg" > "$altcfg.tmp" && mv "$altcfg.tmp" "$altcfg"
+grep -Fv "$XDG_DATA_HOME/dotsecenv/vault" "$altcfg" > "$altcfg.tmp" && mv "$altcfg.tmp" "$altcfg"
 (cd "$proj" && DOTSECENV_CONFIG="$altcfg" "$OLDPWD/$BIN" login "$KEY" >/dev/null 2>&1)
 h="proj.example"
 store_rc=0
@@ -184,19 +189,80 @@ else
     fail "repo-vault workflow failed: store_rc=$store_rc get='$proj_get' in_repo_vault=$in_repo_vault erase_rc=$erase_rc after_erase='$after_erase'"
 fi
 
-# Test 14: contrived hosts that encode to the same key collide, by design.
-# a_-b → A__DASH_B and a__-b → A___DASH_B → collapses to A__DASH_B; c.example_
-# ends in a stripped underscore, so it lands on c.example's key. Real DNS
-# hostnames cannot contain '_', so the collision is accepted, not fixed.
+# Test 14: runs of underscores stay distinct. The encoder used to collapse three
+# or more underscores into two, so a_-b, a__-b and a___-b all shared one key and
+# overwrote each other. Escaping '_' first keeps them apart.
 ((TESTS_RUN++)) || true
 printf 'protocol=https\nhost=a_-b.example\nusername=u\npassword=p14a\n\n' | "$HELPER" store 2>/dev/null
-collide_a=$(printf 'protocol=https\nhost=a__-b.example\n\n' | "$HELPER" get 2>/dev/null)
-printf 'protocol=https\nhost=c.example_\nusername=u\npassword=p14b\n\n' | "$HELPER" store 2>/dev/null
-collide_b=$(printf 'protocol=https\nhost=c.example\n\n' | "$HELPER" get 2>/dev/null)
-if echo "$collide_a" | grep -q '^password=p14a$' && echo "$collide_b" | grep -q '^password=p14b$'; then
-    pass "contrived underscore hosts collapse to the same key"
+printf 'protocol=https\nhost=a__-b.example\nusername=u\npassword=p14b\n\n' | "$HELPER" store 2>/dev/null
+printf 'protocol=https\nhost=a___-b.example\nusername=u\npassword=p14c\n\n' | "$HELPER" store 2>/dev/null
+run_a=$(printf 'protocol=https\nhost=a_-b.example\n\n' | "$HELPER" get 2>/dev/null)
+run_b=$(printf 'protocol=https\nhost=a__-b.example\n\n' | "$HELPER" get 2>/dev/null)
+run_c=$(printf 'protocol=https\nhost=a___-b.example\n\n' | "$HELPER" get 2>/dev/null)
+if echo "$run_a" | grep -q '^password=p14a$' && echo "$run_b" | grep -q '^password=p14b$' \
+    && echo "$run_c" | grep -q '^password=p14c$'; then
+    pass "underscore runs keep separate keys"
 else
-    fail "expected key collisions, got: collapse='$collide_a' edge-strip='$collide_b'"
+    fail "underscore runs collided: one='$run_a' two='$run_b' three='$run_c'"
+fi
+
+# Test 15: a trailing underscore is part of the name. It used to be stripped, so
+# c.example_ landed on c.example's key and served that host's credential.
+((TESTS_RUN++)) || true
+printf 'protocol=https\nhost=c.example\nusername=u\npassword=p15a\n\n' | "$HELPER" store 2>/dev/null
+printf 'protocol=https\nhost=c.example_\nusername=u\npassword=p15b\n\n' | "$HELPER" store 2>/dev/null
+tail_plain=$(printf 'protocol=https\nhost=c.example\n\n' | "$HELPER" get 2>/dev/null)
+tail_under=$(printf 'protocol=https\nhost=c.example_\n\n' | "$HELPER" get 2>/dev/null)
+if echo "$tail_plain" | grep -q '^password=p15a$' && echo "$tail_under" | grep -q '^password=p15b$'; then
+    pass "trailing underscore keeps a separate key"
+else
+    fail "trailing underscore collided: plain='$tail_plain' underscore='$tail_under'"
+fi
+
+# Test 16: an ephemeral credential is never written to the vault. git-credential(1)
+# says a helper must not save the value in the credential field when ephemeral is
+# set, and a stored copy would also be replayed on the next get.
+((TESTS_RUN++)) || true
+printf 'protocol=https\nhost=eph.example\nusername=u\nauthtype=Digest\ncredential=nonce-bound\nephemeral=1\n\n' | "$HELPER" store 2>/dev/null
+eph_out=$(printf 'protocol=https\nhost=eph.example\n\n' | "$HELPER" get 2>/dev/null)
+if ! echo "$eph_out" | grep -q 'nonce-bound' && ! echo "$eph_out" | grep -q '^ephemeral=' \
+    && ! echo "$eph_out" | grep -q '^authtype='; then
+    pass "ephemeral credential is not stored"
+else
+    fail "ephemeral credential leaked into the vault, got: $eph_out"
+fi
+
+# Test 17: when git names the account it wants, a record for a different account
+# is not an answer. git takes the helper's username over the one it asked for, so
+# replying here would authenticate as the wrong person.
+((TESTS_RUN++)) || true
+printf 'protocol=https\nhost=two.example\nusername=alice\npassword=alice-token\n\n' | "$HELPER" store 2>/dev/null
+wrong_user=$(printf 'protocol=https\nhost=two.example\nusername=bob\n\n' | "$HELPER" get 2>/dev/null)
+right_user=$(printf 'protocol=https\nhost=two.example\nusername=alice\n\n' | "$HELPER" get 2>/dev/null)
+if [ -z "$wrong_user" ] && echo "$right_user" | grep -q '^password=alice-token$'; then
+    pass "get stays silent when the stored account is not the one git asked for"
+else
+    fail "username mismatch mishandled: bob='$wrong_user' alice='$right_user'"
+fi
+
+# Test 18: credential.dotsecenv.useUsername gives each account its own key, so two
+# accounts on one host stop overwriting each other. git reads the setting on the
+# helper's behalf, so the case needs git installed.
+if command -v git >/dev/null 2>&1; then
+    ((TESTS_RUN++)) || true
+    printf '[credential "dotsecenv"]\n\tuseUsername = true\n' > "$HOME/.gitconfig"
+    printf 'protocol=https\nhost=multi.example\nusername=alice\npassword=alice-pw\n\n' | "$HELPER" store 2>/dev/null
+    printf 'protocol=https\nhost=multi.example\nusername=bob\npassword=bob-pw\n\n' | "$HELPER" store 2>/dev/null
+    scoped_alice=$(printf 'protocol=https\nhost=multi.example\nusername=alice\n\n' | "$HELPER" get 2>/dev/null)
+    scoped_bob=$(printf 'protocol=https\nhost=multi.example\nusername=bob\n\n' | "$HELPER" get 2>/dev/null)
+    rm -f "$HOME/.gitconfig"
+    if echo "$scoped_alice" | grep -q '^password=alice-pw$' && echo "$scoped_bob" | grep -q '^password=bob-pw$'; then
+        pass "useUsername keeps two accounts on one host apart"
+    else
+        fail "username scoping failed: alice='$scoped_alice' bob='$scoped_bob'"
+    fi
+else
+    echo "  SKIP: git not installed, useUsername case not exercised"
 fi
 
 echo ""

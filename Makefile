@@ -128,7 +128,8 @@ e2e-terraform:
 	echo "Terraform e2e tests passed, cleaned up $$E2E_HOME"
 
 # Git credential helper E2E tests
-# Requires bin/dotsecenv, contrib/, gpg, and jq to exist
+# Requires bin/dotsecenv, contrib/, gpg, and jq to exist. git is optional: it
+# only gates the credential.dotsecenv.useUsername case, which skips without it.
 .PHONY: e2e-git-credential
 e2e-git-credential:
 	@echo "Running git credential helper e2e tests..."
