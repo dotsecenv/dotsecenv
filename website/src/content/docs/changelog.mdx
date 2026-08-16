@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Bug Fixes
+
+- The deb and rpm packages now list `jq` under Recommends rather than Suggests, so apt and dnf install it by default and `git-credential-dotsecenv store` works on a fresh package install. Arch has no nfpm mapping for weak dependencies, so it stays documented there (#305)
+
 ---
 
 ## v0.8.1

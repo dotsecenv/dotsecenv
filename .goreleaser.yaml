@@ -151,10 +151,15 @@ nfpms:
       - archlinux
     dependencies:
       - gnupg
+    recommends:
+      # git-credential-dotsecenv needs jq for `store`. Recommends, not Depends:
+      # the helper is optional, so jq should not be forced on everyone who
+      # installs dotsecenv. apt and dnf both pull weak dependencies by default,
+      # so anyone who does not opt out gets a working helper. Arch has no nfpm
+      # mapping for this, so there it stays documentation-only.
+      - jq
     suggests:
       - bash-completion
-      # jq is required by the bundled git-credential-dotsecenv helper
-      - jq
     rpm:
       packager: DotSecEnv <release@dotsecenv.com>
       signature:
