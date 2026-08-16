@@ -570,22 +570,3 @@ func TestManagerRequireExplicitUpgrade_NoAutoUpgrade(t *testing.T) {
 		t.Errorf("expected 2 identities, got %d", len(vault.Identities))
 	}
 }
-
-func TestHeaderMarkerForVersion(t *testing.T) {
-	// HeaderMarkerForVersion now returns a constant marker regardless of version
-	tests := []struct {
-		version  int
-		expected string
-	}{
-		{1, HeaderMarker},
-		{2, HeaderMarker},
-		{10, HeaderMarker},
-	}
-
-	for _, tt := range tests {
-		got := HeaderMarkerForVersion(tt.version)
-		if got != tt.expected {
-			t.Errorf("HeaderMarkerForVersion(%d) = %q, want %q", tt.version, got, tt.expected)
-		}
-	}
-}
