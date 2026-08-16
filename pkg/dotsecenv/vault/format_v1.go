@@ -80,6 +80,3 @@ func UnmarshalHeaderV1(data []byte) (*Header, error) {
 
 	return h, nil
 }
-
-// HeaderMarkerV1 is the header marker for v1 vaults.
-const HeaderMarkerV1 = "# === VAULT HEADER v1 ==="

@@ -234,12 +234,6 @@ func isNumeric(s string) bool {
 	return true
 }
 
-// HeaderMarkerForVersion returns the header marker (version-independent).
-// Deprecated: The version parameter is ignored. Use HeaderMarker constant directly.
-func HeaderMarkerForVersion(_ int) string {
-	return HeaderMarker
-}
-
 // detectVersionFromJSON extracts the version from header JSON without full parsing.
 // Uses a heuristic approach:
 // 1. Fast path: assume version field is first ({"version":N,...)
