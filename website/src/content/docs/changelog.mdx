@@ -11,10 +11,6 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
-### Bug Fixes
-
-- The git credential helper no longer answers with a credential that belongs to a different host or account: the key encoding stopped collapsing runs of underscores and stripping a trailing one, `get` stays silent when git asked for another username, and `ephemeral` credentials are never written to the vault. Set `credential.dotsecenv.useUsername` to keep two accounts on one host apart (#301)
-
 ---
 
 ## v0.8.1
