@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/output"
 )
@@ -71,20 +70,4 @@ func PrintError(w io.Writer, err error) ExitCode {
 	// Generic error
 	_, _ = fmt.Fprintf(w, "%v\n", err)
 	return ExitGeneralError
-}
-
-// PrintWarning prints a warning to stderr.
-func PrintWarning(w io.Writer, message string) {
-	_, _ = fmt.Fprintf(w, "warning: %s\n", message)
-}
-
-// PrintSuccess prints a success message to stdout.
-func PrintSuccess(w io.Writer, message string) {
-	_, _ = fmt.Fprintf(w, "%s\n", message)
-}
-
-// ExitWithError exits the program with the given error.
-func ExitWithError(err error) {
-	code := PrintError(os.Stderr, err)
-	os.Exit(int(code))
 }

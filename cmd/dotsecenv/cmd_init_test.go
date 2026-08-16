@@ -3,22 +3,12 @@ package main_test
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
 )
-
-// skipIfNoGPG skips the test if GPG is not available
-func skipIfNoGPG(t *testing.T) {
-	t.Helper()
-	_, err := exec.LookPath("gpg")
-	if err != nil {
-		t.Skip("GPG not available, skipping test")
-	}
-}
 
 // configForTest represents the config file structure for test assertions
 type configForTest struct {
@@ -77,16 +67,6 @@ func TestInitConfig_HasBehaviorSection(t *testing.T) {
 	} else if *cfg.Behavior.RestrictToConfiguredVaults != false {
 		t.Errorf("expected restrict_to_configured_vaults=false, got %v", *cfg.Behavior.RestrictToConfiguredVaults)
 	}
-}
-
-func TestInitConfig_LoginFlag(t *testing.T) {
-	// The --login flag now creates a signed login proof, which requires GPG
-	// to sign the proof. Skip this test if GPG is not available.
-	skipIfNoGPG(t)
-
-	// This test requires a real GPG key - we need to use e2e tests for proper validation
-	// For now, we just test the flag parsing without actual GPG operations
-	t.Skip("TestInitConfig_LoginFlag requires real GPG key - tested in e2e")
 }
 
 func TestInitConfig_BehaviorCommentsExist(t *testing.T) {
