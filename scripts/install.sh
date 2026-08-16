@@ -53,6 +53,13 @@ VERIFY="${VERIFY:-1}"
 
 TMPDIR_ROOT=""
 
+# Where the optional helpers actually landed. Empty means nothing was written,
+# either because the component was turned off or because the release archive
+# did not carry it, so the summary can report what is on disk rather than what
+# was asked for.
+TF_HELPER_TARGET=""
+GIT_HELPER_TARGET=""
+
 # ---------------------------------------------------------------------------
 # Cleanup
 # ---------------------------------------------------------------------------
@@ -597,6 +604,7 @@ install_tf_helper() {
         mkdir -p "${tf_plugin_dir}"
         install -m 755 "${helper_src}" "${tf_plugin_dir}/terraform-credentials-dotsecenv"
     fi
+    TF_HELPER_TARGET="${tf_plugin_dir}"
     success "Terraform credentials helper installed to ${tf_plugin_dir}"
 
     printf "\n"
@@ -629,34 +637,63 @@ install_git_credential_helper() {
     else
         install -m 755 "${helper_src}" "${dest}"
     fi
+    GIT_HELPER_TARGET="${dest}"
     success "Git credential helper installed to ${dest}"
+
+    check_git_version_for_helper
 
     printf "\n"
     printf "${BLUE}==>${RESET} Enable it with:\n"
     cat <<'GITEOF'
 
-    git config --global credential.helper dotsecenv
+    git config --global --replace-all credential.helper ""
+    git config --global --add credential.helper dotsecenv
 
 GITEOF
+    printf "  The empty value first clears any helper set by a lower-priority\n"
+    printf "  config file, such as the osxkeychain that Apple Git enables.\n"
     printf "  Requires ${BOLD}jq${RESET}. For OAuth without a stored token, also add a\n"
     printf "  generator such as git-credential-oauth (configured last).\n"
+}
+
+# The OAuth workflow needs git 2.41, the first release that round-trips
+# oauth_refresh_token. Older git drops the field without saying anything, so the
+# generator re-runs its browser flow on every fetch and nothing points at why.
+# A stored token works on any version, so this is a warning, not a failure.
+check_git_version_for_helper() {
+    local raw major minor rest
+    raw="$(git --version 2>/dev/null | awk '{print $3}')"
+
+    if [ -z "${raw}" ]; then
+        warn "git is not on PATH; install git to use the credential helper"
+        return 0
+    fi
+
+    major="${raw%%.*}"
+    rest="${raw#*.}"
+    minor="${rest%%.*}"
+    case "${major}" in ''|*[!0-9]*) return 0 ;; esac
+    case "${minor}" in ''|*[!0-9]*) return 0 ;; esac
+
+    if [ "${major}" -lt 2 ] || { [ "${major}" -eq 2 ] && [ "${minor}" -lt 41 ]; }; then
+        warn "git ${raw} predates 2.41, which is where oauth_refresh_token round-trips."
+        warn "A stored token works fine. The OAuth workflow will loop back to the browser."
+    fi
 }
 
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 print_summary() {
-    local share_prefix comp_dir man_dir tf_dir
+    local share_prefix comp_dir man_dir
     if is_system_install; then
         share_prefix="/usr/share"
         [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
         comp_dir="${share_prefix}"
         man_dir="/usr/local/share/man/man1"
-        tf_dir="${share_prefix}/terraform/plugins"
     else
         comp_dir="${HOME}/.local/share"
         man_dir="${HOME}/.local/share/man/man1"
-        tf_dir="${HOME}/.terraform.d/plugins"
     fi
 
     printf "\n"
@@ -676,8 +713,11 @@ print_summary() {
         fi
         printf "  Shell plugin: ${plugin_summary_dir}/\n"
     fi
-    [ "${INSTALL_TF_CREDENTIALS_HELPER}" = "1" ] && printf "  TF helper:    ${tf_dir}/\n"
-    [ "${INSTALL_GIT_CREDENTIALS_HELPER}" = "1" ] && printf "  Git helper:   ${INSTALL_DIR}/git-credential-dotsecenv\n"
+    # Both helpers skip themselves when the archive does not carry them, which is
+    # what happens on a release older than the one that added them. Report the
+    # path only once something is there to report.
+    [ -n "${TF_HELPER_TARGET}" ] && printf "  TF helper:    ${TF_HELPER_TARGET}/\n"
+    [ -n "${GIT_HELPER_TARGET}" ] && printf "  Git helper:   ${GIT_HELPER_TARGET}\n"
     printf "\n"
     printf "  Get started:  ${BOLD}dotsecenv --help${RESET}\n"
     printf "\n"
