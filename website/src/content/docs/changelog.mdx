@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Other
+
+- Disable Renovate on the packages satellite. That repo is artifact-only, so a dependency PR merged there is overwritten by the next publish; the updates land here instead, where the monorepo's Renovate already covers the satellite's publish workflow (#323)
+
 ---
 
 ## v0.9.0
