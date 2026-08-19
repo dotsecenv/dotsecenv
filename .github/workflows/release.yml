@@ -776,7 +776,7 @@ jobs:
           repositories: packages
 
       - name: Publish packages source + tag the satellite
-        uses: releasetools/actions/signed-push@57073d3d58774563dfaa76eaaf89ae086c278ee3  # v0.0.2
+        uses: releasetools/actions/signed-push@e03d8631693c67061fb9d1216cf23b1c370a992c  # v0.0.6
         with:
           source-dir: packages
           target-repo: dotsecenv/packages
@@ -871,7 +871,7 @@ jobs:
           repositories: plugin
 
       - name: Publish plugin source + tag the satellite
-        uses: releasetools/actions/signed-push@57073d3d58774563dfaa76eaaf89ae086c278ee3  # v0.0.2
+        uses: releasetools/actions/signed-push@e03d8631693c67061fb9d1216cf23b1c370a992c  # v0.0.6
         with:
           source-dir: plugin
           target-repo: dotsecenv/plugin
