@@ -32,7 +32,8 @@ end-to-end test harness verified by network-namespace + strace in CI.
 | `contrib/`          | Bash helpers that plug dotsecenv into other tools: `terraform-credentials-dotsecenv` for Terraform/OpenTofu, `git-credential-dotsecenv` for git over HTTPS. |
 | `demos/`            | `demo.sh` for asciinema recording (driven by `make demo`).                     |
 | `skills/`           | Shared Claude Code and Codex plugin skills (`secenv/`, `secrets/`, `vault/`).     |
-| `.claude/skills/`   | Maintainer-only skills, NOT shipped to plugin installers (`changelog/`, `cli-reference-drift/`). |
+| `.claude/skills/`   | Maintainer-only skills for Claude Code, NOT shipped to plugin installers (`changelog/`, `cli-reference-drift/`). |
+| `.agents/skills/`   | The same maintainer-only skills discovered by Codex; each `SKILL.md` is Codex-specific, the `*.sh` are symlinked to `.claude/skills/`. |
 | `.claude-plugin/`   | Claude Code plugin manifest (`plugin.json`, `marketplace.json`).               |
 | `.codex-plugin/`    | Codex plugin manifest (`plugin.json`); loads the shared root `skills/` tree.    |
 | `scripts/`          | Install/e2e/release helpers plus agent-plugin version and validation scripts.   |
@@ -243,10 +244,10 @@ What the script does NOT do — handle manually if needed:
   a separator.
 - **Changelog:** every PR adds one line to the `## Upcoming` section of
   `website/src/content/docs/changelog.mdx` (use the `changelog` skill,
-  `.claude/skills/changelog/SKILL.md`), in the subsection for its type (`feat` ->
+  `.agents/skills/changelog/SKILL.md`), in the subsection for its type (`feat` ->
   Features, `fix` -> Bug Fixes, else Other), ending with the PR number. Release
   notes build up per PR; the release PR stamps "Upcoming" to the tag.
-  `bash .claude/skills/changelog/assess.sh` reports any merged PRs missing from it.
+  `bash .agents/skills/changelog/assess.sh` reports any merged PRs missing from it.
 - **Marking a feature experimental on the website:** use the shared
   `Experimental` component, don't hand-roll an aside. Import it from
   `website/src/components/Experimental.astro` and put it directly under the
@@ -280,8 +281,8 @@ What the script does NOT do — handle manually if needed:
 - **Releases:** Triggered by pushing a signed semver tag. Before tagging, sync
   the two agent plugin manifests with `uv run --script scripts/set-plugin-version.py X.Y.Z`,
   validate them with `uv run --script scripts/validate-agent-plugins.py X.Y.Z`, then run the
-  CLI reference drift check (`bash .claude/skills/cli-reference-drift/check.sh`; see
-  `.claude/skills/cli-reference-drift/SKILL.md`) and resolve any drift. Use
+  CLI reference drift check (`bash .agents/skills/cli-reference-drift/check.sh`; see
+  `.agents/skills/cli-reference-drift/SKILL.md`) and resolve any drift. Use
   [`releasetools-cli`](https://github.com/releasetools/cli):
 
   ```bash

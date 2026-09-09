@@ -1,0 +1,1 @@
+../../../.claude/skills/cli-reference-drift/check.sh
