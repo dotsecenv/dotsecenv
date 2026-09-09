@@ -74,8 +74,6 @@ changelog:
 # https://goreleaser.com/customization/homebrew_casks/?h=homebrew_casks
 homebrew_casks:
   - name: dotsecenv
-    url:
-      verified: "github.com/dotsecenv/dotsecenv/"
     commit_msg_template: "Cask update for {{ .ProjectName }} version {{ .Tag }}"
     homepage: "https://dotsecenv.com"
     description: "Safe environment secrets — encrypted at rest, ready to commit, easy to share."

@@ -266,14 +266,14 @@ func extractCurveFromKey(pubKey interface{}) string {
 	}
 
 	keyValue := reflect.ValueOf(pubKey)
-	if keyValue.Kind() == reflect.Ptr {
+	if keyValue.Kind() == reflect.Pointer {
 		keyValue = keyValue.Elem()
 	}
 
 	// Check if this is a wrapper struct that contains the actual key
 	if keyValue.Kind() == reflect.Struct {
 		if pkField := keyValue.FieldByName("PublicKey"); pkField.IsValid() && !pkField.IsZero() {
-			if pkField.Kind() == reflect.Interface || pkField.Kind() == reflect.Ptr {
+			if pkField.Kind() == reflect.Interface || pkField.Kind() == reflect.Pointer {
 				if innerCurve := extractCurveFromKey(pkField.Interface()); innerCurve != "" {
 					return innerCurve
 				}
@@ -370,7 +370,7 @@ func getAlgorithmBitsFromKey(entity interface{}) int {
 	}
 
 	parentValue := reflect.ValueOf(entity)
-	if parentValue.Kind() == reflect.Ptr {
+	if parentValue.Kind() == reflect.Pointer {
 		bitLengthMethod := parentValue.MethodByName("BitLength")
 		if bitLengthMethod.IsValid() {
 			results := bitLengthMethod.Call([]reflect.Value{})
