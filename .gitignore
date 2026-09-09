@@ -17,6 +17,4 @@ website/.cache
 # shared project config and skills stay tracked.
 !.claude/
 .claude/settings.local.json
-# Claude Code fetches this plugin from GitHub on install; not vendored.
-.claude/marketplace/technical-docs/
 .worktrees/

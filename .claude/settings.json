@@ -1,7 +1,7 @@
 {
   "enabledPlugins": {
     "claude-blog@agricidaniel-blog": true,
-    "technical-docs@dotsecenv-project-local": true
+    "technical-docs@danielrosehill": true
   },
   "extraKnownMarketplaces": {
     "agricidaniel-blog": {
@@ -10,10 +10,10 @@
         "repo": "AgriciDaniel/claude-blog"
       }
     },
-    "dotsecenv-project-local": {
+    "danielrosehill": {
       "source": {
-        "source": "directory",
-        "path": "./.claude/marketplace"
+        "source": "github",
+        "repo": "danielrosehill/Claude-Code-Plugins"
       }
     }
   }
