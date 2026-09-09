@@ -1,1 +1,0 @@
-../../../.claude/skills/changelog/assess.sh

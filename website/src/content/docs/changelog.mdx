@@ -14,7 +14,7 @@ _Unreleased_
 ### Other
 
 - Disable Renovate on the packages satellite. That repo is artifact-only, so a dependency PR merged there is overwritten by the next publish; the updates land here instead, where the monorepo's Renovate already covers the satellite's publish workflow (#323)
-- Point the Codex maintainer skills under `.agents/skills/` at their real script paths so `changelog` and `cli-reference-drift` resolve, and symlink the scripts to their `.claude/skills/` originals (#344)
+- Let Codex discover the `changelog` and `cli-reference-drift` maintainer skills by directory-symlinking `.agents/skills/*` to their `.claude/skills/` originals (#344)
 
 ---
 
