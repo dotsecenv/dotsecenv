@@ -275,19 +275,21 @@ install-lefthook:
 		go install github.com/evilmartians/lefthook/v2@v2.0.13; \
 	fi
 
-# Pinned to v2.11.4: v2.12.0 and v2.12.1 have a SHA-256 mismatch between the
-# published tarball and the corresponding _checksums.txt in the GitHub release,
-# causing install.sh to abort. v2.11.4 is the latest known-good release.
-# Bump back to `latest` (or a known-good v2.12.x) once the upstream release
-# pipeline is fixed.
-GOLANGCI_LINT_VERSION := v2.11.4
+# Pinned to v2.13.2: the go.mod directive targets 1.27.1, so golangci-lint must
+# be built with Go >= 1.27 or `run` aborts with a language-version error.
+# Installed with `go install` instead of the upstream install.sh: the v2.12.x and
+# v2.13.2 release tarballs fail install.sh's checksum step (the published tarball
+# and its _checksums.txt disagree). Building from source with the go.mod toolchain
+# sidesteps the bad checksums and guarantees a Go >= 1.27 build.
+GOLANGCI_LINT_VERSION := v2.13.2
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
+GOLANGCI_LINT_PKG := github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 
 .PHONY: install-lint
 install-lint:
 	@if ! [ -x "$(GOLANGCI_LINT)" ]; then \
 		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLANGCI_LINT_VERSION); \
+		GOFLAGS= GOBIN=$(GOBIN) go install $(GOLANGCI_LINT_PKG)@$(GOLANGCI_LINT_VERSION); \
 	fi
 
 SYFT := $(GOBIN)/syft
