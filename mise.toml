@@ -13,4 +13,4 @@
 [tools]
 go = "1.27.1"
 node = "25"
-pnpm = "11"
+pnpm = "12"
