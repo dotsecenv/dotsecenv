@@ -32,7 +32,8 @@ end-to-end test harness verified by network-namespace + strace in CI.
 | `contrib/`          | Bash helpers that plug dotsecenv into other tools: `terraform-credentials-dotsecenv` for Terraform/OpenTofu, `git-credential-dotsecenv` for git over HTTPS. |
 | `demos/`            | `demo.sh` for asciinema recording (driven by `make demo`).                     |
 | `skills/`           | Shared Claude Code and Codex plugin skills (`secenv/`, `secrets/`, `vault/`).     |
-| `.claude/skills/`   | Maintainer-only skills, NOT shipped to plugin installers (`changelog/`, `cli-reference-drift/`). |
+| `.claude/skills/`   | Maintainer-only skills for Claude Code, NOT shipped to plugin installers (`changelog/`, `cli-reference-drift/`). |
+| `.agents/skills/`   | Codex's discovery path for the same maintainer skills; each entry is a directory symlink to the matching `.claude/skills/` skill. |
 | `.claude-plugin/`   | Claude Code plugin manifest (`plugin.json`, `marketplace.json`).               |
 | `.codex-plugin/`    | Codex plugin manifest (`plugin.json`); loads the shared root `skills/` tree.    |
 | `scripts/`          | Install/e2e/release helpers plus agent-plugin version and validation scripts.   |
