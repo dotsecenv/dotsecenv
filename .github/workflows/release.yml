@@ -50,9 +50,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          if ! rt github::assert_release_absent "$GITHUB_REF_NAME"; then
+          if ! rt github::assert_release_absent "$TAG"; then
             echo "::error::Tag protection rules prevent moving or deleting release tags, so the only forward path is a new version."
             echo "::error::To ship a fix: bump the version (next patch) and cut a new tag."
             echo "::error::To withdraw the existing release: retract it (see scripts/retract-version.sh)."
