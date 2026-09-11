@@ -11,6 +11,12 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+---
+
+## v0.10.0
+
+_September 11, 2026_
+
 ### Bug Fixes
 
 - Two documentation links printed by the CLI returned 404: the `https://dotsecenv.com/docs/concepts/behavior-settings` comment written into every generated config, and the gpg-agent link in the `vault doctor` error path. Both now point at live pages (#356)
@@ -21,6 +27,7 @@ _Unreleased_
 - Rewrite the README as an introduction rather than a manual: 1012 lines to 134, with installation flags, the command reference, the policy specification, the vault format, the FAQ, and the development setup deferred to dotsecenv.com and CONTRIBUTING.md. Windows is documented as unsupported and unplanned (#356)
 - Remove the `FormatVersion` alias from `pkg/dotsecenv/vault`. `LatestFormatVersion` is the single name for the version new vaults are written with. This drops an exported symbol, so a Go program importing that package directly may need a change (#354)
 - Point the README status badges at workflows that exist: the renamed `e2e-action-post-release.yml` and `e2e-hermetic.yml`, and `ci-plugin.yml` and `deploy-website.yml` in this repository rather than in the plugin and website repositories. The Contrib E2E badge is gone, because that workflow folded into CI (#355)
+- The release workflow tells a missing release apart from an API error. An expired token, a rate limit, or a network failure used to read as "no release for this tag" and let the run publish over an existing one; the pre-flight now uses `github::assert_release_absent` (#353)
 
 ---
 
