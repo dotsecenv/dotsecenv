@@ -137,7 +137,7 @@ func saveConfigWithComments(path string, cfg config.Config) error {
 	// Behavior section with comments
 	sb.WriteString("\n# Behavior settings control how dotsecenv handles edge cases.\n")
 	sb.WriteString("# All settings default to false (permissive). Set to true for stricter behavior.\n")
-	sb.WriteString("# See: https://dotsecenv.com/docs/concepts/behavior-settings\n")
+	sb.WriteString("# See: https://dotsecenv.com/concepts/behavior-settings/\n")
 	sb.WriteString("behavior:\n")
 	sb.WriteString("  # Prevent automatic vault format upgrades; requires 'dotsecenv vault doctor'\n")
 	sb.WriteString("  require_explicit_vault_upgrade: false\n")

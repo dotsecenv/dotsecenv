@@ -119,26 +119,6 @@ jobs:
 
       - run: make clean lint build test
 
-  test-windows:
-    name: Build, Test (windows-latest)
-    runs-on: windows-latest
-    # WIP — set repo var `ENABLE_WINDOWS_CI=true` to opt in.
-    # https://github.com/dotsecenv/dotsecenv/issues/8
-    if: ${{ vars.ENABLE_WINDOWS_CI == 'true' }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
-        with:
-          go-version-file: "go.mod"
-          cache-dependency-path: "go.sum"
-
-      - name: Build
-        run: go build -ldflags "-s -w" -o bin/dotsecenv.exe ./cmd/dotsecenv
-
-      - name: Test
-        run: go test -v -p 1 ./...
-
   build-docs:
     name: Build Docs
     runs-on: ubuntu-latest

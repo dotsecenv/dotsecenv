@@ -396,7 +396,8 @@ reasoning about behavior. They are also what reviewers will check.
 - **Append-only signed JSONL vault.** Each line is one JSON object: a header
   on line 1, then `identity`, `secret`, or `value` entries. New entries are
   appended; existing entries are never rewritten. The format is documented
-  in `README.md` and implemented in `pkg/dotsecenv/vault/`.
+  at https://dotsecenv.com/concepts/vault-format/ and implemented in
+  `pkg/dotsecenv/vault/`.
 - **Every identity, secret, and value entry is individually signed.** The
   signer is recorded in `signed_by` and verified against the identity's
   public key on every read. Validation is performed by `dotsecenv validate`
@@ -409,7 +410,8 @@ reasoning about behavior. They are also what reviewers will check.
   vaults default to `$XDG_DATA_HOME/dotsecenv/vault`. `DOTSECENV_CONFIG`
   overrides; `-c` overrides everything. See `internal/xdg/`.
 - **Stable numeric exit codes.** Defined in
-  `pkg/dotsecenv/output/exitcodes.go` and documented in `README.md`. Codes
+  `pkg/dotsecenv/output/exitcodes.go` and documented at
+  https://dotsecenv.com/reference/#exit-codes. Codes
   `0`–`9` map to specific error categories (success, general, config, vault,
   GPG, auth, validation, fingerprint, access denied, algorithm). Don't
   renumber or repurpose them — scripts and CI depend on them.
