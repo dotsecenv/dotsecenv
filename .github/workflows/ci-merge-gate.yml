@@ -41,9 +41,13 @@ jobs:
     steps:
       - name: Wait for ${{ matrix.workflow }} on PR head
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.event.pull_request.head.sha }}
+          # GITHUB_REPOSITORY is a variable the runner already sets; GH_REPO renames it to
+          # what gh reads. GITHUB_TOKEN is not a default variable, so the token has to be
+          # handed over. SHA is the pull request's head, not $GITHUB_SHA, which on a
+          # pull_request event is the merge commit.
+          GH_TOKEN: ${{ github.token }} # no runner default
+          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY, under the name gh reads
+          SHA: ${{ github.event.pull_request.head.sha }} # not $GITHUB_SHA, see above
           WORKFLOW: ${{ matrix.workflow }}
         run: |
           set -euo pipefail
@@ -55,7 +59,7 @@ jobs:
           RUN_ID=""
           while [ "$(date +%s)" -lt "$deadline" ]; do
             RUN_ID=$(gh api \
-              "repos/${REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${SHA}&event=pull_request&per_page=1" \
+              "repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${SHA}&event=pull_request&per_page=1" \
               --jq '.workflow_runs[0].id // empty')
             [ -n "$RUN_ID" ] && break
             sleep 10
@@ -68,7 +72,7 @@ jobs:
 
           echo "Watching ${WORKFLOW} run ${RUN_ID}..."
           # exits non-zero on failure/cancelled/timed_out, zero on success/skipped
-          gh run watch "$RUN_ID" --exit-status --repo "$REPO"
+          gh run watch "$RUN_ID" --exit-status --repo "$GH_REPO"
 
   allow:
     name: allow
