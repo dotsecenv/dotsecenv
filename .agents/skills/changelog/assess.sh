@@ -44,7 +44,7 @@ done < <(git -C "$ROOT" log "${LAST}..HEAD" --pretty='%s')
 echo
 if [ "$missing" -ne 0 ]; then
   echo "RESULT: ${missing} commit(s) since ${LAST} are not in 'Upcoming'." >&2
-  echo "Add an entry for each (see .claude/skills/changelog/SKILL.md) before releasing." >&2
+  echo "Add an entry for each (see .agents/skills/changelog/SKILL.md) before releasing." >&2
   exit 1
 fi
 echo "RESULT: 'Upcoming' covers every commit since ${LAST}."

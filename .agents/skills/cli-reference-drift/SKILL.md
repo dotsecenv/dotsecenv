@@ -21,7 +21,7 @@ from the page.
 ## Run it
 
 ```bash
-bash .claude/skills/cli-reference-drift/check.sh
+bash .agents/skills/cli-reference-drift/check.sh
 ```
 
 The script runs the repo's `make docs` target to generate the live command and
