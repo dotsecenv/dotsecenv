@@ -14,6 +14,7 @@ _Unreleased_
 ### Other
 
 - Remove the `FormatVersion` alias from `pkg/dotsecenv/vault`. `LatestFormatVersion` is the single name for the version new vaults are written with. This drops an exported symbol, so a Go program importing that package directly may need a change (#354)
+- Point the README status badges at workflows that exist: the renamed `e2e-action-post-release.yml` and `e2e-hermetic.yml`, and `ci-plugin.yml` and `deploy-website.yml` in this repository rather than in the plugin and website repositories. The Contrib E2E badge is gone, because that workflow folded into CI (#355)
 
 ---
 
