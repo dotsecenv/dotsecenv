@@ -52,7 +52,7 @@ jobs:
           # and GITHUB_REF_NAME. The rename matters for the first: gh looks for GH_REPO and
           # never at GITHUB_REPOSITORY. GITHUB_TOKEN is not a default variable at all.
           GH_TOKEN: ${{ github.token }} # no runner default
-          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY; gh only reads GH_REPO
+          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY; gh reads GH_REPO
           TAG: ${{ github.ref_name }} # = $GITHUB_REF_NAME
         run: |
           set -euo pipefail
@@ -117,7 +117,7 @@ jobs:
           # and GITHUB_SHA. The rename matters for the first: gh looks for GH_REPO and never
           # at GITHUB_REPOSITORY. GITHUB_TOKEN is not a default variable at all.
           GH_TOKEN: ${{ github.token }} # no runner default
-          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY; gh only reads GH_REPO
+          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY; gh reads GH_REPO
           SHA: ${{ github.sha }} # = $GITHUB_SHA
           WORKFLOW: ${{ matrix.workflow }}
         run: |
