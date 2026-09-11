@@ -2,13 +2,12 @@
 
 [![CI](https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/ci.yml)
 [![Release](https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/release.yml)
-[![GitHub Action E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/action-e2e.yml)
-[![Contrib E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/contrib-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/contrib-e2e.yml)
-[![Hermetic E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/hermetic-e2e.yml)
+[![E2E Action (post-release)](https://github.com/dotsecenv/dotsecenv/actions/workflows/e2e-action-post-release.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/e2e-action-post-release.yml)
+[![Hermetic E2E](https://github.com/dotsecenv/dotsecenv/actions/workflows/e2e-hermetic.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/e2e-hermetic.yml)
+[![CI Plugin](https://github.com/dotsecenv/dotsecenv/actions/workflows/ci-plugin.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/ci-plugin.yml)
+[![Deploy Website](https://github.com/dotsecenv/dotsecenv/actions/workflows/deploy-website.yml/badge.svg)](https://github.com/dotsecenv/dotsecenv/actions/workflows/deploy-website.yml)
 [![Publish Packages](https://github.com/dotsecenv/packages/actions/workflows/publish.yml/badge.svg)](https://github.com/dotsecenv/packages/actions/workflows/publish.yml)
 [![Homebrew install](https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml/badge.svg)](https://github.com/dotsecenv/homebrew-tap/actions/workflows/post-release.yml)
-[![Shell plugins CI](https://github.com/dotsecenv/plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/dotsecenv/plugin/actions/workflows/ci.yml)
-[![Publish Website](https://github.com/dotsecenv/website/actions/workflows/deploy-website.yml/badge.svg)](https://github.com/dotsecenv/website/actions/workflows/deploy-website.yml)
 
 A complete Go CLI application for securely managing environment secrets with GPG-based encryption, multi-user support, and FIPS 186-5 compliant algorithm defaults.
 
