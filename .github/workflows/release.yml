@@ -48,11 +48,11 @@ jobs:
       # to get one.
       - name: Verify no existing release for tag
         env:
-          # The runner sets GITHUB_REPOSITORY and GITHUB_REF_NAME itself; these name the
-          # same two values the way gh and this step want them. It sets no token: that one
-          # has no default and has to be handed over.
+          # GH_REPO and TAG carry values the runner already publishes, as GITHUB_REPOSITORY
+          # and GITHUB_REF_NAME. The rename matters for the first: gh looks for GH_REPO and
+          # never at GITHUB_REPOSITORY. GITHUB_TOKEN is not a default variable at all.
           GH_TOKEN: ${{ github.token }} # no runner default
-          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY, under the name gh reads
+          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY; gh only reads GH_REPO
           TAG: ${{ github.ref_name }} # = $GITHUB_REF_NAME
         run: |
           set -euo pipefail
@@ -113,11 +113,11 @@ jobs:
     steps:
       - name: Find and watch ${{ matrix.workflow }} on ${{ github.sha }}
         env:
-          # GITHUB_REPOSITORY and GITHUB_SHA are variables the runner already sets; these
-          # rename them, GH_REPO to the name gh reads. GITHUB_TOKEN is not a default
-          # variable, so the token is the one value here that has to be handed over.
+          # GH_REPO and SHA carry values the runner already publishes, as GITHUB_REPOSITORY
+          # and GITHUB_SHA. The rename matters for the first: gh looks for GH_REPO and never
+          # at GITHUB_REPOSITORY. GITHUB_TOKEN is not a default variable at all.
           GH_TOKEN: ${{ github.token }} # no runner default
-          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY, under the name gh reads
+          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY; gh only reads GH_REPO
           SHA: ${{ github.sha }} # = $GITHUB_SHA
           WORKFLOW: ${{ matrix.workflow }}
         run: |

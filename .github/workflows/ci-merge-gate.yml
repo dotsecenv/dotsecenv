@@ -41,12 +41,12 @@ jobs:
     steps:
       - name: Wait for ${{ matrix.workflow }} on PR head
         env:
-          # GITHUB_REPOSITORY is a variable the runner already sets; GH_REPO renames it to
-          # what gh reads. GITHUB_TOKEN is not a default variable, so the token has to be
-          # handed over. SHA is the pull request's head, not $GITHUB_SHA, which on a
+          # GH_REPO carries the value the runner publishes as GITHUB_REPOSITORY: gh looks for
+          # GH_REPO and never at GITHUB_REPOSITORY. GITHUB_TOKEN is not a default variable at
+          # all. SHA is the pull request's head rather than $GITHUB_SHA, which on a
           # pull_request event is the merge commit.
           GH_TOKEN: ${{ github.token }} # no runner default
-          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY, under the name gh reads
+          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY; gh only reads GH_REPO
           SHA: ${{ github.event.pull_request.head.sha }} # not $GITHUB_SHA, see above
           WORKFLOW: ${{ matrix.workflow }}
         run: |
