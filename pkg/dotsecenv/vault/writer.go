@@ -416,7 +416,7 @@ func (w *Writer) Version() int {
 func (w *Writer) Header() Header {
 	if w.header == nil {
 		return Header{
-			Version:    FormatVersion,
+			Version:    LatestFormatVersion,
 			Identities: make(map[string]int),
 			Secrets:    make(map[string]SecretIndex),
 		}

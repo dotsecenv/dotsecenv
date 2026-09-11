@@ -25,8 +25,6 @@ const (
 	LatestFormatVersion = 2
 	// MinSupportedVersion is the minimum vault format version that can be read
 	MinSupportedVersion = 1
-	// FormatVersion is kept for backward compatibility, use LatestFormatVersion instead
-	FormatVersion = LatestFormatVersion
 )
 
 // Entry types for JSONL records
@@ -54,7 +52,7 @@ type SecretIndex struct {
 // NewHeader creates a new empty header
 func NewHeader() *Header {
 	return &Header{
-		Version:    FormatVersion,
+		Version:    LatestFormatVersion,
 		Identities: make(map[string]int),
 		Secrets:    make(map[string]SecretIndex),
 	}

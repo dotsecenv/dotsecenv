@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Other
+
+- Remove the `FormatVersion` alias from `pkg/dotsecenv/vault`. `LatestFormatVersion` is the single name for the version new vaults are written with. This drops an exported symbol, so a Go program importing that package directly may need a change (#354)
+
 ---
 
 ## v0.9.1

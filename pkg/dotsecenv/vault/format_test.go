@@ -12,8 +12,8 @@ import (
 
 func TestNewHeader(t *testing.T) {
 	h := NewHeader()
-	if h.Version != FormatVersion {
-		t.Errorf("expected version %d, got %d", FormatVersion, h.Version)
+	if h.Version != LatestFormatVersion {
+		t.Errorf("expected version %d, got %d", LatestFormatVersion, h.Version)
 	}
 	if h.Identities == nil {
 		t.Error("expected identities map to be initialized")

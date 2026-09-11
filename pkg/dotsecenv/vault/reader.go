@@ -114,7 +114,7 @@ func (r *Reader) Version() int {
 func (r *Reader) Header() Header {
 	if r.header == nil {
 		return Header{
-			Version:    FormatVersion,
+			Version:    LatestFormatVersion,
 			Identities: make(map[string]int),
 			Secrets:    make(map[string]SecretIndex),
 		}
