@@ -298,7 +298,7 @@ A few things the policy directory is not.
 - Per-user policy. All users on the host get the same policy. If you need per-user rules, that is what user config is for, pinned by what admin policy allows.
 - Remote policy. No HTTP fetch, no signed URL. To distribute fragments across a fleet, use configuration management (Ansible, Chef, MDM, image bake).
 - Policy on `login:` or `vault:`. Identity and vault paths belong to the user. Use `approved_vault_paths` to constrain where vaults may live; the user still chooses which to use.
-- Windows. Not yet supported. The permission check assumes POSIX semantics, and the policy loader returns an error on Windows.
+- Windows. Not a supported platform. The permission check assumes POSIX semantics, and the policy loader returns an error there.
 
 If `/etc/dotsecenv/policy.d/` does not exist, none of this is in effect. dotsecenv runs entirely from user config.
 

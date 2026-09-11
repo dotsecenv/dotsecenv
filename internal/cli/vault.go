@@ -373,7 +373,7 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 	if !c.gpgClient.IsAgentAvailable() {
 		gpgStatus = "error"
 		gpgMessage = "gpg-agent is not available"
-		gpgDetails = "See: https://dotsecenv.com/docs/troubleshooting/gpg-agent"
+		gpgDetails = "See: https://dotsecenv.com/guides/gpg-agent/"
 		overallStatus = "error"
 	}
 	checks = append(checks, DoctorCheckJSON{
