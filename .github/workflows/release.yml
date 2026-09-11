@@ -35,30 +35,33 @@ jobs:
           version: "0.12.10"
           enable-cache: false
 
+      - name: Install the release tools
+        uses: releasetools/cli@v0
+
+      # The three-way rule this used to spell out inline: a release with assets
+      # stops the run, one with none is a prior attempt that failed partway and
+      # is allowed through, and no release at all is the ordinary case.
+      #
+      # The inline version sent every gh failure to /dev/null and read it as
+      # "no release", so an expired token or a rate limit reported every tag as
+      # unreleased. github::assert_release_absent separates a 404 from a failure
+      # to get one.
       - name: Verify no existing release for tag
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          # GH_REPO and TAG carry values the runner already publishes, as GITHUB_REPOSITORY
+          # and GITHUB_REF_NAME. The rename matters for the first: gh looks for GH_REPO and
+          # never at GITHUB_REPOSITORY. GITHUB_TOKEN is not a default variable at all.
+          GH_TOKEN: ${{ github.token }} # no runner default
+          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY; gh reads GH_REPO
+          TAG: ${{ github.ref_name }} # = $GITHUB_REF_NAME
         run: |
           set -euo pipefail
-          # gh api exits non-zero on 404; treat that as the happy path.
-          if ! RELEASE_JSON=$(gh api "repos/${REPO}/releases/tags/${TAG}" 2>/dev/null); then
-            echo "::notice::No existing release for ${TAG}; clear to proceed."
-            exit 0
-          fi
-
-          ASSET_COUNT=$(echo "$RELEASE_JSON" | jq '.assets | length')
-          if [ "$ASSET_COUNT" -gt 0 ]; then
-            RELEASE_URL=$(echo "$RELEASE_JSON" | jq -r '.html_url')
-            echo "::error::Release ${TAG} already exists with ${ASSET_COUNT} assets: ${RELEASE_URL}"
+          if ! rt github::assert_release_absent "$TAG"; then
             echo "::error::Tag protection rules prevent moving or deleting release tags, so the only forward path is a new version."
             echo "::error::To ship a fix: bump the version (next patch) and cut a new tag."
             echo "::error::To withdraw the existing release: retract it (see scripts/retract-version.sh)."
             exit 1
           fi
-
-          echo "::notice::Release ${TAG} exists with no assets (likely partial prior failure); proceeding."
 
       - name: Verify agent plugin versions match release tag
         run: |
@@ -110,14 +113,17 @@ jobs:
     steps:
       - name: Find and watch ${{ matrix.workflow }} on ${{ github.sha }}
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
+          # GH_REPO and SHA carry values the runner already publishes, as GITHUB_REPOSITORY
+          # and GITHUB_SHA. The rename matters for the first: gh looks for GH_REPO and never
+          # at GITHUB_REPOSITORY. GITHUB_TOKEN is not a default variable at all.
+          GH_TOKEN: ${{ github.token }} # no runner default
+          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY; gh reads GH_REPO
+          SHA: ${{ github.sha }} # = $GITHUB_SHA
           WORKFLOW: ${{ matrix.workflow }}
         run: |
           set -euo pipefail
           RUN_ID=$(gh api \
-            "repos/${REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${SHA}&per_page=1" \
+            "repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${SHA}&per_page=1" \
             --jq '.workflow_runs[0].id // empty')
 
           if [ -z "$RUN_ID" ]; then
@@ -126,7 +132,7 @@ jobs:
           fi
 
           echo "Watching ${WORKFLOW} run ${RUN_ID}..."
-          gh run watch "$RUN_ID" --exit-status --repo "$REPO"
+          gh run watch "$RUN_ID" --exit-status --repo "$GH_REPO"
 
   goreleaser:
     needs: [e2e-hermetic, wait-ci]
