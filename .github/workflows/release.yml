@@ -48,9 +48,12 @@ jobs:
       # to get one.
       - name: Verify no existing release for tag
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          # The runner sets GITHUB_REPOSITORY and GITHUB_REF_NAME itself; these name the
+          # same two values the way gh and this step want them. It sets no token: that one
+          # has no default and has to be handed over.
+          GH_TOKEN: ${{ github.token }} # no runner default
+          GH_REPO: ${{ github.repository }} # = $GITHUB_REPOSITORY, under the name gh reads
+          TAG: ${{ github.ref_name }} # = $GITHUB_REF_NAME
         run: |
           set -euo pipefail
           if ! rt github::assert_release_absent "$TAG"; then
