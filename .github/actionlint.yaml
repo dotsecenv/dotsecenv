@@ -1,8 +1,11 @@
 # Config for actionlint (rhysd/actionlint). See:
 # https://github.com/rhysd/actionlint/blob/main/docs/config.md
 
+# actionlint 1.7.12 does not list the hosted `ubuntu-26.04` image, so it is
+# declared here to keep the runner-label check from rejecting it.
 self-hosted-runner:
-  labels: []
+  labels:
+    - ubuntu-26.04
 
 # Allow any GHA configuration variable — we use `vars.RELEASE_APP_CLIENT_ID`,
 # `vars.ENABLE_WINDOWS_CI`, etc. without declaring an exhaustive allowlist.

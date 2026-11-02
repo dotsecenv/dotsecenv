@@ -30,7 +30,7 @@ env:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -392,7 +392,7 @@ jobs:
 
   verify-darwin-notarization:
     needs: build-and-deploy
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - name: Generate App Token
         uses: actions/create-github-app-token@v3

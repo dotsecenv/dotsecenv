@@ -13,8 +13,8 @@ name: CI
 # `test` and `build-docs` are the two roots — both fast, both build the
 # binary, and they run in parallel so the slower of the two sets the
 # critical path's first stage. Everything downstream gates on BOTH.
-# Single-os (ubuntu) jobs: e2e-terraform, e2e-git-credential, e2e-action-*, build-docs.
-# Matrix (ubuntu+macos): test, e2e.
+# Ubuntu-only jobs (ubuntu-24.04 + ubuntu-26.04): e2e-terraform, e2e-git-credential, e2e-action-*, build-docs.
+# Matrix (ubuntu-24.04 + ubuntu-26.04 + macos-26): test, e2e.
 #
 # Scoped to Go-related changes via `paths:` allowlist below — touches to
 # website/, plugin/, docs-only files, etc. don't fire this pipeline.
@@ -107,8 +107,9 @@ jobs:
     name: Lint, Build, Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-24.04, ubuntu-26.04, macos-26]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -120,8 +121,12 @@ jobs:
       - run: make clean lint build test
 
   build-docs:
-    name: Build Docs
-    runs-on: ubuntu-latest
+    name: Build Docs (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -137,8 +142,9 @@ jobs:
     needs: [test, build-docs]
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-24.04, ubuntu-26.04, macos-26]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -150,9 +156,13 @@ jobs:
       - run: make build e2e
 
   e2e-terraform:
-    name: E2E Terraform Credentials Helper
+    name: E2E Terraform Credentials Helper (${{ matrix.os }})
     needs: [test, build-docs]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -168,9 +178,13 @@ jobs:
       - run: make build e2e-terraform
 
   e2e-git-credential:
-    name: E2E Git Credential Helper
+    name: E2E Git Credential Helper (${{ matrix.os }})
     needs: [test, build-docs]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -182,9 +196,13 @@ jobs:
       - run: make build e2e-git-credential
 
   e2e-action-default-args:
-    name: E2E Action default-args
+    name: E2E Action default-args (${{ matrix.os }})
     needs: [test, build-docs]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -196,9 +214,13 @@ jobs:
       - run: dotsecenv version
 
   e2e-action-init-config:
-    name: E2E Action init-config
+    name: E2E Action init-config (${{ matrix.os }})
     needs: [test, build-docs]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 

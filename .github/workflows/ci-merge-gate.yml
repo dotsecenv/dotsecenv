@@ -25,7 +25,7 @@ concurrency:
 jobs:
   ci-merge-gate:
     name: ci-merge-gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 75
     strategy:
       fail-fast: false
@@ -78,7 +78,7 @@ jobs:
     name: allow
     needs: ci-merge-gate
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Verify all ci-merge-gate shards passed
         env:
