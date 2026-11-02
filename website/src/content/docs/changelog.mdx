@@ -11,11 +11,24 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+---
+
+## v0.10.1
+
+_November 2, 2026_
+
+### Bug Fixes
+
+- Update `charm.land/bubbletea/v2` to v2.1.1 and `github.com/protonmail/go-crypto` to v1.5.2 (#367, #366)
+- Update the website's Astro ecosystem dependencies, including Astro v7.3.3 for a security advisory and sharp v0.35.5 for another (#362, #372, #369)
+
 ### Other
 
 - CI and release jobs run on pinned runner images instead of `*-latest`: `macos-26`, `ubuntu-24.04` and `ubuntu-26.04`. PR checks run every Ubuntu job on both Ubuntu versions; release, deploy and publish jobs run on `ubuntu-24.04` only (#373)
 - The Go toolchain is 1.27.3 and `golangci-lint` is v2.15.0, so `make release-test` can install the current `goreleaser` (#373)
 - The `changelog` and `cli-reference-drift` maintainer skills now live in `.agents/skills/`, with `.claude/skills` a single directory symlink to it, so both Claude Code and Codex load one copy of each skill (#358)
+- Update website tooling: eslint v10.14.0, eslint-plugin-mdx v3.8.3, typescript-eslint v8.72.1 and pnpm v12.16.1 (#363, #376, #365, #359)
+- Update CI actions and tooling: `actions/create-github-app-token` v3.3.0, `actions/upload-artifact` v7.0.2, `actions/download-artifact` v8.0.2, `astral-sh/setup-uv` v10.3.3, `anchore/sbom-action` v0.24.3, `releasetools/actions` v0.9.0 and uv v0.13.6 (#377, #375, #374, #361, #370, #364, #360)
 
 ---
 
