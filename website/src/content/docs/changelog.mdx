@@ -14,6 +14,7 @@ _Unreleased_
 ### Other
 
 - CI and release jobs run on pinned runner images instead of `*-latest`: `macos-26`, `ubuntu-24.04` and `ubuntu-26.04`. PR checks run every Ubuntu job on both Ubuntu versions; release, deploy and publish jobs run on `ubuntu-24.04` only (#373)
+- The Go toolchain is 1.27.3 and `golangci-lint` is v2.15.0, so `make release-test` can install the current `goreleaser` (#373)
 - The `changelog` and `cli-reference-drift` maintainer skills now live in `.agents/skills/`, with `.claude/skills` a single directory symlink to it, so both Claude Code and Codex load one copy of each skill (#358)
 
 ---
