@@ -67,6 +67,8 @@ jobs:
             "https://github.com/fish-shell/fish-shell/releases/download/${FISH_VERSION}/fish-${FISH_VERSION}.tar.xz"
           echo "${FISH_SHA256}  $RUNNER_TEMP/fish.tar.xz" | sha256sum -c -
           tar -xf "$RUNNER_TEMP/fish.tar.xz" -C "$RUNNER_TEMP"
+          # fish 3.7.1 sets CMP0037 to OLD for an alias test target, which CMake 4 rejects.
+          sed -i 's/^if(POLICY CMP0037)$/if(FALSE)/' "$RUNNER_TEMP/fish-${FISH_VERSION}/cmake/Tests.cmake"
           cmake -S "$RUNNER_TEMP/fish-${FISH_VERSION}" -B "$RUNNER_TEMP/fish-build" \
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DWITH_GETTEXT=OFF
           cmake --build "$RUNNER_TEMP/fish-build" -j"$(nproc)"
