@@ -392,7 +392,7 @@ jobs:
 
   verify-darwin-notarization:
     needs: build-and-deploy
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - name: Generate App Token
         uses: actions/create-github-app-token@v3

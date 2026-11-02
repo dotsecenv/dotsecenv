@@ -207,7 +207,7 @@ jobs:
 
   notarize-macos:
     needs: goreleaser
-    runs-on: macos-latest
+    runs-on: macos-26
     strategy:
       matrix:
         arch: [x86_64, arm64]
@@ -615,7 +615,7 @@ jobs:
   # next release.
   verify-homebrew-install:
     needs: update-homebrew-tap
-    runs-on: macos-latest
+    runs-on: macos-26
     permissions: {}
     steps:
       - name: brew tap and install
