@@ -84,7 +84,7 @@ expect that to run before push.
 Each workflow is path-scoped to its own area. A change touching only one
 area triggers only that workflow:
 
-- **`ci.yml`** — Go DAG on `ubuntu-latest` + `macos-26`. Triggers on
+- **`ci.yml`** — Go DAG on `ubuntu-24.04`, `ubuntu-26.04` and `macos-26`. Triggers on
   Go source, `Makefile`, `action.yml`, `.goreleaser.yaml`, `.golangci.yaml`,
   `tools.go`. Runs (in order): `make clean lint build test` → `make build e2e`
   → `make build e2e-terraform` → composite action self-test (default-args

@@ -25,11 +25,17 @@ jobs:
         include:
           # Ubuntu covers both fish majors via the fish-shell PPAs. macOS
           # (Homebrew) only ships the current major, so it tracks fish 4.x.
-          - os: ubuntu-latest
-            label: ubuntu / fish 3.x
+          - os: ubuntu-24.04
+            label: ubuntu-24.04 / fish 3.x
             fish_ppa: ppa:fish-shell/release-3
-          - os: ubuntu-latest
-            label: ubuntu / fish 4.x
+          - os: ubuntu-24.04
+            label: ubuntu-24.04 / fish 4.x
+            fish_ppa: ppa:fish-shell/release-4
+          - os: ubuntu-26.04
+            label: ubuntu-26.04 / fish 3.x
+            fish_ppa: ppa:fish-shell/release-3
+          - os: ubuntu-26.04
+            label: ubuntu-26.04 / fish 4.x
             fish_ppa: ppa:fish-shell/release-4
           - os: macos-26
             label: macos / fish 4.x

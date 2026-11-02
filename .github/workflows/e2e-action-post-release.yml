@@ -37,8 +37,9 @@ jobs:
     name: Test Released Action (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-26]
+        os: [ubuntu-24.04, ubuntu-26.04, macos-26]
     steps:
       - uses: dotsecenv/dotsecenv@v0
         with:
@@ -49,8 +50,9 @@ jobs:
     name: Test Build-From-Source Action (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-26]
+        os: [ubuntu-24.04, ubuntu-26.04, macos-26]
     steps:
       - uses: dotsecenv/dotsecenv@v0
         with:
@@ -59,8 +61,12 @@ jobs:
       - run: dotsecenv version
 
   test-init-config-defaults:
-    name: Test init-config with defaults
-    runs-on: ubuntu-latest
+    name: Test init-config with defaults (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
     steps:
       - uses: dotsecenv/dotsecenv@v0
         with:
@@ -69,8 +75,12 @@ jobs:
       - run: dotsecenv version
 
   test-init-config-login:
-    name: Test init-config --login
-    runs-on: ubuntu-latest
+    name: Test init-config --login (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
     steps:
       - name: Generate GPG key
         id: gpg
@@ -95,8 +105,12 @@ jobs:
       - run: dotsecenv version
 
   test-init-config-gpg-program:
-    name: Test init-config --gpg-program
-    runs-on: ubuntu-latest
+    name: Test init-config --gpg-program (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
     steps:
       - uses: dotsecenv/dotsecenv@v0
         with:
