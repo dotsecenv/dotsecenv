@@ -31,9 +31,12 @@ jobs:
           - os: ubuntu-24.04
             label: ubuntu-24.04 / fish 4.x
             fish_ppa: ppa:fish-shell/release-4
+          # ppa:fish-shell/release-3 has no 26.04 series, so this leg builds the
+          # pinned fish 3 source release instead.
           - os: ubuntu-26.04
             label: ubuntu-26.04 / fish 3.x
-            fish_ppa: ppa:fish-shell/release-3
+            fish_source_version: 3.7.1
+            fish_source_sha256: 614c9f5643cd0799df391395fa6bbc3649427bb839722ce3b114d3bbc1a3b250
           - os: ubuntu-26.04
             label: ubuntu-26.04 / fish 4.x
             fish_ppa: ppa:fish-shell/release-4
@@ -52,8 +55,26 @@ jobs:
         with:
           go-version-file: "go.mod"
 
-      - name: Install fish (Ubuntu)
-        if: runner.os == 'Linux'
+      - name: Install fish (Ubuntu, from source)
+        if: matrix.fish_source_version
+        env:
+          FISH_VERSION: ${{ matrix.fish_source_version }}
+          FISH_SHA256: ${{ matrix.fish_source_sha256 }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libncurses-dev libpcre2-dev
+          curl -sSfL -o "$RUNNER_TEMP/fish.tar.xz" \
+            "https://github.com/fish-shell/fish-shell/releases/download/${FISH_VERSION}/fish-${FISH_VERSION}.tar.xz"
+          echo "${FISH_SHA256}  $RUNNER_TEMP/fish.tar.xz" | sha256sum -c -
+          tar -xf "$RUNNER_TEMP/fish.tar.xz" -C "$RUNNER_TEMP"
+          cmake -S "$RUNNER_TEMP/fish-${FISH_VERSION}" -B "$RUNNER_TEMP/fish-build" \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DWITH_GETTEXT=OFF
+          cmake --build "$RUNNER_TEMP/fish-build" -j"$(nproc)"
+          sudo cmake --install "$RUNNER_TEMP/fish-build"
+          fish --version
+
+      - name: Install fish (Ubuntu, PPA)
+        if: runner.os == 'Linux' && matrix.fish_ppa
         run: |
           sudo apt-add-repository ${{ matrix.fish_ppa }} -y
           sudo apt-get update
