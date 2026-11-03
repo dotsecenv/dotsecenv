@@ -1,4 +1,5 @@
 name: Verify Satellite Drift
+run-name: "Verify satellite drift: ${{ inputs.sha || github.event.workflow_run.head_branch || 'Source-SHA trailers' }}"
 
 # Reconcile the published satellite repos (dotsecenv/plugin,
 # dotsecenv/packages) against the monorepo source at the SHA each

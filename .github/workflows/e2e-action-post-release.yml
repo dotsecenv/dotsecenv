@@ -1,4 +1,5 @@
 name: E2E Action (post-release)
+run-name: E2E Action (post-release) ${{ inputs.version || 'latest' }}
 
 # POST-RELEASE smoke test for the published GitHub Action. Not a PR-time
 # check — `ci.yml` already exercises the action against `./` + the PR's
