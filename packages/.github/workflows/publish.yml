@@ -41,7 +41,7 @@ jobs:
       - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev createrepo-c jq
+          sudo apt-get install -y apt-utils dpkg-dev createrepo-c jq
 
       - name: Import GPG key
         id: import_gpg
