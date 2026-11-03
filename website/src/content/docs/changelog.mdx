@@ -13,6 +13,24 @@ _Unreleased_
 
 ---
 
+## v0.10.2
+
+_November 3, 2026_
+
+### Bug Fixes
+
+- Update `github.com/ProtonMail/gopenpgp/v3` to v3.5.2 and `golang.org/x/term` to v0.47.0, which pulls in `golang.org/x/sys` v0.49.0 (#383, #385)
+
+### Other
+
+- Release, deploy and publish jobs run on `ubuntu-26.04`; PR checks still run every Ubuntu job on both `ubuntu-24.04` and `ubuntu-26.04` (#386)
+- Satellite publishing uses `releasetools/actions` v0.9.1, which keeps each file's mode, so a script added under `plugin/` or `packages/` reaches the satellite executable (#388)
+- Manually dispatched satellite publish runs are titled after their target, such as "Publish satellites: plugin" (#387)
+- Update CI actions: `goreleaser/goreleaser-action` v7.3.0, `actions/setup-node` v7.1.0 and `step-security/harden-runner` v2.22.3 (#381, #379, #382)
+- Update the development toolchain: Node.js 26, `markdownlint-cli` v0.50.0 and `eslint-plugin-mdx` v3.9.0 (#390, #380, #389)
+
+---
+
 ## v0.10.1
 
 _November 2, 2026_
