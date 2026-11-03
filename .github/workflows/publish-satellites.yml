@@ -30,7 +30,7 @@ permissions:
 jobs:
   publish-packages:
     if: inputs.target == 'packages' || inputs.target == 'both'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       packages_run_id: ${{ steps.find_packages.outputs.run_id }}
     steps:
@@ -91,7 +91,7 @@ jobs:
   wait-publish-packages:
     needs: publish-packages
     if: inputs.target == 'packages' || inputs.target == 'both'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -113,7 +113,7 @@ jobs:
 
   publish-plugin:
     if: inputs.target == 'plugin' || inputs.target == 'both'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -149,7 +149,7 @@ jobs:
   test-plugin-managers:
     needs: publish-plugin
     if: inputs.target == 'plugin' || inputs.target == 'both'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
