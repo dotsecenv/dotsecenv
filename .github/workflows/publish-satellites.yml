@@ -114,6 +114,9 @@ jobs:
   publish-plugin:
     if: inputs.target == 'plugin' || inputs.target == 'both'
     runs-on: ubuntu-26.04
+    outputs:
+      commit_sha: ${{ steps.push.outputs.commit-sha }}
+      commit_url: ${{ steps.push.outputs.commit-url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -128,6 +131,7 @@ jobs:
 
       - name: Publish plugin source to satellite (no tag)
         uses: releasetools/actions/signed-push@05f197a5d5ed9b47c306389884b7cf79542132db  # v0.9.1
+        id: push
         with:
           source-dir: plugin
           target-repo: dotsecenv/plugin
@@ -139,6 +143,17 @@ jobs:
             Source-Path: plugin
             Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           token: ${{ steps.app-token.outputs.token }}
+
+      - name: Summarize plugin publish
+        env:
+          COMMIT_SHA: ${{ steps.push.outputs.commit-sha }}
+          COMMIT_URL: ${{ steps.push.outputs.commit-url }}
+        run: |
+          {
+            echo "## Satellite publish on \`dotsecenv/plugin\`"
+            echo
+            echo "Pushed commit: [${COMMIT_SHA:0:7}](${COMMIT_URL})"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # Mirror release.yml's test-plugin-managers gate. The plugin satellite
   # has no CI of its own, so verification happens here in the monorepo
@@ -156,5 +171,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Run plugin manager integration tests (remote)
+        id: test
         working-directory: plugin
         run: make test-managers-remote
+
+      - name: Summarize plugin manager tests
+        if: always()
+        env:
+          OUTCOME: ${{ steps.test.outcome }}
+          COMMIT_SHA: ${{ needs.publish-plugin.outputs.commit_sha }}
+          COMMIT_URL: ${{ needs.publish-plugin.outputs.commit_url }}
+        run: |
+          case "$OUTCOME" in
+            success) result="✅ success" ;;
+            *) result="❌ ${OUTCOME}" ;;
+          esac
+          {
+            echo "## Satellite publish on \`dotsecenv/plugin\`"
+            echo
+            echo "Tested plugin managers against [${COMMIT_SHA:0:7}](${COMMIT_URL})."
+            echo
+            echo "**Result:** ${result}"
+          } >> "$GITHUB_STEP_SUMMARY"
