@@ -1,4 +1,5 @@
 name: Publish Satellites
+run-name: "Publish satellites: ${{ inputs.target }}"
 
 # Manual / ad-hoc publish of plugin/ or packages/ source from this
 # monorepo to its respective satellite repo, outside of the release
