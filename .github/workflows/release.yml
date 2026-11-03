@@ -22,7 +22,7 @@ jobs:
   # where the rule was bypassed, disabled, or not yet enforced.
   preflight:
     name: Pre-flight release check
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -97,7 +97,7 @@ jobs:
   wait-ci:
     name: Wait for CI on tagged commit
     needs: preflight
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       actions: read
     strategy:
@@ -136,7 +136,7 @@ jobs:
 
   goreleaser:
     needs: [e2e-hermetic, wait-ci]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -288,7 +288,7 @@ jobs:
 
   update-checksums:
     needs: notarize-macos
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -349,7 +349,7 @@ jobs:
 
   update-homebrew-tap:
     needs: update-checksums
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       cask_commit_sha: ${{ steps.commit.outputs.cask_commit_sha }}
     steps:
@@ -557,7 +557,7 @@ jobs:
   # for the run we just triggered and surfaces its result here.
   wait-homebrew-tap-ci:
     needs: update-homebrew-tap
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions: {}
     steps:
       - name: Generate App token (homebrew-tap actions:read)
@@ -681,7 +681,7 @@ jobs:
   tag-homebrew-tap:
     needs: [update-homebrew-tap, verify-homebrew-install]
     if: ${{ !failure() && !cancelled() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions: {}
     steps:
       - name: Generate App Token
@@ -740,7 +740,7 @@ jobs:
     # on success-or-skipped so legitimate skips upstream don't block us.
     needs: [goreleaser, update-checksums, update-homebrew-tap, verify-homebrew-install, wait-homebrew-tap-ci]
     if: ${{ !failure() && !cancelled() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     environment:
@@ -812,7 +812,7 @@ jobs:
   wait-publish-packages:
     needs: publish-packages
     if: needs.publish-packages.result == 'success'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -861,7 +861,7 @@ jobs:
     # on success-or-skipped so legitimate skips upstream don't block us.
     needs: update-homebrew-tap
     if: ${{ !failure() && !cancelled() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -900,7 +900,7 @@ jobs:
   # satellite after push but did not surface back to the monorepo run.
   test-plugin-managers:
     needs: publish-plugin
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
