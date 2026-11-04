@@ -11,6 +11,12 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+---
+
+## v0.10.3
+
+_November 4, 2026_
+
 ### Bug Fixes
 
 - The APT repository builds again on `ubuntu-26.04` runners, which do not ship `apt-ftparchive`, so the APT and RPM repositories carry v0.10.2 (#393)
@@ -18,6 +24,7 @@ _Unreleased_
 ### Other
 
 - Release and Publish Satellites runs summarize the plugin satellite publish: the pushed commit, the tag on release, and the plugin manager test result against that commit (#394)
+- Post-release E2E and satellite drift-check runs are titled after their inputs, such as "E2E Action (post-release) v0.10.2" and "Verify satellite drift: v0.10.2" (#392)
 
 ---
 
