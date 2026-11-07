@@ -22,6 +22,7 @@
 #                        trigger fires multiple events that map to different
 #                        workflows; otherwise a discovery for the wrong one
 #                        may collide.
+#   HEAD_SHA             exact published satellite commit to match.
 #   DISCOVER_TIMEOUT_S   max seconds to look for the triggered run (default 60)
 
 set -euo pipefail
@@ -33,6 +34,7 @@ set -euo pipefail
 DISCOVER_TIMEOUT_S=${DISCOVER_TIMEOUT_S:-60}
 WORKFLOW_FILE=${WORKFLOW_FILE:-}
 EVENT=${EVENT:-push}
+HEAD_SHA=${HEAD_SHA:-}
 
 if [ -n "$WORKFLOW_FILE" ]; then
   RUNS_API="repos/${SATELLITE_REPO}/actions/workflows/${WORKFLOW_FILE}/runs"
@@ -51,12 +53,13 @@ deadline=$(( $(date +%s) + DISCOVER_TIMEOUT_S ))
 run_id=""
 
 while [ "$(date +%s)" -lt "$deadline" ]; do
-  json=$(gh api "${RUNS_API}?event=${EVENT}&created=>=${SINCE}&per_page=5")
-  count=$(jq -r '.total_count // 0' <<<"$json")
-  if [ "$count" -gt 0 ]; then
-    run_id=$(jq -r '.workflow_runs[0].id' <<<"$json")
-    run_url=$(jq -r '.workflow_runs[0].html_url' <<<"$json")
-    run_name=$(jq -r '.workflow_runs[0].name // .workflow_runs[0].display_title // "run"' <<<"$json")
+  json=$(gh api "${RUNS_API}?event=${EVENT}&created=>=${SINCE}&per_page=100")
+  run=$(jq -c --arg sha "$HEAD_SHA" \
+    '[.workflow_runs[] | select($sha == "" or .head_sha == $sha)][0] // empty' <<<"$json")
+  if [ -n "$run" ]; then
+    run_id=$(jq -r '.id' <<<"$run")
+    run_url=$(jq -r '.html_url' <<<"$run")
+    run_name=$(jq -r '.name // .display_title // "run"' <<<"$run")
     echo "Found run: ${run_name} #${run_id}"
     echo "URL: ${run_url}"
     break

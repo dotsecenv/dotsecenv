@@ -28,5 +28,12 @@ overwritten on the next publish.
   load-time / `chpwd` equivalents.
 
 Each mirrored commit records its origin in the commit body: `Source-Commit`,
-`Source-SHA`, `Source-Path`, and `Source-Tag` (on release). See
+`Source-SHA`, `Source-Path`, and `Source-Tag` (on release). The monorepo's
+`Verify Satellite Drift` workflow authenticates the exact commit through
+GitHub's API: a valid GitHub signature and the release App author are required.
+It checks that the source SHA is on monorepo `main` and that any release tag
+points to it and has a valid maintainer signature. Verifier code comes from
+trusted monorepo `main`; the authenticated source revision supplies the files
+for comparison. Missing or invalid provenance fails verification. Untagged
+ad-hoc publishes require the same signature and ancestry checks. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide.

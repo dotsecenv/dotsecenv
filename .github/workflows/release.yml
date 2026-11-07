@@ -731,10 +731,12 @@ jobs:
   # Push monorepo packages/ source to the dotsecenv/packages satellite
   # (mirroring publish-plugin). Generates retracted.txt from go.mod via
   # the canonical `go mod edit -json | jq` pipeline before pushing, so
-  # the satellite receives the freshly-derived retraction list. The push
-  # itself triggers the satellite's publish.yml (push: main), which
-  # builds apt/yum/arch repos and deploys to get.dotsecenv.com.
+  # the satellite receives the freshly-derived retraction list. An explicit
+  # dispatch starts the authenticated packages deployment.
   publish-packages:
+    concurrency:
+      group: publish-packages
+      cancel-in-progress: false
     # Don't push to the satellite (or tag it) if anything earlier in the
     # release chain failed; a half-baked release shouldn't propagate. Run
     # on success-or-skipped so legitimate skips upstream don't block us.
@@ -780,8 +782,12 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: packages
+          permission-actions: write
+          permission-contents: write
+          permission-workflows: write
 
       - name: Publish packages source + tag the satellite
+        id: publish_packages
         uses: releasetools/actions/signed-push@76cf0826db3a16eed6baa02d03548628e7a32519  # v0.10.0
         with:
           source-dir: packages
@@ -797,12 +803,23 @@ jobs:
           tag: ${{ github.ref_name }}
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Find satellite publish.yml run (push-triggered)
+      - name: Dispatch packages deployment
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_TAG: ${{ github.ref_name }}
+        run: |
+          gh workflow run publish.yml --repo dotsecenv/packages --ref main \
+            -f "source_sha=$SOURCE_SHA" -f "source_tag=$SOURCE_TAG"
+
+      - name: Find dispatched satellite publish.yml run
         id: find_packages
         env:
           SATELLITE_REPO: dotsecenv/packages
           WORKFLOW_FILE: publish.yml
           SINCE: ${{ steps.timestamp.outputs.push_time }}
+          EVENT: workflow_dispatch
+          HEAD_SHA: ${{ steps.publish_packages.outputs.commit-sha }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: scripts/release/find-satellite-run.sh
 

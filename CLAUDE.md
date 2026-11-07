@@ -12,9 +12,15 @@
 
 `plugin/` and `packages/` in this monorepo are the **source of truth**. CI mirrors them to their standalone satellite repos (`dotsecenv/plugin`, `dotsecenv/packages`). Never edit the satellites directly and never accept PRs there; edits made on a satellite are overwritten by the next publish.
 
-- **On release**, `.github/workflows/release.yml` (`publish-plugin` / `publish-packages`) pushes the source dir to the satellite's `main` and tags it with the release version.
-- **Ad-hoc** (Renovate updates, doc fixes that don't warrant a release), run the `Publish Satellites` workflow (`.github/workflows/publish-satellites.yml`, `workflow_dispatch`); it pushes without tagging.
-- Both use `releasetools/actions/signed-push` and stamp `Source-Commit`, `Source-SHA`, `Source-Path` (and `Source-Tag` on release) into the satellite commit body.
+The release workflow (`.github/workflows/release.yml`) mirrors each source directory to its satellite's `main` and adds a version tag. Run `Publish Satellites` (`.github/workflows/publish-satellites.yml`) from monorepo `main` for updates between releases; it publishes without a tag. Both use `releasetools/actions/signed-push` and record `Source-Commit`, `Source-SHA`, `Source-Path`, and, on releases, `Source-Tag` in the commit body.
+
+`scripts/release/verify-satellite-provenance.py` checks the exact satellite commit through GitHub's API before trusting those trailers. The signature must be valid and made by GitHub, and the author must be `dotsecenv-automated-releases[bot]`. `Source-Commit` and `Source-Path` must match the expected monorepo and satellite. `Source-SHA` must be reachable from monorepo `main`. A release's `Source-Tag` must point to that commit and be an annotated tag with a valid signature from `MihaiBojin`. Untagged ad-hoc publishes still require signature and ancestry checks.
+
+The drift workflow runs verifier code from a separate trusted `main` checkout. It compares the authenticated source revision with the satellite's files and executable bits, including symlink targets. The generated `packages/retracted.txt` is compared after regeneration from the authenticated `go.mod`.
+
+Packages deployment starts only through `workflow_dispatch`. The release and ad-hoc workflows dispatch it after publishing, passing the source SHA and the release tag when present. The release App needs Actions write permission on `packages`. A job with `permissions: {}` and no distribution secrets authenticates provenance and checks the mirrored files. Both jobs that use secrets depend on that gate, and the build checks out its validated satellite SHA. The release App must supply `source_sha`; `MihaiBojin` can rebuild manually with `keep_versions`, using authenticated HEAD trailers when the source inputs are empty.
+
+The org-scoped `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` are sign-only distribution credentials used by the monorepo and packages workflows. The plugin satellite requires neither. Workflow checks trust protected monorepo `main` and do not prevent a credential with workflow-editing access from replacing the satellite workflow itself.
 
 A bug reported on a satellite (e.g. `dotsecenv/plugin#29` about `conf.d/dotsecenv.fish`) is fixed here under `plugin/` with a matching `plugin/tests/` change, and reaches the satellite on the next publish. `plugin/AGENTS.md` states this in the satellite for anyone landing there. Reference satellite issues/PRs as `plugin#N` / `packages#N`. The plugin test suite is `make -C plugin test-plugins` (bash/zsh/fish).
 

@@ -9,14 +9,14 @@ tags:
   - release-pipeline
   - monorepo
   - graphql
-excerpt: "How a monorepo release workflow publishes signed commits to homebrew-tap, apt/yum packages, and plugin satellite repos, with no private signing key on the CI runner."
+excerpt: "How a monorepo release workflow publishes GitHub-signed satellite commits and checks their source provenance."
 ---
 
 The nice thing about personal projects is that you only have to convince yourself. When you get an itch, you scratch it.
 
 Last weekend's itch was the dotsecenv release pipeline. Specifically: 150 lines of shell on every release that did GPG dances on a GitHub Actions runner just to sign a single commit into a satellite repo. It worked. It also looked nothing like code I wanted to maintain.
 
-The rewrite ended up at zero private keys on the runner, one GraphQL mutation, and a custom GitHub Action we can reuse across the whole org. Here is what got in the way.
+GitHub signs satellite commits through one GraphQL mutation. A custom GitHub Action handles publication across the org. Artifact and package metadata signing still use a separate GPG private key on the runners that need it.
 
 ## Why dotsecenv needs satellite repos
 
@@ -35,7 +35,7 @@ The first version was a shell script. It generated a signing key, imported it on
 
 By the time it was reliable, it was about 150 lines. The signing key had to be a real secret with real lifecycle. We had to trust the runner with that secret for the duration of the job. Every new satellite repo meant another copy of the same shell to maintain.
 
-A cleaner shape was waiting: have GitHub sign the commits itself, attributed to a GitHub App, with no private key on the runner at any point. GitHub exposes exactly that via the [`createCommitOnBranch` GraphQL mutation](https://docs.github.com/en/graphql/reference/mutations#createcommitonbranch). GitHub signs each commit with its own key, so it lands as a Verified commit in the satellite repo.
+GitHub signs the commits itself, attributed to a GitHub App. The runner holds an App credential; GitHub retains its commit-signing key. The [`createCommitOnBranch` GraphQL mutation](https://docs.github.com/en/graphql/reference/mutations#createcommitonbranch) creates each commit with that credential's owner as author and GitHub's signature.
 
 Sounds great. The mutation is also where I lost most of two days.
 
@@ -57,7 +57,7 @@ The workaround is straightforward once you find it. Build the request body yours
 
 ## Extracting the custom GHA
 
-A 150-line shell script that solves a recurring problem deserves to be its own artifact, not buried inside a release workflow. Other projects shipping to satellite repos hit the same Verified-commit / no-key-on-runner constraint and the same gh api stringification footgun.
+A 150-line shell script that solves a recurring problem deserves to be its own artifact, not buried inside a release workflow. Other projects shipping to satellite repos also need verifiable commits without importing a commit-signing key, and face the same gh api stringification footgun.
 
 I extracted the working version into [`releasetools/actions/signed-push`](https://github.com/releasetools/actions/tree/main/signed-push), a custom GitHub Action. The action takes a source directory, a target repo, a target branch, a commit body, and a token. It writes the directory into the satellite repo via [`createCommitOnBranch`](https://docs.github.com/en/graphql/reference/mutations#createcommitonbranch) and tags the commit. The caller never sees GraphQL.
 
@@ -75,18 +75,30 @@ Published-By: https://github.com/dotsecenv/dotsecenv/actions/runs/26005850942
 
 `Source-Commit` in `owner/repo@SHA` form gets auto-linked in the GitHub commit view, so the satellite commit always points back to the monorepo revision that produced it. `Source-SHA`, `Source-Path`, and `Source-Tag` are denormalized into separate trailers so downstream tooling can grep them out without parsing the compound form.
 
+## What verification checks
+
+The monorepo's `Verify Satellite Drift` workflow authenticates the exact plugin or packages commit before trusting its trailers. GitHub's API must report a valid signature made by GitHub, and the author must be `dotsecenv-automated-releases[bot]`. A Verified badge alone does not identify GitHub as the signer.
+
+The verifier rejects ambiguous source trailers. `Source-Commit` and `Source-Path` must identify the expected monorepo and satellite directory. The source SHA must be reachable from monorepo `main`. On release publishes, `Source-Tag` must resolve to that SHA and be an annotated tag with a valid signature from the release maintainer, `MihaiBojin`. Ad-hoc publishes omit the tag and still undergo commit authentication and source ancestry checks.
+
+Verifier code runs from a separate checkout of trusted monorepo `main`. Only after authentication does the workflow check out the claimed source revision for comparison. It compares file contents and executable bits, including symlink targets. For packages, it regenerates `retracted.txt` from the authenticated `go.mod` before comparing.
+
+The packages satellite publishes only on explicit dispatch. A job without distribution secrets validates the dispatch actor and source provenance, then compares the mirrored files. Both secret-consuming jobs depend on that result. The build checks out the validated satellite commit, so a later push cannot change its inputs. The release App dispatches with an explicit source SHA; the maintainer can manually rebuild with `keep_versions` and authenticated HEAD trailers.
+
+These checks trust the protected monorepo and its workflows. A credential that can replace the satellite workflow can also remove its checks. Commit provenance does not grant release authorization by itself; signed release tags supply that separate assertion.
+
 ## When this pattern is worth it
 
 The signed-push pattern fits when all of these are true:
 
 - You publish to one or more satellite repos on every release.
 - You want commits in those repos to be signed and verifiable on GitHub.
-- You do not want to manage a long-lived signing key on a CI runner.
+- You want GitHub to hold the commit-signing key.
 - The satellite repos are within or accessible to a GitHub App you control.
 
 If your release flow already runs `git commit -S` with a hardware-backed key on a self-hosted runner you control, this rewrite buys you nothing. If you are doing key generation, GPG import, and key cleanup on hosted runners across multiple satellite repos, it deletes a lot of code and a lot of lifecycle complexity.
 
-The end state runs in a single workflow: [unified release view](https://github.com/dotsecenv/dotsecenv/actions/runs/26005850942). [Goreleaser](https://github.com/dotsecenv/dotsecenv/blob/main/.goreleaser.yaml) builds the binaries. Homebrew-tap, packages, and plugin satellites each get a signed commit and a tag. Zero private keys touch the runner.
+The [release workflow](https://github.com/dotsecenv/dotsecenv/blob/main/.github/workflows/release.yml) builds binaries with GoReleaser and publishes signed commits and version tags to the satellites. It dispatches packages publication and waits for the result. The org-scoped, sign-only `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` serve artifact and package metadata signing in the monorepo and packages workflows. The plugin satellite does not need those credentials.
 
 And every release renders as one DAG you can read at a glance.
 
