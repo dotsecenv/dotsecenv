@@ -78,6 +78,11 @@ func (c *CLI) SecretRevokeAll(secretKey, targetFingerprint string) *Error {
 			skippedCount++
 			continue
 		}
+		if secretObj.IsDeleted() {
+			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, secret deleted in vault\n", displayPos, vaultPath)
+			skippedCount++
+			continue
+		}
 		currentValue := secretObj.Values[len(secretObj.Values)-1]
 		if !slices.Contains(currentValue.AvailableTo, targetFingerprint) {
 			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, target does not have access\n", displayPos, vaultPath)
@@ -123,6 +128,9 @@ func (c *CLI) secretRevokeInVault(secretKey, targetFingerprint string, vaultInde
 			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, secret not found in vault\n", displayPos, vaultPath)
 		}
 		return nil
+	}
+	if secretObj.IsDeleted() {
+		return NewError(fmt.Sprintf("secret '%s' has been deleted", secretKey), ExitVaultError)
 	}
 
 	manager := c.vaultResolver.GetVaultManager(vaultIndex)

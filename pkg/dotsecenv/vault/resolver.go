@@ -157,81 +157,53 @@ func (vr *VaultResolver) GetLoadError(index int) error {
 	return vr.loadErrors[index]
 }
 
-// GetSecret retrieves a secret from a specific vault index (0-based)
-func (vr *VaultResolver) GetSecret(index int, key string) (*SecretValue, error) {
+// GetSecretFromAnyVault returns the latest value of a secret from the first
+// vault, in configuration order, where the secret exists and is not deleted,
+// together with that vault's index.
+func (vr *VaultResolver) GetSecretFromAnyVault(key string, stderr io.Writer) (*SecretValue, int, error) {
 	vr.mu.RLock()
 	defer vr.mu.RUnlock()
 
 	// Normalize key for lookup (graceful fallback for legacy keys)
 	key = NormalizeKeyForLookup(key)
 
-	if index < 0 || index >= len(vr.vaults) {
-		return nil, fmt.Errorf("vault index %d out of range", index)
-	}
-
-	manager := vr.vaults[index]
-	if manager == nil {
-		path := vr.config.Entries[index].Path
-		if loadErr := vr.loadErrors[index]; loadErr != nil {
-			return nil, fmt.Errorf("Vault %d (%s): %v", index+1, path, loadErr)
-		}
-		return nil, fmt.Errorf("Vault %d (%s): not loaded", index+1, path)
-	}
-
-	secret := manager.GetSecretByKey(key)
-	if secret == nil {
-		return nil, fmt.Errorf("secret '%s' not found in vault %d", key, index+1)
-	}
-
-	if len(secret.Values) == 0 {
-		return nil, fmt.Errorf("secret '%s' has no values in vault %d", key, index+1)
-	}
-	return &secret.Values[len(secret.Values)-1], nil
-}
-
-// GetSecretFromAnyVault retrieves a secret value from any vault, searching in order
-func (vr *VaultResolver) GetSecretFromAnyVault(key string, stderr io.Writer) (*SecretValue, error) {
-	vr.mu.RLock()
-	defer vr.mu.RUnlock()
-
-	// Normalize key for lookup (graceful fallback for legacy keys)
-	key = NormalizeKeyForLookup(key)
-
-	for _, manager := range vr.vaults {
+	for i, manager := range vr.vaults {
 		if manager == nil {
 			continue
 		}
 
 		secret := manager.GetSecretByKey(key)
-		if secret != nil && len(secret.Values) > 0 {
-			return &secret.Values[len(secret.Values)-1], nil
+		if secret != nil && len(secret.Values) > 0 && !secret.IsDeleted() {
+			return &secret.Values[len(secret.Values)-1], i, nil
 		}
 	}
 
-	return nil, fmt.Errorf("secret '%s' not found in any vault", key)
+	return nil, -1, fmt.Errorf("secret '%s' not found in any vault", key)
 }
 
-// GetAccessibleSecretFromAnyVault retrieves the most recent accessible secret value from any vault, searching in order.
-// Returns the most recent value the identity has access to (falls back to older values if needed).
-func (vr *VaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint string) (*SecretValue, error) {
+// GetAccessibleSecretFromAnyVault returns the most recent live value encrypted
+// to the identity from the first vault, in configuration order, that has one,
+// together with that vault's index. Within a vault it falls back to older live
+// values when the identity is not on the latest one.
+func (vr *VaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint string) (*SecretValue, int, error) {
 	vr.mu.RLock()
 	defer vr.mu.RUnlock()
 
 	// Normalize key for lookup (graceful fallback for legacy keys)
 	key = NormalizeKeyForLookup(key)
 
-	for _, manager := range vr.vaults {
+	for i, manager := range vr.vaults {
 		if manager == nil {
 			continue
 		}
 
 		val := manager.GetAccessibleSecretValue(fingerprint, key)
 		if val != nil {
-			return val, nil
+			return val, i, nil
 		}
 	}
 
-	return nil, fmt.Errorf("secret '%s' not found or not accessible in any vault", key)
+	return nil, -1, fmt.Errorf("secret '%s' not found or not accessible in any vault", key)
 }
 
 // AddIdentity adds an identity to all open vaults (or a specific vault if index >= 0)
@@ -465,8 +437,10 @@ func (vr *VaultResolver) SaveVault(index int) error {
 	return nil
 }
 
-// FindSecretVaultIndex finds the first vault index containing the secret key
-// Returns -1 if not found
+// FindSecretVaultIndex returns the index of the first vault where the secret
+// exists and is not deleted. When every vault holding the secret has deleted
+// it, it returns the first of those, so callers can report the deletion. It
+// returns -1 when no vault holds the secret.
 func (vr *VaultResolver) FindSecretVaultIndex(key string) int {
 	vr.mu.RLock()
 	defer vr.mu.RUnlock()
@@ -474,12 +448,23 @@ func (vr *VaultResolver) FindSecretVaultIndex(key string) int {
 	// Normalize key for lookup (graceful fallback for legacy keys)
 	key = NormalizeKeyForLookup(key)
 
+	deleted := -1
 	for i, manager := range vr.vaults {
-		if manager != nil && manager.GetSecretByKey(key) != nil {
+		if manager == nil {
+			continue
+		}
+		secret := manager.GetSecretByKey(key)
+		if secret == nil {
+			continue
+		}
+		if !secret.IsDeleted() {
 			return i
 		}
+		if deleted < 0 {
+			deleted = i
+		}
 	}
-	return -1
+	return deleted
 }
 
 // SecretKeyInfo contains information about a secret key and its location
@@ -490,13 +475,15 @@ type SecretKeyInfo struct {
 	Deleted  bool   `json:"deleted,omitempty"`
 }
 
-// ListAllSecretKeys returns all secret keys from all valid vaults
+// ListAllSecretKeys returns each secret key once, located in the first vault
+// that holds it undeleted. A key is reported deleted only when every vault
+// holding it has deleted it, and it is then located in the first of those.
 func (vr *VaultResolver) ListAllSecretKeys() []SecretKeyInfo {
 	vr.mu.RLock()
 	defer vr.mu.RUnlock()
 
 	var result []SecretKeyInfo
-	seen := make(map[string]bool)
+	position := make(map[string]int) // key -> index in result
 
 	for i, manager := range vr.vaults {
 		if manager == nil {
@@ -505,19 +492,21 @@ func (vr *VaultResolver) ListAllSecretKeys() []SecretKeyInfo {
 
 		vaultPath := vr.config.Entries[i].Path
 		for _, secret := range manager.vault.Secrets {
-			// Use the key as identifier to avoid duplicates
-			keyID := secret.Key
-			if seen[keyID] {
-				continue
-			}
-			seen[keyID] = true
-
-			result = append(result, SecretKeyInfo{
+			info := SecretKeyInfo{
 				Key:      secret.Key,
 				Vault:    vaultPath,
 				VaultIdx: i + 1,
 				Deleted:  secret.IsDeleted(),
-			})
+			}
+			j, seen := position[secret.Key]
+			if !seen {
+				position[secret.Key] = len(result)
+				result = append(result, info)
+				continue
+			}
+			if result[j].Deleted && !info.Deleted {
+				result[j] = info
+			}
 		}
 	}
 

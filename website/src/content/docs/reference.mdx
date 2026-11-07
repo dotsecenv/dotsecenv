@@ -385,6 +385,8 @@ dotsecenv secret get [SECRET] [flags]
 1. **List mode** (no arguments): Lists all secret keys from configured vaults
 2. **Get mode** (with SECRET argument): Retrieves the secret value
 
+Get mode returns the value from the first configured vault that holds the secret, skipping any vault where it was forgotten.
+
 <Aside type="note" title="Available in v0.4.3+">
   List mode (calling `secret get` with no SECRET argument) was added in v0.4.3. The `--json` flag was added in v0.4.8.
 </Aside>
@@ -398,7 +400,7 @@ dotsecenv secret get [SECRET] [flags]
 
 | Flag | Description |
 |------|-------------|
-| `--all` | Retrieve all values for the secret (requires SECRET) |
+| `--all` | Retrieve all values for the secret, newest first, including values that `secret forget` deleted (requires SECRET) |
 | `--last` | Retrieve the most recent value across all vaults (requires SECRET) |
 | `--json` | Output as JSON |
 
@@ -438,6 +440,8 @@ prod::API_KEY
 OLD_SECRET (deleted)
 ```
 
+A key shows as deleted only when every vault holding it has deleted it.
+
 **List mode JSON output (`--json`):**
 
 ```json
@@ -470,7 +474,7 @@ OLD_SECRET (deleted)
 
 **Get-all mode JSON output (`SECRET --all --json`):**
 
-Returns an array, newest-first, with `available_to` and `signed_by` per version for auditing access control across history. See [Audit Trail](/concepts/audit-trail/) for usage patterns.
+Returns an array, newest-first, with `available_to` and `signed_by` per version for auditing access control across history. A value that a later `secret forget` in the same vault deleted carries `"deleted": true`; the text output marks it `[deleted]`. See [Audit Trail](/concepts/audit-trail/) for usage patterns.
 
 ```json
 [
@@ -487,6 +491,14 @@ Returns an array, newest-first, with `available_to` and `signed_by` per version 
     "vault": "~/.local/share/dotsecenv/vault",
     "available_to": ["ALICE_FP"],
     "signed_by": "ALICE_FP"
+  },
+  {
+    "added_at": "2025-11-20T09:15:40Z",
+    "value": "forgotten-value",
+    "vault": "~/.local/share/dotsecenv/vault",
+    "available_to": ["ALICE_FP", "BOB_FP"],
+    "signed_by": "BOB_FP",
+    "deleted": true
   }
 ]
 ```
@@ -502,6 +514,8 @@ dotsecenv secret store SECRET [flags]
 Storing over an existing secret keeps its current recipient set: the new value is encrypted to every fingerprint on the latest entry's `available_to`, not just yours. Rotating a shared secret therefore never removes anyone's access. To narrow access, use `secret revoke` (before or after storing).
 
 When the kept recipient set includes identities other than yours, `secret store` warns and lists them. With a terminal attached it then asks for confirmation; declining cancels the store without writing anything. Without a terminal (piped input, CI) it proceeds after the warning. The `--share` and `--no-share` flags skip both the warning and the confirmation.
+
+After `secret forget`, any identity in the vault can store the secret again. The new value is encrypted only to yours, and `secret get` never returns values from before the deletion.
 
 **Options:**
 
@@ -620,10 +634,10 @@ Mark a secret as deleted in the vault.
 dotsecenv secret forget SECRET [flags]
 ```
 
-This adds a deletion marker to the secret. The secret will no longer be returned by `secret get` and will be shown as deleted in `vault describe`.
+This adds a deletion marker to the secret in one vault. `secret get` skips that vault and returns the secret from the next vault that holds it, if any, and `vault describe` shows it as deleted. Any identity can then store the secret again with `secret store`.
 
 <Aside type="note">
-The deletion is a soft delete. The secret's history is preserved in the vault file. Use `vault compact` to permanently remove deleted secrets and drop superseded value versions.
+The deletion is a soft delete. The secret's history is preserved in the vault file, and `secret get --all` still lists it. Use `vault compact` to permanently remove deleted secrets and drop superseded value versions.
 </Aside>
 
 **Options:**
@@ -650,9 +664,10 @@ dotsecenv secret forget --ignore-not-found DATABASE_PASSWORD
 
 **Behavior after deletion:**
 
-- `secret get SECRET` returns the error "secret has been deleted"
-- `secret get --all` skips values from vaults where the secret is deleted
-- `secret get --last` does not consider deleted secrets
+- `secret get SECRET` skips the vault; when no other vault holds the secret, it returns the error "secret has been deleted"
+- `secret get --all` lists the deleted values, marked `[deleted]` (or `"deleted": true` with `--json`)
+- `secret get --last` does not consider deleted values
+- `secret store SECRET` works for any identity and encrypts the new value only to the storer
 - `vault describe` shows `(deleted)` next to the secret name
 
 ---
@@ -804,7 +819,7 @@ Drop superseded secret values to shrink a vault.
 dotsecenv vault compact [flags]
 ```
 
-For each secret, compaction keeps the newest value every current identity can decrypt (exactly what `secret get` returns for that identity) and drops the rest. Deleted secrets are removed entirely. Values readable only by revoked fingerprints fall away, since no current identity reaches them.
+For each secret, compaction keeps the newest value every current identity can decrypt (exactly what `secret get` returns for that identity) and drops the rest. Deleted secrets are removed entirely. For a secret stored again after a deletion, compaction also drops every value up to and including the deletion. Values readable only by revoked fingerprints are dropped, since no current identity can read them.
 
 Compaction never decrypts. It reads only access lists (`available_to` fingerprints) and value order, then rewrites the file preserving every kept value verbatim, so signatures stay valid. Identities are never touched.
 

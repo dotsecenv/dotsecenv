@@ -69,6 +69,11 @@ func (c *CLI) SecretShareAll(secretKey, targetFingerprint string) *Error {
 			skippedCount++
 			continue
 		}
+		if secretObj.IsDeleted() {
+			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, secret deleted in vault\n", displayPos, vaultPath)
+			skippedCount++
+			continue
+		}
 
 		// Check if already shared
 		if len(secretObj.Values) > 0 {
@@ -120,6 +125,9 @@ func (c *CLI) secretShareInVault(secretKey, targetFingerprint string, vaultIndex
 			return nil
 		}
 		return NewError(fmt.Sprintf("secret not found in vault: %s", secretKey), ExitVaultError)
+	}
+	if secretObj.IsDeleted() {
+		return NewError(fmt.Sprintf("secret '%s' has been deleted", secretKey), ExitVaultError)
 	}
 
 	manager := c.vaultResolver.GetVaultManager(vaultIndex)

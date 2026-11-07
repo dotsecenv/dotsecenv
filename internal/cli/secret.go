@@ -20,14 +20,92 @@ import (
 )
 
 // SecretValueJSON is the JSON output structure for secret values.
-// AvailableTo and SignedBy are populated when --all is used so the JSON
-// output is sufficient for auditing access control across versions.
+// AvailableTo, SignedBy and Deleted are populated when --all is used so the
+// JSON output is sufficient for auditing access control across versions.
+// Deleted marks a value that a later 'secret forget' in the same vault deleted.
 type SecretValueJSON struct {
 	AddedAt     time.Time   `json:"added_at"`
 	Value       interface{} `json:"value"`
 	Vault       string      `json:"vault,omitempty"`
 	AvailableTo []string    `json:"available_to,omitempty"`
 	SignedBy    string      `json:"signed_by,omitempty"`
+	Deleted     bool        `json:"deleted,omitempty"`
+}
+
+// allValuesLine formats one 'secret get --all' text line, marking deleted values.
+func allValuesLine(item SecretValueJSON) string {
+	marker := ""
+	if item.Deleted {
+		marker = " [deleted]"
+	}
+	return fmt.Sprintf("%s (%s)%s: %s\n", item.AddedAt.Format(time.RFC3339), item.Vault, marker, item.Value)
+}
+
+// historyValue is one value of a secret as 'secret get --all' lists it.
+type historyValue struct {
+	value     vault.SecretValue
+	vaultPath string
+	deleted   bool // a later deletion marker in the same vault deleted it
+}
+
+// secretHistory returns every value of a secret except its deletion markers,
+// oldest first, flagging the values that a later deletion marker deleted.
+func secretHistory(secretObj *vault.Secret, vaultPath string) []historyValue {
+	liveStart := secretObj.LiveStart()
+	var history []historyValue
+	for i, val := range secretObj.Values {
+		if val.Deleted {
+			continue
+		}
+		history = append(history, historyValue{value: val, vaultPath: vaultPath, deleted: i < liveStart})
+	}
+	return history
+}
+
+// decryptHistory decrypts history values in order. A value that fails to
+// decode or decrypt is skipped with a warning; a missing pinentry stops the walk.
+func (c *CLI) decryptHistory(history []historyValue, fp string) ([]SecretValueJSON, *Error) {
+	var decrypted []SecretValueJSON
+	for _, item := range history {
+		val := item.value
+
+		encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
+		if decodeErr != nil {
+			c.Output().Warnf(output.CodeWarnDecodeFailure, "failed to decode value from %s: %v", val.AddedAt, decodeErr)
+			continue
+		}
+
+		// Let the GPG agent determine decryptability: the user may have a key
+		// in the agent that isn't the logged-in identity.
+		plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
+		if decErr != nil {
+			if errors.Is(decErr, gpg.ErrPinentryRequired) {
+				return nil, NewError(decErr.Error(), ExitGPGError)
+			}
+			c.Output().Warnf(output.CodeWarnDecryptFailure, "failed to decrypt value from %s: %v", val.AddedAt, decErr)
+			continue
+		}
+		decrypted = append(decrypted, SecretValueJSON{
+			AddedAt:     val.AddedAt,
+			Value:       smartJSONValue(string(plaintext)),
+			Vault:       item.vaultPath,
+			AvailableTo: val.AvailableTo,
+			SignedBy:    val.SignedBy,
+			Deleted:     item.deleted,
+		})
+	}
+	return decrypted, nil
+}
+
+// secretDeletedEverywhere reports whether some vault holds the secret and every
+// vault holding it has deleted it.
+func (c *CLI) secretDeletedEverywhere(key string) bool {
+	idx := c.vaultResolver.FindSecretVaultIndex(key)
+	if idx < 0 {
+		return false
+	}
+	secretObj := c.vaultResolver.GetSecretByKeyFromVault(idx, key)
+	return secretObj != nil && secretObj.IsDeleted()
 }
 
 // accessDeniedMessage builds the error message for a secret that exists in a
@@ -110,14 +188,11 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 	// Check if secret exists and if we have access to the latest value.
 	// When overwriting, the latest value's recipient set carries forward to the
 	// new entry: rotating a shared secret must not silently narrow access to
-	// just the storer. Narrowing the set is 'secret revoke'.
+	// just the storer. Narrowing the set is 'secret revoke'. A deleted secret is
+	// stored as a new one: any identity may store it, encrypted only to itself.
 	recipients := []string{fp}
 	existingSecret := c.vaultResolver.GetSecretByKeyFromVault(targetIndex, secretKey)
-	if existingSecret != nil && len(existingSecret.Values) > 0 {
-		// Check if secret has been deleted
-		if existingSecret.IsDeleted() {
-			return NewError(fmt.Sprintf("secret '%s' has been deleted; cannot overwrite a deleted secret", secretKey), ExitVaultError)
-		}
+	if existingSecret != nil && len(existingSecret.Values) > 0 && !existingSecret.IsDeleted() {
 		latestValue := existingSecret.Values[len(existingSecret.Values)-1]
 		if !slices.Contains(latestValue.AvailableTo, fp) {
 			return NewError(fmt.Sprintf("access denied: you do not have access to the latest value of secret '%s'", secretKey), ExitAccessDenied)
@@ -453,102 +528,52 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 	var secretVaultPath string
 
 	if all {
-		// Collect all values from ALL vaults
-		var allValues []struct {
-			Value     vault.SecretValue
-			VaultPath string
-		}
-
-		// Search all vaults
+		// Collect the history of every vault, deleted values included.
+		var history []historyValue
 		for i, entry := range c.vaultResolver.GetConfig().Entries {
-			secretObj := c.vaultResolver.GetSecretByKeyFromVault(i, secretKey)
-			if secretObj != nil {
-				// Skip vaults where the secret is deleted
-				if secretObj.IsDeleted() {
-					continue
-				}
-				for j := range secretObj.Values {
-					allValues = append(allValues, struct {
-						Value     vault.SecretValue
-						VaultPath string
-					}{secretObj.Values[j], entry.Path})
-				}
+			if secretObj := c.vaultResolver.GetSecretByKeyFromVault(i, secretKey); secretObj != nil {
+				history = append(history, secretHistory(secretObj, entry.Path)...)
 			}
 		}
 
-		if len(allValues) == 0 {
+		if len(history) == 0 {
 			return NewError(fmt.Sprintf("secret '%s' not found in any vault", secretKey), ExitVaultError)
 		}
 
 		// Sort by AddedAt descending (newest first)
-		sort.Slice(allValues, func(i, j int) bool {
-			return allValues[i].Value.AddedAt.After(allValues[j].Value.AddedAt)
+		sort.Slice(history, func(i, j int) bool {
+			return history[i].value.AddedAt.After(history[j].value.AddedAt)
 		})
 
-		// Decrypt all values
-		for _, item := range allValues {
-			val := item.Value
-
-			encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
-			if decodeErr != nil {
-				// Always warn and try other values
-				c.Output().Warnf(output.CodeWarnDecodeFailure, "failed to decode value from %s: %v", val.AddedAt, decodeErr)
-				continue
-			}
-
-			// Let GPG agent determine decryptability — the user may have a key
-			// in the agent that isn't the logged-in identity.
-			plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
-			if decErr != nil {
-				if errors.Is(decErr, gpg.ErrPinentryRequired) {
-					return NewError(decErr.Error(), ExitGPGError)
-				}
-				// Always warn and try other values
-				c.Output().Warnf(output.CodeWarnDecryptFailure, "failed to decrypt value from %s: %v", val.AddedAt, decErr)
-				continue
-			}
-			valStr := string(plaintext)
-			decryptedValues = append(decryptedValues, valStr)
-			decryptedValuesWithTime = append(decryptedValuesWithTime, SecretValueJSON{
-				AddedAt:     val.AddedAt,
-				Value:       smartJSONValue(valStr),
-				Vault:       item.VaultPath,
-				AvailableTo: val.AvailableTo,
-				SignedBy:    val.SignedBy,
-			})
+		var histErr *Error
+		decryptedValuesWithTime, histErr = c.decryptHistory(history, fp)
+		if histErr != nil {
+			return histErr
 		}
 	} else {
-		// Default mode: search all vaults in order, return from first vault that has it
-		// First check if the secret exists but is deleted
-		for i := range c.vaultResolver.GetConfig().Entries {
-			secretObj := c.vaultResolver.GetSecretByKeyFromVault(i, secretKey)
-			if secretObj != nil && secretObj.IsDeleted() {
-				_, _ = fmt.Fprintf(c.output.Stderr(), "error: secret '%s' has been deleted\n", secretKey)
-				return NewError(fmt.Sprintf("secret '%s' has been deleted", secretKey), ExitVaultError)
-			}
-		}
-
-		// Try fingerprint-matched access first (fast path), then fall back to
-		// any-vault lookup and let GPG agent determine decryptability.
-		// The user may have a different key in the agent than the logged-in identity.
+		// Default mode: return the value from the first vault, in configuration
+		// order, that holds the secret undeleted. Try fingerprint-matched access
+		// first (fast path), then fall back to the latest value and let the GPG
+		// agent determine decryptability: the user may have a different key in
+		// the agent than the logged-in identity.
 		var errGet error
+		var idx int
 		notGranted := false
-		secret, errGet = c.vaultResolver.GetAccessibleSecretFromAnyVault(secretKey, fp)
+		secret, idx, errGet = c.vaultResolver.GetAccessibleSecretFromAnyVault(secretKey, fp)
 		if errGet != nil {
 			notGranted = true
-			secret, errGet = c.vaultResolver.GetSecretFromAnyVault(secretKey, c.output.Stderr())
+			secret, idx, errGet = c.vaultResolver.GetSecretFromAnyVault(secretKey, c.output.Stderr())
 			if errGet != nil {
+				if c.secretDeletedEverywhere(secretKey) {
+					_, _ = fmt.Fprintf(c.output.Stderr(), "error: secret '%s' has been deleted\n", secretKey)
+					return NewError(fmt.Sprintf("secret '%s' has been deleted", secretKey), ExitVaultError)
+				}
 				return NewError(fmt.Sprintf("secret '%s' not found in any vault", secretKey), ExitVaultError)
 			}
 		}
 
-		// Find the vault path for this secret
-		idx := c.vaultResolver.FindSecretVaultIndex(secretKey)
-		if idx >= 0 {
-			entries := c.vaultResolver.GetConfig().Entries
-			if idx < len(entries) {
-				secretVaultPath = entries[idx].Path
-			}
+		if entries := c.vaultResolver.GetConfig().Entries; idx < len(entries) {
+			secretVaultPath = entries[idx].Path
 		}
 
 		encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(secret.Value)
@@ -590,7 +615,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 	} else {
 		if all {
 			for _, item := range decryptedValuesWithTime {
-				_, _ = fmt.Fprintf(c.output.Stdout(), "%s (%s): %s\n", item.AddedAt.Format(time.RFC3339), item.Vault, item.Value)
+				_, _ = fmt.Fprint(c.output.Stdout(), allValuesLine(item))
 			}
 		} else {
 			if len(decryptedValues) > 0 {
@@ -616,12 +641,6 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 		return NewError(fmt.Sprintf("secret '%s' has no values", key), ExitVaultError)
 	}
 
-	// Check if secret is deleted
-	if secretObj.IsDeleted() {
-		_, _ = fmt.Fprintf(c.output.Stderr(), "error: secret '%s' has been deleted\n", key)
-		return NewError(fmt.Sprintf("secret '%s' has been deleted", key), ExitVaultError)
-	}
-
 	entries := c.vaultResolver.GetConfig().Entries
 	var vaultPath string
 	if index < len(entries) {
@@ -632,39 +651,20 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 	var decryptedValuesWithTime []SecretValueJSON
 
 	if all {
-		// Decrypt all values in reverse order
-		for i := len(secretObj.Values) - 1; i >= 0; i-- {
-			val := secretObj.Values[i]
-
-			encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
-			if decodeErr != nil {
-				// Always warn and try other values
-				c.Output().Warnf(output.CodeWarnDecodeFailure, "failed to decode value from %s: %v", val.AddedAt, decodeErr)
-				continue
-			}
-
-			// Let GPG agent determine decryptability — the user may have a key
-			// in the agent that isn't the logged-in identity.
-			plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
-			if decErr != nil {
-				if errors.Is(decErr, gpg.ErrPinentryRequired) {
-					return NewError(decErr.Error(), ExitGPGError)
-				}
-				// Always warn and try other values
-				c.Output().Warnf(output.CodeWarnDecryptFailure, "failed to decrypt value from %s: %v", val.AddedAt, decErr)
-				continue
-			}
-			valStr := string(plaintext)
-			decryptedValues = append(decryptedValues, valStr)
-			decryptedValuesWithTime = append(decryptedValuesWithTime, SecretValueJSON{
-				AddedAt:     val.AddedAt,
-				Value:       smartJSONValue(valStr),
-				Vault:       vaultPath,
-				AvailableTo: val.AvailableTo,
-				SignedBy:    val.SignedBy,
-			})
+		// The vault's whole history, deleted values included, newest first.
+		history := secretHistory(secretObj, vaultPath)
+		slices.Reverse(history)
+		var histErr *Error
+		decryptedValuesWithTime, histErr = c.decryptHistory(history, fp)
+		if histErr != nil {
+			return histErr
 		}
 	} else {
+		if secretObj.IsDeleted() {
+			_, _ = fmt.Fprintf(c.output.Stderr(), "error: secret '%s' has been deleted\n", key)
+			return NewError(fmt.Sprintf("secret '%s' has been deleted", key), ExitVaultError)
+		}
+
 		// Use manager to get accessible value (supporting fallback)
 		manager := c.vaultResolver.GetVaultManager(index)
 		if manager == nil {
@@ -707,7 +707,7 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 		})
 	}
 
-	if len(decryptedValues) == 0 {
+	if len(decryptedValuesWithTime) == 0 {
 		return NewError(fmt.Sprintf("no accessible values for secret '%s'", key), ExitAccessDenied)
 	}
 
@@ -727,7 +727,7 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 	} else {
 		if all {
 			for _, item := range decryptedValuesWithTime {
-				_, _ = fmt.Fprintf(c.output.Stdout(), "%s (%s): %s\n", item.AddedAt.Format(time.RFC3339), item.Vault, item.Value)
+				_, _ = fmt.Fprint(c.output.Stdout(), allValuesLine(item))
 			}
 		} else {
 			// Trim trailing newline to avoid double newline (echo adds one, we add one)
@@ -745,6 +745,7 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 	var mostRecentTime time.Time
 	var mostRecentVaultPath string
 	secretExists := false
+	secretDeleted := false
 
 	entries := c.vaultResolver.GetConfig().Entries
 
@@ -756,12 +757,14 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 
 		// Skip vaults where the secret is deleted
 		if secretObj.IsDeleted() {
+			secretDeleted = true
 			continue
 		}
 		secretExists = true
 
-		for j := range secretObj.Values {
-			val := &secretObj.Values[j]
+		live := secretObj.LiveValues()
+		for j := range live {
+			val := &live[j]
 
 			hasAccess := false
 			for _, authorizedFp := range val.AvailableTo {
@@ -785,6 +788,9 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 	if mostRecentValue == nil {
 		if secretExists {
 			return NewError(accessDeniedMessage(key, fp), ExitAccessDenied)
+		}
+		if secretDeleted {
+			return NewError(fmt.Sprintf("secret '%s' has been deleted", key), ExitVaultError)
 		}
 		return NewError(fmt.Sprintf("secret '%s' not found in any vault", key), ExitVaultError)
 	}

@@ -259,37 +259,6 @@ func (m *Manager) CanIdentityAccessSecret(fingerprint, secretKey string) bool {
 	return m.vault.CanIdentityAccessSecret(fingerprint, secretKey)
 }
 
-// GetAllAccessibleSecretValues returns all unique secret values accessible to an identity
-func (m *Manager) GetAllAccessibleSecretValues(fingerprint, secretKey string) []*SecretValue {
-	secret := m.vault.GetSecretByKey(secretKey)
-	if secret == nil {
-		return nil
-	}
-
-	seen := make(map[string]bool)
-	var result []*SecretValue
-
-	// Iterate from oldest to newest to maintain chronological order
-	for i := 0; i < len(secret.Values); i++ {
-		value := &secret.Values[i]
-		// Check if identity can access this value
-		canAccess := false
-		for _, fp := range value.AvailableTo {
-			if fp == fingerprint {
-				canAccess = true
-				break
-			}
-		}
-
-		if canAccess && !seen[value.Value] {
-			result = append(result, value)
-			seen[value.Value] = true
-		}
-	}
-
-	return result
-}
-
 // ListIdentityFingerprints returns all identity fingerprints in the vault
 func (m *Manager) ListIdentityFingerprints() []string {
 	fingerprints := make([]string, 0, len(m.vault.Identities))

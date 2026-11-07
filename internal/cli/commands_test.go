@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -537,8 +538,9 @@ func TestSecretForget_NotFound(t *testing.T) {
 	}
 }
 
-// TestSecretPut_BlockedByDeleted tests that putting to a deleted secret fails
-func TestSecretPut_BlockedByDeleted(t *testing.T) {
+// TestSecretPut_StoresOverDeleted tests that a deleted secret is stored as a
+// new one: any identity may store it, encrypted only to itself.
+func TestSecretPut_StoresOverDeleted(t *testing.T) {
 	t.Setenv("DOTSECENV_CONFIG", "")
 
 	mockVaultResolver := NewMockVaultResolver()
@@ -590,7 +592,7 @@ func TestSecretPut_BlockedByDeleted(t *testing.T) {
 			Key:     "DELETED_SECRET",
 			AddedAt: time.Now(),
 			Values: []vault.SecretValue{
-				{Value: "old_value", AvailableTo: []string{testFP}},
+				{Value: "old_value", AvailableTo: []string{"OTHERFINGERPRINT"}},
 				{Value: "", AvailableTo: []string{}, Deleted: true},
 			},
 		},
@@ -604,17 +606,21 @@ func TestSecretPut_BlockedByDeleted(t *testing.T) {
 		output:        output.NewHandler(&bytes.Buffer{}, &bytes.Buffer{}),
 	}
 
-	// Try to put to a deleted secret
-	putErr := cli.SecretPut("DELETED_SECRET", vaultPath, 0, "", StoreSharePrompt)
-	switch {
-	case putErr == nil:
-		t.Fatal("SecretPut should fail for deleted secret")
-	case !strings.Contains(putErr.Message, "has been deleted"):
-		t.Errorf("Expected 'has been deleted' error, got: %s", putErr.Message)
+	var stored []vault.Secret
+	mockVaultResolver.AddSecretFunc = func(secret vault.Secret, index int) error {
+		stored = append(stored, secret)
+		return nil
 	}
 
-	if !strings.Contains(putErr.Message, "cannot overwrite") {
-		t.Errorf("Expected 'cannot overwrite' in error, got: %s", putErr.Message)
+	// The storer was never a recipient of the deleted value.
+	if putErr := cli.SecretPut("DELETED_SECRET", vaultPath, 0, "", StoreSharePrompt); putErr != nil {
+		t.Fatalf("SecretPut over a deleted secret failed: %s", putErr.Message)
+	}
+	if len(stored) != 1 || len(stored[0].Values) != 1 {
+		t.Fatalf("expected one stored secret with one value, got %+v", stored)
+	}
+	if got := stored[0].Values[0].AvailableTo; !slices.Equal(got, []string{testFP}) {
+		t.Errorf("expected the new value encrypted only to the storer, got available_to %v", got)
 	}
 }
 
