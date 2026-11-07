@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 #
 # Commit a single file (the homebrew cask) to a target branch via
-# GitHub's GraphQL `createCommitOnBranch` mutation, producing a
-# server-signed commit. Mirrors publish-to-satellite.sh for the
-# single-file case so we avoid GPG handling on the runner — the App
-# installation token used by gh signs the commit server-side.
+# GitHub's GraphQL `createCommitOnBranch` mutation. GitHub signs the
+# commit for the App whose installation token gh uses, so no signing
+# key is on the runner.
 #
 # Required env:
 #   TAP_REPO     "<owner>/<repo>" of the homebrew tap (e.g.
@@ -44,8 +43,7 @@ echo "Current ${TAP_REPO}/${TAP_BRANCH} HEAD: ${EXPECTED_OID}"
 
 # Build the CreateCommitOnBranchInput payload. createCommitOnBranch
 # expects file contents base64-encoded. We materialize the JSON to a
-# file because the same `gh api graphql -F` quirk that bites
-# publish-to-satellite.sh applies here: -F reads the value as a STRING,
+# file because `gh api graphql -F` reads the value as a STRING,
 # not JSON, so building the request body ourselves and sending via
 # --input is the only reliable path.
 CONTENTS=$(base64 < "${CASK_FILE}" | tr -d '\n')

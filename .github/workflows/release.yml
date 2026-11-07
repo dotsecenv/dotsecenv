@@ -398,7 +398,7 @@ jobs:
       - name: Sync tap CI and README from monorepo
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_COMMIT: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -413,8 +413,7 @@ jobs:
               continue
             fi
             cp "$SRC" "$DEST"
-            BODY="$(printf 'Source-Commit: dotsecenv/dotsecenv@%s\nSource-SHA: %s\nSource-Path: homebrew-tap/%s\nPublished-By: %s\n' \
-              "$SOURCE_SHA" "$SOURCE_SHA" "$path" "$PUBLISHED_BY")"
+            BODY="$(printf 'Source-Commit: <%s>\nPublished-By: <%s>\n' "$SOURCE_COMMIT" "$PUBLISHED_BY")"
             TAP_REPO=dotsecenv/homebrew-tap \
             TAP_BRANCH=main \
             CASK_PATH="$path" \
@@ -499,19 +498,15 @@ jobs:
           cat "$CASK_FILE"
 
       # Commit the cask update via GitHub's GraphQL createCommitOnBranch
-      # mutation, which signs the commit server-side with the App's key.
-      # Replaces the previous `git config user.name; git commit; git push`
-      # flow so the homebrew-tap commit gets the same signed-by-bot
-      # provenance as the satellite publishes (see publish-to-satellite.sh).
-      # Provenance trailers (Source-Commit, Source-SHA, Source-Tag,
-      # Published-By) match the satellite convention so tap commits are
-      # parseable by the same `git interpret-trailers --parse` machinery.
+      # mutation, so GitHub signs it for the release App as it signs the
+      # satellite publishes. Its Source-Commit trailer names the monorepo
+      # commit in the same URL form.
       - name: Commit cask via GraphQL (server-signed)
         id: commit
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ github.ref_name }}
-          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_COMMIT: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -525,12 +520,7 @@ jobs:
           fi
 
           HEADLINE="fix: update Darwin checksums for ${VERSION} (post-notarization)"
-          BODY=$(
-            printf 'Source-Commit: dotsecenv/dotsecenv@%s\n' "${SOURCE_SHA}"
-            printf 'Source-SHA: %s\n' "${SOURCE_SHA}"
-            printf 'Source-Tag: %s\n' "${VERSION}"
-            printf 'Published-By: %s\n' "${PUBLISHED_BY}"
-          )
+          BODY="$(printf 'Source-Commit: <%s>\nPublished-By: <%s>\n' "$SOURCE_COMMIT" "$PUBLISHED_BY")"
 
           OUTPUT=$(
             TAP_REPO=dotsecenv/homebrew-tap \
