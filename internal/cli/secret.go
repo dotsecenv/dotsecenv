@@ -15,6 +15,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/output"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
@@ -390,7 +391,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		hasTTY = defaultHasTTY
 	}
 	if !hasTTY() {
-		c.Warnf("decrypting in non-interactive terminal; for better security, configure GPG to require passphrase entry (https://dotsecenv.com/concepts/threat-model/#automated-secret-exfiltration)")
+		c.Output().Warnf(output.CodeWarnGeneric, "decrypting in non-interactive terminal; for better security, configure GPG to require passphrase entry (https://dotsecenv.com/concepts/threat-model/#automated-secret-exfiltration)")
 	}
 
 	// Handle --last + -v combination - always error (conflicting flags)
@@ -491,7 +492,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 			encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
 			if decodeErr != nil {
 				// Always warn and try other values
-				c.Warnf("failed to decode value from %s: %v", val.AddedAt, decodeErr)
+				c.Output().Warnf(output.CodeWarnDecodeFailure, "failed to decode value from %s: %v", val.AddedAt, decodeErr)
 				continue
 			}
 
@@ -503,7 +504,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 					return NewError(decErr.Error(), ExitGPGError)
 				}
 				// Always warn and try other values
-				c.Warnf("failed to decrypt value from %s: %v", val.AddedAt, decErr)
+				c.Output().Warnf(output.CodeWarnDecryptFailure, "failed to decrypt value from %s: %v", val.AddedAt, decErr)
 				continue
 			}
 			valStr := string(plaintext)
@@ -638,7 +639,7 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 			encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
 			if decodeErr != nil {
 				// Always warn and try other values
-				c.Warnf("failed to decode value from %s: %v", val.AddedAt, decodeErr)
+				c.Output().Warnf(output.CodeWarnDecodeFailure, "failed to decode value from %s: %v", val.AddedAt, decodeErr)
 				continue
 			}
 
@@ -650,7 +651,7 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 					return NewError(decErr.Error(), ExitGPGError)
 				}
 				// Always warn and try other values
-				c.Warnf("failed to decrypt value from %s: %v", val.AddedAt, decErr)
+				c.Output().Warnf(output.CodeWarnDecryptFailure, "failed to decrypt value from %s: %v", val.AddedAt, decErr)
 				continue
 			}
 			valStr := string(plaintext)
