@@ -8,6 +8,12 @@
 - When asked to release, use `rt git::release --major --sign --push vX.Y.Z` where X.Y.Z is the version to release
 - Then push the tag to the origin
 
+### Release signing key
+
+For initial release-signing setup or key replacement, run [`bash scripts/generate_release_key.sh`](scripts/generate_release_key.sh) from the repo root. It creates a signing-only RSA-4096 primary key with no subkeys and a two-year expiry in a temporary GPG keyring.
+
+The script prompts for a non-empty passphrase and prints ASCII-armored public and private keys before deleting its temporary keyring. Publish the public key at `https://get.dotsecenv.com/key.asc`, set the private key as release CI's `GPG_PRIVATE_KEY`, and set its passphrase as `GPG_PASSPHRASE`. This key signs releases; vault-decryption keys used in application CI have a separate role.
+
 ## Satellite repositories (plugin, packages)
 
 `plugin/` and `packages/` in this monorepo are the **source of truth**. CI mirrors them to their standalone satellite repos (`dotsecenv/plugin`, `dotsecenv/packages`). Never edit the satellites directly and never accept PRs there; edits made on a satellite are overwritten by the next publish.
