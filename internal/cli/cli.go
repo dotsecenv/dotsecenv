@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/dotsecenv/dotsecenv/internal/xdg"
 
@@ -263,20 +262,6 @@ func newCLI(vaultPaths []string, configPath string, silent, noPinentry bool, std
 	cli.vaultPaths = vaultPaths
 	cli.vaultResolver = vaultResolver
 	return cli, nil
-}
-
-// Warnf prints a warning message to stderr unless silent mode is enabled.
-// Deprecated: For new code, use c.Output().Warnf() with a structured code.
-func (c *CLI) Warnf(format string, args ...interface{}) {
-	if !c.Silent {
-		if !strings.HasPrefix(format, "warning:") {
-			format = "warning: " + format
-		}
-		if !strings.HasSuffix(format, "\n") {
-			format = format + "\n"
-		}
-		_, _ = fmt.Fprintf(c.output.Stderr(), format, args...)
-	}
 }
 
 // Output returns the unified output handler for this CLI instance.
