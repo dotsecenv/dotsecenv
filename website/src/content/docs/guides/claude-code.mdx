@@ -1,170 +1,128 @@
 ---
 title: Claude Code
-description: Use dotsecenv with Claude Code to manage secrets from your AI coding assistant
+description: Choose how to provide dotsecenv secrets to Claude Code and its tools
 ---
 
-import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+Load project secrets into your shell before starting Claude Code, or let the
+dotsecenv agent plugin retrieve them during the session. The options below use
+[dotsecenv](/tutorials/installation/) and the Claude Code CLI launched from your
+terminal. IDE and desktop sessions have their own launcher environment.
 
-<Aside type="note" title="Available in v0.5.2+">
-  The Claude Code plugin (`/dotsecenv:secrets` and `/dotsecenv:secenv` skills) shipped in v0.5.2.
-</Aside>
+## Load .secenv before starting Claude
 
-## Goal
+Install the [dotsecenv shell plugin](/guides/shell-plugins/) and put vault
+references in your project's `.secenv`:
 
-Install the dotsecenv plugin for [Claude Code](https://claude.ai/claude-code) so your AI coding assistant can list, retrieve, store, share, and revoke GPG-encrypted secrets.
-
-## Prerequisites
-
-- [dotsecenv installed](/tutorials/installation/) and available on your PATH
-- A GPG key with your passphrase cached in gpg-agent (or macOS Keychain)
-- [Claude Code](https://claude.ai/claude-code) installed (CLI, desktop app, or IDE extension)
-
-## Steps
-
-<Steps>
-
-1. **Add the dotsecenv marketplace**
-
-   In Claude Code, run:
-
-   ```text
-   /plugin marketplace add dotsecenv/dotsecenv
-   ```
-
-2. **Install the plugin**
-
-   ```text
-   /plugin install dotsecenv@dotsecenv
-   ```
-
-   This registers two skills:
-
-   - `/dotsecenv:secrets`: manages secrets via the dotsecenv CLI (store, get, share, revoke)
-   - `/dotsecenv:secenv`: interprets `.secenv` files, resolves vault references, and debugs loading issues
-
-3. **Verify GPG is ready**
-
-   The plugin checks your GPG configuration on first use. If your passphrase is not cached, Claude will ask you to warm the cache:
-
-   ```bash
-   ! gpg --sign --local-user YOUR_FINGERPRINT </dev/null
-   ```
-
-   The `!` prefix runs the command in your terminal so pinentry can prompt for your passphrase.
-
-4. **Use it**
-
-   Ask Claude to work with your secrets naturally:
-
-   - *"List my secrets"*: lists secret keys without decrypting values
-   - *"Show me the value of myapp::API\_KEY"*: decrypts a specific secret
-   - *"Store a new secret called myapp::DB\_PASSWORD"*: encrypts and stores a value
-   - *"Share myapp::API\_KEY with fingerprint ABC123"*: re-encrypts for another team member
-   - *"Create a .secenv file for this project"*: generates a `.secenv` with the right references
-   - *"Why isn't my secret loading?"*: debugs vault paths and `.secenv` references
-
-</Steps>
-
-## Expected Result
-
-After installation, Claude can manage your dotsecenv secrets through natural language. The plugin enforces a security model that prevents Claude from decrypting secrets unless you explicitly ask.
-
-```text
-You: list my secrets
-
-Claude: Running dotsecenv secret get...
-
-  myapp::API_KEY
-  myapp::DB_PASSWORD
-  staging::JWT_SECRET
-
-You have 3 secrets across 1 vault.
+```bash title=".secenv"
+HCLOUD_TOKEN={dotsecenv}
 ```
 
-## Included Skills
+In your terminal, enter the directory and complete the shell plugin's load
+before starting Claude:
 
-The plugin provides two skills:
+```bash title="Your terminal"
+cd /path/to/project
+claude
+```
 
-### `/dotsecenv:secrets`: CLI Operations
+The shell plugin fetches the referenced values and exports them as environment
+variables. Claude and the tools it starts inherit those values. The `.secenv`
+file holds references; the exported values are plaintext in the running
+processes' environments.
 
-Teaches Claude how to use the dotsecenv CLI safely. It knows which commands are safe (listing secrets, describing vaults, and running health checks never trigger GPG decryption), when to ask first (decryption and mutation require your explicit request), and how to detect problems (if your GPG pinentry is terminal-based or your passphrase is not cached, Claude warns you upfront instead of failing silently).
+This option works with GPG policies that require interaction for each
+decryption: you handle the load in your terminal before the agent starts.
+The dotsecenv agent plugin is optional for this workflow.
 
-### `/dotsecenv:secenv`: File Interpretation
+## Fetch a secret yourself
 
-Teaches Claude how to work with `.secenv` files:
+Use the CLI in your terminal to retrieve selected values and export them
+before launching Claude. For Bash or Zsh:
 
-- Parse `.secenv` syntax: plain variables (`KEY=value`), secret references (`KEY={dotsecenv}`, `KEY={dotsecenv/prod::SECRET}`), and quoted values
-- Resolve vault paths: reads your dotsecenv config to find vaults and understands that relative paths like `.dotsecenv/vault` resolve against the `.secenv` file's directory
-- Debug loading issues: checks if referenced secrets exist in reachable vaults, verifies file ownership and permissions, and explains ancestor loading behavior
-- Create `.secenv` files: generates them with the correct syntax after verifying secrets exist
+```bash title="Your terminal"
+HCLOUD_TOKEN=$(dotsecenv secret get HCLOUD_TOKEN) &&
+  export HCLOUD_TOKEN &&
+  claude
+```
 
-### GPG Pinentry Compatibility
+Claude and its tools receive `HCLOUD_TOKEN` from the launching shell. You can
+also save a value to a file when a tool expects one. Such files contain
+plaintext; restrict their permissions and keep them outside version control.
 
-Claude Code runs shell commands without a terminal, which affects how GPG passphrase prompts work:
+Choose the values and destinations yourself. The agent can use the values you
+prepared without fetching them from the vault during the session.
 
-| Pinentry Program | Works with Claude Code? | Notes |
-|------------------|------------------------|-------|
-| `pinentry-mac` | Yes | GUI-based. Passphrase returned silently from Keychain or gpg-agent cache. |
-| `pinentry-gnome3` | Yes | GUI-based. Needs a display server. |
-| `pinentry-qt` | Yes | GUI-based. Needs a display server. |
-| `pinentry-tty` | No | Requires terminal input that Claude cannot provide. |
-| `pinentry-curses` | No | Requires terminal input that Claude cannot provide. |
+## Let the agent plugin use cached GPG credentials
 
-If you use a terminal-based pinentry, you have two options:
+Install the [agent plugin](#install-the-agent-plugin) to let Claude retrieve
+secrets when you request them during a session.
 
-1. Switch to a GUI pinentry by setting `pinentry-program` in `~/.gnupg/gpg-agent.conf`.
-2. Pre-cache your passphrase before asking Claude to decrypt:
+Set the cache duration in your GPG agent configuration. `default-cache-ttl`
+controls inactivity expiry, and `max-cache-ttl` sets a hard limit even when
+the key is used repeatedly. The [GPG Agent guide](/guides/gpg-agent/)
+shows a one-hour inactivity limit and a four-hour maximum, with commands to
+apply and verify the settings.
 
-   ```bash
-   ! gpg --sign --local-user YOUR_FINGERPRINT </dev/null
-   ```
+Before starting Claude, exercise the decryption you need from your terminal:
 
-### Security Model
+```bash title="Your terminal"
+dotsecenv secret get HCLOUD_TOKEN >/dev/null &&
+  claude
+```
 
-The plugin enforces four tiers of operations:
+The plugin can use credentials available to the same gpg-agent during their
+cache lifetime. Longer cache durations give other processes that can access
+the agent a longer window to request operations with the key. Exported values
+in an already running process have their own lifetime, independent of the GPG
+cache.
 
-| Tier | Operations | Behavior |
-|------|-----------|----------|
-| Safe | List secrets, describe vaults, validate, health checks | Claude runs freely |
-| Decrypt | Retrieve a secret value | Only when you explicitly ask |
-| Mutate | Store, share, revoke, forget | Claude confirms before executing |
-| Prohibited | Keychain extraction, exfiltration, init/login | Never executed |
+The agent plugin adds `--no-pinentry` to its calls. See
+[GPG Agent: agent calls](/guides/gpg-agent/#agent-calls) for the resulting
+behavior and recovery steps.
 
-<Aside type="caution" title="GPG Agent Security">
-  When your GPG passphrase is cached, any process running as your user can trigger decryption, including AI agents. For the operational reference (health checks, cache warming, troubleshooting) see [GPG Agent](/guides/gpg-agent/); for the security rationale see [Threat Model](/concepts/threat-model/#recommended-gpg-agent-configuration).
-</Aside>
+## Install the agent plugin
 
-## Up-to-date Docs via Context7
+In Claude Code, add the marketplace and install the plugin:
 
-[Context7](https://context7.com) is an MCP server and documentation index that ingests project docs and serves them to LLMs and coding agents on demand. When Claude Code (or another MCP-aware tool like Cursor) has the Context7 MCP server configured, it can pull current dotsecenv documentation at request time instead of relying on whatever its training data captured.
+```text title="Inside Claude Code"
+/plugin marketplace add dotsecenv/dotsecenv
+/plugin install dotsecenv@dotsecenv
+```
 
-dotsecenv's documentation is indexed at [context7.com/code-docs/dotsecenv/dotsecenv](https://context7.com/code-docs/dotsecenv/dotsecenv). If your AI tooling has Context7 set up, asking about `.secenv` syntax, vault commands, or shell plugin behavior will pull from the same docs you're reading here, kept in sync as new releases ship.
+The plugin provides these skills:
 
-<Aside type="tip">
-  Context7 is independent of the `/dotsecenv:secrets` and `/dotsecenv:secenv` skills above. The skills run dotsecenv on your machine; Context7 just provides up-to-date reference material to your assistant.
-</Aside>
+| Skill | Purpose |
+|-------|---------|
+| `/dotsecenv:secrets` | List and retrieve secrets; store, share, revoke, or forget them when requested |
+| `/dotsecenv:secenv` | Read and edit `.secenv` references and diagnose loading problems |
+| `/dotsecenv:vault` | Inspect, validate, and compact vaults |
 
-## Variations
+Metadata operations such as listing key names work independently of the GPG
+passphrase cache. Decryption requires your explicit request. Mutating
+operations require your request and confirmation under the skill's rules.
 
-### Local Development (without marketplace)
+For example, ask Claude to list your secret names, retrieve a named secret,
+or create a `.secenv` containing selected references. The skills prohibit
+keychain extraction and sending decrypted values to external services.
 
-If you are developing dotsecenv locally, you can load the plugin directly from a checkout:
+### Local plugin development
 
-```bash
+Load the plugin from a checkout when developing dotsecenv:
+
+```bash title="Your terminal"
 claude --plugin-dir /path/to/dotsecenv
 ```
 
-### Uninstalling
+### Remove the plugin
 
-```text
+```text title="Inside Claude Code"
 /plugin uninstall dotsecenv@dotsecenv
 /plugin marketplace remove dotsecenv
 ```
 
----
+## Documentation from Context7
 
-## Next Steps
-
-- [Threat Model: AI Agent Security](/concepts/threat-model/#ai-coding-agents-and-gpg): understand the security implications
-- [Your First Secret](/tutorials/first-secret/): get started with dotsecenv
-- [Shell Plugins](/guides/shell-plugins/): auto-load secrets when entering directories
+[Context7](https://context7.com) provides dotsecenv documentation to assistants
+that have its MCP server configured. The project is indexed at
+[context7.com/code-docs/dotsecenv/dotsecenv](https://context7.com/code-docs/dotsecenv/dotsecenv).
+Context7 supplies documentation; the dotsecenv agent plugin runs the local CLI.

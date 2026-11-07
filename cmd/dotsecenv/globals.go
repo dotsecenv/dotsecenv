@@ -18,6 +18,7 @@ type GlobalOptions struct {
 	ConfigPath string
 	VaultPaths []string
 	Silent     bool
+	NoPinentry bool
 }
 
 // globalOpts is the shared global options instance
@@ -73,7 +74,7 @@ func createCLI() (*clilib.CLI, error) {
 		return nil, err
 	}
 
-	return clilib.NewCLI(resolvedPaths, globalOpts.ConfigPath, globalOpts.Silent, os.Stdin, os.Stdout, os.Stderr)
+	return clilib.NewCLI(resolvedPaths, globalOpts.ConfigPath, globalOpts.Silent, globalOpts.NoPinentry, os.Stdin, os.Stdout, os.Stderr)
 }
 
 // parseVaultSpec parses a vault specification (-v value) and returns the vault path and index

@@ -66,22 +66,22 @@ func defaultHasTTY() bool {
 }
 
 // NewCLI creates a new CLI instance
-func NewCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
-	return newCLI(vaultPaths, configPath, silent, stdin, stdout, stderr, nil)
+func NewCLI(vaultPaths []string, configPath string, silent, noPinentry bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
+	return newCLI(vaultPaths, configPath, silent, noPinentry, stdin, stdout, stderr, nil)
 }
 
 // NewCLIConfigOnly creates a CLI instance that only loads config and GPG,
 // without opening any vaults. This is used by commands like `login` that
 // operate purely on config and do not need vault access.
-func NewCLIConfigOnly(configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
-	return loadConfigAndPrepareGPG(configPath, silent, stdin, stdout, stderr)
+func NewCLIConfigOnly(configPath string, silent, noPinentry bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
+	return loadConfigAndPrepareGPG(configPath, silent, noPinentry, stdin, stdout, stderr)
 }
 
 // loadConfigAndPrepareGPG returns a CLI populated with everything except
 // vaultResolver and vaultPaths. Both NewCLI and NewCLIConfigOnly use this as
 // their prelude — the only difference between them is whether vaults are
 // opened afterward.
-func loadConfigAndPrepareGPG(configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
+func loadConfigAndPrepareGPG(configPath string, silent, noPinentry bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
 		return nil, NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
@@ -140,7 +140,7 @@ func loadConfigAndPrepareGPG(configPath string, silent bool, stdin io.Reader, st
 		xdgPaths:   xdgPaths,
 		config:     cfg,
 		policy:     pol,
-		gpgClient:  &gpg.GPGClient{},
+		gpgClient:  &gpg.GPGClient{NoPinentry: noPinentry},
 		stdin:      stdin,
 		Silent:     silent,
 		output: output.NewHandler(stdout, stderr,
@@ -151,8 +151,8 @@ func loadConfigAndPrepareGPG(configPath string, silent bool, stdin io.Reader, st
 }
 
 // newCLI creates a CLI instance. If requireExplicitUpgradeOverride is non-nil, it overrides the config setting.
-func newCLI(vaultPaths []string, configPath string, silent bool, stdin io.Reader, stdout, stderr io.Writer, requireExplicitUpgradeOverride *bool) (*CLI, error) {
-	cli, err := loadConfigAndPrepareGPG(configPath, silent, stdin, stdout, stderr)
+func newCLI(vaultPaths []string, configPath string, silent, noPinentry bool, stdin io.Reader, stdout, stderr io.Writer, requireExplicitUpgradeOverride *bool) (*CLI, error) {
+	cli, err := loadConfigAndPrepareGPG(configPath, silent, noPinentry, stdin, stdout, stderr)
 	if err != nil {
 		return nil, err
 	}

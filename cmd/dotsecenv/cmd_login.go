@@ -30,7 +30,7 @@ to the secret key can configure dotsecenv to use it.`,
 		}
 
 		// Login operates on config only, no vault access needed
-		cli, err := clilib.NewCLIConfigOnly(globalOpts.ConfigPath, globalOpts.Silent, os.Stdin, os.Stdout, os.Stderr)
+		cli, err := clilib.NewCLIConfigOnly(globalOpts.ConfigPath, globalOpts.Silent, globalOpts.NoPinentry, os.Stdin, os.Stdout, os.Stderr)
 		if err != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, err)))
 		}

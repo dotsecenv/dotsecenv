@@ -19,7 +19,13 @@ These options work with all commands:
 | `-c, --config PATH` | Path to config file (default: `~/.config/dotsecenv/config`) |
 | `-v, --vault PATH` | Path to vault file or vault index (1-based) |
 | `-s, --silent` | Silent mode (suppress warnings) |
+| `--no-pinentry` | Disable GPG pinentry prompts; fail if user interaction is required |
 | `-h, --help` | Show help for command |
+
+Calls to dotsecenv use your GPG pinentry configuration. The Claude Code and
+Codex skills add `--no-pinentry` to their calls. See
+[GPG Agent: agent calls](/guides/gpg-agent/#agent-calls) for the flag's behavior
+and recovery guidance.
 
 ---
 

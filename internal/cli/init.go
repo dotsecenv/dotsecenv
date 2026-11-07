@@ -17,7 +17,7 @@ import (
 // gpgProgram: if non-empty, set gpg.program to this value (without validation).
 // Otherwise gpg.program defaults to "PATH" (resolved at runtime).
 // loginFingerprint: if non-empty, creates a signed login proof for this fingerprint.
-func InitConfig(configPath string, initialVaults []string, gpgProgram string, loginFingerprint string, out *output.Handler) *Error {
+func InitConfig(configPath string, initialVaults []string, gpgProgram string, loginFingerprint string, noPinentry bool, out *output.Handler) *Error {
 	xdgPaths, err := xdg.NewPaths()
 	if err != nil {
 		return NewError(fmt.Sprintf("failed to get XDG paths: %v", err), ExitConfigError)
@@ -54,7 +54,7 @@ func InitConfig(configPath string, initialVaults []string, gpgProgram string, lo
 		}
 
 		// Create a GPG client (uses the validated program path)
-		gpgClient := &gpg.GPGClient{}
+		gpgClient := &gpg.GPGClient{NoPinentry: noPinentry}
 
 		// Validate the key exists first
 		publicKeyInfo, pubKeyErr := gpgClient.GetPublicKeyInfo(loginFingerprint)

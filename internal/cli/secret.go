@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -13,6 +14,7 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
@@ -198,7 +200,7 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 	secretHash := vault.ComputeSecretHash(&newSecret, identity.AlgorithmBits)
 	secretSig, sigErr := c.gpgClient.SignDataWithAgent(fp, []byte(secretHash))
 	if sigErr != nil {
-		return NewError(fmt.Sprintf("failed to sign secret: %v", sigErr), ExitGeneralError)
+		return newGPGError("failed to sign secret", sigErr, ExitGeneralError)
 	}
 	newSecret.Hash = secretHash
 	newSecret.Signature = secretSig
@@ -216,7 +218,7 @@ func (c *CLI) SecretPut(secretKeyArg, vaultPath string, fromIndex int, preReadVa
 	valueHash := vault.ComputeSecretValueHash(&newValue, secretKey, identity.AlgorithmBits)
 	valueSig, valueSigErr := c.gpgClient.SignDataWithAgent(fp, []byte(valueHash))
 	if valueSigErr != nil {
-		return NewError(fmt.Sprintf("failed to sign secret value: %v", valueSigErr), ExitGeneralError)
+		return newGPGError("failed to sign secret value", valueSigErr, ExitGeneralError)
 	}
 	newValue.Hash = valueHash
 	newValue.Signature = valueSig
@@ -339,7 +341,7 @@ func (c *CLI) SecretForget(secretKeyArg, vaultPath string, fromIndex int, ignore
 	valueHash := vault.ComputeSecretValueHash(&deletionValue, secretKey, identity.AlgorithmBits)
 	valueSig, valueSigErr := c.gpgClient.SignDataWithAgent(fp, []byte(valueHash))
 	if valueSigErr != nil {
-		return NewError(fmt.Sprintf("failed to sign deletion marker: %v", valueSigErr), ExitGeneralError)
+		return newGPGError("failed to sign deletion marker", valueSigErr, ExitGeneralError)
 	}
 	deletionValue.Hash = valueHash
 	deletionValue.Signature = valueSig
@@ -497,6 +499,9 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 			// in the agent that isn't the logged-in identity.
 			plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 			if decErr != nil {
+				if errors.Is(decErr, gpg.ErrPinentryRequired) {
+					return NewError(decErr.Error(), ExitGPGError)
+				}
 				// Always warn and try other values
 				c.Warnf("failed to decrypt value from %s: %v", val.AddedAt, decErr)
 				continue
@@ -552,10 +557,13 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 
 		plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 		if decErr != nil {
+			if errors.Is(decErr, gpg.ErrPinentryRequired) {
+				return NewError(decErr.Error(), ExitGPGError)
+			}
 			if notGranted {
 				return NewError(accessDeniedMessage(secretKey, fp), ExitAccessDenied)
 			}
-			return NewError(fmt.Sprintf("failed to decrypt secret: %v", decErr), ExitGPGError)
+			return newGPGError("failed to decrypt secret", decErr, ExitGPGError)
 		}
 		decryptedValues = append(decryptedValues, string(plaintext))
 	}
@@ -638,6 +646,9 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 			// in the agent that isn't the logged-in identity.
 			plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 			if decErr != nil {
+				if errors.Is(decErr, gpg.ErrPinentryRequired) {
+					return NewError(decErr.Error(), ExitGPGError)
+				}
 				// Always warn and try other values
 				c.Warnf("failed to decrypt value from %s: %v", val.AddedAt, decErr)
 				continue
@@ -679,10 +690,13 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 
 		plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 		if decErr != nil {
+			if errors.Is(decErr, gpg.ErrPinentryRequired) {
+				return NewError(decErr.Error(), ExitGPGError)
+			}
 			if notGranted {
 				return NewError(accessDeniedMessage(key, fp), ExitAccessDenied)
 			}
-			return NewError(fmt.Sprintf("failed to decrypt secret: %v", decErr), ExitGPGError)
+			return newGPGError("failed to decrypt secret", decErr, ExitGPGError)
 		}
 		decryptedValues = append(decryptedValues, string(plaintext))
 		decryptedValuesWithTime = append(decryptedValuesWithTime, SecretValueJSON{
@@ -781,7 +795,7 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 
 	plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 	if decErr != nil {
-		return NewError(fmt.Sprintf("failed to decrypt secret: %v", decErr), ExitGPGError)
+		return newGPGError("failed to decrypt secret", decErr, ExitGPGError)
 	}
 
 	if jsonOutput {

@@ -3,7 +3,6 @@ package gpg
 import (
 	"encoding/base64"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
@@ -49,27 +48,13 @@ func (c *GPGClient) DecryptWithAgent(ciphertext []byte, fingerprint string) ([]b
 	// Ciphertext is armored message (as bytes), use directly
 	armoredCiphertext := string(ciphertext)
 
-	// Build GPG command
-	// If fingerprint is provided, use it to restrict which secret key is tried.
-	var cmd *exec.Cmd
+	args := []string{"--decrypt", "--quiet"}
 	if fingerprint != "" {
-		cmd = exec.Command(GetGPGProgram(), "--decrypt", "--try-secret-key", fingerprint, "--quiet")
-	} else {
-		cmd = exec.Command(GetGPGProgram(), "--decrypt", "--quiet")
+		args = append(args, "--try-secret-key", fingerprint)
 	}
-	cmd.Stdin = strings.NewReader(armoredCiphertext)
-
-	// Capture stderr to show actual GPG errors
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-
-	output, err := cmd.Output()
+	output, err := c.runWithAgent(args, []byte(armoredCiphertext))
 	if err != nil {
-		stderrMsg := stderr.String()
-		if stderrMsg != "" {
-			return nil, fmt.Errorf("failed to decrypt with gpg-agent: %w\nGPG error: %s", err, stderrMsg)
-		}
-		return nil, fmt.Errorf("failed to decrypt with gpg-agent: %w\nMake sure gpg-agent is running and has access to the private key", err)
+		return nil, fmt.Errorf("failed to decrypt with gpg-agent: %w", err)
 	}
 
 	return output, nil

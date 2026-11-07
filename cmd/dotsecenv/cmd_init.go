@@ -67,7 +67,7 @@ from the system PATH at runtime. Use --gpg-program to pin an absolute path.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		out := defaultOutput()
 		targetConfig := clilib.ResolveConfigPath(globalOpts.ConfigPath, globalOpts.Silent, out.Stderr())
-		err := clilib.InitConfig(targetConfig, globalOpts.VaultPaths, initConfigOpts.GPGProgram, initConfigOpts.LoginFingerprint, out)
+		err := clilib.InitConfig(targetConfig, globalOpts.VaultPaths, initConfigOpts.GPGProgram, initConfigOpts.LoginFingerprint, globalOpts.NoPinentry, out)
 		if err != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, err)))
 		}

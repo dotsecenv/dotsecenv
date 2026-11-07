@@ -12,6 +12,13 @@ description: >
 
 This skill teaches you how to read, write, and debug `.secenv` files and their relationship to dotsecenv vaults and config. For CLI operations (storing, retrieving, sharing secrets), defer to the bundled `secrets` skill.
 
+## Agent invocations
+
+Include `--no-pinentry` when running dotsecenv from the agent, including
+commands in scripts and subprocesses. For `GPG_ERR_NO_PIN_ENTRY` or an
+unsupported flag, follow the bundled `secrets` skill. Stop for user action;
+do not drop the flag or load the shell plugin to bypass the failure.
+
 ## .secenv File Format
 
 A `.secenv` file is a line-based file with `KEY=VALUE` pairs. It lives in a project directory and is loaded by the [shell plugin](https://dotsecenv.com/guides/shell-plugins/) when the user `cd`s into that directory.
@@ -130,10 +137,10 @@ To write the file by hand instead:
 
    ```bash
    # List secrets in the default vault
-   dotsecenv secret get --json
+   dotsecenv --no-pinentry secret get --json
 
    # Or check a specific vault
-   dotsecenv vault describe --json
+   dotsecenv --no-pinentry vault describe --json
    ```
 
 3. Write the `.secenv` file with the correct syntax
@@ -162,13 +169,13 @@ When a secret referenced in `.secenv` fails to load:
 6. **List secrets in that vault** to see if the referenced secret exists:
 
    ```bash
-   dotsecenv secret get --json -v /project/.dotsecenv/vault
+   dotsecenv --no-pinentry secret get --json -v /project/.dotsecenv/vault
    ```
 
 7. **Check identities** — the user's fingerprint must be in the vault's `available_to` list for that secret:
 
    ```bash
-   dotsecenv vault describe --json -v /project/.dotsecenv/vault
+   dotsecenv --no-pinentry vault describe --json -v /project/.dotsecenv/vault
    ```
 
 ### Debugging "Vault Not Found"

@@ -51,6 +51,7 @@ setting. See https://dotsecenv.com/concepts/compliance/ for details.`,
 			Email:        identityCreateOpts.Email,
 			TemplateOnly: identityCreateOpts.TemplateOnly,
 			NoPassphrase: identityCreateOpts.NoPassphrase,
+			NoPinentry:   globalOpts.NoPinentry,
 		}
 
 		// Try to create CLI (may fail if no config exists)

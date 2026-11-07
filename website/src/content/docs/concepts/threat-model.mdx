@@ -89,23 +89,19 @@ This forces manual passphrase entry for every decryption operation, which automa
 
 AI coding agents (Claude Code, GitHub Copilot CLI, Cursor, etc.) run shell commands as subprocesses of your terminal session. This creates a specific threat surface for GPG-encrypted secrets:
 
-**How agents interact with GPG pinentry:**
+The Claude Code and Codex skills add `--no-pinentry` to their dotsecenv
+calls. The [GPG Agent guide](/guides/gpg-agent/#agent-calls) describes pinentry
+behavior for user commands and agent plugin calls.
 
-AI agent Bash tools typically spawn subprocesses with `stdin` connected to `/dev/null` and no controlling terminal. This means:
+You can provide selected plaintext values to an agent by loading `.secenv` or
+exporting secrets before launching it. Alternatively, the agent plugin can
+retrieve secrets using credentials available to gpg-agent. See
+[Claude Code](/guides/claude-code/) for these workflows and where each command
+runs.
 
-| Pinentry Program | Agent Can Trigger Decryption? | Why |
-|------------------|-------------------------------|-----|
-| `pinentry-mac` (macOS) | **Yes**, if passphrase is cached in Keychain or gpg-agent | GUI-based; checks Keychain silently before showing any dialog |
-| `pinentry-gnome3` (Linux) | **Yes**, if passphrase is cached in GNOME Keyring or gpg-agent | GUI-based; checks keyring before showing dialog |
-| `pinentry-qt` (Linux) | **Yes**, if cached | GUI-based |
-| `pinentry-tty` | **No** | Requires terminal input; fails with "Operation cancelled" when there is no controlling terminal |
-| `pinentry-curses` | **No** | Requires terminal input; fails with "Inappropriate ioctl for device" |
-
-Terminal-based pinentry programs (`pinentry-tty`, `pinentry-curses`) fail because the agent's subprocess has no controlling terminal. `/dev/tty` returns "Device not configured". Even when `GPG_TTY` is set to the parent terminal, the agent's terminal renderer is already reading from that device, creating input contention.
-
-GUI-based pinentry programs work because they open their own window, independent of terminal state. When the passphrase is already cached (in gpg-agent memory, the macOS Keychain, or GNOME Keyring), the GUI dialog never appears. The passphrase is returned silently.
-
-**The critical risk: once cached, any process can decrypt.** When a passphrase is cached in gpg-agent or an OS keychain, any process running as your user can invoke `gpg --decrypt` without interaction. This includes AI agents, build scripts, postinstall hooks, and malicious dependencies.
+Cached GPG credentials can also be used by other processes that can access
+the same agent. Extending the cache duration extends that access window.
+Other programs choose their own GPG options.
 
 #### OS Keychain Passphrase Extraction
 

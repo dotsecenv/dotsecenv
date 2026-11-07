@@ -178,3 +178,9 @@ func GenerateKeyTemplate(algo KeyAlgorithm, name, email string, opts *KeyTemplat
 func GetSupportedAlgorithmsString() string {
 	return "Supported algorithms: ED25519, RSA4096, P384 (default), P521"
 }
+
+// GenerateKey creates a key from a GPG batch template under this client's pinentry policy.
+func (c *GPGClient) GenerateKey(template string) error {
+	_, err := c.runWithAgent([]string{"--batch", "--generate-key"}, []byte(template))
+	return err
+}

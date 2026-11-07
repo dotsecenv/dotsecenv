@@ -31,6 +31,7 @@ Secrets are stored in vault files and can be shared between team members.`
 	rootCmd.PersistentFlags().StringVarP(&globalOpts.ConfigPath, "config", "c", "", "Path to config file")
 	rootCmd.PersistentFlags().StringArrayVarP(&globalOpts.VaultPaths, "vault", "v", nil, "Path to vault file or vault index (1-based)")
 	rootCmd.PersistentFlags().BoolVarP(&globalOpts.Silent, "silent", "s", false, "Silent mode (suppress warnings)")
+	rootCmd.PersistentFlags().BoolVar(&globalOpts.NoPinentry, "no-pinentry", false, "Disable GPG pinentry prompts; fail if user interaction is required")
 
 	// Add subcommands
 	rootCmd.AddCommand(loginCmd)

@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/output"
 )
 
@@ -30,7 +32,19 @@ const (
 type Error struct {
 	Message  string
 	ExitCode ExitCode
+	cause    error
 }
+
+// newGPGError preserves pinentry failures through command error handling.
+func newGPGError(message string, cause error, code ExitCode) *Error {
+	if errors.Is(cause, gpg.ErrPinentryRequired) {
+		code = ExitGPGError
+	}
+	return &Error{Message: fmt.Sprintf("%s: %v", message, cause), ExitCode: code, cause: cause}
+}
+
+// Unwrap returns the underlying operation error.
+func (e *Error) Unwrap() error { return e.cause }
 
 // NewError creates a new CLI error.
 // For new code, prefer output.NewError with a structured code.
