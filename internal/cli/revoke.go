@@ -2,11 +2,13 @@ package cli
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
 	"time"
 
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
@@ -85,6 +87,9 @@ func (c *CLI) SecretRevokeAll(secretKey, targetFingerprint string) *Error {
 
 		err := c.secretRevokeInVault(secretKey, targetFingerprint, i, true)
 		if err != nil {
+			if errors.Is(err, gpg.ErrPinentryRequired) {
+				return err
+			}
 			_, _ = fmt.Fprintf(c.output.Stdout(), "Vault %d (%s): skipped, %s\n", displayPos, vaultPath, err.Message)
 			failureCount++
 			continue
@@ -182,7 +187,7 @@ func (c *CLI) secretRevokeInVault(secretKey, targetFingerprint string, vaultInde
 
 	plaintext, decErr := c.gpgClient.DecryptWithAgent(encryptedArmored, fp)
 	if decErr != nil {
-		return NewError(fmt.Sprintf("failed to decrypt secret: %v", decErr), ExitGPGError)
+		return newGPGError("failed to decrypt secret", decErr, ExitGPGError)
 	}
 
 	sort.Strings(newRecipients)
@@ -226,7 +231,7 @@ func (c *CLI) secretRevokeInVault(secretKey, targetFingerprint string, vaultInde
 	valueHash := vault.ComputeSecretValueHash(&newSecretValue, secretKey, algorithmBits)
 	valueSig, sigErr := c.gpgClient.SignDataWithAgent(fp, []byte(valueHash))
 	if sigErr != nil {
-		return NewError(fmt.Sprintf("failed to sign secret value: %v", sigErr), ExitGeneralError)
+		return newGPGError("failed to sign secret value", sigErr, ExitGeneralError)
 	}
 	newSecretValue.Hash = valueHash
 	newSecretValue.Signature = valueSig

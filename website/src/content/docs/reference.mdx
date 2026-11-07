@@ -19,7 +19,24 @@ These options work with all commands:
 | `-c, --config PATH` | Path to config file (default: `~/.config/dotsecenv/config`) |
 | `-v, --vault PATH` | Path to vault file or vault index (1-based) |
 | `-s, --silent` | Silent mode (suppress warnings) |
+| `--no-pinentry` | Disable GPG pinentry prompts; fail if user interaction is required |
 | `-h, --help` | Show help for command |
+
+Without `--no-pinentry`, dotsecenv follows your GPG pinentry configuration.
+With it, signing and decryption use credentials already available to gpg-agent;
+operations that require pinentry fail with `GPG_PINENTRY_REQUIRED` and exit code
+`4`. Key generation also suppresses pinentry when the flag is set. The flag
+controls GPG pinentry; dotsecenv's own selection and confirmation prompts are
+unchanged.
+
+```bash
+dotsecenv --no-pinentry secret get API_KEY
+```
+
+Complete the required GPG unlock in a separate terminal with the same GPG home
+before retrying. If your policy requires interaction for every operation, run
+the operation directly outside the agent session. The Claude Code and Codex
+skills always pass this flag and stop for user action when pinentry is required.
 
 ---
 

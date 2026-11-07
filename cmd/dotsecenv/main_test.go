@@ -68,6 +68,12 @@ func runCmdWithEnv(env []string, args ...string) (string, string, error) {
 	return stdout.String(), stderr.String(), err
 }
 
+func TestGlobalOptions_NoPinentry(t *testing.T) {
+	if _, stderr, err := runCmd("version", "--no-pinentry"); err != nil {
+		t.Fatalf("--no-pinentry must be accepted globally: %v\n%s", err, stderr)
+	}
+}
+
 // setupTestUser creates a GPG identity ready to act as a dotsecenv user:
 // generates a key in gpgHome, writes a minimal config that points at vaultPath,
 // and runs `dotsecenv login` to populate a signed Login section. Tests can then

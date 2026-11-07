@@ -87,7 +87,7 @@ The plugin provides two skills:
 
 ### `/dotsecenv:secrets`: CLI Operations
 
-Teaches Claude how to use the dotsecenv CLI safely. It knows which commands are safe (listing secrets, describing vaults, and running health checks never trigger GPG decryption), when to ask first (decryption and mutation require your explicit request), and how to detect problems (if your GPG pinentry is terminal-based or your passphrase is not cached, Claude warns you upfront instead of failing silently).
+Teaches Claude how to use the dotsecenv CLI safely. It knows which commands are safe (listing secrets, describing vaults, and running health checks never trigger GPG decryption), when to ask first (decryption and mutation require your explicit request), and how to handle GPG failures. Commands use `--no-pinentry` and stop for user action when GPG requires pinentry.
 
 ### `/dotsecenv:secenv`: File Interpretation
 
@@ -98,26 +98,24 @@ Teaches Claude how to work with `.secenv` files:
 - Debug loading issues: checks if referenced secrets exist in reachable vaults, verifies file ownership and permissions, and explains ancestor loading behavior
 - Create `.secenv` files: generates them with the correct syntax after verifying secrets exist
 
-### GPG Pinentry Compatibility
+### GPG Pinentry
 
-Claude Code runs shell commands without a terminal, which affects how GPG passphrase prompts work:
+The shared Claude Code and Codex skills pass `--no-pinentry` on dotsecenv calls.
+GPG can use credentials already available to gpg-agent. When it needs terminal
+or GUI pinentry, dotsecenv returns `GPG_PINENTRY_REQUIRED` with exit code `4`.
+The skill stops and waits for you to act.
 
-| Pinentry Program | Works with Claude Code? | Notes |
-|------------------|------------------------|-------|
-| `pinentry-mac` | Yes | GUI-based. Passphrase returned silently from Keychain or gpg-agent cache. |
-| `pinentry-gnome3` | Yes | GUI-based. Needs a display server. |
-| `pinentry-qt` | Yes | GUI-based. Needs a display server. |
-| `pinentry-tty` | No | Requires terminal input that Claude cannot provide. |
-| `pinentry-curses` | No | Requires terminal input that Claude cannot provide. |
+Complete the required GPG unlock in a separate terminal on the same machine,
+as the same user, with the same GPG home (`GNUPGHOME`, if set). Then tell the
+agent to retry. Signing and decryption can use different keys, so unlocking a
+signing key does not prove that the decryption key is ready.
 
-If you use a terminal-based pinentry, you have two options:
-
-1. Switch to a GUI pinentry by setting `pinentry-program` in `~/.gnupg/gpg-agent.conf`.
-2. Pre-cache your passphrase before asking Claude to decrypt:
-
-   ```bash
-   ! gpg --sign --local-user YOUR_FINGERPRINT </dev/null
-   ```
+If your GPG policy requires interaction for every operation, perform the
+operation directly outside the agent session. Direct CLI calls without
+`--no-pinentry` follow your GPG configuration. The skills do not change your
+pinentry program or cache policy and do not ask for your passphrase or PIN in
+chat. If your dotsecenv binary does not support the flag, upgrade it before
+continuing.
 
 ### Security Model
 

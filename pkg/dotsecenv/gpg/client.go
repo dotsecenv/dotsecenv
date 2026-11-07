@@ -58,6 +58,8 @@ type Client interface {
 // GPGClient provides GPG operations.
 type GPGClient struct {
 	Validator *dscrypto.AlgorithmValidator
+	// NoPinentry prevents agent-backed operations from launching pinentry.
+	NoPinentry bool
 }
 
 // DefaultGPGClient is the default client instance.

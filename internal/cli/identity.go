@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
@@ -55,6 +57,9 @@ func (c *CLI) IdentityAdd(fingerprint string, addAll bool, vaultPath string, fro
 		}
 
 		if err := c.addIdentityToVault(fingerprint, signerFP, idx); err != nil {
+			if errors.Is(err, gpg.ErrPinentryRequired) {
+				return err
+			}
 			_, _ = fmt.Fprintf(c.output.Stderr(), "failed: vault %d (%s): %s\n", idx+1, vPath, err.Message)
 			lastErr = err
 			failed++
@@ -115,7 +120,7 @@ func (c *CLI) addIdentityToVault(fingerprint string, signerFingerprint string, i
 
 	signature, signErr := c.gpgClient.SignDataWithAgent(signerFingerprint, []byte(newIdentity.Hash))
 	if signErr != nil {
-		return NewError(fmt.Sprintf("failed to sign identity: %v", signErr), ExitGPGError)
+		return newGPGError("failed to sign identity", signErr, ExitGPGError)
 	}
 	newIdentity.Signature = signature
 
@@ -182,7 +187,7 @@ func (c *CLI) ensureIdentityInVault(fingerprint string, index int) *Error {
 
 	signature, signErr := c.gpgClient.SignDataWithAgent(signerFP, []byte(newIdentity.Hash))
 	if signErr != nil {
-		return NewError(fmt.Sprintf("failed to sign identity: %v", signErr), ExitGPGError)
+		return newGPGError("failed to sign identity", signErr, ExitGPGError)
 	}
 	newIdentity.Signature = signature
 

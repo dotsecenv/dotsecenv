@@ -9,8 +9,42 @@ import (
 	"testing"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/config"
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/policy"
 )
+
+func TestNewCLIConfigOnly_NoPinentry(t *testing.T) {
+	pointPolicyAtMissing(t)
+	tmp := t.TempDir()
+	program := filepath.Join(tmp, "gpg")
+	if err := os.WriteFile(program, []byte(`#!/bin/sh
+case " $* " in
+    *" --pinentry-mode=error "*) ;;
+    *) echo 'pinentry was not disabled' >&2; exit 2 ;;
+esac
+cat >/dev/null
+printf '[GNUPG:] FAILURE sign 85\n' >&2
+exit 2
+`), 0700); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.DefaultConfig()
+	cfg.GPG.Program = program
+	path := filepath.Join(tmp, "config")
+	if err := config.Save(path, cfg); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	cli, err := NewCLIConfigOnly(path, true, true, strings.NewReader(""), &stdout, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = cli.Close() }()
+	_, err = cli.gpgClient.SignDataWithAgent("TESTFP", []byte("data"))
+	if !errors.Is(err, gpg.ErrPinentryRequired) {
+		t.Fatalf("got %v, want pinentry-required error", err)
+	}
+}
 
 // withTempPolicyDir overrides policy.DefaultDir for the duration of t and
 // restores it on cleanup. The returned dir is the one tests should write
@@ -48,7 +82,7 @@ func TestNewCLIConfigOnly_LoadsConfig(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	cli, err := NewCLIConfigOnly(cfgPath, true, strings.NewReader(""), &stdout, &stderr)
+	cli, err := NewCLIConfigOnly(cfgPath, true, false, strings.NewReader(""), &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("NewCLIConfigOnly failed: %v", err)
 	}
@@ -71,7 +105,7 @@ func TestNewCLIConfigOnly_MissingConfig(t *testing.T) {
 	cfgPath := filepath.Join(tmpDir, "nonexistent.yaml")
 
 	var stdout, stderr bytes.Buffer
-	_, err := NewCLIConfigOnly(cfgPath, true, strings.NewReader(""), &stdout, &stderr)
+	_, err := NewCLIConfigOnly(cfgPath, true, false, strings.NewReader(""), &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error for missing config, got nil")
 	}
@@ -96,7 +130,7 @@ func TestNewCLIConfigOnly_DoesNotOpenVaults(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	cli, err := NewCLIConfigOnly(cfgPath, true, strings.NewReader(""), &stdout, &stderr)
+	cli, err := NewCLIConfigOnly(cfgPath, true, false, strings.NewReader(""), &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("NewCLIConfigOnly should succeed even with nonexistent vault, got: %v", err)
 	}
@@ -138,7 +172,7 @@ func TestNewCLIConfigOnly_AbortsOnInsecurePolicy(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	_, err := NewCLIConfigOnly(cfgPath, true, strings.NewReader(""), &stdout, &stderr)
+	_, err := NewCLIConfigOnly(cfgPath, true, false, strings.NewReader(""), &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected NewCLIConfigOnly to fail on insecure policy, got nil")
 	}
@@ -168,7 +202,7 @@ func TestNewCLIConfigOnly_PolicyLoadErrorClassification(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	_, err := NewCLIConfigOnly(cfgPath, true, strings.NewReader(""), &stdout, &stderr)
+	_, err := NewCLIConfigOnly(cfgPath, true, false, strings.NewReader(""), &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

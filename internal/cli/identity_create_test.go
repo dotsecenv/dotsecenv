@@ -2,9 +2,49 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/gpg"
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/output"
 )
+
+func TestIdentityCreate_NoPinentry(t *testing.T) {
+	program := filepath.Join(t.TempDir(), "gpg")
+	if err := os.WriteFile(program, []byte(`#!/bin/sh
+case " $* " in
+    *" --pinentry-mode=error "*) ;;
+    *) echo 'pinentry was not disabled' >&2; exit 2 ;;
+esac
+cat >/dev/null
+printf '[GNUPG:] FAILURE genkey 85\n' >&2
+exit 2
+`), 0700); err != nil {
+		t.Fatal(err)
+	}
+	previous := gpg.GetGPGProgram()
+	t.Cleanup(func() {
+		if previous == "" {
+			previous = "PATH"
+		}
+		_ = gpg.ValidateAndSetGPGProgram(previous)
+	})
+	if err := gpg.ValidateAndSetGPGProgram(program); err != nil {
+		t.Fatal(err)
+	}
+	cli, _, _ := newSecretStoreCLI(t, nil, nil)
+	var stdout, stderr bytes.Buffer
+	cli.output = output.NewHandler(&stdout, &stderr)
+	err := cli.IdentityCreate(IdentityCreateOptions{Algorithm: "RSA4096", Name: "Test", Email: "test@example.test", NoPinentry: true})
+	if err == nil || err.ExitCode != ExitGPGError || !strings.Contains(err.Message, "GPG_PINENTRY_REQUIRED") {
+		t.Fatalf("got %v, want pinentry required with exit code 4", err)
+	}
+	if strings.Contains(stdout.String(), "GPG will prompt") {
+		t.Errorf("advertised a disabled prompt: %s", stdout.String())
+	}
+}
 
 func TestPrintSuccessOutput_WithConfig(t *testing.T) {
 	var buf bytes.Buffer

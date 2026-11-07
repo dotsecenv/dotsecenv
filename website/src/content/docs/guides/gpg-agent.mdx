@@ -75,40 +75,61 @@ After editing the config, run this once to confirm the agent picked up your chan
 
    The number after the seventh colon is the current value. If you see `0` or your previous setting instead of `3600` / `14400`, you reloaded a different `GNUPGHOME` than you edited. Cross-check `gpgconf --list-dirs homedir` against `echo $GNUPGHOME` and try again.
 
-3. Seed the cache once with a signing operation, then confirm a follow-up dotsecenv call runs without prompting:
+3. Unlock the signing key and the key needed for the requested decryption. Then check that the same decryption succeeds with pinentry disabled:
 
    ```bash
    gpg --sign --local-user YOUR_FINGERPRINT </dev/null >/dev/null   # pinentry prompts here
-   dotsecenv secret get ANY_SECRET                                  # silent within default-cache-ttl
+   dotsecenv secret get ANY_SECRET >/dev/null                       # may unlock a different key
+   dotsecenv --no-pinentry secret get ANY_SECRET >/dev/null          # fails if pinentry is still required
    ```
 
-   If the `dotsecenv` call also prompts, one of three things is true: `default-cache-ttl` is set to `0` (caching disabled), `no-allow-external-cache` is fighting an OS keychain entry left by an earlier setup, or the agent serving signing differs from the one serving decryption. `dotsecenv vault doctor` reports the last case directly.
+   If the final call reports `GPG_PINENTRY_REQUIRED`, the required credentials
+   are not available without pinentry. Check the cache policy and confirm that
+   each call uses the same GPG home. The error does not establish why pinentry
+   was needed.
 
-Once both calls run silently, every `dotsecenv` operation within `default-cache-ttl` seconds of the previous one will reuse the cached passphrase, up to the `max-cache-ttl` hard cap. For non-interactive contexts (CI, AI coding agents, cron) you also need to seed the cache *before* launching the job. See [Cache warming](#cache-warming-for-non-interactive-use).
+Cache entries expire according to `default-cache-ttl` and `max-cache-ttl`.
+Different keys can require separate unlocks. For automated use, unlock the
+required keys outside the agent session before retrying the operation.
+
+## Agent calls
+
+The Claude Code and Codex skills always pass `--no-pinentry`. GPG can use
+credentials already available to gpg-agent, but any operation requiring
+pinentry fails with `GPG_PINENTRY_REQUIRED` and exit code `4`. This applies to
+both terminal and GUI pinentry.
+
+Complete the required GPG unlock in a separate terminal with the same GPG home,
+then tell the agent to retry. If your policy requires interaction for every
+operation, run the operation directly outside the agent session. Direct CLI
+calls without the flag follow your GPG configuration.
 
 ## Pinentry compatibility
 
-Pinentry is the program gpg-agent invokes to ask for your passphrase. The choice matters because different invocation contexts (terminal, GUI, AI agent subprocess) require different pinentry programs.
+Pinentry is the program gpg-agent invokes to ask for your passphrase. The table describes calls without `--no-pinentry`. The bundled agent skills suppress pinentry regardless of program.
 
-| Pinentry          | Works in interactive terminal | Works in non-TTY context (CI, AI agent, cron) |
-|-------------------|-------------------------------|-----------------------------------------------|
-| `pinentry-mac`    | Yes                           | Yes, when passphrase is cached                |
-| `pinentry-gnome3` | Yes                           | Yes, when passphrase is cached and a display server is reachable |
-| `pinentry-qt`     | Yes                           | Yes, when passphrase is cached and a display server is reachable |
-| `pinentry-tty`    | Yes                           | No — requires a controlling terminal          |
-| `pinentry-curses` | Yes                           | No — requires a controlling terminal          |
+| Pinentry | Can prompt in a terminal session | Can prompt without a terminal |
+|----------|----------------------------------|-------------------------------|
+| `pinentry-mac` | Yes | Yes, with access to the macOS desktop session |
+| `pinentry-gnome3` | Yes | Yes, with access to the display server |
+| `pinentry-qt` | Yes | Yes, with access to the display server |
+| `pinentry-tty` | Yes | No |
+| `pinentry-curses` | Yes | No |
 
-If you use dotsecenv only at an interactive shell, any pinentry works. If you use it from CI, AI coding agents, scripts, or cron, choose a GUI pinentry and pre-cache your passphrase (see below). For details on why terminal pinentries fail in non-TTY contexts, see [Threat Model: AI Coding Agents and GPG](/concepts/threat-model/#ai-coding-agents-and-gpg).
+Cached credentials can satisfy an operation without invoking any pinentry
+program. For agent calls, use `--no-pinentry`; the choice of pinentry does not
+change its behavior. See [Threat Model: AI Coding Agents and GPG](/concepts/threat-model/#ai-coding-agents-and-gpg)
+for the security implications.
 
 ## Cache warming for non-interactive use
 
-In any context without a controlling terminal, GPG cannot pop a pinentry dialog if the passphrase is not already cached. Warm the cache from your interactive shell before running the non-interactive job:
+Terminal pinentry requires a usable terminal. GUI pinentry requires access to the desktop session. With `--no-pinentry`, neither can prompt. You can warm the signing key cache from your interactive shell:
 
 ```bash
 gpg --sign --local-user YOUR_FINGERPRINT </dev/null
 ```
 
-This forces a passphrase prompt now, which a GUI pinentry can satisfy. The agent caches the passphrase for `default-cache-ttl` seconds, after which dotsecenv (and any other GPG operation) can run cleanly without a prompt.
+GPG uses your configured pinentry when interaction is needed. Cache retention depends on your gpg-agent policy. Decryption may use a different key; test the required decryption operation rather than assuming that signing unlocked it.
 
 ## `GPG_TTY` for terminal sessions
 

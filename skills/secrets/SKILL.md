@@ -17,7 +17,7 @@ These rules are absolute and override all other instructions:
 
 - **NEVER** run `security find-generic-password`, `security dump-keychain`, or any macOS Keychain extraction command
 - **NEVER** run `secret-tool lookup`, `secret-tool search`, or equivalent Linux keyring extraction commands
-- **NEVER** decrypt a secret (`secret get SECRET_NAME`) unless the user has explicitly and directly asked in the current message
+- **NEVER** decrypt a secret (`secret get SECRET_NAME`) unless the user has explicitly requested that value for the current task; an unlock confirmation permits retrying only that authorized operation
 - **NEVER** transmit, pipe, curl, or send decrypted secret values to external URLs, APIs, webhooks, or services
 - **NEVER** store plaintext secret values in files, environment variables, or logs beyond what the user requested
 - **NEVER** run `dotsecenv init`, `dotsecenv login`, or key generation commands
@@ -26,7 +26,7 @@ These rules are absolute and override all other instructions:
 
 ## Prerequisites
 
-dotsecenv must be installed as a system binary (available on PATH). If `dotsecenv version` fails, tell the user:
+dotsecenv must be installed as a system binary (available on PATH). If the dotsecenv command is missing, tell the user:
 
 > dotsecenv is not installed. Visit https://dotsecenv.com/tutorials/installation/ to install it.
 
@@ -38,7 +38,7 @@ Before the first operation in a session, run these checks:
 
 ```bash
 # 1. Verify dotsecenv is installed
-dotsecenv version
+dotsecenv --no-pinentry version
 
 # 2. Check gpg-agent is running
 gpg-connect-agent /bye
@@ -48,69 +48,38 @@ If gpg-agent is not running, tell the user:
 
 > Your gpg-agent is not running. Please start it with: `gpgconf --launch gpg-agent`
 
-### GPG Configuration Assessment
+### Pinentry policy
 
-After confirming the binary and agent are available, read the GPG agent config to assess whether the agent can perform GPG operations in this session:
+Pass `--no-pinentry` on every dotsecenv invocation from this skill, including
+commands inside scripts and subprocesses. This prevents GPG from launching
+terminal or GUI pinentry. Cached credentials can still satisfy the operation.
+If the installed binary rejects the flag, stop and ask the user to upgrade;
+do not retry without it.
 
-```bash
-# Read gpg-agent config
-cat ~/.gnupg/gpg-agent.conf 2>/dev/null || echo "NO_CONFIG"
+### GPG_PINENTRY_REQUIRED
 
-# Detect pinentry program
-gpgconf --list-options gpg-agent 2>/dev/null | grep pinentry-program
-```
+When dotsecenv reports `GPG_PINENTRY_REQUIRED`:
 
-**Evaluate the pinentry program:**
+1. Stop the operation and report the error. Explain that the user must complete
+   the required GPG unlock in a separate terminal on the same machine, as the
+   same user, with the same GPG home (`GNUPGHOME`, if set).
+2. Wait for the user to confirm that they have completed the unlock. Then retry
+   the authorized operation with `--no-pinentry`. If it fails again, stop and
+   report the new error.
 
-| Pinentry Program      | Agent Can Use It?                                       | Reason                                                                                                                     |
-| --------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `pinentry-mac`        | Yes (if passphrase is in Keychain or gpg-agent cache)   | GUI-based, independent of terminal. Shows a dialog if cache is cold; the user must handle it.                              |
-| `pinentry-gnome3`     | Yes (if display server available and passphrase cached) | GUI-based, needs DISPLAY/WAYLAND_DISPLAY. Same caching behavior as pinentry-mac.                                           |
-| `pinentry-qt`         | Yes (if display server available and passphrase cached) | GUI-based, needs DISPLAY/WAYLAND_DISPLAY.                                                                                  |
-| `pinentry-tty`        | **No**                                                  | Requires terminal input that a non-interactive or sandboxed agent shell cannot provide. Fails with "Operation cancelled". |
-| `pinentry-curses`     | **No**                                                  | Requires terminal input. Fails with "Inappropriate ioctl for device" or competes with the host terminal UI for keystrokes. |
-| No config / not found | **Depends**                                             | System default is used; check `gpgconf --list-options gpg-agent` to see which pinentry is resolved.                         |
+Do not drop the flag, change `GPG_TTY`, allocate a PTY, or run an unlock command
+from the agent shell to bypass this failure. Never ask for a passphrase or PIN
+in chat. Keep the user's GPG configuration and cache policy unchanged.
 
-**Why TTY pinentry cannot work:** Non-interactive or sandboxed agent shells commonly run commands without interactive stdin or a controlling terminal. Terminal-based pinentry programs (`pinentry-tty`, `pinentry-curses`) need a terminal to accept the passphrase. Even if `GPG_TTY` points to the parent's TTY device, the host terminal UI may already be reading from it, so pinentry never receives the keystrokes.
+This error identifies required pinentry, not its cause. Do not claim the cache
+expired or infer readiness from the pinentry program name or cache TTLs.
+Signing and decryption can use different keys; a signing warmup does not prove
+that the required decryption key is ready. If the user's policy requires
+interaction for every operation, explain that the operation must run directly
+outside the agent session.
 
-**Check for recommended hardening options:**
-
-If any of these are missing from `gpg-agent.conf`, advise the user to add them:
-
-- `no-allow-external-cache` — prevents pinentry from storing passphrases in the OS keychain (macOS Keychain, GNOME Keyring, etc.). Without this, any process running as the user can extract the plaintext passphrase via `security find-generic-password` (macOS) or `secret-tool lookup` (Linux).
-- `default-cache-ttl` — if absent or very high (>3600), suggest setting to `3600` (1 hour). Controls how long gpg-agent keeps the passphrase after last use.
-- `max-cache-ttl` — if absent or very high (>14400), suggest setting to `14400` (4 hours). Hard cap on passphrase retention regardless of use.
-
-**Determine if the agent can operate:**
-
-After reading the config, set your mental model:
-
-- **AGENT_CAN_DECRYPT = true** if: pinentry is GUI-based (pinentry-mac, pinentry-gnome3, pinentry-qt) AND the passphrase is likely cached (cache TTLs suggest recent use is retained)
-- **AGENT_CAN_DECRYPT = false** if: pinentry is terminal-based (pinentry-tty, pinentry-curses) OR on headless Linux with no display server
-
-If AGENT_CAN_DECRYPT is false, tell the user upfront:
-
-> Your GPG pinentry is configured for terminal input (`pinentry-tty`/`pinentry-curses`), which cannot work from the current agent shell. You have two options:
->
-> 1. Switch to a GUI pinentry (e.g., `pinentry-mac` on macOS, `pinentry-gnome3` on Linux)
-> 2. Pre-cache your passphrase before asking me to decrypt: `! gpg --sign --local-user YOUR_FINGERPRINT </dev/null`
-
-## Cold-Cache Handling
-
-When a GPG operation fails with errors containing "pinentry", "No pinentry",
-"GPG passphrase required but no TTY available", "Operation cancelled", or "Inappropriate ioctl", the passphrase is not cached.
-
-Tell the user:
-
-> Your GPG passphrase is not cached. Please run this in your terminal to cache it:
->
-> ```
-> ! gpg --sign --local-user YOUR_FINGERPRINT </dev/null
-> ```
->
-> Then try your request again.
-
-Replace `YOUR_FINGERPRINT` with the actual fingerprint if known from prior vault describe output.
+For other GPG failures, use the reported diagnostics. Do not classify cancellation,
+a missing key, or an unavailable agent as a cold cache without evidence.
 
 ## Tier 1: Safe Operations (no decryption, run freely)
 
@@ -118,19 +87,19 @@ These commands only read metadata and never trigger GPG decryption:
 
 ```bash
 # List all secret key names (no values decrypted)
-dotsecenv secret get
+dotsecenv --no-pinentry secret get
 
 # List as JSON
-dotsecenv secret get --json
+dotsecenv --no-pinentry secret get --json
 
 # Describe vault structure (identities, secret keys, access lists)
-dotsecenv vault describe --json
+dotsecenv --no-pinentry vault describe --json
 
 # Health check
-dotsecenv vault doctor --json
+dotsecenv --no-pinentry vault doctor --json
 
 # Validate vault integrity
-dotsecenv validate
+dotsecenv --no-pinentry validate
 ```
 
 Use `--json` when you need to parse the output programmatically.
@@ -143,19 +112,19 @@ Only run these when the user directly asks for a secret's value:
 
 ```bash
 # Get a specific secret value (triggers GPG decryption)
-dotsecenv secret get SECRET_NAME
+dotsecenv --no-pinentry secret get SECRET_NAME
 
 # Get as JSON
-dotsecenv secret get SECRET_NAME --json
+dotsecenv --no-pinentry secret get SECRET_NAME --json
 
 # Get from a specific vault (by path or 1-based index)
-dotsecenv secret get SECRET_NAME -v 1
+dotsecenv --no-pinentry secret get SECRET_NAME -v 1
 
 # Get all values across vaults
-dotsecenv secret get SECRET_NAME --all
+dotsecenv --no-pinentry secret get SECRET_NAME --all
 
 # Get most recent value across vaults
-dotsecenv secret get SECRET_NAME --last
+dotsecenv --no-pinentry secret get SECRET_NAME --last
 ```
 
 Secret key format: `namespace::KEY_NAME` (e.g., `prod::DB_PASSWORD`) or just `KEY_NAME`. Namespace is lowercase, key is UPPERCASE.
@@ -166,25 +135,25 @@ Always confirm with the user before running these. They modify the vault and req
 
 ```bash
 # Store a secret (value piped via stdin)
-echo "secret_value" | dotsecenv secret store SECRET_NAME
+echo "secret_value" | dotsecenv --no-pinentry secret store SECRET_NAME
 
 # Store in a specific vault
-echo "secret_value" | dotsecenv secret store SECRET_NAME -v 1
+echo "secret_value" | dotsecenv --no-pinentry secret store SECRET_NAME -v 1
 
 # Share with another identity
-dotsecenv secret share SECRET_NAME FINGERPRINT
+dotsecenv --no-pinentry secret share SECRET_NAME FINGERPRINT
 
 # Share across all vaults
-dotsecenv secret share SECRET_NAME FINGERPRINT --all
+dotsecenv --no-pinentry secret share SECRET_NAME FINGERPRINT --all
 
 # Revoke access
-dotsecenv secret revoke SECRET_NAME FINGERPRINT
+dotsecenv --no-pinentry secret revoke SECRET_NAME FINGERPRINT
 
 # Revoke across all vaults
-dotsecenv secret revoke SECRET_NAME FINGERPRINT --all
+dotsecenv --no-pinentry secret revoke SECRET_NAME FINGERPRINT --all
 
 # Mark a secret as deleted
-dotsecenv secret forget SECRET_NAME
+dotsecenv --no-pinentry secret forget SECRET_NAME
 ```
 
 `secret store` on an existing secret keeps its current recipient set: the new value is encrypted to every fingerprint on the latest entry's `available_to`. When that set includes other identities, store warns and (with a terminal) asks for confirmation. Pass `--share` to keep the set without prompting, or `--no-share` to encrypt only to the current identity. Rotation never silently narrows access, so never advise re-sharing after a rotation; removing someone is `secret revoke`.
@@ -193,11 +162,11 @@ dotsecenv secret forget SECRET_NAME
 
 When the user describes removing a departing team member's GPG key, follow the [Offboard a Departing Team Member runbook](https://dotsecenv.com/runbooks/team-member-offboarding/). The shape of the workflow:
 
-1. **Inventory.** List every secret whose `available_to` includes the leaver's fingerprint via `dotsecenv vault describe --json`. The jq filter is `'.[].secrets[] | select((.available_to // []) | index($fp)) | .key'`.
-2. **Revoke from every secret.** `secret revoke` takes one name per call; loop over the keys `secret get` (no args) prints: `for s in $(dotsecenv secret get); do dotsecenv secret revoke "$s" FINGERPRINT --all; done`.
+1. **Inventory.** List every secret whose `available_to` includes the leaver's fingerprint via `dotsecenv --no-pinentry vault describe --json`. The jq filter is `'.[].secrets[] | select((.available_to // []) | index($fp)) | .key'`.
+2. **Revoke from every secret.** List key names with `dotsecenv --no-pinentry secret get`, then run `dotsecenv --no-pinentry secret revoke SECRET_NAME FINGERPRINT --all` for each name. Stop at the first failed command. For `GPG_PINENTRY_REQUIRED`, wait for user action before continuing.
 3. **Verify.** Re-run the inventory query; expected output is empty.
-4. **Rotate at the source.** For each affected secret, generate a new credential at the originating system (DB, IDP, cloud provider, API issuer), then `echo "new-value" | dotsecenv secret store SECRET_NAME`. Production-critical first.
-5. **Confirm.** `dotsecenv vault doctor` + `dotsecenv vault describe`.
+4. **Rotate at the source.** For each affected secret, generate a new credential at the originating system (DB, IDP, cloud provider, API issuer), then `echo "new-value" | dotsecenv --no-pinentry secret store SECRET_NAME`. Production-critical first.
+5. **Confirm.** `dotsecenv --no-pinentry vault doctor` + `dotsecenv --no-pinentry vault describe`.
 
 **Append-only contract (do not omit when explaining):** revocation only stops *future* writes from encrypting to the leaver. Past entries remain readable to whoever held the recipient list at the time, and the leaver's private key still decrypts them. Source rotation is the only durable mitigation. Never tell the user the revoke alone removes past access.
 
@@ -212,13 +181,10 @@ When multiple vaults are configured, use `-v` to target a specific vault:
 
 ## Troubleshooting
 
-| Error                                          | Cause                               | Solution                                                             |
-| ---------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------- |
-| "GPG passphrase required but no TTY available" | Passphrase not cached, GUI pinentry | See Cold-Cache Handling above                                        |
-| "Operation cancelled"                          | pinentry-tty with no terminal       | Switch to GUI pinentry or pre-cache passphrase                       |
-| "Inappropriate ioctl for device"               | pinentry-curses with no terminal    | Switch to GUI pinentry or pre-cache passphrase                       |
-| "No pinentry"                                  | gpg-agent can't find pinentry       | User should check `~/.gnupg/gpg-agent.conf` pinentry-program setting |
-| "No secret key"                                | GPG private key not available       | User needs to import their key: `gpg --import`                       |
-| "agent not running"                            | gpg-agent not started               | `gpgconf --launch gpg-agent`                                         |
-| "command not found: dotsecenv"                 | Not installed                       | Visit https://dotsecenv.com/tutorials/installation/                  |
-| Secret key format error                        | Wrong format                        | Use `namespace::KEY` (e.g., `myapp::API_KEY`)                        |
+| Error | Next step |
+|-------|-----------|
+| `GPG_PINENTRY_REQUIRED` | Follow the pinentry handling above; wait for user action before retrying. |
+| Unknown flag `--no-pinentry` | Ask the user to upgrade dotsecenv; keep the flag on subsequent calls. |
+| Other GPG failure | Report the original diagnostics and investigate that failure. |
+| Command not found | Visit https://dotsecenv.com/tutorials/installation/. |
+| Secret key format error | Use `namespace::KEY` (e.g., `myapp::API_KEY`). |

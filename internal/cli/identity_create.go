@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"os/exec"
@@ -20,6 +19,7 @@ type IdentityCreateOptions struct {
 	Email        string // User's email address
 	TemplateOnly bool   // If true, only output the template without generating
 	NoPassphrase bool   // If true, create key without passphrase (for CI/automation)
+	NoPinentry   bool   // Prevent GPG from launching pinentry
 }
 
 // identityCreateIO holds the I/O streams for identity creation.
@@ -133,11 +133,11 @@ func identityCreateCore(opts IdentityCreateOptions, cfg *config.Config, io *iden
 	_, _ = fmt.Fprintf(io.stdout, "Generating %s key for %s <%s>...\n", opts.Algorithm, name, email)
 	if opts.NoPassphrase {
 		_, _ = fmt.Fprintf(io.stderr, "WARNING: Creating key without passphrase. Only use for CI/automation.\n\n")
-	} else {
+	} else if !opts.NoPinentry {
 		_, _ = fmt.Fprintf(io.stdout, "GPG will prompt for a passphrase to protect your key.\n\n")
 	}
 
-	fingerprint, genErr := generateGPGKeyWithTemplate(template)
+	fingerprint, genErr := generateGPGKeyWithTemplate(template, opts.NoPinentry)
 	if genErr != nil {
 		return genErr
 	}
@@ -211,17 +211,10 @@ func printSuccessOutput(w io.Writer, name, email, algorithm, fingerprint string,
 
 // generateGPGKeyWithTemplate generates a GPG key using the provided template.
 // Returns the fingerprint of the generated key.
-func generateGPGKeyWithTemplate(template string) (string, *Error) {
-	cmd := exec.Command(gpg.GetGPGProgram(), "--batch", "--generate-key")
-	cmd.Stdin = strings.NewReader(template)
-
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	// Run the command (GPG will use pinentry for passphrase)
-	err := cmd.Run()
-	if err != nil {
-		return "", NewError(fmt.Sprintf("failed to generate GPG key: %v\n%s", err, stderr.String()), ExitGPGError)
+func generateGPGKeyWithTemplate(template string, noPinentry bool) (string, *Error) {
+	client := &gpg.GPGClient{NoPinentry: noPinentry}
+	if err := client.GenerateKey(template); err != nil {
+		return "", NewError(fmt.Sprintf("failed to generate GPG key: %v", err), ExitGPGError)
 	}
 
 	// Extract the fingerprint from the most recently created key
