@@ -15,6 +15,10 @@ _Unreleased_
 
 - Agent skills use `--no-pinentry` to suppress GPG prompts and report `GPG_ERR_NO_PIN_ENTRY` with recovery guidance when interaction is needed (#402)
 
+### Bug Fixes
+
+- `make lint` ignores vendored Go files in nested `vendor/` directories, including those inside a checkout placed under the repository (#403)
+
 ---
 
 ## v0.10.3
