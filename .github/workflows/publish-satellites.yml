@@ -29,7 +29,10 @@ permissions:
 
 jobs:
   publish-packages:
-    if: inputs.target == 'packages' || inputs.target == 'both'
+    concurrency:
+      group: publish-packages
+      cancel-in-progress: false
+    if: github.ref == 'refs/heads/main' && (inputs.target == 'packages' || inputs.target == 'both')
     runs-on: ubuntu-26.04
     outputs:
       packages_run_id: ${{ steps.find_packages.outputs.run_id }}
@@ -61,11 +64,15 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: packages
+          permission-actions: write
+          permission-contents: write
+          permission-workflows: write
 
       # No `tag:` input — ad-hoc publishes shouldn't clutter the satellite
       # with refs. Source-Tag is omitted from the body for the same reason:
       # there's no release tag this commit corresponds to.
       - name: Publish packages source to satellite (no tag)
+        id: publish_packages
         uses: releasetools/actions/signed-push@76cf0826db3a16eed6baa02d03548628e7a32519  # v0.10.0
         with:
           source-dir: packages
@@ -79,12 +86,22 @@ jobs:
             Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Dispatch packages deployment
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          gh workflow run publish.yml --repo dotsecenv/packages --ref main \
+            -f "source_sha=$SOURCE_SHA"
+
       - name: Find satellite publish.yml run
         id: find_packages
         env:
           SATELLITE_REPO: dotsecenv/packages
           WORKFLOW_FILE: publish.yml
           SINCE: ${{ steps.timestamp.outputs.push_time }}
+          EVENT: workflow_dispatch
+          HEAD_SHA: ${{ steps.publish_packages.outputs.commit-sha }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: scripts/release/find-satellite-run.sh
 
@@ -112,7 +129,7 @@ jobs:
         run: scripts/release/watch-satellite-run.sh
 
   publish-plugin:
-    if: inputs.target == 'plugin' || inputs.target == 'both'
+    if: github.ref == 'refs/heads/main' && (inputs.target == 'plugin' || inputs.target == 'both')
     runs-on: ubuntu-26.04
     outputs:
       commit_sha: ${{ steps.push.outputs.commit-sha }}

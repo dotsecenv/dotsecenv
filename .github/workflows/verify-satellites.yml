@@ -19,10 +19,9 @@ run-name: "Verify satellite drift: ${{ inputs.sha || github.event.workflow_run.h
 #   1. workflow_dispatch input `sha` (explicit operator override)
 #   2. workflow_run.head_sha (the tag commit the upstream Release
 #      just published — newest known publish SHA)
-#   3. The Source-SHA trailer in the satellite's HEAD commit body
-#      (the satellite's authoritative claim of which monorepo commit
-#      it was last published from), parsed via
-#      `git interpret-trailers --parse`.
+#   3. The authenticated Source-SHA trailer in the satellite commit.
+# The verifier runs from main and validates the commit signature and
+# source ancestry before the selected source revision is checked out.
 #
 # Crucially, we do NOT default to `github.sha`. That would be the
 # main HEAD when the workflow fires, which can be ahead of the last
@@ -73,48 +72,41 @@ jobs:
             repo: dotsecenv/packages
             source_dir: packages
     steps:
-      # Satellite goes first because we may need to read its Source-SHA
-      # trailer to decide which monorepo commit to compare against.
+      - name: Checkout trusted verifier from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: main
+          path: trusted
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Checkout ${{ matrix.repo }} satellite
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: ${{ matrix.repo }}
           path: satellite
           fetch-depth: 1
+          persist-credentials: false
 
-      - name: Resolve monorepo SHA to verify against
+      - name: Authenticate satellite and resolve source SHA
         id: sha
         env:
           INPUT_SHA: ${{ inputs.sha }}
           WR_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ github.token }}
+          MONOREPO_DIR: trusted
+          SATELLITE_DIR: satellite
+          SATELLITE_REPO: ${{ matrix.repo }}
         run: |
-          if [ -n "${INPUT_SHA}" ]; then
-            SHA="${INPUT_SHA}"
-            SRC="workflow_dispatch input"
-          elif [ -n "${WR_SHA}" ]; then
-            SHA="${WR_SHA}"
-            SRC="upstream Release run head_sha"
-          elif [ -d satellite/.git ]; then
-            SHA=$(git -C satellite log -1 --format=%B \
-              | git interpret-trailers --parse \
-              | awk -F': ' '$1=="Source-SHA"{print $2}')
-            if [ -z "${SHA}" ]; then
-              echo "::error::Satellite HEAD commit has no Source-SHA trailer"
-              exit 1
-            fi
-            SRC="satellite Source-SHA trailer"
-          else
-            echo "::error::No SHA source available (no input, no workflow_run, no satellite git history)"
-            exit 1
-          fi
-          echo "Reference SHA: ${SHA} (from ${SRC})"
-          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          export EXPECTED_SHA="${INPUT_SHA:-${WR_SHA}}"
+          python3 trusted/scripts/release/verify-satellite-provenance.py
 
-      - name: Checkout monorepo @ ${{ steps.sha.outputs.sha }}
+      - name: Checkout authenticated monorepo source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          ref: ${{ steps.sha.outputs.sha }}
+          ref: ${{ steps.sha.outputs.source_sha }}
           path: monorepo
+          persist-credentials: false
 
       # The packages satellite is published with a retracted.txt
       # generated from go.mod at publish time. The monorepo source
@@ -133,11 +125,14 @@ jobs:
       - name: Regenerate packages/retracted.txt from go.mod
         if: matrix.satellite == 'packages'
         working-directory: monorepo
-        run: ./scripts/extract-retracted.sh go.mod > packages/retracted.txt
+        run: ../trusted/scripts/extract-retracted.sh go.mod > packages/retracted.txt
 
       - name: Verify ${{ matrix.satellite }} satellite
         env:
           SOURCE_DIR: monorepo/${{ matrix.source_dir }}
           SATELLITE_DIR: satellite
-          EXPECTED_SHA: ${{ steps.sha.outputs.sha }}
-        run: monorepo/scripts/release/verify-satellite.sh
+          SATELLITE_REPO: ${{ matrix.repo }}
+          MONOREPO_DIR: trusted
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ steps.sha.outputs.source_sha }}
+        run: trusted/scripts/release/verify-satellite.sh

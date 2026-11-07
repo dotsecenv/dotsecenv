@@ -1,25 +1,22 @@
 name: Publish Packages
 
 on:
-  # Trigger on push to main. The monorepo's publish-packages job pushes
-  # source (key.asc, retracted.txt, this very workflow file, etc.) to
-  # this satellite via a signed commit on every release; that push lands
-  # here and triggers this workflow. Renovate PRs that merge to main
-  # also trigger a republish to pick up dependency updates.
-  push:
-    branches: [main]
-
   workflow_dispatch:
     inputs:
+      source_sha:
+        description: "Monorepo commit (manual rebuilds default to authenticated provenance)"
+        required: false
+        default: ""
+      source_tag:
+        description: "Release tag (empty for ad-hoc publication or manual rebuild)"
+        required: false
+        default: ""
       keep_versions:
-        description: "Number of minor versions to include — last patch of each (default: 5)"
+        description: "Number of minor versions to include (last patch of each; default: 5)"
         required: false
         default: "5"
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: {}
 
 concurrency:
   group: "pages"
@@ -29,14 +26,83 @@ env:
   KEEP_VERSIONS: ${{ inputs.keep_versions || '5' }}
 
 jobs:
-  build-and-deploy:
+  provenance:
+    if: github.repository == 'dotsecenv/packages' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-26.04
+    permissions: {}
+    outputs:
+      satellite_sha: ${{ steps.provenance.outputs.satellite_sha }}
+    steps:
+      - name: Checkout trusted verifier from monorepo main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: dotsecenv/dotsecenv
+          ref: main
+          path: trusted
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout dispatched satellite commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: satellite
+          persist-credentials: false
+
+      - name: Authenticate commit, source and dispatch actor
+        id: provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SATELLITE_REPO: dotsecenv/packages
+          SATELLITE_DIR: satellite
+          MONOREPO_DIR: trusted
+          EXPECTED_SHA: ${{ inputs.source_sha }}
+          EXPECTED_TAG: ${{ inputs.source_tag }}
+          DISPATCH_ACTOR: ${{ github.triggering_actor }}
+        run: python3 trusted/scripts/release/verify-satellite-provenance.py --actor "$DISPATCH_ACTOR"
+
+      - name: Checkout authenticated source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: dotsecenv/dotsecenv
+          ref: ${{ steps.provenance.outputs.source_sha }}
+          path: source
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: source/go.mod
+          cache: false
+
+      - name: Compare satellite with authenticated source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SATELLITE_REPO: dotsecenv/packages
+          SATELLITE_DIR: satellite
+          MONOREPO_DIR: trusted
+          SOURCE_DIR: source/packages
+          EXPECTED_SHA: ${{ steps.provenance.outputs.source_sha }}
+        run: |
+          trusted/scripts/extract-retracted.sh source/go.mod > source/packages/retracted.txt
+          trusted/scripts/release/verify-satellite.sh
+
+  build-and-deploy:
+    needs: provenance
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ needs.provenance.outputs.satellite_sha }}
+          persist-credentials: false
 
       - name: Install Tools
         run: |
@@ -137,13 +203,15 @@ jobs:
             | awk -F. '!seen[$1"."$2]++' \
             | head -n "${KEEP_VERSIONS}")
 
-          echo "versions<<EOF" >> $GITHUB_OUTPUT
-          echo "$VERSIONS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "versions<<EOF"
+            echo "$VERSIONS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
           # Latest version (first in list)
           LATEST=$(echo "$VERSIONS" | head -n 1)
-          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
 
           echo "Found versions (after filtering retracted):"
           echo "$VERSIONS"
@@ -251,8 +319,8 @@ jobs:
           cd _stage/apt
 
           # Check if we have any debs
-          if ls *.deb 1>/dev/null 2>&1; then
-            sha256sum *.deb > checksums.txt
+          if ls -- *.deb 1>/dev/null 2>&1; then
+            sha256sum -- *.deb > checksums.txt
 
             # Generate multi-version Packages
             dpkg-scanpackages --multiversion . /dev/null > Packages
@@ -278,8 +346,8 @@ jobs:
           cd _stage/yum
 
           # Check if we have any rpms
-          if ls *.rpm 1>/dev/null 2>&1; then
-            sha256sum *.rpm > checksums.txt
+          if ls -- *.rpm 1>/dev/null 2>&1; then
+            sha256sum -- *.rpm > checksums.txt
 
             # Create repo (includes all RPMs automatically)
             createrepo_c .
@@ -331,13 +399,13 @@ jobs:
           done
 
           cd _stage/darwin
-          if ls *.tar.gz 1>/dev/null 2>&1; then
-            sha256sum *.tar.gz > checksums.txt
+          if ls -- *.tar.gz 1>/dev/null 2>&1; then
+            sha256sum -- *.tar.gz > checksums.txt
           fi
 
           cd ../linux
-          if ls *.tar.gz 1>/dev/null 2>&1; then
-            sha256sum *.tar.gz > checksums.txt
+          if ls -- *.tar.gz 1>/dev/null 2>&1; then
+            sha256sum -- *.tar.gz > checksums.txt
           fi
 
       - name: Copy Static Files
@@ -391,7 +459,7 @@ jobs:
         uses: actions/deploy-pages@v5
 
   verify-darwin-notarization:
-    needs: build-and-deploy
+    needs: [provenance, build-and-deploy]
     runs-on: macos-26
     steps:
       - name: Generate App Token

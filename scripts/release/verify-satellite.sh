@@ -1,25 +1,9 @@
 #!/usr/bin/env bash
 #
-# Verify that a satellite checkout matches what the monorepo's source
-# subdirectory says it should be — byte-for-byte, mode-for-mode.
-#
-# The publish flow (releasetools/actions/signed-push) syncs every file
-# under SOURCE_DIR into the satellite via GitHub's GraphQL
-# createCommitOnBranch mutation. Provenance lives in RFC-822 git trailers
-# in the satellite's
-# HEAD commit body (Source-Commit, Source-SHA, Source-Path, Source-Tag,
-# Published-By), parseable via `git interpret-trailers --parse`. So a
-# healthy satellite at commit SHA contains exactly the files under
-# SOURCE_DIR at SHA. Anything else is drift: a missed file, an out-of-
-# band edit on the satellite, a publish bug, or a stale satellite that
-# didn't receive a later push.
-#
-# This script:
-#   1. Diffs the file LISTS (source-only / satellite-only / common),
-#      with GENERATED_PATHS whitelisted as expected on the satellite.
-#   2. Diffs the file CONTENTS and Unix mode for files present in both.
-#   3. If EXPECTED_SHA is set, validates the Source-SHA trailer in
-#      the satellite's HEAD commit body matches it.
+# Authenticate a satellite commit and compare its files with its source.
+# Run this script from a trusted monorepo checkout. The adjacent provenance
+# verifier requires a GitHub-signed release App commit, source ancestry on
+# main, and a maintainer-signed tag for release publishes.
 #
 # Exits non-zero on any drift. The diff payload (capped) is printed to
 # stdout and additionally written to $GITHUB_STEP_SUMMARY when running
@@ -28,12 +12,14 @@
 # Required env:
 #   SOURCE_DIR        path to the monorepo subdirectory (e.g. "plugin")
 #   SATELLITE_DIR     path to a checkout of the satellite (e.g. "satellite/")
+#   SATELLITE_REPO    dotsecenv/plugin or dotsecenv/packages
+#   MONOREPO_DIR      trusted monorepo checkout with origin/main and tags
+#   GH_TOKEN          GitHub API token for public commit signature metadata
 #
 # Optional env:
 #   EXPECTED_SHA      monorepo commit SHA the satellite should be at.
-#                     Validates the Source-SHA trailer in the satellite's
-#                     HEAD commit body matches. If unset, the SHA-pinning
-#                     check is skipped.
+#                     Must match Source-SHA when provided.
+#   EXPECTED_TAG      release tag that must match Source-Tag when provided.
 #   GENERATED_PATHS   newline-separated paths the publish workflow
 #                     writes into the satellite but that don't live
 #                     in the monorepo source tree (e.g. "retracted.txt"
@@ -45,9 +31,7 @@
 #                     full so you can still see what differs.
 #
 # Required tools in PATH:
-#   find, diff, cmp, comm, sort, sed, awk, stat
-#   (git is only needed when EXPECTED_SHA is set, to read the
-#    Source-SHA trailer on the satellite's HEAD commit)
+#   python3, gh, git, find, diff, cmp, comm, sort, sed, stat, grep
 
 set -euo pipefail
 
@@ -56,6 +40,17 @@ set -euo pipefail
 EXPECTED_SHA="${EXPECTED_SHA:-}"
 GENERATED_PATHS="${GENERATED_PATHS:-}"
 MAX_DIFF_BYTES="${MAX_DIFF_BYTES:-65536}"
+
+PROVENANCE=$(python3 "$(dirname "$0")/verify-satellite-provenance.py")
+SOURCE_SHA=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["source_sha"])' <<< "$PROVENANCE")
+if [ "$(git -C "${SOURCE_DIR}" rev-parse HEAD)" != "${SOURCE_SHA}" ]; then
+  echo "::error::Source checkout does not match authenticated Source-SHA" >&2
+  exit 1
+fi
+if find "${SOURCE_DIR}" "${SATELLITE_DIR}" -name $'*\n*' -print -quit | grep -q .; then
+  echo "::error::Newline filenames cannot be compared safely" >&2
+  exit 1
+fi
 
 DRIFT=0
 REPORT=$(mktemp)
@@ -68,28 +63,7 @@ say "  source    : ${SOURCE_DIR}"
 say "  satellite : ${SATELLITE_DIR}"
 [ -n "${EXPECTED_SHA}" ] && say "  expected  : ${EXPECTED_SHA}"
 
-# ---------- Source-SHA trailer ----------------------------------------------
-# The publish flow writes a Source-SHA trailer to the satellite commit
-# body. Read it via `git interpret-trailers --parse` and check that it
-# matches what the caller expects.
-if [ -n "${EXPECTED_SHA}" ]; then
-  if command -v git >/dev/null 2>&1 && [ -d "${SATELLITE_DIR}/.git" ]; then
-    TRAILER_SHA=$(git -C "${SATELLITE_DIR}" log -1 --format=%B \
-      | git interpret-trailers --parse \
-      | awk -F': ' '$1=="Source-SHA"{print $2}')
-    if [ -z "${TRAILER_SHA}" ]; then
-      say "  Source-SHA trailer: MISSING on satellite HEAD commit"
-      DRIFT=1
-    elif [ "${TRAILER_SHA}" = "${EXPECTED_SHA}" ]; then
-      say "  Source-SHA trailer: OK (${TRAILER_SHA:0:12})"
-    else
-      say "  Source-SHA trailer: DRIFT — trailer says ${TRAILER_SHA:0:12}, expected ${EXPECTED_SHA:0:12}"
-      DRIFT=1
-    fi
-  else
-    say "  Source-SHA trailer: SKIPPED (no git available or satellite has no .git/)"
-  fi
-fi
+say "  authenticated Source-SHA: ${SOURCE_SHA}"
 
 # ---------- File-list comparison --------------------------------------------
 # Build NL-separated exclude list for satellite-side listing: just
@@ -100,17 +74,17 @@ SAT_EXCLUDES="${GENERATED_PATHS}"
 SRC_LIST=$(mktemp); SAT_LIST=$(mktemp)
 trap 'rm -f "${REPORT}" "${SRC_LIST}" "${SAT_LIST}"' EXIT
 
-( cd "${SOURCE_DIR}" && find . -type f -not -path './.git/*' | sed 's|^\./||' ) \
+( cd "${SOURCE_DIR}" && find . \( -type f -o -type l \) -not -path './.git' -not -path './.git/*' | sed 's|^\./||' ) \
   | LC_ALL=C sort -u > "${SRC_LIST}"
 
 # When SAT_EXCLUDES is empty, skip the grep — `grep -vxF ""` would match
 # empty lines (harmless here, since find never emits them, but odd to read).
 if [ -n "${SAT_EXCLUDES}" ]; then
-  ( cd "${SATELLITE_DIR}" && find . -type f -not -path './.git/*' | sed 's|^\./||' ) \
+  ( cd "${SATELLITE_DIR}" && find . \( -type f -o -type l \) -not -path './.git' -not -path './.git/*' | sed 's|^\./||' ) \
     | grep -vxF "${SAT_EXCLUDES}" \
     | LC_ALL=C sort -u > "${SAT_LIST}"
 else
-  ( cd "${SATELLITE_DIR}" && find . -type f -not -path './.git/*' | sed 's|^\./||' ) \
+  ( cd "${SATELLITE_DIR}" && find . \( -type f -o -type l \) -not -path './.git' -not -path './.git/*' | sed 's|^\./||' ) \
     | LC_ALL=C sort -u > "${SAT_LIST}"
 fi
 
@@ -148,6 +122,15 @@ stat_mode() {
 while IFS= read -r f; do
   [ -z "$f" ] && continue
   COMMON_COUNT=$((COMMON_COUNT + 1))
+  if [ -L "${SOURCE_DIR}/${f}" ] || [ -L "${SATELLITE_DIR}/${f}" ]; then
+    if [ ! -L "${SOURCE_DIR}/${f}" ] || [ ! -L "${SATELLITE_DIR}/${f}" ] \
+      || ! python3 -c 'import os,sys; sys.exit(os.readlink(sys.argv[1]) != os.readlink(sys.argv[2]))' \
+        "${SOURCE_DIR}/${f}" "${SATELLITE_DIR}/${f}"; then
+      CONTENT_COUNT=$((CONTENT_COUNT + 1))
+      echo "--- symlink drift: ${f} ---" >> "${DIFFS}"
+    fi
+    continue
+  fi
   if ! cmp -s "${SOURCE_DIR}/${f}" "${SATELLITE_DIR}/${f}"; then
     CONTENT_COUNT=$((CONTENT_COUNT + 1))
     {

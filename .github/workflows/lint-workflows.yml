@@ -14,11 +14,15 @@ on:
     paths:
       - ".github/workflows/**"
       - ".github/actionlint*"
+      - "packages/.github/workflows/**"
+      - "scripts/release/**"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/**"
       - ".github/actionlint*"
+      - "packages/.github/workflows/**"
+      - "scripts/release/**"
 
 permissions:
   contents: read
@@ -36,3 +40,11 @@ jobs:
 
       - name: Run actionlint
         uses: docker://rhysd/actionlint:1.7.12
+
+      - name: Lint packages satellite workflow
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: packages/.github/workflows/publish.yml
+
+      - name: Test satellite provenance
+        run: python3 scripts/release/test_satellite_provenance.py
