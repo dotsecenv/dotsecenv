@@ -293,6 +293,9 @@ What the script does NOT do — handle manually if needed:
   `release.yml` workflow runs hermetic e2e first, then GoReleaser, then
   notarizes Darwin archives, then re-signs checksums, then triggers downstream
   repos (`packages`, `homebrew-tap`, `plugin`, `website`).
+  For initial release-signing key setup or replacement, use
+  [`scripts/generate_release_key.sh`](scripts/generate_release_key.sh); see
+  [Release signing key](CLAUDE.md#release-signing-key) for its output and CI secrets.
 - **Secret naming (CI/CD vault-decryption secrets).** A user feeds a GPG
   private key into CI so dotsecenv can decrypt the committed vault. Name it by
   SCOPE:

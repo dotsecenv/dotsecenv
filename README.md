@@ -64,6 +64,7 @@ echo 'DB_PASSWORD={dotsecenv}' > .secenv
 [Getting Started](https://dotsecenv.com/getting-started/) runs the same flow with the shell plugin turned on.
 [`examples/`](./examples/) holds eight worked scenarios; four of them ship a `run.sh` that builds an isolated
 vault and tears it down again.
+The [vault compaction example](./examples/08-compact-vault/) previews and applies compaction, then checks that the remaining secrets are readable.
 
 ## Share with your team
 
