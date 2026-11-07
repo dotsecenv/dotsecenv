@@ -35,7 +35,7 @@ jobs:
     steps:
       - name: Verify this commit holds monorepo packages/
         id: provenance
-        uses: releasetools/actions/verify-signed-push@v0.12.0
+        uses: releasetools/actions/verify-signed-push@155dac3fe326bcdec985b9351788b43e82df0398  # v0.12.0
         with:
           source-repository: dotsecenv/dotsecenv
           source-path: packages
