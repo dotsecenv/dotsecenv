@@ -89,34 +89,19 @@ This forces manual passphrase entry for every decryption operation, which automa
 
 AI coding agents (Claude Code, GitHub Copilot CLI, Cursor, etc.) run shell commands as subprocesses of your terminal session. This creates a specific threat surface for GPG-encrypted secrets:
 
-The bundled Claude Code and Codex skills invoke dotsecenv with `--no-pinentry`.
-They stop on `GPG_ERR_NO_PIN_ENTRY` and wait for the user to unlock GPG outside
-the agent session. This suppresses both terminal and GUI prompts; it does not
-prevent other programs from using GPG or credentials already cached by gpg-agent.
+The Claude Code and Codex skills add `--no-pinentry` to their dotsecenv
+calls. The [GPG Agent guide](/guides/gpg-agent/#agent-calls) describes pinentry
+behavior for user commands and agent plugin calls.
 
-**How agents interact with GPG pinentry:**
+You can provide selected plaintext values to an agent by loading `.secenv` or
+exporting secrets before launching it. Alternatively, the agent plugin can
+retrieve secrets using credentials available to gpg-agent. See
+[Claude Code](/guides/claude-code/) for these workflows and where each command
+runs.
 
-Agent subprocesses may lack a usable terminal for pinentry. An inherited
-`GPG_TTY` does not establish that pinentry can receive keyboard input: the
-agent's terminal interface may already be reading from that device.
-
-The table describes prompting capability for calls without `--no-pinentry`:
-
-| Pinentry program | Can prompt without a usable terminal? |
-|------------------|---------------------------------------|
-| `pinentry-mac` (macOS) | Yes, with access to the macOS desktop session |
-| `pinentry-gnome3` (Linux) | Yes, with access to the display server |
-| `pinentry-qt` (Linux) | Yes, with access to the display server |
-| `pinentry-tty` | No |
-| `pinentry-curses` | No |
-
-Cached credentials can satisfy decryption without invoking pinentry, regardless
-of the configured program. GUI pinentry can open a separate window when GPG
-needs interaction. With `--no-pinentry`, both terminal and GUI prompts are
-suppressed; credentials held only by an external pinentry cache are unavailable
-through that path.
-
-**The critical risk: once cached, any process can decrypt.** When a passphrase is cached in gpg-agent or an OS keychain, any process running as your user can invoke `gpg --decrypt` without interaction. This includes AI agents, build scripts, postinstall hooks, and malicious dependencies.
+Cached GPG credentials can also be used by other processes that can access
+the same agent. Extending the cache duration extends that access window.
+Other programs choose their own GPG options.
 
 #### OS Keychain Passphrase Extraction
 

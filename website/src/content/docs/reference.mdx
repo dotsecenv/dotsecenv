@@ -22,21 +22,10 @@ These options work with all commands:
 | `--no-pinentry` | Disable GPG pinentry prompts; fail if user interaction is required |
 | `-h, --help` | Show help for command |
 
-Without `--no-pinentry`, dotsecenv follows your GPG pinentry configuration.
-With it, signing and decryption use credentials already available to gpg-agent;
-operations that require pinentry fail with `GPG_ERR_NO_PIN_ENTRY` and exit code
-`4`. Key generation also suppresses pinentry when the flag is set. The flag
-controls GPG pinentry; dotsecenv's own selection and confirmation prompts are
-unchanged.
-
-```bash
-dotsecenv --no-pinentry secret get API_KEY
-```
-
-Complete the required GPG unlock in a separate terminal with the same GPG home
-before retrying. If your policy requires interaction for every operation, run
-the operation directly outside the agent session. The Claude Code and Codex
-skills always pass this flag and stop for user action when pinentry is required.
+Calls to dotsecenv use your GPG pinentry configuration. The Claude Code and
+Codex skills add `--no-pinentry` to their calls. See
+[GPG Agent: agent calls](/guides/gpg-agent/#agent-calls) for the flag's behavior
+and recovery guidance.
 
 ---
 
