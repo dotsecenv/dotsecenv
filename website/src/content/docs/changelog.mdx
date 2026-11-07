@@ -23,6 +23,7 @@ _Unreleased_
 
 - Secret retrieval warnings use structured output codes for decode and decrypt failures and respect JSON output mode (#404)
 - Packages publication and satellite drift checks authenticate commit signatures and source provenance before using mirrored content (#407)
+- Satellite commits are verified through GitHub's API with `releasetools/actions/verify-signed-push`, and `packages/retracted.txt` is committed and checked against `go.mod` by `make lint`
 
 ---
 

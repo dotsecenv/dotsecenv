@@ -729,10 +729,8 @@ jobs:
           fi
 
   # Push monorepo packages/ source to the dotsecenv/packages satellite
-  # (mirroring publish-plugin). Generates retracted.txt from go.mod via
-  # the canonical `go mod edit -json | jq` pipeline before pushing, so
-  # the satellite receives the freshly-derived retraction list. An explicit
-  # dispatch starts the authenticated packages deployment.
+  # (mirroring publish-plugin), then dispatch its deployment, which
+  # verifies the pushed commit before building anything.
   publish-packages:
     concurrency:
       group: publish-packages
@@ -762,18 +760,6 @@ jobs:
           # satellite's, plus the time between this step and the push.
           echo "push_time=$(date -u -d '5 seconds ago' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Go (for extract-retracted.sh)
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: false
-
-      - name: Generate retracted.txt from go.mod
-        run: |
-          ./scripts/extract-retracted.sh go.mod > packages/retracted.txt
-          echo "Retracted versions being published:"
-          cat packages/retracted.txt || echo "(none)"
-
       - name: Generate App token (packages only)
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
         id: app-token
@@ -795,11 +781,7 @@ jobs:
           target-branch: main
           headline: "publish: ${{ github.ref_name }}"
           body: |
-            Source-Commit: dotsecenv/dotsecenv@${{ github.sha }}
-            Source-SHA: ${{ github.sha }}
-            Source-Path: packages
-            Source-Tag: ${{ github.ref_name }}
-            Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Source-Commit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}>
           tag: ${{ github.ref_name }}
           token: ${{ steps.app-token.outputs.token }}
 
@@ -905,11 +887,7 @@ jobs:
           target-branch: main
           headline: "publish: ${{ github.ref_name }}"
           body: |
-            Source-Commit: dotsecenv/dotsecenv@${{ github.sha }}
-            Source-SHA: ${{ github.sha }}
-            Source-Path: plugin
-            Source-Tag: ${{ github.ref_name }}
-            Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Source-Commit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}>
           tag: ${{ github.ref_name }}
           token: ${{ steps.app-token.outputs.token }}
 

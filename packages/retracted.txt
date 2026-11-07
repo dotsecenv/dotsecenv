@@ -1,0 +1,2 @@
+v0.6.10	no release published
+v0.6.11	tag moved; second push triggered duplicate-upload failure

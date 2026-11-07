@@ -67,6 +67,11 @@ lint: install-lint
 		gofmt -l . | grep -vE '(^|/)vendor/'; \
 		exit 1; \
 	fi
+	@echo "Checking packages/retracted.txt against go.mod..."
+	@./scripts/extract-retracted.sh go.mod | diff -u packages/retracted.txt - || { \
+		echo "Regenerate it: ./scripts/extract-retracted.sh go.mod > packages/retracted.txt"; \
+		exit 1; \
+	}
 	@echo "Running golangci-lint..."
 	@$(GOLANGCI_LINT) run ./...
 

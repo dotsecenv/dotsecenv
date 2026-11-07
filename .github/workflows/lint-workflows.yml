@@ -46,5 +46,5 @@ jobs:
         with:
           args: packages/.github/workflows/publish.yml
 
-      - name: Test satellite provenance
-        run: python3 scripts/release/test_satellite_provenance.py
+      - name: Test satellite run discovery
+        run: python3 scripts/release/test_find_satellite_run.py
