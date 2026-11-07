@@ -102,7 +102,7 @@ Teaches Claude how to work with `.secenv` files:
 
 The shared Claude Code and Codex skills pass `--no-pinentry` on dotsecenv calls.
 GPG can use credentials already available to gpg-agent. When it needs terminal
-or GUI pinentry, dotsecenv returns `GPG_PINENTRY_REQUIRED` with exit code `4`.
+or GUI pinentry, dotsecenv returns `GPG_ERR_NO_PIN_ENTRY` with exit code `4`.
 The skill stops and waits for you to act.
 
 Complete the required GPG unlock in a separate terminal on the same machine,

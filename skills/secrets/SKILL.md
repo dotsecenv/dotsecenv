@@ -56,9 +56,9 @@ terminal or GUI pinentry. Cached credentials can still satisfy the operation.
 If the installed binary rejects the flag, stop and ask the user to upgrade;
 do not retry without it.
 
-### GPG_PINENTRY_REQUIRED
+### GPG_ERR_NO_PIN_ENTRY
 
-When dotsecenv reports `GPG_PINENTRY_REQUIRED`:
+When dotsecenv reports `GPG_ERR_NO_PIN_ENTRY`:
 
 1. Stop the operation and report the error. Explain that the user must complete
    the required GPG unlock in a separate terminal on the same machine, as the
@@ -163,7 +163,7 @@ dotsecenv --no-pinentry secret forget SECRET_NAME
 When the user describes removing a departing team member's GPG key, follow the [Offboard a Departing Team Member runbook](https://dotsecenv.com/runbooks/team-member-offboarding/). The shape of the workflow:
 
 1. **Inventory.** List every secret whose `available_to` includes the leaver's fingerprint via `dotsecenv --no-pinentry vault describe --json`. The jq filter is `'.[].secrets[] | select((.available_to // []) | index($fp)) | .key'`.
-2. **Revoke from every secret.** List key names with `dotsecenv --no-pinentry secret get`, then run `dotsecenv --no-pinentry secret revoke SECRET_NAME FINGERPRINT --all` for each name. Stop at the first failed command. For `GPG_PINENTRY_REQUIRED`, wait for user action before continuing.
+2. **Revoke from every secret.** List key names with `dotsecenv --no-pinentry secret get`, then run `dotsecenv --no-pinentry secret revoke SECRET_NAME FINGERPRINT --all` for each name. Stop at the first failed command. For `GPG_ERR_NO_PIN_ENTRY`, wait for user action before continuing.
 3. **Verify.** Re-run the inventory query; expected output is empty.
 4. **Rotate at the source.** For each affected secret, generate a new credential at the originating system (DB, IDP, cloud provider, API issuer), then `echo "new-value" | dotsecenv --no-pinentry secret store SECRET_NAME`. Production-critical first.
 5. **Confirm.** `dotsecenv --no-pinentry vault doctor` + `dotsecenv --no-pinentry vault describe`.
@@ -183,7 +183,7 @@ When multiple vaults are configured, use `-v` to target a specific vault:
 
 | Error | Next step |
 |-------|-----------|
-| `GPG_PINENTRY_REQUIRED` | Follow the pinentry handling above; wait for user action before retrying. |
+| `GPG_ERR_NO_PIN_ENTRY` | Follow the pinentry handling above; wait for user action before retrying. |
 | Unknown flag `--no-pinentry` | Ask the user to upgrade dotsecenv; keep the flag on subsequent calls. |
 | Other GPG failure | Report the original diagnostics and investigate that failure. |
 | Command not found | Visit https://dotsecenv.com/tutorials/installation/. |

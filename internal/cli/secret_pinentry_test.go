@@ -71,7 +71,7 @@ func TestSecretGet_PinentryRequired(t *testing.T) {
 					hasTTY:        func() bool { return true },
 				}
 				err := cli.SecretGet("HCLOUD_TOKEN", mode.all, mode.last, false, mode.path, mode.index)
-				if err == nil || err.ExitCode != ExitGPGError || !strings.Contains(err.Message, "GPG_PINENTRY_REQUIRED") {
+				if err == nil || err.ExitCode != ExitGPGError || !strings.Contains(err.Message, "GPG_ERR_NO_PIN_ENTRY") {
 					t.Fatalf("got %v, want pinentry required with exit code 4", err)
 				}
 				if calls != 1 || stdout.Len() != 0 || stderr.Len() != 0 {
@@ -167,7 +167,7 @@ func TestSecretMutations_PinentryRequired(t *testing.T) {
 			cli.gpgClient = client
 			client.PublicKeyInfo["NEW"] = gpg.KeyInfo{Fingerprint: "NEW", Algorithm: "RSA", AlgorithmBits: 2048, CanEncrypt: true, PublicKeyBase64: "synthetic"}
 			err := tc.run(cli)
-			if err == nil || err.ExitCode != ExitGPGError || !strings.Contains(err.Message, "GPG_PINENTRY_REQUIRED") {
+			if err == nil || err.ExitCode != ExitGPGError || !strings.Contains(err.Message, "GPG_ERR_NO_PIN_ENTRY") {
 				t.Fatalf("got %v, want pinentry-required error with exit code 4", err)
 			}
 			if client.calls != tc.signAt || decryptCalls > 1 || len(resolver.SavedVaults) != 0 {

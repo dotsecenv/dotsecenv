@@ -10,7 +10,7 @@ import (
 )
 
 // ErrPinentryRequired identifies an operation that needs pinentry while prompting is disabled.
-var ErrPinentryRequired = errors.New("GPG_PINENTRY_REQUIRED: GPG requires pinentry, but --no-pinentry disables it.\n\n" +
+var ErrPinentryRequired = errors.New("GPG_ERR_NO_PIN_ENTRY: GPG requires pinentry, but --no-pinentry disables it.\n\n" +
 	"Complete the required GPG unlock in a separate terminal using the same GPG home, then retry.\n" +
 	"If your GPG policy requires interaction for every operation, perform the operation directly outside the agent session")
 

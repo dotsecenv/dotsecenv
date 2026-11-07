@@ -38,7 +38,7 @@ exit 2
 	var stdout, stderr bytes.Buffer
 	cli.output = output.NewHandler(&stdout, &stderr)
 	err := cli.IdentityCreate(IdentityCreateOptions{Algorithm: "RSA4096", Name: "Test", Email: "test@example.test", NoPinentry: true})
-	if err == nil || err.ExitCode != ExitGPGError || !strings.Contains(err.Message, "GPG_PINENTRY_REQUIRED") {
+	if err == nil || err.ExitCode != ExitGPGError || !strings.Contains(err.Message, "GPG_ERR_NO_PIN_ENTRY") {
 		t.Fatalf("got %v, want pinentry required with exit code 4", err)
 	}
 	if strings.Contains(stdout.String(), "GPG will prompt") {

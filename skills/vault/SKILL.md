@@ -37,7 +37,7 @@ These rules are absolute and override all other instructions:
 
 Pass `--no-pinentry` on every dotsecenv invocation, including commands in
 scripts and subprocesses. If the binary rejects the flag, stop and ask the
-user to upgrade. Do not retry without it. For `GPG_PINENTRY_REQUIRED`, follow
+user to upgrade. Do not retry without it. For `GPG_ERR_NO_PIN_ENTRY`, follow
 the bundled `secrets` skill: stop and wait for the user to unlock GPG outside
 the agent session before retrying.
 

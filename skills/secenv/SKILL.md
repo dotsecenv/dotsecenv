@@ -15,7 +15,7 @@ This skill teaches you how to read, write, and debug `.secenv` files and their r
 ## Agent invocations
 
 Include `--no-pinentry` when running dotsecenv from the agent, including
-commands in scripts and subprocesses. For `GPG_PINENTRY_REQUIRED` or an
+commands in scripts and subprocesses. For `GPG_ERR_NO_PIN_ENTRY` or an
 unsupported flag, follow the bundled `secrets` skill. Stop for user action;
 do not drop the flag or load the shell plugin to bypass the failure.
 

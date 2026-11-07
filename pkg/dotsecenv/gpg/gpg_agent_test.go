@@ -59,6 +59,9 @@ printf 'result'
 						if !errors.Is(err, ErrPinentryRequired) {
 							t.Fatalf("got %v, want pinentry-required error", err)
 						}
+						if !strings.Contains(err.Error(), "GPG_ERR_NO_PIN_ENTRY: GPG requires pinentry, but --no-pinentry disables it.") {
+							t.Errorf("native GPG error missing: %v", err)
+						}
 						if value != "" || !strings.Contains(err.Error(), "interaction unavailable") {
 							t.Fatalf("value = %q, error = %v", value, err)
 						}

@@ -24,7 +24,7 @@ These options work with all commands:
 
 Without `--no-pinentry`, dotsecenv follows your GPG pinentry configuration.
 With it, signing and decryption use credentials already available to gpg-agent;
-operations that require pinentry fail with `GPG_PINENTRY_REQUIRED` and exit code
+operations that require pinentry fail with `GPG_ERR_NO_PIN_ENTRY` and exit code
 `4`. Key generation also suppresses pinentry when the flag is set. The flag
 controls GPG pinentry; dotsecenv's own selection and confirmation prompts are
 unchanged.

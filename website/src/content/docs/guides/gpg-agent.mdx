@@ -83,7 +83,7 @@ After editing the config, run this once to confirm the agent picked up your chan
    dotsecenv --no-pinentry secret get ANY_SECRET >/dev/null          # fails if pinentry is still required
    ```
 
-   If the final call reports `GPG_PINENTRY_REQUIRED`, the required credentials
+   If the final call reports `GPG_ERR_NO_PIN_ENTRY`, the required credentials
    are not available without pinentry. Check the cache policy and confirm that
    each call uses the same GPG home. The error does not establish why pinentry
    was needed.
@@ -96,7 +96,7 @@ required keys outside the agent session before retrying the operation.
 
 The Claude Code and Codex skills always pass `--no-pinentry`. GPG can use
 credentials already available to gpg-agent, but any operation requiring
-pinentry fails with `GPG_PINENTRY_REQUIRED` and exit code `4`. This applies to
+pinentry fails with `GPG_ERR_NO_PIN_ENTRY` and exit code `4`. This applies to
 both terminal and GUI pinentry.
 
 Complete the required GPG unlock in a separate terminal with the same GPG home,

@@ -90,7 +90,7 @@ This forces manual passphrase entry for every decryption operation, which automa
 AI coding agents (Claude Code, GitHub Copilot CLI, Cursor, etc.) run shell commands as subprocesses of your terminal session. This creates a specific threat surface for GPG-encrypted secrets:
 
 The bundled Claude Code and Codex skills invoke dotsecenv with `--no-pinentry`.
-They stop on `GPG_PINENTRY_REQUIRED` and wait for the user to unlock GPG outside
+They stop on `GPG_ERR_NO_PIN_ENTRY` and wait for the user to unlock GPG outside
 the agent session. This suppresses both terminal and GUI prompts; it does not
 prevent other programs from using GPG or credentials already cached by gpg-agent.
 
