@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -22,6 +23,8 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	vault.BinaryVersion = version
+
 	rootCmd.Long = "dotsecenv " + version + `: safe environment secrets — encrypted at rest, ready to commit, easy to share.
 
 A secure tool for managing environment secrets using GPG encryption.

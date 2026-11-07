@@ -70,6 +70,7 @@ const (
 	CodeWarnDecodeFailure    Code = "WARN_DECODE_FAILURE"
 	CodeWarnDecryptFailure   Code = "WARN_DECRYPT_FAILURE"
 	CodeWarnVaultLoadError   Code = "WARN_VAULT_LOAD_ERROR"
+	CodeWarnVaultNewer       Code = "WARN_VAULT_NEWER"
 )
 
 // IsWarning returns true if the code is a warning code.
@@ -78,7 +79,7 @@ func (c Code) IsWarning() bool {
 	case CodeWarnGeneric, CodeWarnFallbackValue, CodeWarnIgnoringConfig,
 		CodeWarnVaultNotInConfig, CodeWarnFlagIgnored, CodeWarnFlagConflict,
 		CodeWarnSelfRevoke, CodeWarnIdentityNotFound, CodeWarnDecodeFailure,
-		CodeWarnDecryptFailure, CodeWarnVaultLoadError:
+		CodeWarnDecryptFailure, CodeWarnVaultLoadError, CodeWarnVaultNewer:
 		return true
 	default:
 		return false

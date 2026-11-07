@@ -116,6 +116,8 @@ superseded secret versions:
    ```
 
    Without `--yes`, this reports the plan and writes nothing (`"applied": false`).
+   If it warns that a newer dotsecenv release wrote the vault, stop and ask the
+   user to upgrade dotsecenv before compacting.
 3. Back up the vault file before applying:
 
    ```bash

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/output"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
 
@@ -32,7 +33,8 @@ type CompactResultJSON struct {
 // rewrites the file preserving every kept value verbatim (signatures intact).
 //
 // Without --yes it prints the plan and asks for confirmation (skipped in CI).
-// In JSON mode it reports the plan and only writes when --yes is set.
+// In JSON mode it reports the plan and only writes when --yes is set. It warns
+// when a newer dotsecenv release created or last rewrote the vault.
 func (c *CLI) VaultCompact(jsonOutput bool, yes bool, vaultPath string, fromIndex int) *Error {
 	targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex, "Select vault to compact:")
 	if resolveErr != nil {
@@ -49,6 +51,12 @@ func (c *CLI) VaultCompact(jsonOutput bool, yes bool, vaultPath string, fromInde
 	writer, err := vault.NewWriter(expandedPath)
 	if err != nil {
 		return NewError(fmt.Sprintf("failed to open vault: %v", err), ExitVaultError)
+	}
+
+	if stamp := writer.Header().DotsecenvVersion; vault.IsNewerRelease(stamp, vault.BinaryVersion) {
+		c.Output().Warnf(output.CodeWarnVaultNewer,
+			"vault %s was written by dotsecenv %s, newer than this dotsecenv %s; upgrade dotsecenv before compacting it",
+			entry.Path, stamp, vault.BinaryVersion)
 	}
 
 	v, err := writer.ReadVault()

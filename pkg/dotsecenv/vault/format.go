@@ -38,9 +38,13 @@ const (
 // It maps fingerprints to line numbers for identities,
 // and secret keys to their definition and value line numbers.
 type Header struct {
-	Version    int                    `json:"version"`
-	Identities map[string]int         `json:"identities"` // fingerprint -> line number
-	Secrets    map[string]SecretIndex `json:"secrets"`    // key -> secret index
+	Version int `json:"version"`
+	// DotsecenvVersion is the dotsecenv release that created the vault or last
+	// rewrote it (compact, defragment, upgrade). Appends keep it unchanged.
+	// Empty means a release before 0.11.0, or a build that is not a release.
+	DotsecenvVersion string                 `json:"dotsecenv_version,omitempty"`
+	Identities       map[string]int         `json:"identities"` // fingerprint -> line number
+	Secrets          map[string]SecretIndex `json:"secrets"`    // key -> secret index
 }
 
 // SecretIndex tracks line numbers for a secret and its values
@@ -49,12 +53,14 @@ type SecretIndex struct {
 	Values     []int `json:"values"` // line numbers of secret values
 }
 
-// NewHeader creates a new empty header
+// NewHeader creates a new empty header stamped with this release (see
+// BinaryVersion).
 func NewHeader() *Header {
 	return &Header{
-		Version:    LatestFormatVersion,
-		Identities: make(map[string]int),
-		Secrets:    make(map[string]SecretIndex),
+		Version:          LatestFormatVersion,
+		DotsecenvVersion: releaseStamp(),
+		Identities:       make(map[string]int),
+		Secrets:          make(map[string]SecretIndex),
 	}
 }
 
