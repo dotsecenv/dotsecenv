@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: "Monorepo commit (manual rebuilds default to authenticated provenance)"
+        description: "Monorepo commit the satellite commit must name (empty for a manual rebuild)"
         required: false
         default: ""
       source_tag:
-        description: "Release tag (empty for ad-hoc publication or manual rebuild)"
+        description: "Signed release tag that must name that commit (empty for ad-hoc publication or manual rebuild)"
         required: false
         default: ""
       keep_versions:
@@ -31,61 +31,17 @@ jobs:
     runs-on: ubuntu-26.04
     permissions: {}
     outputs:
-      satellite_sha: ${{ steps.provenance.outputs.satellite_sha }}
+      satellite_sha: ${{ steps.provenance.outputs.commit-sha }}
     steps:
-      - name: Checkout trusted verifier from monorepo main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          repository: dotsecenv/dotsecenv
-          ref: main
-          path: trusted
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Checkout dispatched satellite commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          path: satellite
-          persist-credentials: false
-
-      - name: Authenticate commit, source and dispatch actor
+      - name: Verify this commit holds monorepo packages/
         id: provenance
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SATELLITE_REPO: dotsecenv/packages
-          SATELLITE_DIR: satellite
-          MONOREPO_DIR: trusted
-          EXPECTED_SHA: ${{ inputs.source_sha }}
-          EXPECTED_TAG: ${{ inputs.source_tag }}
-          DISPATCH_ACTOR: ${{ github.triggering_actor }}
-        run: python3 trusted/scripts/release/verify-satellite-provenance.py --actor "$DISPATCH_ACTOR"
-
-      - name: Checkout authenticated source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        uses: releasetools/actions/verify-signed-push@155dac3fe326bcdec985b9351788b43e82df0398  # v0.12.0
         with:
-          repository: dotsecenv/dotsecenv
-          ref: ${{ steps.provenance.outputs.source_sha }}
-          path: source
-          persist-credentials: false
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
-        with:
-          go-version-file: source/go.mod
-          cache: false
-
-      - name: Compare satellite with authenticated source
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SATELLITE_REPO: dotsecenv/packages
-          SATELLITE_DIR: satellite
-          MONOREPO_DIR: trusted
-          SOURCE_DIR: source/packages
-          EXPECTED_SHA: ${{ steps.provenance.outputs.source_sha }}
-        run: |
-          trusted/scripts/extract-retracted.sh source/go.mod > source/packages/retracted.txt
-          trusted/scripts/release/verify-satellite.sh
+          source-repository: dotsecenv/dotsecenv
+          source-path: packages
+          publisher: dotsecenv-automated-releases[bot]
+          source-commit: ${{ inputs.source_sha }}
+          tag: ${{ inputs.source_tag }}
 
   build-and-deploy:
     needs: provenance
@@ -129,11 +85,9 @@ jobs:
       - name: Read Retraction List
         id: retracted
         run: |
-          # retracted.txt is pushed to this satellite from the monorepo
-          # (dotsecenv/dotsecenv) by the publish-packages job in
-          # release.yml. It's generated there from go.mod's `retract`
-          # block via `go mod edit -json | jq`, so the canonical source
-          # of truth lives with the code in one place.
+          # retracted.txt is the monorepo's packages/retracted.txt, which
+          # `make lint` keeps equal to go.mod's `retract` block. The
+          # provenance job verified this commit holds that directory.
           # Format: one "VERSION<TAB>REASON" line per retracted version.
           set -euo pipefail
 

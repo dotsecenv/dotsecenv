@@ -186,8 +186,8 @@ resolve_version() {
 # Retraction check
 # ---------------------------------------------------------------------------
 # Refuse to install versions listed at get.dotsecenv.com/retracted.txt.
-# The file is generated from dotsecenv's go.mod `retract` block at package
-# publish time, so the canonical source of truth lives with the code.
+# The file is packages/retracted.txt in the dotsecenv repository, which
+# `make lint` keeps equal to go.mod's `retract` block.
 # Format: one "VERSION<TAB>REASON" line per retracted version.
 # There is no override flag: retracted means retracted. If you genuinely
 # need a retracted binary for forensic / replay use, download it

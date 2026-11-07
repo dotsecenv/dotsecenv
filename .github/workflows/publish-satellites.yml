@@ -44,18 +44,6 @@ jobs:
         run: |
           echo "push_time=$(date -u -d '5 seconds ago' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Go (for extract-retracted.sh)
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: false
-
-      - name: Generate retracted.txt from go.mod
-        run: |
-          ./scripts/extract-retracted.sh go.mod > packages/retracted.txt
-          echo "Retracted versions being published:"
-          cat packages/retracted.txt || echo "(none)"
-
       - name: Generate App token (packages only)
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
         id: app-token
@@ -68,9 +56,8 @@ jobs:
           permission-contents: write
           permission-workflows: write
 
-      # No `tag:` input — ad-hoc publishes shouldn't clutter the satellite
-      # with refs. Source-Tag is omitted from the body for the same reason:
-      # there's no release tag this commit corresponds to.
+      # No `tag:` input: an ad-hoc publish corresponds to no release, so
+      # the satellite gets no tag for it.
       - name: Publish packages source to satellite (no tag)
         id: publish_packages
         uses: releasetools/actions/signed-push@76cf0826db3a16eed6baa02d03548628e7a32519  # v0.10.0
@@ -80,10 +67,7 @@ jobs:
           target-branch: main
           headline: "publish: ad-hoc (${{ github.sha }})"
           body: |
-            Source-Commit: dotsecenv/dotsecenv@${{ github.sha }}
-            Source-SHA: ${{ github.sha }}
-            Source-Path: packages
-            Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Source-Commit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}>
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Dispatch packages deployment
@@ -155,10 +139,7 @@ jobs:
           target-branch: main
           headline: "publish: ad-hoc (${{ github.sha }})"
           body: |
-            Source-Commit: dotsecenv/dotsecenv@${{ github.sha }}
-            Source-SHA: ${{ github.sha }}
-            Source-Path: plugin
-            Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Source-Commit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}>
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Summarize plugin publish

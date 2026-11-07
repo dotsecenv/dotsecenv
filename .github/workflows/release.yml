@@ -398,7 +398,7 @@ jobs:
       - name: Sync tap CI and README from monorepo
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_COMMIT: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -413,8 +413,7 @@ jobs:
               continue
             fi
             cp "$SRC" "$DEST"
-            BODY="$(printf 'Source-Commit: dotsecenv/dotsecenv@%s\nSource-SHA: %s\nSource-Path: homebrew-tap/%s\nPublished-By: %s\n' \
-              "$SOURCE_SHA" "$SOURCE_SHA" "$path" "$PUBLISHED_BY")"
+            BODY="$(printf 'Source-Commit: <%s>\nPublished-By: <%s>\n' "$SOURCE_COMMIT" "$PUBLISHED_BY")"
             TAP_REPO=dotsecenv/homebrew-tap \
             TAP_BRANCH=main \
             CASK_PATH="$path" \
@@ -499,19 +498,15 @@ jobs:
           cat "$CASK_FILE"
 
       # Commit the cask update via GitHub's GraphQL createCommitOnBranch
-      # mutation, which signs the commit server-side with the App's key.
-      # Replaces the previous `git config user.name; git commit; git push`
-      # flow so the homebrew-tap commit gets the same signed-by-bot
-      # provenance as the satellite publishes (see publish-to-satellite.sh).
-      # Provenance trailers (Source-Commit, Source-SHA, Source-Tag,
-      # Published-By) match the satellite convention so tap commits are
-      # parseable by the same `git interpret-trailers --parse` machinery.
+      # mutation, so GitHub signs it for the release App as it signs the
+      # satellite publishes. Its Source-Commit trailer names the monorepo
+      # commit in the same URL form.
       - name: Commit cask via GraphQL (server-signed)
         id: commit
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ github.ref_name }}
-          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_COMMIT: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           PUBLISHED_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -525,12 +520,7 @@ jobs:
           fi
 
           HEADLINE="fix: update Darwin checksums for ${VERSION} (post-notarization)"
-          BODY=$(
-            printf 'Source-Commit: dotsecenv/dotsecenv@%s\n' "${SOURCE_SHA}"
-            printf 'Source-SHA: %s\n' "${SOURCE_SHA}"
-            printf 'Source-Tag: %s\n' "${VERSION}"
-            printf 'Published-By: %s\n' "${PUBLISHED_BY}"
-          )
+          BODY="$(printf 'Source-Commit: <%s>\nPublished-By: <%s>\n' "$SOURCE_COMMIT" "$PUBLISHED_BY")"
 
           OUTPUT=$(
             TAP_REPO=dotsecenv/homebrew-tap \
@@ -729,10 +719,8 @@ jobs:
           fi
 
   # Push monorepo packages/ source to the dotsecenv/packages satellite
-  # (mirroring publish-plugin). Generates retracted.txt from go.mod via
-  # the canonical `go mod edit -json | jq` pipeline before pushing, so
-  # the satellite receives the freshly-derived retraction list. An explicit
-  # dispatch starts the authenticated packages deployment.
+  # (mirroring publish-plugin), then dispatch its deployment, which
+  # verifies the pushed commit before building anything.
   publish-packages:
     concurrency:
       group: publish-packages
@@ -762,18 +750,6 @@ jobs:
           # satellite's, plus the time between this step and the push.
           echo "push_time=$(date -u -d '5 seconds ago' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Go (for extract-retracted.sh)
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: false
-
-      - name: Generate retracted.txt from go.mod
-        run: |
-          ./scripts/extract-retracted.sh go.mod > packages/retracted.txt
-          echo "Retracted versions being published:"
-          cat packages/retracted.txt || echo "(none)"
-
       - name: Generate App token (packages only)
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
         id: app-token
@@ -795,11 +771,7 @@ jobs:
           target-branch: main
           headline: "publish: ${{ github.ref_name }}"
           body: |
-            Source-Commit: dotsecenv/dotsecenv@${{ github.sha }}
-            Source-SHA: ${{ github.sha }}
-            Source-Path: packages
-            Source-Tag: ${{ github.ref_name }}
-            Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Source-Commit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}>
           tag: ${{ github.ref_name }}
           token: ${{ steps.app-token.outputs.token }}
 
@@ -905,11 +877,7 @@ jobs:
           target-branch: main
           headline: "publish: ${{ github.ref_name }}"
           body: |
-            Source-Commit: dotsecenv/dotsecenv@${{ github.sha }}
-            Source-SHA: ${{ github.sha }}
-            Source-Path: plugin
-            Source-Tag: ${{ github.ref_name }}
-            Published-By: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Source-Commit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}>
           tag: ${{ github.ref_name }}
           token: ${{ steps.app-token.outputs.token }}
 

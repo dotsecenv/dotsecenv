@@ -6,10 +6,11 @@
 # vs single-line forms, line continuations, comments — without
 # reimplementing them.
 #
-# Used by:
-#   - .github/workflows/release.yml (to generate packages/retracted.txt
-#     before pushing the monorepo packages/ source to the satellite)
-#   - scripts/install.sh (to refuse to install retracted versions)
+# `make lint` compares its output with packages/retracted.txt, which the
+# packages satellite publishes and scripts/install.sh reads to refuse
+# retracted versions. After editing the retract block, regenerate it:
+#
+#   ./scripts/extract-retracted.sh go.mod > packages/retracted.txt
 #
 # Output: one "VERSION<TAB>REASON" line per retracted version.
 #

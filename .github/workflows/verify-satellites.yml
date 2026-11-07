@@ -1,38 +1,20 @@
 name: Verify Satellite Drift
-run-name: "Verify satellite drift: ${{ inputs.sha || github.event.workflow_run.head_branch || 'Source-SHA trailers' }}"
+run-name: "Verify satellite drift: ${{ inputs.sha || github.event.workflow_run.head_branch || 'Source-Commit trailers' }}"
 
-# Reconcile the published satellite repos (dotsecenv/plugin,
-# dotsecenv/packages) against the monorepo source at the SHA each
-# satellite says it was last published from.
+# Check that each satellite's HEAD (dotsecenv/plugin, dotsecenv/packages)
+# is a signed release App commit holding exactly its monorepo directory,
+# at a commit on main. releasetools/actions/verify-signed-push does this
+# through GitHub's API, so nothing is checked out.
 #
-# Why a separate workflow (and not part of release.yml)?
-#   The release pipeline already shipped binaries, packaged assets,
-#   tagged the satellites, and built the docs site by the time we get
-#   here. The user-visible release is DONE. Verification is a
-#   reconciliation check — useful signal, not a release gate. If we
-#   ran it inside release.yml, a transient drift (or a bug in the
-#   verifier itself) could mark a perfectly good release red. Living
-#   in its own workflow keeps the release graph clean and lets us
-#   iterate on the verifier without touching the release path.
+# This runs apart from release.yml because the release is already out by
+# the time it runs. Drift is a signal to investigate, and a failure here
+# should not mark a good release red.
 #
-# Reference SHA precedence (highest to lowest):
-#   1. workflow_dispatch input `sha` (explicit operator override)
-#   2. workflow_run.head_sha (the tag commit the upstream Release
-#      just published — newest known publish SHA)
-#   3. The authenticated Source-SHA trailer in the satellite commit.
-# The verifier runs from main and validates the commit signature and
-# source ancestry before the selected source revision is checked out.
-#
-# Crucially, we do NOT default to `github.sha`. That would be the
-# main HEAD when the workflow fires, which can be ahead of the last
-# release — main is allowed to move between releases without the
-# satellites moving with it, so comparing the satellite against
-# main HEAD would produce false drift every time the workflow ran
-# off-cycle.
-#
-# Failure UX: the workflow goes red. GitHub's built-in failure
-# notification (email to the actor + workflow watchers) is enough
-# signal — no separate issue tracker plumbing.
+# The expected monorepo commit is the dispatch input `sha`, else the tag
+# commit the upstream Release published, else whatever each satellite's
+# Source-Commit trailer names. It is never `github.sha`: main moves between
+# releases without the satellites, so main's HEAD would report false drift.
+# After a release, the release tag must also be signed and name that commit.
 
 on:
   workflow_run:
@@ -42,20 +24,15 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: "Monorepo SHA to verify satellites against (default: each satellite's own Source-SHA trailer)"
+        description: "Monorepo SHA to verify satellites against (default: each satellite's own Source-Commit trailer)"
         required: false
         default: ""
 
-permissions:
-  contents: read
-  actions: read
+permissions: {}
 
 jobs:
-  # Gate on the upstream release succeeding. If release.yml failed,
-  # the satellite publishes may have been skipped (publish-{plugin,
-  # packages} use `if: !failure() && !cancelled()`), so the satellite
-  # legitimately wouldn't have moved — verifying against the release
-  # SHA would report false drift.
+  # A failed release may have skipped the satellite publishes, and then the
+  # satellites legitimately did not move.
   verify:
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -64,75 +41,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - satellite: plugin
-            repo: dotsecenv/plugin
-            source_dir: plugin
-          - satellite: packages
-            repo: dotsecenv/packages
-            source_dir: packages
+        satellite: [plugin, packages]
     steps:
-      - name: Checkout trusted verifier from main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Verify dotsecenv/${{ matrix.satellite }}
+        uses: releasetools/actions/verify-signed-push@155dac3fe326bcdec985b9351788b43e82df0398  # v0.12.0
         with:
-          ref: main
-          path: trusted
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Checkout ${{ matrix.repo }} satellite
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          repository: ${{ matrix.repo }}
-          path: satellite
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Authenticate satellite and resolve source SHA
-        id: sha
-        env:
-          INPUT_SHA: ${{ inputs.sha }}
-          WR_SHA: ${{ github.event.workflow_run.head_sha }}
-          GH_TOKEN: ${{ github.token }}
-          MONOREPO_DIR: trusted
-          SATELLITE_DIR: satellite
-          SATELLITE_REPO: ${{ matrix.repo }}
-        run: |
-          export EXPECTED_SHA="${INPUT_SHA:-${WR_SHA}}"
-          python3 trusted/scripts/release/verify-satellite-provenance.py
-
-      - name: Checkout authenticated monorepo source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          ref: ${{ steps.sha.outputs.source_sha }}
-          path: monorepo
-          persist-credentials: false
-
-      # The packages satellite is published with a retracted.txt
-      # generated from go.mod at publish time. The monorepo source
-      # tree at the release SHA does NOT contain that file, so we
-      # regenerate it here into the source tree using the same
-      # script the publish flow uses — now the verify can do a
-      # full byte-identity check including retracted.txt instead of
-      # whitelisting it.
-      - name: Set up Go (for extract-retracted.sh)
-        if: matrix.satellite == 'packages'
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
-        with:
-          go-version-file: monorepo/go.mod
-          cache: false
-
-      - name: Regenerate packages/retracted.txt from go.mod
-        if: matrix.satellite == 'packages'
-        working-directory: monorepo
-        run: ../trusted/scripts/extract-retracted.sh go.mod > packages/retracted.txt
-
-      - name: Verify ${{ matrix.satellite }} satellite
-        env:
-          SOURCE_DIR: monorepo/${{ matrix.source_dir }}
-          SATELLITE_DIR: satellite
-          SATELLITE_REPO: ${{ matrix.repo }}
-          MONOREPO_DIR: trusted
-          GH_TOKEN: ${{ github.token }}
-          EXPECTED_SHA: ${{ steps.sha.outputs.source_sha }}
-        run: trusted/scripts/release/verify-satellite.sh
+          repository: dotsecenv/${{ matrix.satellite }}
+          commit: main
+          source-repository: dotsecenv/dotsecenv
+          source-path: ${{ matrix.satellite }}
+          publisher: dotsecenv-automated-releases[bot]
+          source-commit: ${{ inputs.sha || github.event.workflow_run.head_sha }}
+          tag: ${{ github.event.workflow_run.head_branch }}

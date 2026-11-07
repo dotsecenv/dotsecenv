@@ -66,26 +66,29 @@ The commit body uses [RFC-822 trailers](https://git-scm.com/docs/git-interpret-t
 ```text
 publish: v0.6.1
 
-Source-Commit: dotsecenv/dotsecenv@21eee0028a7b8182e37cac526725b2fa9023d6e4
-Source-SHA: 21eee0028a7b8182e37cac526725b2fa9023d6e4
-Source-Path: packages
-Source-Tag: v0.6.1
-Published-By: https://github.com/dotsecenv/dotsecenv/actions/runs/26005850942
+Source-Commit: <https://github.com/dotsecenv/dotsecenv/commit/21eee0028a7b8182e37cac526725b2fa9023d6e4>
+
+---
+
+Workflow-Commit: <https://github.com/dotsecenv/dotsecenv/commit/21eee0028a7b8182e37cac526725b2fa9023d6e4>
+Published-By: <https://github.com/dotsecenv/dotsecenv/actions/runs/26005850942>
 ```
 
-`Source-Commit` in `owner/repo@SHA` form gets auto-linked in the GitHub commit view, so the satellite commit always points back to the monorepo revision that produced it. `Source-SHA`, `Source-Path`, and `Source-Tag` are denormalized into separate trailers so downstream tooling can grep them out without parsing the compound form.
+The workflow writes `Source-Commit`, which names the monorepo revision the satellite holds, in the form the [`traceable-tag` convention](https://github.com/releasetools/conventions/blob/main/conventions/traceable-tag.md) uses. `signed-push` appends the footer below the `---` itself, naming the commit and run that published it.
 
 ## What verification checks
 
-The monorepo's `Verify Satellite Drift` workflow authenticates the exact plugin or packages commit before trusting its trailers. GitHub's API must report a valid signature made by GitHub, and the author must be `dotsecenv-automated-releases[bot]`. A Verified badge alone does not identify GitHub as the signer.
+[`releasetools/actions/verify-signed-push`](https://github.com/releasetools/actions/tree/main/verify-signed-push) checks a satellite commit before anything uses it. It makes four to six REST API requests and clones nothing.
 
-The verifier rejects ambiguous source trailers. `Source-Commit` and `Source-Path` must identify the expected monorepo and satellite directory. The source SHA must be reachable from monorepo `main`. On release publishes, `Source-Tag` must resolve to that SHA and be an annotated tag with a valid signature from the release maintainer, `MihaiBojin`. Ad-hoc publishes omit the tag and still undergo commit authentication and source ancestry checks.
+GitHub must report a valid signature with `web-flow` as the committer, which means GitHub made the signature, and the author must be `dotsecenv-automated-releases[bot]`. A Verified badge alone would also pass a web edit by anyone with write access to the satellite.
 
-Verifier code runs from a separate checkout of trusted monorepo `main`. Only after authentication does the workflow check out the claimed source revision for comparison. It compares file contents and executable bits, including symlink targets. For packages, it regenerates `retracted.txt` from the authenticated `go.mod` before comparing.
+The commit needs exactly one `Source-Commit` trailer, naming a full SHA in `dotsecenv/dotsecenv`, and that commit must be on `main`. Then the satellite's tree SHA must equal the tree SHA of `plugin/` or `packages/` at that commit. Git trees are content-addressed, so that one comparison covers every path, byte, executable bit and symlink. It is also why `packages/retracted.txt` is committed in the monorepo: a file generated during publication would make the satellite differ from its source.
 
-The packages satellite publishes only on explicit dispatch. A job without distribution secrets validates the dispatch actor and source provenance, then compares the mirrored files. Both secret-consuming jobs depend on that result. The build checks out the validated satellite commit, so a later push cannot change its inputs. The release App dispatches with an explicit source SHA; the maintainer can manually rebuild with `keep_versions` and authenticated HEAD trailers.
+On a release, the tag must be annotated, carry a verified signature, and point at that commit. The verifier keeps no list of who may sign. The monorepo's tag ruleset requires a signature on every `v*` tag and forbids moving or deleting one, so anyone with write access who signs a tag can cut a release.
 
-These checks trust the protected monorepo and its workflows. A credential that can replace the satellite workflow can also remove its checks. Commit provenance does not grant release authorization by itself; signed release tags supply that separate assertion.
+The packages satellite deploys only on explicit dispatch. Its first job runs the check with no permissions and no secrets. The jobs holding secrets depend on it, and the build checks out the verified commit, so a later push cannot change its inputs. After every release, the `Verify Satellite Drift` workflow runs the same check on both satellites.
+
+These checks trust the protected monorepo and the pinned action release. A credential that can replace the satellite workflow can also remove its checks.
 
 ## When this pattern is worth it
 
