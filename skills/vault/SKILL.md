@@ -96,8 +96,9 @@ dotsecenv --no-pinentry vault doctor --json
 `vault compact` drops superseded secret-value versions. For each secret it keeps
 the newest value every current identity can decrypt (exactly what `secret get`
 returns for that identity) and drops the rest. Deleted secrets are removed
-whole. Values readable only by revoked fingerprints fall away, since no current
-identity reaches them.
+whole. For a secret stored again after a deletion, compaction also drops every
+value up to and including the deletion. Values readable only by revoked
+fingerprints are dropped, since no current identity can read them.
 
 What compaction does NOT change: identities, the newest value each current
 identity can read, and the signatures on kept values (records are preserved

@@ -18,6 +18,7 @@ _Unreleased_
 ### Bug Fixes
 
 - `make lint` ignores vendored Go files in nested `vendor/` directories, including those inside a checkout placed under the repository (#403)
+- After `secret forget`, any identity can `secret store` the secret again, and the new value is encrypted only to the storer. The git and Terraform credential helpers can then save a replacement credential after `erase` or `terraform logout`. Reads stop at the most recent deletion: `secret get` skips a vault where the secret is deleted and returns it from the next vault that holds it, `secret get --all` lists deleted values marked `[deleted]` (`"deleted": true` with `--json`), and `vault compact` drops every value up to the deletion. A dotsecenv older than 0.11.0 reading such a secret can return its value from before the deletion, and its `vault compact` keeps those values; upgrade everyone who shares the vault, or compact it with 0.11.0 or later. Go programs importing `pkg/dotsecenv/vault` directly may need a change: `GetSecretFromAnyVault` and `GetAccessibleSecretFromAnyVault` also return the index of the vault they read, the lookups, access checks and `ListAllSecretKeys` ignore values before the most recent deletion and skip vaults that deleted the secret, and `Manager.GetAllAccessibleSecretValues` and `VaultResolver.GetSecret`, which nothing called, are removed (#333)
 
 ### Other
 

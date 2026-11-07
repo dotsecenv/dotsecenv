@@ -42,6 +42,10 @@ value is encrypted to every fingerprint on the latest entry's available_to,
 not just yours. When that set includes other identities, store warns and,
 if a terminal is available, asks for confirmation.
 
+Any identity can store a deleted secret again. The new value is encrypted
+only to yours, and 'secret get' never returns values from before the
+deletion.
+
 Options:
   --share     Keep the recipient set without warning or confirmation
   --no-share  Encrypt the new value only to your identity`,
@@ -142,7 +146,8 @@ When called with a SECRET argument:
   Retrieves the secret value from the vault.
 
 Options:
-  --all   Retrieve all values for the secret across all vaults
+  --all   Retrieve all values for the secret across all vaults, newest first;
+          values a 'secret forget' deleted are marked [deleted]
   --last  Retrieve the most recent value across all vaults
   --json  Output as JSON`,
 	Args: func(cmd *cobra.Command, args []string) error {
@@ -348,8 +353,11 @@ Secret key formats:
   Namespaced:     namespace::KEY_NAME  (e.g., myapp::DATABASE_URL)
   Non-namespaced: KEY_NAME             (e.g., DATABASE_URL)
 
-This adds a deletion marker to the secret. The secret will no longer be
-returned by 'secret get' and will be shown as deleted in 'vault describe'.
+This adds a deletion marker to the secret. 'secret get' stops returning it
+from this vault and moves on to the next vault that holds it, and 'vault
+describe' shows it as deleted. 'secret get --all' still lists its values,
+marked deleted, until 'vault compact' removes them. Any identity can then
+store the secret again with 'secret store'.
 
 Use -v to specify which vault to delete the secret from (either a path
 or 1-based index).`,

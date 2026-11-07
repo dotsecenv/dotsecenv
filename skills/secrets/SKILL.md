@@ -120,7 +120,8 @@ dotsecenv --no-pinentry secret get SECRET_NAME --json
 # Get from a specific vault (by path or 1-based index)
 dotsecenv --no-pinentry secret get SECRET_NAME -v 1
 
-# Get all values across vaults
+# Get all values across vaults; lines marked [deleted] are forgotten history,
+# never the current value
 dotsecenv --no-pinentry secret get SECRET_NAME --all
 
 # Get most recent value across vaults
@@ -157,6 +158,8 @@ dotsecenv --no-pinentry secret forget SECRET_NAME
 ```
 
 `secret store` on an existing secret keeps its current recipient set: the new value is encrypted to every fingerprint on the latest entry's `available_to`. When that set includes other identities, store warns and (with a terminal) asks for confirmation. Pass `--share` to keep the set without prompting, or `--no-share` to encrypt only to the current identity. Rotation never silently narrows access, so never advise re-sharing after a rotation; removing someone is `secret revoke`.
+
+Any identity can `secret store` a forgotten secret again. The new value is encrypted only to the current identity, and `secret get` never returns values from before the `forget`.
 
 ## Departed teammate offboarding
 

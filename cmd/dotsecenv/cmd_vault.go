@@ -88,7 +88,9 @@ var vaultCompactCmd = &cobra.Command{
 
 For each secret it keeps the newest value every current identity can decrypt
 (exactly what 'secret get' returns) and drops the rest. Deleted secrets are
-removed entirely. Values readable only by revoked fingerprints are dropped.
+removed entirely. For a secret stored again after a deletion, compaction also
+drops every value up to and including the deletion. Values readable only by
+revoked fingerprints are dropped.
 
 Compaction never decrypts: it reads only access lists and value order, then
 rewrites the file preserving every kept value verbatim, so signatures stay

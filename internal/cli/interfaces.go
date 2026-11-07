@@ -11,8 +11,8 @@ type VaultResolver interface {
 	GetIdentityByFingerprint(fingerprint string) *vault.Identity
 	AddSecret(secret vault.Secret, index int) error
 	SaveAll() error
-	GetSecretFromAnyVault(key string, stderr io.Writer) (*vault.SecretValue, error)
-	GetAccessibleSecretFromAnyVault(key, fingerprint string) (*vault.SecretValue, error)
+	GetSecretFromAnyVault(key string, stderr io.Writer) (*vault.SecretValue, int, error)
+	GetAccessibleSecretFromAnyVault(key, fingerprint string) (*vault.SecretValue, int, error)
 	GetSecretByKeyFromVault(index int, key string) *vault.Secret
 	FindSecretVaultIndex(key string) int
 	GetVaultManager(index int) *vault.Manager
@@ -25,7 +25,6 @@ type VaultResolver interface {
 	SaveVault(index int) error
 	CloseAll() error
 	GetLoadError(index int) error
-	GetSecret(index int, key string) (*vault.SecretValue, error)
 	OpenVaultsFromPaths(paths []string, stderr io.Writer) error
 	OpenVaults(stderr io.Writer) error
 	VaultCount() int

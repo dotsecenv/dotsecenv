@@ -366,6 +366,39 @@ else
     fail ".git-only path mishandled: path='$only_dot' hostonly='$host_wide'"
 fi
 
+# Test 26: a credential stored after erase replaces the erased one. git erases a
+# credential the server rejected, then stores the one that works.
+((TESTS_RUN++)) || true
+printf 'protocol=https\nhost=retry.example\nusername=user\npassword=old-token\n\n' | "$HELPER" store 2>/dev/null
+printf 'protocol=https\nhost=retry.example\n\n' | "$HELPER" erase 2>/dev/null
+store_rc=0
+printf 'protocol=https\nhost=retry.example\nusername=user\npassword=new-token\n\n' | "$HELPER" store 2>/dev/null || store_rc=$?
+retry=$(printf 'protocol=https\nhost=retry.example\n\n' | "$HELPER" get 2>/dev/null)
+if [ "$store_rc" -eq 0 ] && echo "$retry" | grep -q '^password=new-token$'; then
+    pass "store after erase saves the replacement"
+else
+    fail "store after erase failed: rc=$store_rc get='$retry'"
+fi
+
+# Test 27: the same sequence through git itself. A failing helper store does not
+# fail `git credential approve`, so only `fill` shows whether the replacement
+# landed. GIT_TERMINAL_PROMPT=0 turns a miss into an error instead of a prompt.
+if command -v git >/dev/null 2>&1; then
+    ((TESTS_RUN++)) || true
+    gitcred() { GIT_TERMINAL_PROMPT=0 git -c credential.helper= -c credential.helper="$PWD/$HELPER" credential "$@"; }
+    printf 'protocol=https\nhost=approve.example\nusername=user\npassword=rejected-token\n\n' | gitcred approve 2>/dev/null
+    printf 'protocol=https\nhost=approve.example\nusername=user\npassword=rejected-token\n\n' | gitcred reject 2>/dev/null
+    printf 'protocol=https\nhost=approve.example\nusername=user\npassword=working-token\n\n' | gitcred approve 2>/dev/null
+    filled=$(printf 'protocol=https\nhost=approve.example\n\n' | gitcred fill 2>/dev/null || true)
+    if echo "$filled" | grep -q '^password=working-token$'; then
+        pass "git credential approve, reject, approve, fill returns the replacement"
+    else
+        fail "git did not get the replacement credential back, fill gave: '$filled'"
+    fi
+else
+    echo "  SKIP: git not installed, git credential plumbing case not exercised"
+fi
+
 echo ""
 echo "==> Git credential helper E2E results"
 echo "Tests run:    $TESTS_RUN"

@@ -83,7 +83,7 @@ func (m *MockVaultResolver) CloseAll() error {
 	return nil
 }
 
-func (m *MockVaultResolver) GetSecretFromAnyVault(key string, stderr io.Writer) (*vault.SecretValue, error) {
+func (m *MockVaultResolver) GetSecretFromAnyVault(key string, stderr io.Writer) (*vault.SecretValue, int, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -96,16 +96,16 @@ func (m *MockVaultResolver) GetSecretFromAnyVault(key string, stderr io.Writer) 
 	for i := 0; i < count; i++ {
 		if secrets, ok := m.Secrets[i]; ok {
 			if secret, ok := secrets[key]; ok {
-				if len(secret.Values) > 0 {
-					return &secret.Values[len(secret.Values)-1], nil
+				if len(secret.Values) > 0 && !secret.IsDeleted() {
+					return &secret.Values[len(secret.Values)-1], i, nil
 				}
 			}
 		}
 	}
-	return nil, fmt.Errorf("secret not found")
+	return nil, -1, fmt.Errorf("secret not found")
 }
 
-func (m *MockVaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint string) (*vault.SecretValue, error) {
+func (m *MockVaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint string) (*vault.SecretValue, int, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -118,22 +118,15 @@ func (m *MockVaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint str
 	for i := 0; i < count; i++ {
 		if secrets, ok := m.Secrets[i]; ok {
 			if secret, ok := secrets[key]; ok {
-				if len(secret.Values) == 0 {
-					continue
-				}
-
-				// Check from most recent to oldest for accessible value
-				for j := len(secret.Values) - 1; j >= 0; j-- {
-					for _, fp := range secret.Values[j].AvailableTo {
-						if fp == fingerprint {
-							return &secret.Values[j], nil
-						}
-					}
+				// Reuse the real lookup so the mock walks the same live values.
+				v := vault.Vault{Secrets: []vault.Secret{secret}}
+				if val := v.GetAccessibleSecretValue(fingerprint, secret.Key); val != nil {
+					return val, i, nil
 				}
 			}
 		}
 	}
-	return nil, fmt.Errorf("secret '%s' not found or not accessible", key)
+	return nil, -1, fmt.Errorf("secret '%s' not found or not accessible", key)
 }
 
 func (m *MockVaultResolver) GetSecretByKeyFromVault(index int, key string) *vault.Secret {
@@ -156,14 +149,20 @@ func (m *MockVaultResolver) FindSecretVaultIndex(key string) int {
 		count = len(m.VaultEntries)
 	}
 
+	deleted := -1
 	for i := 0; i < count; i++ {
 		if secrets, ok := m.Secrets[i]; ok {
-			if _, ok := secrets[key]; ok {
-				return i
+			if secret, ok := secrets[key]; ok {
+				if !secret.IsDeleted() {
+					return i
+				}
+				if deleted < 0 {
+					deleted = i
+				}
 			}
 		}
 	}
-	return -1
+	return deleted
 }
 
 func (m *MockVaultResolver) GetVaultManager(index int) *vault.Manager {
@@ -228,14 +227,6 @@ func (m *MockVaultResolver) SaveVault(index int) error {
 
 func (m *MockVaultResolver) GetLoadError(index int) error {
 	return nil
-}
-
-func (m *MockVaultResolver) GetSecret(index int, key string) (*vault.SecretValue, error) {
-	s := m.GetSecretByKeyFromVault(index, key)
-	if s == nil || len(s.Values) == 0 {
-		return nil, fmt.Errorf("not found")
-	}
-	return &s.Values[len(s.Values)-1], nil
 }
 
 func (m *MockVaultResolver) OpenVaultsFromPaths(paths []string, stderr io.Writer) error {

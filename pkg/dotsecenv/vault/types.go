@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"slices"
 	"time"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
@@ -84,20 +85,16 @@ func (v Vault) GetSecretByKey(key string) *Secret {
 	return nil
 }
 
-// CanIdentityAccessSecret checks if an identity can access any value of a secret.
-// It searches from most recent to oldest value.
+// CanIdentityAccessSecret reports whether an identity is a recipient of any
+// live value of a secret (see LiveValues).
 func (v Vault) CanIdentityAccessSecret(fingerprint, secretKey string) bool {
 	secret := v.GetSecretByKey(secretKey)
 	if secret == nil {
 		return false
 	}
-
-	// Check from most recent to oldest
-	for i := len(secret.Values) - 1; i >= 0; i-- {
-		for _, fp := range secret.Values[i].AvailableTo {
-			if fp == fingerprint {
-				return true
-			}
+	for _, value := range secret.LiveValues() {
+		if slices.Contains(value.AvailableTo, fingerprint) {
+			return true
 		}
 	}
 	return false
@@ -111,31 +108,39 @@ func (s Secret) IsDeleted() bool {
 	return s.Values[len(s.Values)-1].Deleted
 }
 
-// GetAccessibleSecretValue returns the most recent secret value accessible to the identity.
-// Returns nil if identity cannot access any version of the secret.
-// Returns nil if the secret is deleted (latest value has Deleted=true).
-// Falls back to older values if the identity doesn't have access to the latest.
+// LiveStart returns the index of the first value after the most recent
+// deletion marker; every value before it is deleted. It is 0 for a secret that
+// was never deleted and len(s.Values) when the latest value is a deletion
+// marker.
+func (s Secret) LiveStart() int {
+	for i := len(s.Values) - 1; i >= 0; i-- {
+		if s.Values[i].Deleted {
+			return i + 1
+		}
+	}
+	return 0
+}
+
+// LiveValues returns the values after the most recent deletion marker. Reads
+// stop there, so a secret stored again after a deletion behaves as if it never
+// existed before it.
+func (s Secret) LiveValues() []SecretValue {
+	return s.Values[s.LiveStart():]
+}
+
+// GetAccessibleSecretValue returns the most recent live value the identity is a
+// recipient of, falling back to older live values when the identity is not on
+// the latest one. It returns nil when the secret is missing or deleted, or when
+// no live value is encrypted to the identity.
 func (v Vault) GetAccessibleSecretValue(fingerprint, secretKey string) *SecretValue {
 	secret := v.GetSecretByKey(secretKey)
 	if secret == nil {
 		return nil
 	}
-
-	if len(secret.Values) == 0 {
-		return nil
-	}
-
-	// If secret is deleted, return nil
-	if secret.IsDeleted() {
-		return nil
-	}
-
-	// Check from most recent to oldest (fallback behavior)
-	for i := len(secret.Values) - 1; i >= 0; i-- {
-		for _, fp := range secret.Values[i].AvailableTo {
-			if fp == fingerprint {
-				return &secret.Values[i]
-			}
+	live := secret.LiveValues()
+	for i := len(live) - 1; i >= 0; i-- {
+		if slices.Contains(live[i].AvailableTo, fingerprint) {
+			return &live[i]
 		}
 	}
 	return nil

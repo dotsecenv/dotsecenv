@@ -39,11 +39,12 @@ func (s *CompactStats) Changed() bool {
 // PlanCompaction computes the compacted vault and statistics without writing.
 //
 // Compaction drops superseded secret-value versions. For each secret it keeps,
-// per current identity, the newest value that identity can decrypt — which is
-// exactly what `secret get` would return for that identity. Values no current
+// per current identity, the newest live value that identity can decrypt, which
+// is exactly what `secret get` returns for that identity. Values no current
 // identity reaches (including versions readable only by revoked fingerprints)
 // are dropped. Deleted secrets (latest value is a tombstone) are removed
-// entirely. Identities are never touched.
+// entirely; for a secret stored again after a deletion, every value up to and
+// including the most recent tombstone is dropped. Identities are never touched.
 //
 // Compaction never decrypts: it reads only available_to fingerprints and value
 // order, and it preserves each kept value verbatim (added_at, available_to,
@@ -73,32 +74,30 @@ func PlanCompaction(v Vault) (Vault, *CompactStats) {
 			continue
 		}
 
-		keep := make([]bool, len(s.Values))
+		live := s.LiveValues()
+		keep := make([]bool, len(live))
 		for fp := range current {
-			// Newest value this identity can decrypt (scan newest -> oldest).
-			for j := len(s.Values) - 1; j >= 0; j-- {
-				if s.Values[j].Deleted {
-					continue
-				}
-				if slices.Contains(s.Values[j].AvailableTo, fp) {
+			// Newest live value this identity can decrypt (scan newest -> oldest).
+			for j := len(live) - 1; j >= 0; j-- {
+				if slices.Contains(live[j].AvailableTo, fp) {
 					keep[j] = true
 					break
 				}
 			}
 		}
 
-		kept := make([]SecretValue, 0, len(s.Values))
-		for j := range s.Values {
+		kept := make([]SecretValue, 0, len(live))
+		for j := range live {
 			if keep[j] {
-				kept = append(kept, s.Values[j])
+				kept = append(kept, live[j])
 			}
 		}
 		// Floor: if no current identity can read any version (e.g. the secret is
 		// shared only with revoked fingerprints), keep the latest value so the
 		// secret still exists and is not silently emptied. Its decryptability is
 		// unchanged — nobody current could read it before either.
-		if len(kept) == 0 && len(s.Values) > 0 {
-			kept = append(kept, s.Values[len(s.Values)-1])
+		if len(kept) == 0 && len(live) > 0 {
+			kept = append(kept, live[len(live)-1])
 		}
 
 		s.Values = kept

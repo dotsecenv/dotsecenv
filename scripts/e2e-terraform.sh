@@ -159,6 +159,18 @@ else
     fail "get on never-stored host should return {}, got: $get_empty"
 fi
 
+# Test 16: terraform login after terraform logout saves the new token. Test 9
+# forgot app.terraform.io, so this store lands on a deleted secret.
+((TESTS_RUN++)) || true
+store_rc=0
+echo '{"token":"tf-token-new"}' | "$HELPER" store app.terraform.io 2>/dev/null || store_rc=$?
+relogin=$("$HELPER" get app.terraform.io 2>/dev/null)
+if [ "$store_rc" -eq 0 ] && echo "$relogin" | grep -q '"tf-token-new"'; then
+    pass "store after forget saves the new token"
+else
+    fail "store after forget failed: rc=$store_rc get=$relogin"
+fi
+
 echo ""
 echo "==> Terraform credentials helper E2E results"
 echo "Tests run:    $TESTS_RUN"
