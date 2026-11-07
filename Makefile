@@ -62,9 +62,9 @@ lint: install-lint
 	@echo "Running go mod tidy..."
 	@go mod tidy
 	@echo "Checking code formatting..."
-	@if [ -n "$$(gofmt -l . | grep -v '^vendor/')" ]; then \
+	@if [ -n "$$(gofmt -l . | grep -vE '(^|/)vendor/')" ]; then \
 		echo "Go code is not formatted:"; \
-		gofmt -l . | grep -v '^vendor/'; \
+		gofmt -l . | grep -vE '(^|/)vendor/'; \
 		exit 1; \
 	fi
 	@echo "Running golangci-lint..."
@@ -73,6 +73,7 @@ lint: install-lint
 .PHONY: test
 test:
 	@echo "Running tests..."
+	@bash scripts/test-make-lint.sh
 	go test -v -p 1 ./...
 
 .PHONY: test-race
