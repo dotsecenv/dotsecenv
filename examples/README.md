@@ -23,8 +23,9 @@ reference see `dotsecenv --help` or the man pages installed by
 | 05 | [secenv-shell-plugin](./05-secenv-shell-plugin/) | Reference `.secenv` file demonstrating every supported placeholder syntax | [Reloading Secrets](https://dotsecenv.com/tutorials/reload-secrets/) |
 | 06 | [multi-environment-fips](./06-multi-environment-fips/) | Vault-per-environment under FIPS 186-5 policy; per-env CI keys (`GPG_PRIVATE_KEY_DEV`...) | [Team Vault Setup](https://dotsecenv.com/tutorials/team-vault-setup/) |
 | 07 | [org-wide-keypair](./07-org-wide-keypair/) | Org-wide CI: one keypair shared across repos via an organization secret (`ORG_GPG_PRIVATE_KEY`) | [Org-wide Keypair in CI](https://dotsecenv.com/tutorials/org-wide-keypair/) |
+| 08 | [compact-vault](./08-compact-vault/) | Preview and apply vault compaction, remove deleted secrets, and validate the result | [vault compact reference](https://dotsecenv.com/reference/#vault-compact) |
 
-Examples 01, 02, and 06 ship a `run.sh` that executes the full flow end to
+Examples 01, 02, 06, and 08 ship a `run.sh` that executes the full flow end to
 end in an ephemeral working directory. Examples 03, 04, 05, and 07 are
 configuration artifacts (workflow YAML, policy fragments, a `.secenv` file)
 that ship with a `README.md` explaining how to install and use them; there is
