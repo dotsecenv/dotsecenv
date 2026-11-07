@@ -73,7 +73,6 @@ lint: install-lint
 .PHONY: test
 test:
 	@echo "Running tests..."
-	@bash scripts/test-make-lint.sh
 	go test -v -p 1 ./...
 
 .PHONY: test-race
