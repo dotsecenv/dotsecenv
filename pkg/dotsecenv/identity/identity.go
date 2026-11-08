@@ -19,11 +19,13 @@ import (
 // This follows security best practices for matching hash strength to key strength.
 func ComputeHash(data []byte, algorithmBits int) string {
 	if algorithmBits >= 256 {
-		// Use SHA-512 for stronger keys
+		// [code-scanning/15] CodeQL false positive: secretKey contains a secret's name.
+		// SHA-512 hashes canonical record data for signatures; values are encrypted.
 		hash := sha512.Sum512(data)
 		return hex.EncodeToString(hash[:])
 	}
-	// Use SHA-256 for standard keys
+	// [code-scanning/16] CodeQL false positive: secretKey contains a secret's name.
+	// SHA-256 hashes canonical record data for signatures; values are encrypted.
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
 }
