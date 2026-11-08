@@ -5,8 +5,9 @@
 # The website CLI reference (website/src/content/docs/reference.mdx) is
 # hand-curated and NOT generated, so it can drift from the real CLI. This
 # script generates the command + flag inventory from source and verifies every
-# command and command-specific flag is documented in reference.mdx. Run it
-# before every release.
+# command and command-specific flag is documented in reference.mdx, and that
+# every subcommand heading names a command that exists. Run it before every
+# release.
 #
 # Exit codes: 0 = no drift, 1 = drift detected, 2 = setup error.
 
@@ -63,6 +64,19 @@ for f in "$CLI"/*.md; do
 done
 
 echo
+echo "==> subcommand headings in reference.mdx with no such command"
+# A heading such as "### vault upgrade": its first word is a top-level command
+# and the rest names a subcommand. Each must have a generated page.
+groups="$(find "$CLI" -name 'dotsecenv_*.md' | sed -E 's|.*/dotsecenv_||; s|\.md$||' | grep -v _ || true)"
+while IFS= read -r heading; do
+  [ -n "$heading" ] || continue
+  if grep -qxF -- "${heading%% *}" <<<"$groups" && [ ! -f "$CLI/dotsecenv_${heading// /_}.md" ]; then
+    echo "  STALE command: '${heading}' (not in the CLI)"
+    drift=1
+  fi
+done < <(grep -E '^#{2,6} [a-z][a-z-]*( [a-z][a-z-]*)+$' "$REF" | sed -E 's/^#{2,6} //' || true)
+
+echo
 echo "==> duplicate headings in reference.mdx"
 dupes="$(grep -E '^#{2,3} ' "$REF" | sed -E 's/^#{2,3} //' | sort | uniq -d || true)"
 if [ -n "$dupes" ]; then
@@ -77,11 +91,11 @@ RESULT: drift detected.
 
 Update website/src/content/docs/reference.mdx to add the missing command(s) or
 flag(s) (match the page's style: description, options table, examples) and
-remove any duplicate/stale section, then re-run this check until it passes.
+remove any duplicate or stale section, then re-run this check until it passes.
 
 Known false positives: `completion bash|zsh|fish` are documented under
 `## completion` as `### Bash|Zsh|Fish`, not as `### completion <shell>`.
 EOF
   exit 1
 fi
-echo "RESULT: no drift — every command and flag is documented, no duplicate headings."
+echo "RESULT: no drift — every command and flag is documented, every subcommand heading exists, no duplicate headings."

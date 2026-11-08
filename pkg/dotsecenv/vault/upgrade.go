@@ -81,9 +81,9 @@ func printUpgradeNotice(path string, fromVersion, toVersion int) {
 		path, fromVersion, toVersion)
 }
 
-// printExplicitUpgradeHint outputs hint about running vault upgrade command.
+// printExplicitUpgradeHint names the command that upgrades the vault format.
 func printExplicitUpgradeHint() {
-	fmt.Fprintf(os.Stderr, "dotsecenv: run 'dotsecenv vault upgrade' to upgrade the vault format\n")
+	fmt.Fprintf(os.Stderr, "dotsecenv: run 'dotsecenv vault doctor' to upgrade the vault format\n")
 }
 
 // CheckAndUpgradeVault checks if a vault needs upgrading and handles it based on requireExplicitUpgrade.
