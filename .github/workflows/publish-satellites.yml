@@ -60,12 +60,12 @@ jobs:
       # the satellite gets no tag for it.
       - name: Publish packages source to satellite (no tag)
         id: publish_packages
-        uses: releasetools/actions/signed-push@76cf0826db3a16eed6baa02d03548628e7a32519  # v0.10.0
+        uses: releasetools/actions/signed-push@9828828b39bb2261f95b6f45749fb96ce22c9d2d  # v0.12.1
         with:
           source-dir: packages
           target-repo: dotsecenv/packages
           target-branch: main
-          headline: "publish: ad-hoc (${{ github.sha }})"
+          headline: "publish: ad-hoc"
           body: |
             Source-Commit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}>
           token: ${{ steps.app-token.outputs.token }}
@@ -131,13 +131,13 @@ jobs:
           repositories: plugin
 
       - name: Publish plugin source to satellite (no tag)
-        uses: releasetools/actions/signed-push@76cf0826db3a16eed6baa02d03548628e7a32519  # v0.10.0
+        uses: releasetools/actions/signed-push@9828828b39bb2261f95b6f45749fb96ce22c9d2d  # v0.12.1
         id: push
         with:
           source-dir: plugin
           target-repo: dotsecenv/plugin
           target-branch: main
-          headline: "publish: ad-hoc (${{ github.sha }})"
+          headline: "publish: ad-hoc"
           body: |
             Source-Commit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}>
           token: ${{ steps.app-token.outputs.token }}
