@@ -422,9 +422,10 @@ func (w *Writer) Header() Header {
 		}
 	}
 	h := Header{
-		Version:    w.header.Version,
-		Identities: make(map[string]int, len(w.header.Identities)),
-		Secrets:    make(map[string]SecretIndex, len(w.header.Secrets)),
+		Version:          w.header.Version,
+		DotsecenvVersion: w.header.DotsecenvVersion,
+		Identities:       make(map[string]int, len(w.header.Identities)),
+		Secrets:          make(map[string]SecretIndex, len(w.header.Secrets)),
 	}
 	for k, v := range w.header.Identities {
 		h.Identities[k] = v

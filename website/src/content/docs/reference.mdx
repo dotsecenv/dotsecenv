@@ -825,6 +825,8 @@ Compaction never decrypts. It reads only access lists (`available_to` fingerprin
 
 Without `--yes`, the command prints the plan and asks for confirmation before writing. Confirmation is skipped automatically in CI.
 
+Compaction records the running dotsecenv release in the vault header as [`dotsecenv_version`](/concepts/vault-format/#header-format). If a newer release created the vault or last rewrote it, the command warns you to upgrade dotsecenv, then continues.
+
 :::caution
 Compaction rewrites the vault file. Back it up first (`cp <vault> <vault>.bak`). To make a former recipient's old ciphertext unreadable, rotate the secret at its source; compaction drops unreachable versions but does not re-encrypt anything.
 :::

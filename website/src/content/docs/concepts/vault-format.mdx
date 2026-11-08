@@ -9,7 +9,7 @@ import { Aside, Badge } from '@astrojs/starlight/components';
 
 dotsecenv vaults use a versioned JSONL format. The format includes a version field in the header JSON, allowing the format to evolve over time while maintaining backward compatibility.
 
-## Current Format (v1) <Badge text="Current" variant="success" />
+## Current Format (v2) <Badge text="Current" variant="success" />
 
 The vault file consists of:
 
@@ -21,8 +21,8 @@ The vault file consists of:
 ### Structure
 
 ```text
-# === VAULT HEADER v1 ===
-{"version":1,"identities":[["fingerprint1",4],["fingerprint2",5]],"secrets":{...}}
+# === VAULT HEADER ===
+{"version":2,"dotsecenv_version":"0.11.0","identities":{"fingerprint1":4,"fingerprint2":5},"secrets":{...}}
 # === VAULT DATA ===
 {"type":"identity","data":{...}}
 {"type":"secret","data":{...}}
@@ -31,15 +31,16 @@ The vault file consists of:
 
 ### Header Format
 
-Identities are stored as an ordered array of `[fingerprint, line]` pairs, sorted by line number (order added):
+The header maps each identity fingerprint, and each secret, to the lines that hold its entries:
 
 ```json
 {
-  "version": 1,
-  "identities": [
-    ["ABC123DEF456", 4],
-    ["XYZ789GHI012", 5]
-  ],
+  "version": 2,
+  "dotsecenv_version": "0.11.0",
+  "identities": {
+    "ABC123DEF456": 4,
+    "XYZ789GHI012": 5
+  },
   "secrets": {
     "DATABASE_URL": {
       "secret": 6,
@@ -51,13 +52,18 @@ Identities are stored as an ordered array of `[fingerprint, line]` pairs, sorted
 
 | Field | Type | Purpose |
 |-------|------|---------|
-| `version` | `int` | Format version (currently 1) |
-| `identities` | `array` | Array of `[fingerprint, line]` pairs, sorted by line number |
+| `version` | `int` | Format version (currently 2) |
+| `dotsecenv_version` | `string` | dotsecenv release that created the vault or last rewrote it; absent in older vaults |
+| `identities` | `object` | Map of fingerprint to the line of its identity entry |
 | `secrets` | `object` | Map of secret name to definition line and value lines |
 
-### Why Arrays for Identities?
+Keys are written in sorted order, so the same vault always produces the same header line.
 
-The array format preserves insertion order. That gives you deterministic output (the same vault always serializes identically), cleaner git diffs from consistent ordering, and an implicit audit trail since order reflects when identities were added.
+### Release stamp
+
+`dotsecenv_version` names the release, as `X.Y.Z`, that created the vault or last rewrote the whole file: `vault compact`, defragmentation in `vault doctor`, and format upgrades. `secret store`, `secret share`, `secret forget` and other appends leave it unchanged. `vault compact` warns you to upgrade dotsecenv when the stamp names a newer release than the one running.
+
+The field is absent when the vault was last rewritten by a release before 0.11.0 or by a build that is not a release (`dotsecenv version` prints no `X.Y.Z`). A release before 0.11.0 also drops the field whenever it appends to the vault. A missing stamp never triggers the warning.
 
 <Aside type="tip">
 For querying the audit trail (who signed each entry, who could decrypt each version, when changes happened), see [Audit Trail](/concepts/audit-trail/).
@@ -137,7 +143,7 @@ Three properties follow from this:
 dotsecenv detects the format version from the `version` field in the header JSON:
 
 ```json
-{"version":1,"identities":[...],"secrets":{...}}
+{"version":2,"identities":{...},"secrets":{...}}
 ```
 
 This allows efficient version detection by parsing just the header line.
@@ -148,7 +154,7 @@ Line numbers in the header are 1-indexed (first line = 1):
 
 | Line | Content |
 |------|---------|
-| 1 | Header marker (`# === VAULT HEADER v1 ===`) |
+| 1 | Header marker (`# === VAULT HEADER ===`) |
 | 2 | Header JSON |
 | 3 | Data marker (`# === VAULT DATA ===`) |
 | 4+ | Data entries (identities, secrets, values) |
@@ -160,7 +166,7 @@ The header indexes point to line numbers where each entry can be found, enabling
 The format version lets dotsecenv evolve while maintaining compatibility. Older vaults remain readable, new features can land without breaking existing vaults, and future versions may include automatic upgrades.
 
 <Aside type="note">
-  Currently only v1 format exists. Future format changes will be announced in release notes with migration guidance.
+  v1 vaults store identities as an array of `[fingerprint, line]` pairs under a `# === VAULT HEADER v1 ===` marker. dotsecenv upgrades them to v2 when it opens them, unless `behavior.require_explicit_vault_upgrade` is set. Future format changes will be announced in release notes with migration guidance.
 </Aside>
 
 ## Validation

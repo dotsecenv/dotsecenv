@@ -98,6 +98,10 @@ valid. Identities are never touched.
 
 Without --yes it prints the plan and asks for confirmation (skipped in CI).
 
+Compaction records this dotsecenv release in the vault header. If a newer
+release created the vault or last rewrote it, compact warns you to upgrade
+dotsecenv, then continues.
+
 Use -v to target a specific vault.
 
 Options:

@@ -121,9 +121,10 @@ func (r *Reader) Header() Header {
 	}
 	// Return a copy to prevent modification
 	h := Header{
-		Version:    r.header.Version,
-		Identities: make(map[string]int, len(r.header.Identities)),
-		Secrets:    make(map[string]SecretIndex, len(r.header.Secrets)),
+		Version:          r.header.Version,
+		DotsecenvVersion: r.header.DotsecenvVersion,
+		Identities:       make(map[string]int, len(r.header.Identities)),
+		Secrets:          make(map[string]SecretIndex, len(r.header.Secrets)),
 	}
 	for k, v := range r.header.Identities {
 		h.Identities[k] = v

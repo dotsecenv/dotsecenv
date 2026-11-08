@@ -14,6 +14,7 @@ _Unreleased_
 ### Features
 
 - Agent skills use `--no-pinentry` to suppress GPG prompts and report `GPG_ERR_NO_PIN_ENTRY` with recovery guidance when interaction is needed (#402)
+- The vault header records the dotsecenv release that created the vault or last rewrote it (`vault compact`, `vault doctor` defragmentation and format upgrades) as `dotsecenv_version`; `secret store` and other appends leave it unchanged. `vault compact` warns you to upgrade dotsecenv when a newer release wrote the vault. A vault has no stamp when a release before 0.11.0 or a non-release build last rewrote it, or when a release before 0.11.0 has appended to it since (#411)
 
 ### Bug Fixes
 

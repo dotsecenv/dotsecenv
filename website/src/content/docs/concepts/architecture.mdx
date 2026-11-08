@@ -12,7 +12,7 @@ The vault is a JSONL (JSON Lines) file where each line is a self-contained JSON 
 ### File Format
 
 ```text
-# === VAULT HEADER v1 ===
+# === VAULT HEADER ===
 Line 2: Header JSON with metadata and indexes
 # === VAULT DATA ===
 Line 4+: Identity entries, secret definitions, and secret values
@@ -21,7 +21,7 @@ Line 4+: Identity entries, secret definitions, and secret values
 Example structure:
 
 ```json
-{"version":1,"identities":[["ABC123",4],["DEF456",5]],"secrets":{"DATABASE_URL":{"secret":6,"values":[7]}}}
+{"version":2,"dotsecenv_version":"0.11.0","identities":{"ABC123":4,"DEF456":5},"secrets":{"DATABASE_URL":{"secret":6,"values":[7]}}}
 {"type":"identity","data":{"fingerprint":"ABC123","uid":"alice@example.com","algorithm":"RSA","algorithm_bits":4096}}
 {"type":"identity","data":{"fingerprint":"DEF456","uid":"bob@example.com","algorithm":"EdDSA","curve":"Ed25519"}}
 {"type":"secret","data":{"key":"DATABASE_URL","signed_by":"ABC123","added_at":"2025-01-01T00:00:00Z"}}
@@ -38,8 +38,9 @@ The header provides fast lookup without scanning the entire file:
 
 | Field | Purpose |
 |-------|---------|
-| `version` | Format version (currently 1) |
-| `identities` | Array of `[fingerprint, line]` pairs (sorted by line number) |
+| `version` | Format version (currently 2) |
+| `dotsecenv_version` | dotsecenv release that created the vault or last rewrote it (see [Release stamp](/concepts/vault-format/#release-stamp)) |
+| `identities` | Map of fingerprint to the line of its identity entry |
 | `secrets` | Map of secret name to definition line and value lines |
 
 ### Entry Types
