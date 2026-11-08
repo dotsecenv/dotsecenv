@@ -13,7 +13,7 @@ importers:
         version: 0.42.9(@astrojs/markdown-remark@7.3.1(supports-color@9.4.0))(astro@7.4.5(@astrojs/markdown-remark@7.3.1(supports-color@9.4.0))(@types/node@24.13.3)(esbuild@0.28.2)(yaml@2.9.1))(supports-color@9.4.0)(typescript@6.0.3)
       asciinema-player:
         specifier: ^3.17.0
-        version: 3.17.0
+        version: 3.18.0
       astro:
         specifier: ^7.3.2
         version: 7.4.5(@astrojs/markdown-remark@7.3.1(supports-color@9.4.0))(@types/node@24.13.3)(esbuild@0.28.2)(yaml@2.9.1)
@@ -200,10 +200,6 @@ packages:
     resolution: {integrity: sha512-E8lTAYNB1KW+FH+VGJuZM1ioAx2E6oVlvQFRrf5P8ZZmsiJXYAD9vTFV7yyEURNzgh1dFqMZuO6tUwcARbqFCA==}
     engines: {node: '>=6.0.0'}
     hasBin: true
-
-  '@babel/runtime@7.29.7':
-    resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
-    engines: {node: '>=6.9.0'}
 
   '@babel/types@7.29.8':
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
@@ -959,21 +955,6 @@ packages:
   '@shikijs/vscode-textmate@10.0.2':
     resolution: {integrity: sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg==}
 
-  '@solid-primitives/refs@1.1.4':
-    resolution: {integrity: sha512-bLjwIs6ZPu8NQnuw04sU3Zc8qKSpbc0umUU/O4SHf6oWOdO4+dHY8vb1T7C4b/Tg103+9WGr6sEE0+NFlbaB/A==}
-    peerDependencies:
-      solid-js: ^1.6.12
-
-  '@solid-primitives/transition-group@1.1.2':
-    resolution: {integrity: sha512-gnHS0OmcdjeoHN9n7Khu8KNrOlRc8a2weETDt2YT6o1zeW/XtUC6Db3Q9pkMU/9cCKdEmN4b0a/41MKAHRhzWA==}
-    peerDependencies:
-      solid-js: ^1.6.12
-
-  '@solid-primitives/utils@6.4.1':
-    resolution: {integrity: sha512-ISSB5QX1qP2ynrheIpYwc4oKR5Ny4siNuUyf1qZniy+Il+p/PtDB0QK1Dnle8noiHpwRD3gpPdubOC3qI/Zamg==}
-    peerDependencies:
-      solid-js: ^1.6.12
-
   '@tybys/wasm-util@0.10.3':
     resolution: {integrity: sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==}
 
@@ -1170,8 +1151,8 @@ packages:
   array-iterate@2.0.1:
     resolution: {integrity: sha512-I1jXZMjAgCMmxT4qxXfPXa6SthSoE8h6gkSI9BGGNv8mP8G/v0blc+qFnZu6K42vTOiuME596QaLO0TP3Lk0xg==}
 
-  asciinema-player@3.17.0:
-    resolution: {integrity: sha512-JbjNJmA2TLIeYNaOEja+kVSzXadKoqpIzVVmfBGNj2DmdtE/vExBCnkE8NYEcpaQcDvUYg8Ltt0urT80frACmw==}
+  asciinema-player@3.18.0:
+    resolution: {integrity: sha512-5gpt2ipFcy4NKmgkv+c/QXnJ9zMicxqWROCOuJqgwwtiYKM8Qe9hnDOvfqke5bW6M2DW/seO3uQYkQ0xeUUVtw==}
 
   astring@1.9.0:
     resolution: {integrity: sha512-LElXdjswlqjWrPpJFg1Fx4wpkOCxj1TDHlSV4PlaRxHGWko024xICaa97ZkMfs6DRKlCguiAI+rbXv5GWwXIkg==}
@@ -2584,14 +2565,14 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  seroval-plugins@1.5.6:
-    resolution: {integrity: sha512-HXuLAX2pu/UByPpaeo/TaMfvMIi+1QqIoPJYCcAtU8QkVNwgR6MPlGuCQTErV1JwraaMbYaWVIBX7mppzGLATQ==}
+  seroval-plugins@1.6.12:
+    resolution: {integrity: sha512-+reiwp/lYxiyctSrdvX7OQ1YLrcbWYgBiZrhSFL+V43b0/DGRLNVSDyZINbQe+tWplPOI2fw2dPrdv6hcc09kQ==}
     engines: {node: '>=10'}
     peerDependencies:
       seroval: ^1.0
 
-  seroval@1.5.6:
-    resolution: {integrity: sha512-rVQVWjjSvlINzaQPZH5JFqsqEsIWdTxY3iJZCnTL/5gQbXIRooVZKI60tVCkOVfzcRPejboxO2t0P89dg5mQaA==}
+  seroval@1.6.12:
+    resolution: {integrity: sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg==}
     engines: {node: '>=10'}
 
   sharp@0.35.5:
@@ -2639,14 +2620,8 @@ packages:
     resolution: {integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==}
     engines: {node: '>= 18'}
 
-  solid-js@1.9.15:
-    resolution: {integrity: sha512-EeiY2xfpZJqPLjXspVEKjAII4yv8NyG//NxZ3IpOFHdUNnnTyL0uJOeS9LWGvA7cFCz5y94cjFwYlmw5Luncsg==}
-
-  solid-transition-group@0.2.3:
-    resolution: {integrity: sha512-iB72c9N5Kz9ykRqIXl0lQohOau4t0dhel9kjwFvx81UZJbVwaChMuBuyhiZmK24b8aKEK0w3uFM96ZxzcyZGdg==}
-    engines: {node: '>=18.0.0', pnpm: '>=8.6.0'}
-    peerDependencies:
-      solid-js: ^1.6.12
+  solid-js@1.9.18:
+    resolution: {integrity: sha512-CHGO5YFk6Y9m/1YSxVtKnXfrW7JD3Tmof8HmR4z6TmCPsS8efo8LnzIR8CQh3cUvffqYm6DWyBFfk8dQw1CNQQ==}
 
   source-map-js@1.2.2:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
@@ -3289,8 +3264,6 @@ snapshots:
     dependencies:
       '@babel/types': 7.29.8
 
-  '@babel/runtime@7.29.7': {}
-
   '@babel/types@7.29.8':
     dependencies:
       '@babel/helper-string-parser': 7.29.7
@@ -3928,19 +3901,6 @@ snapshots:
 
   '@shikijs/vscode-textmate@10.0.2': {}
 
-  '@solid-primitives/refs@1.1.4(solid-js@1.9.15)':
-    dependencies:
-      '@solid-primitives/utils': 6.4.1(solid-js@1.9.15)
-      solid-js: 1.9.15
-
-  '@solid-primitives/transition-group@1.1.2(solid-js@1.9.15)':
-    dependencies:
-      solid-js: 1.9.15
-
-  '@solid-primitives/utils@6.4.1(solid-js@1.9.15)':
-    dependencies:
-      solid-js: 1.9.15
-
   '@tybys/wasm-util@0.10.3':
     dependencies:
       tslib: 2.8.1
@@ -4155,11 +4115,9 @@ snapshots:
 
   array-iterate@2.0.1: {}
 
-  asciinema-player@3.17.0:
+  asciinema-player@3.18.0:
     dependencies:
-      '@babel/runtime': 7.29.7
-      solid-js: 1.9.15
-      solid-transition-group: 0.2.3(solid-js@1.9.15)
+      solid-js: 1.9.18
 
   astring@1.9.0: {}
 
@@ -6263,11 +6221,11 @@ snapshots:
 
   semver@7.8.5: {}
 
-  seroval-plugins@1.5.6(seroval@1.5.6):
+  seroval-plugins@1.6.12(seroval@1.6.12):
     dependencies:
-      seroval: 1.5.6
+      seroval: 1.6.12
 
-  seroval@1.5.6: {}
+  seroval@1.6.12: {}
 
   sharp@0.35.5(@types/node@24.13.3):
     dependencies:
@@ -6345,17 +6303,11 @@ snapshots:
 
   smol-toml@1.9.1: {}
 
-  solid-js@1.9.15:
+  solid-js@1.9.18:
     dependencies:
       csstype: 3.2.3
-      seroval: 1.5.6
-      seroval-plugins: 1.5.6(seroval@1.5.6)
-
-  solid-transition-group@0.2.3(solid-js@1.9.15):
-    dependencies:
-      '@solid-primitives/refs': 1.1.4(solid-js@1.9.15)
-      '@solid-primitives/transition-group': 1.1.2(solid-js@1.9.15)
-      solid-js: 1.9.15
+      seroval: 1.6.12
+      seroval-plugins: 1.6.12(seroval@1.6.12)
 
   source-map-js@1.2.2: {}
 
