@@ -18,9 +18,8 @@ func createSignedLogin(gpgClient gpg.Client, fingerprint string) (*config.Login,
 	// Create canonical string for hashing: login:{added_at_rfc3339}:{fingerprint}
 	canonical := fmt.Sprintf("login:%s:%s", addedAt.Format(time.RFC3339), fingerprint)
 
-	// CodeQL alert #14 is a false positive: fingerprint is a public key identifier.
+	// [code-scanning/14] CodeQL false positive: fingerprint is a public key identifier.
 	// SHA-256 hashes the timestamp and fingerprint for the signed login proof.
-	// https://github.com/dotsecenv/dotsecenv/security/code-scanning/14
 	hashBytes := sha256.Sum256([]byte(canonical))
 	hashHex := hex.EncodeToString(hashBytes[:])
 

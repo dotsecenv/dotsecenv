@@ -19,15 +19,13 @@ import (
 // This follows security best practices for matching hash strength to key strength.
 func ComputeHash(data []byte, algorithmBits int) string {
 	if algorithmBits >= 256 {
-		// CodeQL alert #15 is a false positive: secretKey contains a secret's name.
+		// [code-scanning/15] CodeQL false positive: secretKey contains a secret's name.
 		// SHA-512 hashes canonical record data for signatures; values are encrypted.
-		// https://github.com/dotsecenv/dotsecenv/security/code-scanning/15
 		hash := sha512.Sum512(data)
 		return hex.EncodeToString(hash[:])
 	}
-	// CodeQL alert #16 is a false positive: secretKey contains a secret's name.
+	// [code-scanning/16] CodeQL false positive: secretKey contains a secret's name.
 	// SHA-256 hashes canonical record data for signatures; values are encrypted.
-	// https://github.com/dotsecenv/dotsecenv/security/code-scanning/16
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
 }
