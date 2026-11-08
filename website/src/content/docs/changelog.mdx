@@ -11,6 +11,12 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+---
+
+## v0.11.0
+
+_November 8, 2026_
+
 ### Features
 
 - Agent skills use `--no-pinentry` to suppress GPG prompts and report `GPG_ERR_NO_PIN_ENTRY` with recovery guidance when interaction is needed (#402)
@@ -29,8 +35,10 @@ _Unreleased_
 - Packages publication and satellite drift checks authenticate commit signatures and source provenance before using mirrored content (#407)
 - Satellite commits are verified through GitHub's API with `releasetools/actions/verify-signed-push`, and `packages/retracted.txt` is committed and checked against `go.mod` by `make lint` (#410)
 - `make build` takes the binary's version from the nearest `vX.Y.Z` tag (`v0.10.3-15-gb9da878`) instead of the rolling `v0` tag, so local builds stamp vaults with the release they were built after (#412)
-- Satellite commits name their monorepo commit once, in `Source-Commit`, and ad-hoc publishes are titled `publish: ad-hoc` (#414)
+- Update `releasetools/actions` from v0.9.1 to v0.12.1. Satellite commits name their monorepo commit once, in `Source-Commit`, and ad-hoc publishes are titled `publish: ad-hoc` (#401, #414)
 - `go.sum` drops 16 checksum lines for module versions the build no longer uses, so `make lint` (which runs `go mod tidy`) leaves the tree clean (#415)
+- Update the website's Astro ecosystem, `@astrojs/starlight` to v0.42.9 and `eslint-plugin-mdx` to v3.9.1 (#397, #408, #396)
+- Update pnpm to v12.17.0, `pnpm/action-setup` to v6.1.1 and uv to v0.13.7 (#399, #400, #398)
 
 ---
 

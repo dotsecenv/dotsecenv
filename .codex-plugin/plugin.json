@@ -1,6 +1,6 @@
 {
   "name": "dotsecenv",
-  "version": "0.10.3",
+  "version": "0.11.0",
   "description": "Manage GPG-encrypted environment secrets using the dotsecenv CLI",
   "author": {
     "name": "dotsecenv",
