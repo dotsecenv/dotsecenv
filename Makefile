@@ -27,8 +27,10 @@ help:
 .PHONY: all
 all: clean update build lint test test-race e2e e2e-terraform e2e-git-credential e2e-install completions docs man plugin
 
-# Common ldflags for version info
-LDFLAGS := -X main.version=$$(git describe --tags --always --dirty) -X main.commit=$$(git rev-parse --short HEAD) -X main.date=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
+# Common ldflags for version info. --match skips the rolling major tag (v0),
+# so a build between releases reports vX.Y.Z-N-g<sha>, which dotsecenv reads
+# as release X.Y.Z when it stamps a vault.
+LDFLAGS := -X main.version=$$(git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --always --dirty) -X main.commit=$$(git rev-parse --short HEAD) -X main.date=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 .PHONY: clean
 clean:
