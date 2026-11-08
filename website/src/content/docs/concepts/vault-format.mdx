@@ -63,7 +63,7 @@ Keys are written in sorted order, so the same vault always produces the same hea
 
 `dotsecenv_version` names the release, as `X.Y.Z`, that created the vault or last rewrote the whole file: `vault compact`, defragmentation in `vault doctor`, and format upgrades. `secret store`, `secret share`, `secret forget` and other appends leave it unchanged. `vault compact` warns you to upgrade dotsecenv when the stamp names a newer release than the one running.
 
-The field is absent when the vault was last rewritten by a release before 0.11.0 or by a build that is not a release (`dotsecenv version` prints no `X.Y.Z`). A release before 0.11.0 also drops the field whenever it appends to the vault. A missing stamp never triggers the warning.
+A build made between releases, such as `v0.11.0-3-gabc1234` from `make build`, records the release it was built after (`0.11.0`). The field is absent when the vault was last rewritten by a release before 0.11.0 or by a build whose version has no `X.Y.Z` (`unknown`, or a bare commit hash). A release before 0.11.0 also drops the field whenever it appends to the vault. A missing stamp never triggers the warning.
 
 <Aside type="tip">
 For querying the audit trail (who signed each entry, who could decrypt each version, when changes happened), see [Audit Trail](/concepts/audit-trail/).
