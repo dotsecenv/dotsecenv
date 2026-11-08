@@ -32,7 +32,7 @@ Controls whether vault format upgrades happen automatically or require explicit 
 | Value | Behavior |
 |-------|----------|
 | `false` (default) | Vaults are automatically upgraded to the latest format with a notice |
-| `true` | Warns about outdated format but doesn't modify; requires `dotsecenv vault upgrade` |
+| `true` | Warns about outdated format but doesn't modify; upgrade with `dotsecenv vault doctor` |
 
 **Use case:** Set to `true` in shared environments where you want to coordinate vault upgrades across team members.
 
@@ -45,7 +45,7 @@ When enabled, you'll see:
 
 ```shell
 dotsecenv: warning: vault "/path/to/vault" uses format v1, upgrade to v2 recommended
-dotsecenv: run 'dotsecenv vault upgrade' to upgrade the vault format
+dotsecenv: run 'dotsecenv vault doctor' to upgrade the vault format
 ```
 
 ### `restrict_to_configured_vaults`

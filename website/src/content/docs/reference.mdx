@@ -768,7 +768,7 @@ Performs the following checks:
 - **Vault format version** - checks if vaults need upgrading to the latest format
 - **Vault fragmentation** - checks if vaults would benefit from defragmentation
 
-After displaying health check results, the command offers to fix any issues found (upgrade outdated vaults, defragment fragmented vaults). Use `--fix` to auto-fix without prompting.
+After displaying health check results, the command offers to fix any issues found (upgrade outdated vaults, defragment fragmented vaults). Use `--fix` to auto-fix without prompting. With `behavior.require_explicit_vault_upgrade` set, run it to upgrade outdated vaults.
 
 :::note[CI Environment Detection]
 In CI environments (`CI=true`, `GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `CIRCLECI`, etc.), interactive prompts are automatically skipped to avoid blocking pipelines. Use `--json` for machine-readable output in CI.
@@ -865,29 +865,6 @@ Compaction plan (metadata only, no decryption):
   DB_PASSWORD: 4 -> 1 value(s)
   TEMP_TOKEN: 2 value(s) -> removed (deleted)
 Total: 11 -> 2 value(s); 1 deleted secret(s) removed
-```
-
-### vault upgrade
-
-Upgrade vault file format to the latest version.
-
-```bash
-dotsecenv vault upgrade [flags]
-```
-
-When `behavior.require_explicit_vault_upgrade` is set to `true` in your config, automatic vault upgrades are disabled. Use this command to explicitly upgrade vault formats.
-
-**Examples:**
-
-```bash
-# Upgrade vault (prompts if multiple vaults configured)
-dotsecenv vault upgrade
-
-# Upgrade specific vault
-dotsecenv vault upgrade -v 1
-
-# Upgrade vault at path
-dotsecenv vault upgrade -v ./project/vault
 ```
 
 ---
@@ -1266,7 +1243,7 @@ Granular settings that control how dotsecenv handles edge cases. See [Behavior S
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `require_explicit_vault_upgrade` | `false` | Prevent automatic vault format upgrades; requires `vault upgrade` command |
+| `require_explicit_vault_upgrade` | `false` | Prevent automatic vault format upgrades; upgrade with `vault doctor` |
 | `restrict_to_configured_vaults` | `false` | Ignore CLI `-v` flags; only use vaults from config file |
 
 ### GPG Program Configuration

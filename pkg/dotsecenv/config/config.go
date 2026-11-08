@@ -27,7 +27,7 @@ type GPGConfig struct {
 // All fields are *bool to distinguish between "not set" (nil) and "explicitly false".
 type BehaviorConfig struct {
 	// RequireExplicitVaultUpgrade when true prevents automatic vault format upgrades.
-	// Users must run `dotsecenv vault upgrade` explicitly.
+	// Users upgrade with `dotsecenv vault doctor`.
 	RequireExplicitVaultUpgrade *bool `yaml:"require_explicit_vault_upgrade,omitempty"`
 
 	// RestrictToConfiguredVaults when true ignores CLI -v flags and uses only config vaults.

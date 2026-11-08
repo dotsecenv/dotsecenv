@@ -31,11 +31,13 @@ flag inventory from source (into `build/cli`), then compares it against
 
 ## What it reports
 
-- **MISSING command** — a CLI command with no matching `##`/`###` heading in
+- **MISSING command**: a CLI command with no matching `##`/`###` heading in
   `reference.mdx`.
-- **MISSING flag** — a command-specific (long) flag not mentioned anywhere in
+- **MISSING flag**: a command-specific (long) flag not mentioned anywhere in
   `reference.mdx`.
-- **DUPLICATE heading** — the same `##`/`###` heading text appears more than
+- **STALE command**: a subcommand heading (such as `### vault upgrade`) for a
+  command the CLI no longer has.
+- **DUPLICATE heading**: the same `##`/`###` heading text appears more than
   once (a copy-paste or stale-section bug).
 
 ## Act on the report
