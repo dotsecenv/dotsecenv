@@ -70,11 +70,10 @@ Source-Commit: <https://github.com/dotsecenv/dotsecenv/commit/21eee0028a7b8182e3
 
 ---
 
-Workflow-Commit: <https://github.com/dotsecenv/dotsecenv/commit/21eee0028a7b8182e37cac526725b2fa9023d6e4>
 Published-By: <https://github.com/dotsecenv/dotsecenv/actions/runs/26005850942>
 ```
 
-The workflow writes `Source-Commit`, which names the monorepo revision the satellite holds, in the form the [`traceable-tag` convention](https://github.com/releasetools/conventions/blob/main/conventions/traceable-tag.md) uses. `signed-push` appends the footer below the `---` itself, naming the commit and run that published it.
+The workflow writes `Source-Commit`, which names the monorepo revision the satellite holds, in the form the [`traceable-tag` convention](https://github.com/releasetools/conventions/blob/main/conventions/traceable-tag.md) uses. `signed-push` appends the footer below the `---` itself, linking the run that published it.
 
 ## What verification checks
 

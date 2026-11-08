@@ -44,7 +44,7 @@ jobs:
         satellite: [plugin, packages]
     steps:
       - name: Verify dotsecenv/${{ matrix.satellite }}
-        uses: releasetools/actions/verify-signed-push@155dac3fe326bcdec985b9351788b43e82df0398  # v0.12.0
+        uses: releasetools/actions/verify-signed-push@9828828b39bb2261f95b6f45749fb96ce22c9d2d  # v0.12.1
         with:
           repository: dotsecenv/${{ matrix.satellite }}
           commit: main
