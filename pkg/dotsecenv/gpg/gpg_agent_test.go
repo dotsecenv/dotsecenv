@@ -9,8 +9,11 @@ import (
 	"testing"
 )
 
+const testFPR = "0123456789ABCDEF0123456789ABCDEF01234567"
+
 func useAgentGPG(t *testing.T, script string) {
 	t.Helper()
+	t.Setenv("TEST_FPR", testFPR)
 	if runtime.GOOS == "windows" {
 		t.Skip("fixture requires a POSIX shell")
 	}
@@ -31,7 +34,8 @@ for required in --pinentry-mode=error --status-fd=2 --batch --no-tty; do
         *) echo "missing $required" >&2; exit 2 ;;
     esac
 done
-cat >/dev/null
+handle=$(sed -n 's/^Handle: //p')
+if [ -n "$handle" ]; then printf '[GNUPG:] KEY_CREATED B %s %s\n' "$TEST_FPR" "$handle" >&2; fi
 if [ "$TEST_GPG_LOCKED" = yes ]; then
     printf '[GNUPG:] ERROR get_passphrase 67108949\n' >&2
     echo 'gpg: interaction unavailable' >&2
@@ -45,7 +49,7 @@ printf 'result'
 			t.Setenv("TEST_GPG_LOCKED", locked)
 			client := &GPGClient{NoPinentry: true}
 			operations := map[string]func() (string, error){
-				"generate": func() (string, error) { return "", client.GenerateKey("template") },
+				"generate": func() (string, error) { return client.GenerateKey("Key-Type: eddsa\n%commit\n") },
 				"sign":     func() (string, error) { return client.SignDataWithAgent("TESTFP", []byte("data")) },
 				"decrypt": func() (string, error) {
 					value, err := client.DecryptWithAgent([]byte("ciphertext"), "TESTFP")
@@ -69,7 +73,7 @@ printf 'result'
 					}
 					want := "result"
 					if name == "generate" {
-						want = ""
+						want = testFPR
 					}
 					if name == "sign" {
 						want = "726573756c74"
@@ -131,7 +135,8 @@ for arg in "$@"; do
         --pinentry-mode*) echo "unexpected pinentry override" >&2; exit 2 ;;
     esac
 done
-cat >/dev/null
+handle=$(sed -n 's/^Handle: //p')
+if [ -n "$handle" ]; then printf '[GNUPG:] KEY_CREATED B %s %s\n' "$TEST_FPR" "$handle" >&2; fi
 printf 'result'
 `)
 	for _, tty := range []string{"", "/dev/inherited-tty"} {
@@ -144,8 +149,8 @@ printf 'result'
 			if _, err := client.DecryptWithAgent([]byte("ciphertext"), "TESTFP"); err != nil {
 				t.Errorf("decryption must follow GPG configuration: %v", err)
 			}
-			if err := client.GenerateKey("template"); err != nil {
-				t.Errorf("key generation must follow GPG configuration: %v", err)
+			if fpr, err := client.GenerateKey("Key-Type: eddsa\n%commit\n"); err != nil || fpr != testFPR {
+				t.Errorf("key generation must follow GPG configuration: fpr=%q err=%v", fpr, err)
 			}
 		})
 	}

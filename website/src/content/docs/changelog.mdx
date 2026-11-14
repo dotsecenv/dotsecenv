@@ -13,6 +13,7 @@ _Unreleased_
 
 ### Bug Fixes
 
+- `identity create` reports the fingerprint that GnuPG gives for the key it created. Before, it reported the newest secret key in the keyring, which could be a different key made at the same time outside dotsecenv (#PR)
 - `identity create` applies the system policy in `/etc/dotsecenv/policy.d` when no user config exists: `approved_algorithms` and `gpg.program` from the policy now take effect, and an unreadable or insecure policy stops the command (#435)
 
 ### Other

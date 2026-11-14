@@ -212,63 +212,14 @@ func printSuccessOutput(w io.Writer, name, email, algorithm, fingerprint string,
 }
 
 // generateGPGKeyWithTemplate generates a GPG key using the provided template.
-// Returns the fingerprint of the generated key.
+// Returns the fingerprint that gpg reported for the key it created.
 func generateGPGKeyWithTemplate(template string, noPinentry bool) (string, *Error) {
 	client := &gpg.GPGClient{NoPinentry: noPinentry}
-	if err := client.GenerateKey(template); err != nil {
+	fingerprint, err := client.GenerateKey(template)
+	if err != nil {
 		return "", NewError(fmt.Sprintf("failed to generate GPG key: %v", err), ExitGPGError)
 	}
-
-	// Extract the fingerprint from the most recently created key
-	return getLatestSecretKeyFingerprint()
-}
-
-// getLatestSecretKeyFingerprint gets the fingerprint of the most recently created secret key.
-func getLatestSecretKeyFingerprint() (string, *Error) {
-	cmd := exec.Command(gpg.GetGPGProgram(), "--list-secret-keys", "--with-colons", "--keyid-format", "long")
-	output, err := cmd.Output()
-	if err != nil {
-		return "", NewError(fmt.Sprintf("failed to list secret keys: %v", err), ExitGPGError)
-	}
-
-	// Parse the output to find the fingerprint
-	// GPG output format: sec:...:...:...:KEYID:CREATION_TIME:...
-	// We want the fpr line that follows
-	var latestFingerprint string
-	var latestCreation int64
-
-	lines := strings.Split(string(output), "\n")
-	var currentCreation int64
-	for _, line := range lines {
-		parts := strings.Split(line, ":")
-		if len(parts) < 2 {
-			continue
-		}
-
-		switch parts[0] {
-		case "sec":
-			// Secret key record - get creation time
-			if len(parts) > 5 {
-				var creation int64
-				_, _ = fmt.Sscanf(parts[5], "%d", &creation)
-				currentCreation = creation
-			}
-		case "fpr":
-			// Fingerprint record
-			if len(parts) >= 10 && parts[9] != "" {
-				if currentCreation > latestCreation {
-					latestCreation = currentCreation
-					latestFingerprint = parts[9]
-				}
-			}
-		}
-	}
-
-	if latestFingerprint == "" {
-		return "", NewError("could not find fingerprint of generated key", ExitGPGError)
-	}
-
-	return latestFingerprint, nil
+	return fingerprint, nil
 }
 
 // exportPublicKeyByFingerprint exports the public key in ASCII armor format.
