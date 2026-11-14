@@ -11,6 +11,12 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+---
+
+## v0.11.1
+
+_November 14, 2026_
+
 ### Bug Fixes
 
 - `identity create` reports the fingerprint that GnuPG gives for the key it created. Before, it reported the newest secret key in the keyring, which could be a different key made at the same time outside dotsecenv (#437)
@@ -21,6 +27,10 @@ _Unreleased_
 - `go.sum` drops 8 checksum lines for module versions the build no longer uses, so `make lint` (which runs `go mod tidy`) leaves the tree clean (#434)
 - Website linting uses `markdownlint` 0.42.1 and patched `re2js` 2.9.1 (#421)
 - Hashing comments explain the false-positive CodeQL alerts for secret names and public fingerprints (#420)
+- Update `golang.org/x/crypto` to v0.59.0 for a security fix, Go to v1.27.4 and `charm.land/lipgloss/v2` to v2.1.0 (#426, #432, #430)
+- Update the website's Astro to v7.4.10, which includes a security fix, `@astrojs/starlight` to v0.42.10, `typescript-eslint` to v8.72.2, `eslint-plugin-mdx` to v3.9.4 and `asciinema-player` to v3.18.0 (#433, #422, #429, #427, #418)
+- Update the website's indirect dependencies `fast-xml-parser` to v5.12.1, `undici` to v8.12.4 and `zod` to v4.6.7, plus `brace-expansion` and `smol-toml` (#428, #419)
+- Update pnpm to v12.18.0 and `step-security/harden-runner` to v2.22.4 (#417, #425)
 
 ---
 
