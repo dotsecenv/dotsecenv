@@ -44,7 +44,7 @@ importers:
         version: 10.14.0(supports-color@9.4.0)
       eslint-plugin-mdx:
         specifier: ^3.8.1
-        version: 3.9.4(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0)
+        version: 3.9.5(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0)
       markdownlint-cli:
         specifier: ^0.50.0
         version: 0.50.0(supports-color@9.4.0)
@@ -1661,8 +1661,8 @@ packages:
       remark-lint-file-extension:
         optional: true
 
-  eslint-plugin-mdx@3.9.4:
-    resolution: {integrity: sha512-WDAS0Fy+VB81SBFCPBaIxeU89/fvxSxyV54QllEqh391p5YpBk/RtchBBs1XxT6C1I4N5y+CA5/5FDeySKiNJw==}
+  eslint-plugin-mdx@3.9.5:
+    resolution: {integrity: sha512-EuIymT7/NL3+XuDtOp202l8FRIhCEOYgakNegd/NaMPsZpSxSXpQ8rAvs2DnZEvEKmvo6J6UUP58KQEFQvBHsA==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       eslint: '>=8.0.0'
@@ -4865,7 +4865,7 @@ snapshots:
       - bluebird
       - supports-color
 
-  eslint-plugin-mdx@3.9.4(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0):
+  eslint-plugin-mdx@3.9.5(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0):
     dependencies:
       eslint: 10.14.0(supports-color@9.4.0)
       eslint-mdx: 3.9.5(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0)
