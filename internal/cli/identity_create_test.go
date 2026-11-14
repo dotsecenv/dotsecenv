@@ -170,3 +170,51 @@ func TestIdentityCreateStandalone_PolicyGPGProgram(t *testing.T) {
 		t.Fatalf("got %v, want exit code %d naming %s", err, ExitGPGError, missing)
 	}
 }
+
+// A key created outside dotsecenv, newer than the key dotsecenv created, must
+// not be returned. The fake gpg reports KEY_CREATED for key A with the handle
+// from the batch template, but lists key B with a later creation time.
+func TestGenerateGPGKeyWithTemplate_ReturnsCreatedKeyNotNewest(t *testing.T) {
+	const created = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	const outside = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+	program := filepath.Join(t.TempDir(), "gpg")
+	if err := os.WriteFile(program, []byte(`#!/bin/sh
+case " $* " in
+    *" --generate-key "*)
+        handle=$(sed -n 's/^Handle: //p')
+        printf '[GNUPG:] KEY_CREATED B `+created+` %s\n' "$handle" >&2
+        ;;
+    *" --list-secret-keys "*)
+        printf 'sec:u:255:22:AAAAAAAAAAAAAAAA:1700000000:::u:::scESC:::+:::23::0:\n'
+        printf 'fpr:::::::::`+created+`:\n'
+        printf 'sec:u:255:22:BBBBBBBBBBBBBBBB:1800000000:::u:::scESC:::+:::23::0:\n'
+        printf 'fpr:::::::::`+outside+`:\n'
+        ;;
+esac
+exit 0
+`), 0700); err != nil {
+		t.Fatal(err)
+	}
+	previous := gpg.GetGPGProgram()
+	t.Cleanup(func() {
+		if previous == "" {
+			previous = "PATH"
+		}
+		_ = gpg.ValidateAndSetGPGProgram(previous)
+	})
+	if err := gpg.ValidateAndSetGPGProgram(program); err != nil {
+		t.Fatal(err)
+	}
+
+	template, err := gpg.GenerateKeyTemplate(gpg.AlgoED25519, "Test", "test@example.test", &gpg.KeyTemplateOptions{NoPassphrase: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, genErr := generateGPGKeyWithTemplate(template, true)
+	if genErr != nil {
+		t.Fatalf("generate: %v", genErr)
+	}
+	if got != created {
+		t.Fatalf("got fingerprint %s, want %s (the key gpg reported as created)", got, created)
+	}
+}

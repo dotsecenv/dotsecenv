@@ -16,6 +16,13 @@ var ErrPinentryRequired = errors.New("GPG_ERR_NO_PIN_ENTRY: GPG requires pinentr
 
 // runWithAgent executes a private-key operation under this client's pinentry policy.
 func (c *GPGClient) runWithAgent(args []string, input []byte) ([]byte, error) {
+	result, _, err := c.runWithAgentStatus(args, input)
+	return result, err
+}
+
+// runWithAgentStatus is runWithAgent, and also returns the stderr output.
+// The output includes the "[GNUPG:]" status lines because --status-fd=2 is set.
+func (c *GPGClient) runWithAgentStatus(args []string, input []byte) ([]byte, string, error) {
 	args = append(args, "--status-fd=2")
 	if c.NoPinentry {
 		args = append(args, "--pinentry-mode=error", "--batch", "--no-tty")
@@ -26,7 +33,7 @@ func (c *GPGClient) runWithAgent(args []string, input []byte) ([]byte, error) {
 	cmd.Stderr = &stderr
 	result, err := cmd.Output()
 	if err == nil {
-		return result, nil
+		return result, stderr.String(), nil
 	}
 
 	pinentryRequired := false
@@ -50,7 +57,7 @@ func (c *GPGClient) runWithAgent(args []string, input []byte) ([]byte, error) {
 		err = ErrPinentryRequired
 	}
 	if message := strings.TrimSpace(stderr.String()); message != "" {
-		return nil, fmt.Errorf("%w\nGPG error: %s", err, message)
+		return nil, stderr.String(), fmt.Errorf("%w\nGPG error: %s", err, message)
 	}
-	return nil, fmt.Errorf("GPG operation failed: %w", err)
+	return nil, stderr.String(), fmt.Errorf("GPG operation failed: %w", err)
 }

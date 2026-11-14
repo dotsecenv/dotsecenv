@@ -1,6 +1,9 @@
 package gpg
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -179,8 +182,100 @@ func GetSupportedAlgorithmsString() string {
 	return "Supported algorithms: ED25519, RSA4096, P384 (default), P521"
 }
 
-// GenerateKey creates a key from a GPG batch template under this client's pinentry policy.
-func (c *GPGClient) GenerateKey(template string) error {
-	_, err := c.runWithAgent([]string{"--batch", "--generate-key"}, []byte(template))
-	return err
+// GenerateKey creates a key from a GPG batch template under this client's
+// pinentry policy, and returns the fingerprint of the key that it created.
+//
+// GenerateKey adds a random Handle to the template. GnuPG repeats the handle
+// in its KEY_CREATED status line, so the fingerprint comes from this gpg run
+// only. A key that another program adds to the keyring at the same time
+// cannot be returned.
+func (c *GPGClient) GenerateKey(template string) (string, error) {
+	handle, err := newKeyHandle()
+	if err != nil {
+		return "", err
+	}
+	withHandle, err := addKeyHandle(template, handle)
+	if err != nil {
+		return "", err
+	}
+	_, status, err := c.runWithAgentStatus([]string{"--batch", "--generate-key"}, []byte(withHandle))
+	if err != nil {
+		return "", err
+	}
+	return createdKeyFingerprint(status, handle)
+}
+
+// newKeyHandle returns a random batch-template handle.
+func newKeyHandle() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate key handle: %w", err)
+	}
+	return "dotsecenv-" + hex.EncodeToString(b), nil
+}
+
+// addKeyHandle puts a "Handle:" line before the %commit of a single-key
+// batch template. A template without %commit gets the line at the end,
+// because GnuPG commits the key at end of input.
+func addKeyHandle(template, handle string) (string, error) {
+	lines := strings.SplitAfter(template, "\n")
+	commit := -1
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(strings.ToLower(trimmed), "handle:") {
+			return "", errors.New("key template must not set Handle; dotsecenv sets it")
+		}
+		if trimmed == "%commit" {
+			if commit >= 0 {
+				return "", errors.New("key template must create exactly one key (more than one %commit)")
+			}
+			commit = i
+		}
+	}
+	handleLine := "Handle: " + handle + "\n"
+	if commit < 0 {
+		if template != "" && !strings.HasSuffix(template, "\n") {
+			handleLine = "\n" + handleLine
+		}
+		return template + handleLine, nil
+	}
+	return strings.Join(lines[:commit], "") + handleLine + strings.Join(lines[commit:], ""), nil
+}
+
+// createdKeyFingerprint returns the primary-key fingerprint from the
+// "[GNUPG:] KEY_CREATED <B|P> <fingerprint> <handle>" status line that
+// carries handle. It is an error unless exactly one such line exists.
+func createdKeyFingerprint(status, handle string) (string, error) {
+	var found []string
+	for _, line := range strings.Split(status, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 5 || fields[0] != "[GNUPG:]" || fields[1] != "KEY_CREATED" || fields[4] != handle {
+			continue
+		}
+		if fields[2] != "B" && fields[2] != "P" {
+			continue
+		}
+		found = append(found, fields[3])
+	}
+	switch len(found) {
+	case 0:
+		return "", errors.New("gpg did not report the created key (no KEY_CREATED status for this run)")
+	case 1:
+		fpr := strings.ToUpper(found[0])
+		if !isHexFingerprint(fpr) {
+			return "", fmt.Errorf("gpg reported an invalid fingerprint: %q", found[0])
+		}
+		return fpr, nil
+	default:
+		return "", fmt.Errorf("gpg reported %d created keys for one template", len(found))
+	}
+}
+
+// isHexFingerprint reports whether s is a v4 (40 hex) or v5/v6 (64 hex) fingerprint.
+func isHexFingerprint(s string) bool {
+	if len(s) != 40 && len(s) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(s)
+	return err == nil
 }
