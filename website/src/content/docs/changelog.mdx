@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Bug Fixes
+
+- `identity create` applies the system policy in `/etc/dotsecenv/policy.d` when no user config exists: `approved_algorithms` and `gpg.program` from the policy now take effect, and an unreadable or insecure policy stops the command (#PR)
+
 ### Other
 
 - Hashing comments explain the false-positive CodeQL alerts for secret names and public fingerprints (#420)

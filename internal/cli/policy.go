@@ -13,6 +13,33 @@ import (
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/policy"
 )
 
+// loadPolicy reads the system policy directory. Tests replace it to inject a
+// policy, because the production permission check requires root-owned files.
+var loadPolicy = policy.Load
+
+// loadAndApplyPolicy loads the system policy and applies it to cfg. It fails
+// closed: any load error stops the command. Warnings go to stderr unless
+// silent is set.
+func loadAndApplyPolicy(cfg config.Config, silent bool, stderr io.Writer) (config.Config, policy.Policy, *Error) {
+	pol, loadWarnings, err := loadPolicy()
+	if err != nil {
+		return cfg, policy.Policy{}, classifyPolicyError(err)
+	}
+
+	cfg, applyWarnings := policy.Apply(cfg, pol)
+
+	if !silent {
+		for _, w := range loadWarnings {
+			_, _ = fmt.Fprintf(stderr, "warning: %s\n", w)
+		}
+		for _, w := range applyWarnings {
+			_, _ = fmt.Fprintf(stderr, "warning: %s\n", w)
+		}
+	}
+
+	return cfg, pol, nil
+}
+
 // PolicyList prints the effective system policy with per-field origin
 // attribution. Operates standalone (does not require a loaded user config),
 // so admins can introspect policy without being dotsecenv users themselves.
