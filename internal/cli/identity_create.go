@@ -41,10 +41,15 @@ func (c *CLI) IdentityCreate(opts IdentityCreateOptions) *Error {
 }
 
 // IdentityCreateStandalone runs identity create without requiring full CLI initialization.
-// This is used when no config exists yet.
+// This is used when no config exists yet. The system policy still applies.
 func IdentityCreateStandalone(opts IdentityCreateOptions, out *output.Handler) *Error {
-	// Ensure GPG program is configured (use PATH lookup for standalone mode)
-	if err := gpg.ValidateAndSetGPGProgram("PATH"); err != nil {
+	cfg, _, polErr := loadAndApplyPolicy(config.DefaultConfig(), out.IsSilent(), out.Stderr())
+	if polErr != nil {
+		return polErr
+	}
+
+	// The default config uses a PATH lookup; a policy gpg.program replaces it.
+	if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program); err != nil {
 		return NewError(fmt.Sprintf("GPG not found: %v", err), ExitGPGError)
 	}
 
@@ -53,9 +58,6 @@ func IdentityCreateStandalone(opts IdentityCreateOptions, out *output.Handler) *
 		stderr: out.Stderr(),
 		stdin:  out.Stdin(),
 	}
-
-	// Use default config for algorithm validation
-	cfg := config.DefaultConfig()
 
 	return identityCreateCore(opts, &cfg, io, false)
 }

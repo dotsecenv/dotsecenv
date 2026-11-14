@@ -113,21 +113,9 @@ func loadConfigAndPrepareGPG(configPath string, silent, noPinentry bool, stdin i
 	// exit codes (e.g. ExitAccessDenied for unreadable / insecure perms,
 	// ExitConfigError for malformed / forbidden, ExitGeneralError for
 	// empty allow-list).
-	pol, polLoadWarnings, polLoadErr := policy.Load()
-	if polLoadErr != nil {
-		return nil, classifyPolicyError(polLoadErr)
-	}
-
-	var polApplyWarnings []string
-	cfg, polApplyWarnings = policy.Apply(cfg, pol)
-
-	if !silent {
-		for _, w := range polLoadWarnings {
-			_, _ = fmt.Fprintf(stderr, "warning: %s\n", w)
-		}
-		for _, w := range polApplyWarnings {
-			_, _ = fmt.Fprintf(stderr, "warning: %s\n", w)
-		}
+	cfg, pol, polErr := loadAndApplyPolicy(cfg, silent, stderr)
+	if polErr != nil {
+		return nil, polErr
 	}
 
 	if err := gpg.ValidateAndSetGPGProgram(cfg.GPG.Program); err != nil {
