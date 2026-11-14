@@ -44,7 +44,7 @@ importers:
         version: 10.14.0(supports-color@9.4.0)
       eslint-plugin-mdx:
         specifier: ^3.8.1
-        version: 3.9.1(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0)
+        version: 3.9.4(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0)
       markdownlint-cli:
         specifier: ^0.50.0
         version: 0.50.0(supports-color@9.4.0)
@@ -1496,8 +1496,8 @@ packages:
     resolution: {integrity: sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==}
     engines: {node: '>=12'}
 
-  eslint-mdx@3.9.1:
-    resolution: {integrity: sha512-PNO+iBG9s0ERe53glwh987Ab96gY94xX9i3hpE04fto16na1n6ilZA+3UzNTRy6LkmxYX4yObpihJbQAlEpjBQ==}
+  eslint-mdx@3.9.5:
+    resolution: {integrity: sha512-pxkzWADqcf/5F4XkQx+5YmhGxlQ9Q3BmOT0CYnuMPm9G3y4DJ3lPc8gHicUowA8fKJDpfrmSJ3TsxMUmXt0GpA==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       '@types/estree': ^1.0.10
@@ -1509,8 +1509,8 @@ packages:
       remark-lint-file-extension:
         optional: true
 
-  eslint-plugin-mdx@3.9.1:
-    resolution: {integrity: sha512-rekc3S2KkRna/W2gwjXtLvNo7qgbSY/7l+EnuhLzmO9iBCR9aD2mu3/8FmWh/zI9ku0bUpqP3CIlet5BWHhF6w==}
+  eslint-plugin-mdx@3.9.4:
+    resolution: {integrity: sha512-WDAS0Fy+VB81SBFCPBaIxeU89/fvxSxyV54QllEqh391p5YpBk/RtchBBs1XxT6C1I4N5y+CA5/5FDeySKiNJw==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       eslint: '>=8.0.0'
@@ -4544,7 +4544,7 @@ snapshots:
 
   escape-string-regexp@5.0.0: {}
 
-  eslint-mdx@3.9.1(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0):
+  eslint-mdx@3.9.5(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0):
     dependencies:
       acorn: 8.19.0
       acorn-jsx: 5.3.2(acorn@8.19.0)
@@ -4568,10 +4568,10 @@ snapshots:
       - bluebird
       - supports-color
 
-  eslint-plugin-mdx@3.9.1(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0):
+  eslint-plugin-mdx@3.9.4(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0):
     dependencies:
       eslint: 10.14.0(supports-color@9.4.0)
-      eslint-mdx: 3.9.1(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0)
+      eslint-mdx: 3.9.5(eslint@10.14.0(supports-color@9.4.0))(supports-color@9.4.0)
       mdast-util-mdx: 3.0.0(supports-color@9.4.0)
       prettier-linter-helpers: 1.0.1
       remark-mdx: 3.1.1(supports-color@9.4.0)
