@@ -14,6 +14,7 @@ _Unreleased_
 ### Other
 
 - The `go.mod` directive is Go 1.27.4, which the current `goreleaser` release requires for `make release-test` (#455)
+- New `make build-unlink` target removes the `~/.local/bin/dotsecenv` symlink created by `make build-link`, and leaves any other file at that path alone (#454)
 
 ---
 

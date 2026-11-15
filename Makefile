@@ -6,6 +6,7 @@ help:
 	@echo "  make update         - Update go dependencies"
 	@echo "  make build          - Build with FIPS 140-3 crypto (no CGO)"
 	@echo "  make build-link     - Build and symlink to ~/.local/bin/dotsecenv"
+	@echo "  make build-unlink   - Remove the ~/.local/bin/dotsecenv symlink created by build-link"
 	@echo "  make fmt            - Format Go code"
 	@echo "  make lint           - Run linting (vet + fmt check)"
 	@echo "  make test           - Run tests"
@@ -52,6 +53,22 @@ build-link: build
 	@mkdir -p ~/.local/bin
 	@ln -sf $(CURDIR)/bin/dotsecenv ~/.local/bin/dotsecenv
 	@echo "Symlinked ~/.local/bin/dotsecenv -> $(CURDIR)/bin/dotsecenv"
+
+# Remove the symlink created by build-link. Only removes it if it is a symlink
+# pointing at this checkout's binary, so a real install is never touched.
+.PHONY: build-unlink
+build-unlink:
+	@link=~/.local/bin/dotsecenv; \
+	if [ ! -L "$$link" ]; then \
+		if [ -e "$$link" ]; then \
+			echo "$$link is not a symlink; leaving it alone"; exit 1; \
+		fi; \
+		echo "$$link does not exist; nothing to do"; \
+	elif [ "$$(readlink "$$link")" = "$(CURDIR)/bin/dotsecenv" ]; then \
+		rm "$$link" && echo "Removed $$link"; \
+	else \
+		echo "$$link points to $$(readlink "$$link"), not this checkout; leaving it alone"; exit 1; \
+	fi
 
 .PHONY: fmt
 fmt:
