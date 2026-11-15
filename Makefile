@@ -282,7 +282,7 @@ install-lefthook:
 		go install github.com/evilmartians/lefthook/v2@v2.0.13; \
 	fi
 
-# Pinned to v2.15.0: the go.mod directive targets 1.27.3, so golangci-lint must
+# Pinned to v2.15.0: the go.mod directive targets 1.27.4, so golangci-lint must
 # be built with Go >= 1.27 or `run` aborts with a language-version error.
 # Installed with `go install` instead of the upstream install.sh: the v2.12.x and
 # v2.13.2 release tarballs fail install.sh's checksum step (the published tarball
