@@ -46,7 +46,7 @@ public key on the vault's recipient list.
 # 1. On a developer machine, generate a CI-only key (NO PASSPHRASE because
 #    GitHub Actions cannot answer a pinentry prompt).
 dotsecenv identity create \
-  --algo ED25519 \
+  --algo P384 \
   --name "CI ($GITHUB_REPOSITORY)" \
   --email "ci@your-org.example" \
   --no-passphrase

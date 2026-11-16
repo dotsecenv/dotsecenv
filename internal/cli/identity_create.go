@@ -14,7 +14,7 @@ import (
 
 // IdentityCreateOptions holds options for the identity create command.
 type IdentityCreateOptions struct {
-	Algorithm    string // Algorithm to use (ED25519, RSA4096, P384, P521)
+	Algorithm    string // Algorithm to use (P384, P521, ED25519, RSA4096)
 	Name         string // User's full name
 	Email        string // User's email address
 	TemplateOnly bool   // If true, only output the template without generating

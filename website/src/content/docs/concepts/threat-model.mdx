@@ -53,9 +53,12 @@ The config file specifies minimum algorithm requirements:
 
 ```yaml
 approved_algorithms:
-  - rsa:3072
-  - ecdsa:p384
-  - eddsa:ed25519
+  - algo: ECC
+    curves: [P-384, P-521]
+    min_bits: 384
+  - algo: EdDSA
+    curves: [Ed25519, Ed448]
+    min_bits: 255
 ```
 
 dotsecenv refuses to encrypt/decrypt with weaker algorithms.

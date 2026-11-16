@@ -22,9 +22,10 @@ You need a GPG key. Most developers already have one for signing git commits. If
   </TabItem>
   <TabItem label="Using GPG directly">
     ```bash
-    gpg --full-generate-key
-    # Select: ECC (sign and encrypt), Curve 25519, key does not expire.
-    # RSA keys need an explicit opt-in: https://dotsecenv.com/concepts/compliance/#rsa-keys-are-legacy
+    # P-384 signing key plus a P-384 encryption subkey: the key `identity create` makes
+    gpg --quick-generate-key "Your Name <you@example.com>" nistp384 sign,cert 2y
+    FPR=$(gpg --list-keys --with-colons you@example.com | awk -F: '/^fpr:/ {print $10; exit}')
+    gpg --quick-add-key "$FPR" nistp384 encrypt 2y
     # Enter your name and email
     ```
   </TabItem>

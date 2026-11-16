@@ -88,10 +88,10 @@ jobs:
         run: |
           cat > /tmp/gpg-key-params <<EOF
           %no-protection
-          Key-Type: EDDSA
-          Key-Curve: ed25519
+          Key-Type: ECDSA
+          Key-Curve: nistp384
           Subkey-Type: ECDH
-          Subkey-Curve: cv25519
+          Subkey-Curve: nistp384
           Name-Real: Test User 4
           Name-Email: test4@dotsecenv.com
           Expire-Date: 0

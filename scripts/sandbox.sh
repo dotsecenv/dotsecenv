@@ -56,7 +56,7 @@ ENVIRONMENT:
   - HOME, GNUPGHOME, XDG_CONFIG_HOME, XDG_DATA_HOME, XDG_STATE_HOME, XDG_CACHE_HOME
   - GPG keys: RSA 3072, RSA 4096, ECDSA P-384, Ed25519
   - Fingerprints exported as: GPG_FP_RSA3072, GPG_FP_RSA4096, GPG_FP_P384, GPG_FP_ED25519
-  - DEFAULT_GPG_KEY points to Ed25519 fingerprint
+  - DEFAULT_GPG_KEY points to the P-384 fingerprint (the identity create default)
 
 EXAMPLES:
   # Create ephemeral sandbox (deleted on exit)
@@ -223,6 +223,8 @@ EOF
     GNUPGHOME="$gnupghome" gpg --batch --gen-key <<EOF
 Key-Type: ECDSA
 Key-Curve: nistp384
+Subkey-Type: ECDH
+Subkey-Curve: nistp384
 $prefs
 Name-Real: Test ECDSA P-384
 Name-Email: test-p384@sandbox.dotsecenv
@@ -235,6 +237,8 @@ EOF
     GNUPGHOME="$gnupghome" gpg --batch --gen-key <<EOF
 Key-Type: EDDSA
 Key-Curve: ed25519
+Subkey-Type: ECDH
+Subkey-Curve: cv25519
 $prefs
 Name-Real: Test Ed25519
 Name-Email: test-ed25519@sandbox.dotsecenv
@@ -318,7 +322,7 @@ EOF
 
     # GPG fingerprint exports (if keys were generated)
     local gpg_vars=""
-    if [[ -n "$fp_ed25519" ]]; then
+    if [[ -n "$fp_p384" ]]; then
         gpg_vars=$(cat <<EOF
 
 # GPG Key Fingerprints
@@ -326,7 +330,7 @@ export GPG_FP_RSA3072="$fp_rsa3072"
 export GPG_FP_RSA4096="$fp_rsa4096"
 export GPG_FP_P384="$fp_p384"
 export GPG_FP_ED25519="$fp_ed25519"
-export DEFAULT_GPG_KEY="\$GPG_FP_ED25519"
+export DEFAULT_GPG_KEY="\$GPG_FP_P384"
 EOF
 )
     fi
@@ -369,7 +373,7 @@ EOF
 )
     banner="${banner//SESSION_NAME/$session_name}"
 
-    if [[ -n "$fp_ed25519" ]]; then
+    if [[ -n "$fp_p384" ]]; then
         banner+='
 echo "  GPG:     $DEFAULT_GPG_KEY"'
     fi
@@ -405,7 +409,7 @@ set -gx GNUPGHOME \$HOME/.gnupg
 set -gx GPG_TTY (tty)
 EOF
 
-    if [[ -n "$fp_ed25519" ]]; then
+    if [[ -n "$fp_p384" ]]; then
         cat >> "$xdg_config/fish/config.fish" <<EOF
 
 # GPG Key Fingerprints
@@ -413,7 +417,7 @@ set -gx GPG_FP_RSA3072 "$fp_rsa3072"
 set -gx GPG_FP_RSA4096 "$fp_rsa4096"
 set -gx GPG_FP_P384 "$fp_p384"
 set -gx GPG_FP_ED25519 "$fp_ed25519"
-set -gx DEFAULT_GPG_KEY \$GPG_FP_ED25519
+set -gx DEFAULT_GPG_KEY \$GPG_FP_P384
 EOF
     fi
 
@@ -434,7 +438,7 @@ echo "╰───────────────────────�
 echo "  Session: $session_name"
 echo "  HOME:    \$HOME"
 EOF
-    if [[ -n "$fp_ed25519" ]]; then
+    if [[ -n "$fp_p384" ]]; then
         echo 'echo "  GPG:     $DEFAULT_GPG_KEY"' >> "$xdg_config/fish/config.fish"
     fi
     cat >> "$xdg_config/fish/config.fish" <<EOF

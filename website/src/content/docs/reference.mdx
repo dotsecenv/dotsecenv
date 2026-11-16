@@ -69,7 +69,7 @@ dotsecenv init config [flags]
 
 By default, creates a configuration file at the XDG config location (`~/.config/dotsecenv/config`). Use `-c` to specify a custom path.
 
-The default configuration uses FIPS 186-5 compliant algorithm minimums: ECC P-384+, EdDSA Ed25519/Ed448. RSA is not included; see [RSA keys are legacy](/concepts/compliance/#rsa-keys-are-legacy).
+The default configuration uses FIPS 186-5 compliant algorithm minimums: ECC P-384+, EdDSA Ed25519/Ed448. RSA is not included; see [RSA keys are legacy](/concepts/compliance/#rsa-keys-are-legacy). New keys from `identity create` default to P-384, which NIST approves for both signing and encryption.
 
 **Options:**
 
@@ -247,7 +247,7 @@ unfamiliar with GPG.
 |------|-------------|
 | `--name` | Your full name (prompts if not provided) |
 | `--email` | Your email address (prompts if not provided) |
-| `--algo` | Key algorithm: `ED25519`, `P384` (default), `P521`, `RSA4096` (legacy) |
+| `--algo` | Key algorithm: `P384` (default), `P521`, `ED25519`, `RSA4096` (legacy) |
 | `--template` | Output GPG batch template instead of generating key |
 | `--no-passphrase` | Create key without passphrase protection (for CI/automation only) |
 
@@ -261,10 +261,12 @@ template and modify the `Expire-Date` field before generating.
 
 | Algorithm | Description |
 |-----------|-------------|
-| `P384` (default) | NIST P-384 ECDSA curve |
-| `P521` | NIST P-521 ECDSA curve |
-| `ED25519` | EdDSA with Ed25519 curve |
+| `P384` (default) | NIST P-384: ECDSA signing, ECDH encryption |
+| `P521` | NIST P-521: ECDSA signing, ECDH encryption |
+| `ED25519` | EdDSA signing, X25519 encryption. X25519 is not NIST-approved |
 | `RSA4096` (legacy) | RSA 4096-bit key. Not in the default `approved_algorithms` |
+
+`P384` is the default because NIST approves both of its algorithms: ECDSA for signatures (FIPS 186-5) and ECDH for encryption. `ED25519` signatures are FIPS 186-5 approved too, but FIPS 140-3 does not approve its X25519 encryption subkey for key agreement.
 
 RSA is legacy. OpenPGP encrypts to RSA keys with PKCS #1 v1.5 padding, which Go deprecated in 1.26, so the default config rejects `--algo RSA4096` and the error explains how to opt in. With RSA allowed, `identity create` still prints a warning before generating the key. See [RSA keys are legacy](/concepts/compliance/#rsa-keys-are-legacy).
 
@@ -304,8 +306,8 @@ dotsecenv identity create
 # Specify name and email via flags
 dotsecenv identity create --name "John Doe" --email "john@example.com"
 
-# Use an Ed25519 key
-dotsecenv identity create --algo ED25519
+# Use a P-521 key
+dotsecenv identity create --algo P521
 
 # Output template for manual generation
 dotsecenv identity create --template --name "John Doe" --email "john@example.com"
@@ -768,7 +770,7 @@ Performs the following checks:
 - **GPG agent availability** - verifies gpg-agent is running
 - **Crypto module** - reports the `GOFIPS140` build setting, the FIPS 140-3 module version, and whether FIPS mode is disabled, enabled, or enforced (`GODEBUG=fips140=only`). This check is informational and never changes the overall status
 - **Vault format version** - checks if vaults need upgrading to the latest format
-- **Legacy RSA identities** - warns when a vault holds RSA identities and lists them by UID and fingerprint. `--fix` can't fix this: each owner creates an ED25519 or P384 identity and the secrets are shared with it
+- **Legacy RSA identities** - warns when a vault holds RSA identities and lists them by UID and fingerprint. `--fix` can't fix this: each owner creates a P-384 identity (the `identity create` default) and the secrets are shared with it
 - **Vault fragmentation** - checks if vaults would benefit from defragmentation
 
 After displaying health check results, the command offers to fix any issues found (upgrade outdated vaults, defragment fragmented vaults). Use `--fix` to auto-fix without prompting. With `behavior.require_explicit_vault_upgrade` set, run it to upgrade outdated vaults.

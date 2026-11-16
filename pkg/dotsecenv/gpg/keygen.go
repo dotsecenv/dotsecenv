@@ -94,7 +94,7 @@ func ParseAlgorithm(algo string) (KeyAlgorithm, error) {
 	case "P521":
 		return AlgoP521, nil
 	default:
-		return "", fmt.Errorf("unsupported algorithm: %s\nSupported algorithms: ED25519, RSA4096, P384, P521", algo)
+		return "", fmt.Errorf("unsupported algorithm: %s\nSupported algorithms: P384 (default), P521, ED25519, RSA4096 (legacy)", algo)
 	}
 }
 
@@ -179,7 +179,7 @@ func GenerateKeyTemplate(algo KeyAlgorithm, name, email string, opts *KeyTemplat
 
 // GetSupportedAlgorithmsString returns a human-readable list of supported algorithms.
 func GetSupportedAlgorithmsString() string {
-	return "Supported algorithms: ED25519, RSA4096, P384 (default), P521"
+	return "Supported algorithms: P384 (default), P521, ED25519, RSA4096 (legacy)"
 }
 
 // GenerateKey creates a key from a GPG batch template under this client's

@@ -21,9 +21,10 @@ chmod +x "$BIN"
 echo "==> Generating test keys in $GNUPGHOME"
 
 # Generate two test keys (passwordless for CI)
-# ED25519 is in the default approved_algorithms (RSA is legacy and opt-in)
+# User One uses the default P384; User Two uses ED25519 so vaults with
+# mixed key types stay covered. RSA is legacy and opt-in.
 # Keys expire in 2y by default (fine for ephemeral test keys)
-"$BIN" identity create --name "Test User One" --email "test1@dotsecenv.com" --algo ED25519 --no-passphrase
+"$BIN" identity create --name "Test User One" --email "test1@dotsecenv.com" --algo P384 --no-passphrase
 "$BIN" identity create --name "Test User Two" --email "test2@dotsecenv.com" --algo ED25519 --no-passphrase
 
 # Capture fingerprints

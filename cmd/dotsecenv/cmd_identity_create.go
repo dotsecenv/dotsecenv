@@ -36,17 +36,19 @@ that providing a simplified wrapper for GPG key generation is a net positive
 for users unfamiliar with GPG.
 
 Supported algorithms:
-  - P384    (default) - NIST P-384 ECDSA curve
-  - P521              - NIST P-521 ECDSA curve
-  - ED25519           - EdDSA with Ed25519 curve
+  - P384    (default) - NIST P-384: ECDSA signing, ECDH encryption
+  - P521              - NIST P-521: ECDSA signing, ECDH encryption
+  - ED25519           - EdDSA signing; X25519 encryption is not NIST-approved
   - RSA4096 (legacy)  - RSA 4096-bit key
 
 The requested algorithm must be allowed by your configuration's approved_algorithms
 setting. See https://dotsecenv.com/concepts/compliance/ for details.
 
-RSA is not in the default approved_algorithms. OpenPGP encrypts to RSA keys
-with PKCS #1 v1.5 padding, which Go deprecated in 1.26. Prefer ED25519, or
-P384/P521 where you need a NIST curve.`,
+P384 is the default because NIST approves both of its algorithms. ED25519
+signatures are FIPS 186-5 approved, but its X25519 encryption subkey is not
+approved for key agreement under FIPS 140-3. RSA is not in the default
+approved_algorithms: OpenPGP encrypts to RSA keys with PKCS #1 v1.5 padding,
+which Go deprecated in 1.26.`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		opts := clilib.IdentityCreateOptions{
@@ -79,7 +81,7 @@ P384/P521 where you need a NIST curve.`,
 
 func init() {
 	identityCreateCmd.Flags().StringVar(&identityCreateOpts.Algorithm, "algo", string(gpg.DefaultAlgorithm),
-		"Key algorithm: ED25519, P384, P521, RSA4096 (legacy)")
+		"Key algorithm: P384, P521, ED25519, RSA4096 (legacy)")
 	identityCreateCmd.Flags().StringVar(&identityCreateOpts.Name, "name", "",
 		"Your full name (prompts if not provided)")
 	identityCreateCmd.Flags().StringVar(&identityCreateOpts.Email, "email", "",
