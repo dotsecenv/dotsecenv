@@ -8,6 +8,7 @@ projects:
     manifest:
       - .claude-plugin/plugin.json
       - .codex-plugin/plugin.json
+    bump: uv run --script scripts/set-plugin-version.py {version}
 
 release:
   branch: main
