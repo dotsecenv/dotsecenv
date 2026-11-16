@@ -47,6 +47,7 @@ var vaultDoctorCmd = &cobra.Command{
 
 Checks performed:
   - GPG agent availability
+  - Crypto module (GOFIPS140 build setting, module version, FIPS mode)
   - Vault format version (upgrades outdated vaults)
   - Vault fragmentation (defragments if needed)
 

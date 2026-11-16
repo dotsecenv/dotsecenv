@@ -765,6 +765,7 @@ dotsecenv vault doctor [flags]
 Performs the following checks:
 
 - **GPG agent availability** - verifies gpg-agent is running
+- **Crypto module** - reports the `GOFIPS140` build setting, the FIPS 140-3 module version, and whether FIPS mode is disabled, enabled, or enforced (`GODEBUG=fips140=only`). This check is informational and never changes the overall status
 - **Vault format version** - checks if vaults need upgrading to the latest format
 - **Vault fragmentation** - checks if vaults would benefit from defragmentation
 
@@ -802,6 +803,7 @@ dotsecenv vault doctor -v 1
 ```text
 Health checks:
   [✓] gpg-agent is available
+  [✓] crypto: GOFIPS140=v1.26.0 (module v1.26.0, FIPS 140-3 mode enabled)
   [✓] ~/.local/share/dotsecenv/vault: format v2 (latest)
   [!] .dotsecenv/vault: format v1 (latest: v2)
   [✓] ~/.local/share/dotsecenv/vault: 0.0% fragmentation
@@ -1167,7 +1169,9 @@ dotsecenv version [flags]
   "goBuildVersion": "go1.24.0",
   "crypto": {
     "GOFIPS140": "v1.26.0",
-    "fips140Enabled": true
+    "fips140ModuleVersion": "v1.26.0",
+    "fips140Enabled": true,
+    "fips140Enforced": false
   }
 }
 ```

@@ -11,7 +11,13 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Features
+
+- `dotsecenv version` reports the FIPS 140-3 module version and whether FIPS mode is disabled, enabled, or enforced (`GODEBUG=fips140=only`); `--json` adds `fips140ModuleVersion` and `fips140Enforced`. `doctor` shows the same status as an informational `crypto_module` check
+
 ### Other
+
+- `make lint` fails when `go fix -diff ./...` reports pending modernizer changes; `make fmt` applies them. The codebase is updated to pass
 
 - The `go.mod` directive is Go 1.27.4, which the current `goreleaser` release requires for `make release-test` (#455)
 - New `make build-unlink` target removes the `~/.local/bin/dotsecenv` symlink created by `make build-link`, and leaves any other file at that path alone (#454)
