@@ -257,11 +257,11 @@ func detectVersionFromJSON(data []byte) (int, error) {
 	} else {
 		// Fallback: search for "version": anywhere in the JSON
 		const versionKey = `"version":`
-		idx := strings.Index(str, versionKey)
-		if idx == -1 {
+		_, after, ok := strings.Cut(str, versionKey)
+		if !ok {
 			return 0, fmt.Errorf("version field not found in header JSON")
 		}
-		rest = str[idx+len(versionKey):]
+		rest = after
 	}
 
 	// Skip whitespace after colon
@@ -277,22 +277,22 @@ func detectVersionFromJSON(data []byte) (int, error) {
 	}
 
 	// Extract digits
-	var versionStr string
+	var versionStr strings.Builder
 	for _, c := range rest {
 		if c >= '0' && c <= '9' {
-			versionStr += string(c)
+			versionStr.WriteString(string(c))
 		} else {
 			break
 		}
 	}
 
-	if versionStr == "" {
+	if versionStr.String() == "" {
 		return 0, fmt.Errorf("no version number found in header JSON")
 	}
 
 	var version int
-	if _, err := fmt.Sscanf(versionStr, "%d", &version); err != nil {
-		return 0, fmt.Errorf("invalid version number: %s", versionStr)
+	if _, err := fmt.Sscanf(versionStr.String(), "%d", &version); err != nil {
+		return 0, fmt.Errorf("invalid version number: %s", versionStr.String())
 	}
 
 	return version, nil

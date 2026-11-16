@@ -937,7 +937,7 @@ func TestFragmentationStats(t *testing.T) {
 
 	// Small vault - should never recommend defrag
 	now := time.Now().UTC().Truncate(time.Second)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		id := identity.Identity{AddedAt: now.Add(time.Duration(i) * time.Second), Fingerprint: string(rune('A' + i))}
 		if err := w.AddIdentity(id); err != nil {
 			t.Fatalf("AddIdentity failed: %v", err)

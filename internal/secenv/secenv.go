@@ -80,11 +80,11 @@ func ReadEnvNames(path string) (map[string]bool, error) {
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		eq := strings.IndexByte(line, '=')
-		if eq < 0 {
+		before, _, ok := strings.Cut(line, "=")
+		if !ok {
 			continue
 		}
-		name := strings.TrimSpace(line[:eq])
+		name := strings.TrimSpace(before)
 		if name != "" {
 			set[name] = true
 		}

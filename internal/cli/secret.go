@@ -24,12 +24,12 @@ import (
 // JSON output is sufficient for auditing access control across versions.
 // Deleted marks a value that a later 'secret forget' in the same vault deleted.
 type SecretValueJSON struct {
-	AddedAt     time.Time   `json:"added_at"`
-	Value       interface{} `json:"value"`
-	Vault       string      `json:"vault,omitempty"`
-	AvailableTo []string    `json:"available_to,omitempty"`
-	SignedBy    string      `json:"signed_by,omitempty"`
-	Deleted     bool        `json:"deleted,omitempty"`
+	AddedAt     time.Time `json:"added_at"`
+	Value       any       `json:"value"`
+	Vault       string    `json:"vault,omitempty"`
+	AvailableTo []string  `json:"available_to,omitempty"`
+	SignedBy    string    `json:"signed_by,omitempty"`
+	Deleted     bool      `json:"deleted,omitempty"`
 }
 
 // allValuesLine formats one 'secret get --all' text line, marking deleted values.
@@ -117,7 +117,7 @@ func accessDeniedMessage(secretKey, fp string) string {
 
 // smartJSONValue returns a json.RawMessage if the value is a JSON object or array,
 // otherwise returns the plain string. This avoids double-escaping stored JSON.
-func smartJSONValue(s string) interface{} {
+func smartJSONValue(s string) any {
 	if len(s) > 0 && (s[0] == '{' || s[0] == '[') && json.Valid([]byte(s)) {
 		return json.RawMessage(s)
 	}
@@ -766,13 +766,7 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 		for j := range live {
 			val := &live[j]
 
-			hasAccess := false
-			for _, authorizedFp := range val.AvailableTo {
-				if authorizedFp == fp {
-					hasAccess = true
-					break
-				}
-			}
+			hasAccess := slices.Contains(val.AvailableTo, fp)
 			if !hasAccess {
 				continue
 			}

@@ -123,7 +123,7 @@ func TestGenerateKey_RealGPGReturnsOwnKey(t *testing.T) {
 	}
 	var newestFPR string
 	var newest, current int64
-	for _, line := range strings.Split(string(all), "\n") {
+	for line := range strings.SplitSeq(string(all), "\n") {
 		f := strings.Split(line, ":")
 		switch {
 		case f[0] == "sec" && len(f) > 5:

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"strings"
 )
@@ -126,9 +127,7 @@ func (r *Reader) Header() Header {
 		Identities:       make(map[string]int, len(r.header.Identities)),
 		Secrets:          make(map[string]SecretIndex, len(r.header.Secrets)),
 	}
-	for k, v := range r.header.Identities {
-		h.Identities[k] = v
-	}
+	maps.Copy(h.Identities, r.header.Identities)
 	for k, v := range r.header.Secrets {
 		valuesCopy := make([]int, len(v.Values))
 		copy(valuesCopy, v.Values)

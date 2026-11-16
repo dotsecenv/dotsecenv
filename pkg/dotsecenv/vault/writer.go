@@ -3,6 +3,7 @@ package vault
 import (
 	"bufio"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -427,9 +428,7 @@ func (w *Writer) Header() Header {
 		Identities:       make(map[string]int, len(w.header.Identities)),
 		Secrets:          make(map[string]SecretIndex, len(w.header.Secrets)),
 	}
-	for k, v := range w.header.Identities {
-		h.Identities[k] = v
-	}
+	maps.Copy(h.Identities, w.header.Identities)
 	for k, v := range w.header.Secrets {
 		valuesCopy := make([]int, len(v.Values))
 		copy(valuesCopy, v.Values)

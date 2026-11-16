@@ -88,12 +88,9 @@ func (m *MockVaultResolver) GetSecretFromAnyVault(key string, stderr io.Writer) 
 	defer m.mu.Unlock()
 
 	// Search in order
-	count := len(m.VaultPaths)
-	if len(m.VaultEntries) > count {
-		count = len(m.VaultEntries)
-	}
+	count := max(len(m.VaultEntries), len(m.VaultPaths))
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		if secrets, ok := m.Secrets[i]; ok {
 			if secret, ok := secrets[key]; ok {
 				if len(secret.Values) > 0 && !secret.IsDeleted() {
@@ -110,12 +107,9 @@ func (m *MockVaultResolver) GetAccessibleSecretFromAnyVault(key, fingerprint str
 	defer m.mu.Unlock()
 
 	// Search in order
-	count := len(m.VaultPaths)
-	if len(m.VaultEntries) > count {
-		count = len(m.VaultEntries)
-	}
+	count := max(len(m.VaultEntries), len(m.VaultPaths))
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		if secrets, ok := m.Secrets[i]; ok {
 			if secret, ok := secrets[key]; ok {
 				// Reuse the real lookup so the mock walks the same live values.
@@ -144,13 +138,10 @@ func (m *MockVaultResolver) FindSecretVaultIndex(key string) int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	count := len(m.VaultPaths)
-	if len(m.VaultEntries) > count {
-		count = len(m.VaultEntries)
-	}
+	count := max(len(m.VaultEntries), len(m.VaultPaths))
 
 	deleted := -1
-	for i := 0; i < count; i++ {
+	for i := range count {
 		if secrets, ok := m.Secrets[i]; ok {
 			if secret, ok := secrets[key]; ok {
 				if !secret.IsDeleted() {
@@ -246,10 +237,7 @@ func (m *MockVaultResolver) OpenVaults(stderr io.Writer) error {
 }
 
 func (m *MockVaultResolver) VaultCount() int {
-	count := len(m.VaultPaths)
-	if len(m.VaultEntries) > count {
-		count = len(m.VaultEntries)
-	}
+	count := max(len(m.VaultEntries), len(m.VaultPaths))
 	// Also count from Secrets map
 	for idx := range m.Secrets {
 		if idx+1 > count {
@@ -267,7 +255,7 @@ func (m *MockVaultResolver) ListAllSecretKeys() []vault.SecretKeyInfo {
 	seen := make(map[string]bool)
 
 	count := m.VaultCount()
-	for i := 0; i < count; i++ {
+	for i := range count {
 		secrets, ok := m.Secrets[i]
 		if !ok {
 			continue

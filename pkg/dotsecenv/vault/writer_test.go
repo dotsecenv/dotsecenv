@@ -281,7 +281,7 @@ func TestFlushPreservesMultipleWriteOperations(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	// Perform multiple operations (each triggers flush)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if err := w.AddIdentity(identity.Identity{
 			AddedAt:     now.Add(time.Duration(i) * time.Second),
 			Fingerprint: string(rune('A' + i)),

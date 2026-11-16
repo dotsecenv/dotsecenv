@@ -27,10 +27,7 @@ func ensureArmoredFormat(ciphertext string) (string, error) {
 	// Add line breaks every 76 characters as per RFC 4880
 	var wrapped strings.Builder
 	for i := 0; i < len(trimmed); i += 76 {
-		end := i + 76
-		if end > len(trimmed) {
-			end = len(trimmed)
-		}
+		end := min(i+76, len(trimmed))
 		wrapped.WriteString(trimmed[i:end])
 		wrapped.WriteString("\n")
 	}

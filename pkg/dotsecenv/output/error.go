@@ -3,15 +3,16 @@ package output
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 )
 
 // Error represents a structured error with code, message, and optional metadata.
 // It implements the standard error interface and supports error chaining.
 type Error struct {
-	Code    Code                   `json:"code"`
-	Message string                 `json:"message"`
-	Details map[string]interface{} `json:"details,omitempty"`
-	Cause   error                  `json:"-"` // Not serialized, for error chaining
+	Code    Code           `json:"code"`
+	Message string         `json:"message"`
+	Details map[string]any `json:"details,omitempty"`
+	Cause   error          `json:"-"` // Not serialized, for error chaining
 }
 
 // NewError creates a new structured error with the given code and message.
@@ -23,7 +24,7 @@ func NewError(code Code, message string) *Error {
 }
 
 // NewErrorf creates a new structured error with a formatted message.
-func NewErrorf(code Code, format string, args ...interface{}) *Error {
+func NewErrorf(code Code, format string, args ...any) *Error {
 	return &Error{
 		Code:    code,
 		Message: fmt.Sprintf(format, args...),
@@ -31,22 +32,20 @@ func NewErrorf(code Code, format string, args ...interface{}) *Error {
 }
 
 // WithDetail adds a metadata field to the error and returns the error for chaining.
-func (e *Error) WithDetail(key string, value interface{}) *Error {
+func (e *Error) WithDetail(key string, value any) *Error {
 	if e.Details == nil {
-		e.Details = make(map[string]interface{})
+		e.Details = make(map[string]any)
 	}
 	e.Details[key] = value
 	return e
 }
 
 // WithDetails adds multiple metadata fields to the error.
-func (e *Error) WithDetails(details map[string]interface{}) *Error {
+func (e *Error) WithDetails(details map[string]any) *Error {
 	if e.Details == nil {
-		e.Details = make(map[string]interface{})
+		e.Details = make(map[string]any)
 	}
-	for k, v := range details {
-		e.Details[k] = v
-	}
+	maps.Copy(e.Details, details)
 	return e
 }
 
