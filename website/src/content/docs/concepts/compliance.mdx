@@ -225,7 +225,7 @@ dotsecenv validate
 | EdDSA | Ed25519 | Ed25519 or Ed448 |
 
 <Aside type="caution">
-For new key generation, use Ed25519 (fast, secure, small signatures), or P-384 where you need a NIST curve. Avoid P-256 ECDSA for new deployments. P-256 is approved, but Ed25519 has better security properties.
+For new keys, use P-384, the `identity create` default. A P-384 identity signs with ECDSA and encrypts with ECDH over P-384, and NIST approves both. Ed25519 signatures are FIPS 186-5 approved, but an Ed25519 identity encrypts with an X25519 subkey, and FIPS 140-3 does not approve X25519 for key agreement: Go's FIPS module rejects it under `GODEBUG=fips140=only`. Avoid P-256 for new deployments; the defaults exclude it.
 </Aside>
 
 ### RSA keys are legacy
@@ -240,7 +240,7 @@ To move an RSA identity to a new key:
 
 <Steps>
 
-1. Create the replacement identity with `dotsecenv identity create --algo ED25519` (or `P384`), then `dotsecenv login <NEW_FINGERPRINT>`.
+1. Create the replacement identity with `dotsecenv identity create` (P-384 by default), then `dotsecenv login <NEW_FINGERPRINT>`.
 
 2. From an identity that can read the secrets, share each one with the new key: `dotsecenv secret share SECRET <NEW_FINGERPRINT> --all`.
 
@@ -411,7 +411,7 @@ These standards define the cryptographic primitives themselves:
 | FIPS 180-4 | SHA-2 hash family | SHA-256/SHA-512 for integrity and signatures |
 
 <Aside type="tip">
-For maximum compliance, build dotsecenv with Go 1.26+ and `GOFIPS140=v1.26.0`, deploy to a validated Operating Environment, and use Ed25519 or P-384 keys.
+For maximum compliance, build dotsecenv with Go 1.26+ and `GOFIPS140=v1.26.0`, deploy to a validated Operating Environment, and use P-384 keys (the `identity create` default).
 </Aside>
 
 ## See also

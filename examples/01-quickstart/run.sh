@@ -51,10 +51,11 @@ echo "==> GNUPGHOME: $GNUPGHOME"
 
 # --- generate an ephemeral GPG key ------------------------------------------
 
-# ED25519 needs GnuPG 2.1 or later, which every supported CI runner ships.
-echo "==> generating CI-only Ed25519 key (no passphrase)"
+# P384 is the identity create default: ECDSA signing and ECDH encryption,
+# both NIST-approved.
+echo "==> generating CI-only P-384 key (no passphrase)"
 "$BIN" identity create \
-  --algo ED25519 \
+  --algo P384 \
   --name "Quickstart Demo" \
   --email "quickstart@example.invalid" \
   --no-passphrase \

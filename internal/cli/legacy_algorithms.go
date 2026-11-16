@@ -17,7 +17,8 @@ const rsaLegacyDocsURL = "https://dotsecenv.com/concepts/compliance/#rsa-keys-ar
 const rsaLegacyReason = `RSA keys are legacy. OpenPGP encrypts to RSA keys with PKCS #1 v1.5
 padding, which Go deprecated in 1.26 as unsafe, and OpenPGP offers no
 OAEP alternative. RSA keys are also larger and slower than elliptic-curve
-keys. Use ED25519, or P384/P521 where you need a NIST curve.`
+keys. Use P384 (the default) or P521: both sign with ECDSA and encrypt
+with ECDH, and NIST approves both.`
 
 // rsaOptInHint tells the user how to keep accepting RSA keys.
 const rsaOptInHint = `To accept RSA keys anyway, add this to approved_algorithms in your config:
@@ -51,7 +52,7 @@ func legacyIdentityCheck(index int, path string, identities []vault.Identity) (c
 		Name:    fmt.Sprintf("vault_%d_legacy_keys", index+1),
 		Status:  "warning",
 		Message: fmt.Sprintf("%s: %d RSA %s (legacy)", path, len(legacy), noun),
-		Details: fmt.Sprintf("%s. Have each owner create an ED25519 or P384 identity and share secrets with it. See %s",
+		Details: fmt.Sprintf("%s. Have each owner create a P384 identity (the identity create default) and share secrets with it. See %s",
 			strings.Join(legacy, ", "), rsaLegacyDocsURL),
 	}, true
 }

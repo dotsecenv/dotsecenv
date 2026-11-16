@@ -107,7 +107,7 @@ An identity represents a user who can access secrets. Each identity is:
 |-------|-------------|
 | `fingerprint` | 40-character GPG key fingerprint |
 | `uid` | User ID (typically email) from GPG key |
-| `algorithm` | Key algorithm and size (e.g., `rsa4096`, `ed25519`) |
+| `algorithm` | Key algorithm family: `ECC`, `EdDSA`, or `RSA`. The curve and size are stored in `curve` and `algorithm_bits` |
 | `created_at` | When identity was added to vault |
 | `signature` | Signature proving identity owns the key |
 
@@ -275,9 +275,12 @@ login:
 
 # Approved algorithms (minimum strength)
 approved_algorithms:
-  - rsa:3072
-  - ecdsa:p384
-  - eddsa:ed25519
+  - algo: ECC
+    curves: [P-384, P-521]
+    min_bits: 384
+  - algo: EdDSA
+    curves: [Ed25519, Ed448]
+    min_bits: 255
 ```
 
 ### Config Override

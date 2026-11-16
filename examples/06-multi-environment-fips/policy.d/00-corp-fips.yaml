@@ -8,6 +8,10 @@
 # What this fragment enforces:
 #   - Identity keys must be FIPS 186-5 approved: ECC P-384/P-521,
 #     EdDSA Ed25519/Ed448, or RSA >= 3072.
+#   - The EdDSA entry covers signatures only. An Ed25519 or Ed448
+#     identity encrypts with X25519 or X448, which FIPS 140-3 does not
+#     approve for key agreement. Remove it if encryption must use
+#     NIST-approved algorithms too.
 #   - The user's own `approved_algorithms` is intersected with this
 #     list (users can be stricter locally; users cannot exceed the
 #     policy).
