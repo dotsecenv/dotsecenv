@@ -234,23 +234,28 @@ Options:
 		secretKey := args[0]
 		targetFingerprint := args[1]
 
-		vaultPath, targetIndex, err := parseVaultSpec(globalOpts.ConfigPath, globalOpts.VaultPaths)
+		// A path keeps VaultPaths, so createCLI loads only that vault and it
+		// sits at index 0. An index clears VaultPaths so createCLI loads the
+		// configured list the index refers to.
+		vaultPath, targetIndex, err := parseVaultSpecScoped()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(int(clilib.ExitGeneralError))
 		}
 
-		// Handle vault path vs index
-		if vaultPath != "" {
-			targetIndex = 0 // Path-based lookup uses index 0
-		} else if targetIndex > 0 {
+		switch {
+		case vaultPath != "":
+			targetIndex = 0
+		case targetIndex > 0:
 			targetIndex-- // Convert to 0-based
-		} else {
+		default:
 			targetIndex = -1 // No specific vault
 		}
 
-		// Clear VaultPaths so createCLI loads from config
-		globalOpts.VaultPaths = []string{}
+		// --all processes every configured vault, regardless of -v
+		if secretShareAll {
+			globalOpts.VaultPaths = []string{}
+		}
 
 		cli, cliErr := createCLI()
 		if cliErr != nil {
@@ -302,23 +307,28 @@ Options:
 		secretKey := args[0]
 		targetFingerprint := args[1]
 
-		vaultPath, targetIndex, err := parseVaultSpec(globalOpts.ConfigPath, globalOpts.VaultPaths)
+		// A path keeps VaultPaths, so createCLI loads only that vault and it
+		// sits at index 0. An index clears VaultPaths so createCLI loads the
+		// configured list the index refers to.
+		vaultPath, targetIndex, err := parseVaultSpecScoped()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(int(clilib.ExitGeneralError))
 		}
 
-		// Handle vault path vs index
-		if vaultPath != "" {
-			targetIndex = 0 // Path-based lookup uses index 0
-		} else if targetIndex > 0 {
+		switch {
+		case vaultPath != "":
+			targetIndex = 0
+		case targetIndex > 0:
 			targetIndex-- // Convert to 0-based
-		} else {
+		default:
 			targetIndex = -1 // No specific vault
 		}
 
-		// Clear VaultPaths so createCLI loads from config
-		globalOpts.VaultPaths = []string{}
+		// --all processes every configured vault, regardless of -v
+		if secretRevokeAll {
+			globalOpts.VaultPaths = []string{}
+		}
 
 		cli, cliErr := createCLI()
 		if cliErr != nil {
