@@ -13,6 +13,7 @@ _Unreleased_
 
 ### Features
 
+- **Breaking**: RSA is no longer in the default `approved_algorithms`, because OpenPGP encrypts to RSA keys with PKCS #1 v1.5 padding, which Go 1.26 deprecated. New configs from `init config` reject RSA keys, and the error shows the entry to opt back in. Existing configs that list RSA are unchanged. `identity create --algo RSA4096` warns when RSA is allowed, and `doctor` warns about vaults holding RSA identities. See [RSA keys are legacy](/concepts/compliance/#rsa-keys-are-legacy) (#457)
 - `dotsecenv version` reports the FIPS 140-3 module version and whether FIPS mode is disabled, enabled, or enforced (`GODEBUG=fips140=only`); `--json` adds `fips140ModuleVersion` and `fips140Enforced`. `doctor` shows the same status as an informational `crypto_module` check (#456)
 
 ### Other
