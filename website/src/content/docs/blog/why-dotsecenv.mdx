@@ -67,7 +67,7 @@ GPG over [age](https://github.com/FiloSottile/age) was a tradeoff. age is simple
 Plus most developers already have a GPG key from [GitHub](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits) or [GitLab](https://docs.gitlab.com/user/project/repository/signed_commits/gpg/) commit signing. dotsecenv builds on that existing infrastructure.
 If, however, you don't have a GPG key, you can generate one with [`dotsecenv identity create`](/reference/#identity-create), without needing to get into the GPG nitty-gritty!
 
-Algorithm defaults align with [FIPS 186-5](https://dotsecenv.com/concepts/compliance/) (Ed25519, ECDSA P-384, RSA-3072+), and the tool refuses to operate with weaker algorithms.
+New keys default to P-384, which NIST approves for both signing (ECDSA) and encryption (ECDH). The default config also accepts Ed25519, refuses weaker algorithms, and treats [RSA as legacy](/concepts/compliance/#rsa-keys-are-legacy): you have to opt in to use it. See [Standards Compliance](/concepts/compliance/) for the details.
 
 ## What dotsecenv does NOT protect against
 
