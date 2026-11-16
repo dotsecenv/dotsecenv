@@ -20,7 +20,7 @@ _Unreleased_
 
 - Website dependency updates: astro 7.4.11, @astrojs/starlight 0.42.11, and eslint-plugin-mdx 3.9.5 (#440, #452, #439)
 - CI updates: pnpm 12.20.0 in the website workflows, and uv 0.13.8 in the agent-plugin and release workflows (#451, #453)
-- Backfill the changelog for the dependency updates merged since v0.11.1 (#PR)
+- Backfill the changelog for the dependency updates merged since v0.11.1 (#461)
 - The "Why your .env secrets shouldn't be plaintext on disk" post no longer lists RSA among the default algorithms (#459)
 - Docs, examples, and `identity create` help recommend P-384, the `identity create` default, because NIST approves both its ECDSA signatures and ECDH encryption. Ed25519 signatures are approved, but its X25519 encryption subkey is not. The sandbox's P-384 and Ed25519 keys gain the encryption subkeys dotsecenv requires (#458)
 - `make lint` fails when `go fix -diff ./...` reports pending modernizer changes; `make fmt` applies them. The codebase is updated to pass (#456)
