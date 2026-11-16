@@ -1,0 +1,23 @@
+# How this repository releases, read by every releasetools tool.
+#
+# Conventions: https://github.com/releasetools/conventions
+# Tools:       https://github.com/releasetools
+
+projects:
+  - path: ./
+    manifest:
+      - .claude-plugin/plugin.json
+      - .codex-plugin/plugin.json
+
+release:
+  branch: main
+  merge: squash
+  # The workflows here: ci-agent-plugins.yml, ci-merge-gate.yml, ci-plugin.yml, ci-release.yml, ci-website.yml, ci.yml, deploy-website.yml, e2e-action-post-release.yml, e2e-hermetic.yml, e2e-install.yml, lint-workflows.yml, publish-satellites.yml, release.yml, verify-satellites.yml
+  # checks: the one that must be green on the release commit
+  publish: release.yml
+  trigger: tag
+  # registry: a URL answering 404 for a version nobody has released,
+  #           with {version} where the version goes
+
+conventions:
+  except: []
