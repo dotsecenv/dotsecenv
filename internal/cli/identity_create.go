@@ -74,8 +74,18 @@ func identityCreateCore(opts IdentityCreateOptions, cfg *config.Config, io *iden
 	// Validate algorithm against config's approved_algorithms
 	algoStr, bits := gpg.GetAlgorithmForValidation(algo)
 	if !cfg.IsAlgorithmAllowed(algoStr, bits) {
+		if isRSAAlgorithm(algoStr) {
+			return NewError(fmt.Sprintf("algorithm '%s' is not allowed by your configuration\n\n%s%s",
+				opts.Algorithm, cfg.GetAllowedAlgorithmsString(), rsaNotAllowedSuffix(algoStr)), ExitAlgorithmNotAllowed)
+		}
 		return NewError(fmt.Sprintf("algorithm '%s' is not allowed by your configuration\n\n%s\n\nTo use %s, add it to your config's approved_algorithms.\nSee https://dotsecenv.com/concepts/compliance/ for more details.",
 			opts.Algorithm, cfg.GetAllowedAlgorithmsString(), opts.Algorithm), ExitAlgorithmNotAllowed)
+	}
+
+	// RSA is allowed here only because the config opted in; say why it is
+	// still discouraged before generating a key the user will keep for years.
+	if isRSAAlgorithm(algoStr) {
+		_, _ = fmt.Fprintf(io.stderr, "WARNING: %s\nSee %s\n\n", rsaLegacyReason, rsaLegacyDocsURL)
 	}
 
 	// Validate --no-passphrase requires --name and --email

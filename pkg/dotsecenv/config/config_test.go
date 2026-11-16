@@ -21,9 +21,7 @@ func TestDefaultConfig(t *testing.T) {
 	for _, algo := range cfg.ApprovedAlgorithms {
 		switch algo.Algo {
 		case "RSA":
-			if algo.MinBits < 2048 {
-				t.Errorf("RSA min bits should be >= 2048 (FIPS 186-5), got %d", algo.MinBits)
-			}
+			t.Errorf("DefaultConfig should not approve RSA (legacy; PKCS #1 v1.5 encryption)")
 		case "ECC":
 			if algo.MinBits < 384 {
 				t.Errorf("ECC min bits should be >= 384 (FIPS 186-5), got %d", algo.MinBits)
@@ -41,7 +39,7 @@ func TestDefaultConfig(t *testing.T) {
 		algoMap[algo.Algo] = true
 	}
 
-	for _, required := range []string{"RSA", "ECC", "EdDSA"} {
+	for _, required := range []string{"ECC", "EdDSA"} {
 		if !algoMap[required] {
 			t.Errorf("DefaultConfig missing required algorithm: %s", required)
 		}
@@ -57,11 +55,11 @@ func TestIsAlgorithmAllowed(t *testing.T) {
 		bits    int
 		allowed bool
 	}{
-		// RSA: minimum 2048 bits (FIPS 186-5)
-		{"RSA-4096", "RSA", 4096, true},
-		{"RSA-3072", "RSA", 3072, true},
-		{"RSA-2048", "RSA", 2048, true},
-		{"RSA-1024", "RSA", 1024, false}, // Below FIPS minimum
+		// RSA: not in the defaults at any size (legacy)
+		{"RSA-4096", "RSA", 4096, false},
+		{"RSA-3072", "RSA", 3072, false},
+		{"RSA-2048", "RSA", 2048, false},
+		{"RSA-1024", "RSA", 1024, false},
 		// ECC: P-384 and P-521 only (FIPS 186-5)
 		{"ECC P-521", "ECC P-521", 521, true},
 		{"ECC P-384", "ECC P-384", 384, true},

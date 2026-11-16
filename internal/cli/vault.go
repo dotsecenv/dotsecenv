@@ -453,7 +453,22 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 		}
 	}
 
-	// Check 4: Vault fragmentation
+	// Check 4: Legacy RSA identities. Warn only; there is nothing to auto-fix,
+	// since replacing a key means its owner creates a new identity.
+	for i, entry := range cfg.Entries {
+		manager := c.vaultResolver.GetVaultManager(i)
+		if manager == nil {
+			continue
+		}
+		if check, ok := legacyIdentityCheck(i, entry.Path, manager.Get().Identities); ok {
+			checks = append(checks, check)
+			if overallStatus == "healthy" {
+				overallStatus = "warning"
+			}
+		}
+	}
+
+	// Check 5: Vault fragmentation
 	// Determine target vault(s) for fragmentation check
 	var targetIndices []int
 	if vaultPath != "" || fromIndex != 0 {

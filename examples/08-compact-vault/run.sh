@@ -60,9 +60,9 @@ echo "==> tempdir: $TMP"
 # --- generate two identities -------------------------------------------------
 
 echo "==> generate Alice and Bob keys"
-"$BIN" identity create --algo RSA4096 --name "Alice (demo)" \
+"$BIN" identity create --algo ED25519 --name "Alice (demo)" \
   --email "alice@example.invalid" --no-passphrase >"$TMP/alice-keygen.log" 2>&1
-"$BIN" identity create --algo RSA4096 --name "Bob (demo)" \
+"$BIN" identity create --algo ED25519 --name "Bob (demo)" \
   --email "bob@example.invalid" --no-passphrase >"$TMP/bob-keygen.log" 2>&1
 
 ALICE_FP="$(gpg --list-keys --with-colons alice@example.invalid | awk -F: '/^fpr:/ { print $10; exit }')"

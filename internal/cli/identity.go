@@ -93,7 +93,7 @@ func (c *CLI) addIdentityToVault(fingerprint string, signerFingerprint string, i
 	}
 
 	if !c.config.IsAlgorithmAllowed(publicKeyInfo.Algorithm, publicKeyInfo.AlgorithmBits) {
-		return NewError(fmt.Sprintf("algorithm not allowed: %s (%d bits)\n%s", publicKeyInfo.Algorithm, publicKeyInfo.AlgorithmBits, c.config.GetAllowedAlgorithmsString()), ExitAlgorithmNotAllowed)
+		return NewError(fmt.Sprintf("algorithm not allowed: %s (%d bits)\n%s%s", publicKeyInfo.Algorithm, publicKeyInfo.AlgorithmBits, c.config.GetAllowedAlgorithmsString(), rsaNotAllowedSuffix(publicKeyInfo.Algorithm)), ExitAlgorithmNotAllowed)
 	}
 
 	if !publicKeyInfo.CanEncrypt {
@@ -160,7 +160,7 @@ func (c *CLI) ensureIdentityInVault(fingerprint string, index int) *Error {
 	}
 
 	if !c.config.IsAlgorithmAllowed(publicKeyInfo.Algorithm, publicKeyInfo.AlgorithmBits) {
-		return NewError(fmt.Sprintf("algorithm not allowed: %s (%d bits)\n%s", publicKeyInfo.Algorithm, publicKeyInfo.AlgorithmBits, c.config.GetAllowedAlgorithmsString()), ExitAlgorithmNotAllowed)
+		return NewError(fmt.Sprintf("algorithm not allowed: %s (%d bits)\n%s%s", publicKeyInfo.Algorithm, publicKeyInfo.AlgorithmBits, c.config.GetAllowedAlgorithmsString(), rsaNotAllowedSuffix(publicKeyInfo.Algorithm)), ExitAlgorithmNotAllowed)
 	}
 
 	if !publicKeyInfo.CanEncrypt {

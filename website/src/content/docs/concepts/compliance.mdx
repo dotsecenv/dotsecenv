@@ -3,7 +3,7 @@ title: Standards Compliance
 description: FIPS 140-3, FIPS 186-5, and RFC 9580 compliance in dotsecenv
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, Steps } from '@astrojs/starlight/components';
 
 ## Overview
 
@@ -168,7 +168,7 @@ SHA-2 hashes serve multiple purposes in dotsecenv:
 
 | Algorithm | Parameters | Status |
 |-----------|------------|--------|
-| **RSA** | 2048-bit minimum, 3072-bit recommended | Approved |
+| **RSA** | 2048-bit minimum, 3072-bit recommended | Approved (legacy in dotsecenv, see [below](#rsa-keys-are-legacy)) |
 | **ECDSA** | P-256, P-384, P-521 curves | Approved |
 | **EdDSA** | Ed25519, Ed448 | Approved |
 | **DSA** | — | Deprecated (removed) |
@@ -183,9 +183,12 @@ dotsecenv validates GPG key algorithms against FIPS 186-5 requirements. The defa
 
 ```yaml
 approved_algorithms:
-  - rsa:3072
-  - ecdsa:p384
-  - eddsa:ed25519
+  - algo: ECC
+    curves: [P-384, P-521]
+    min_bits: 384
+  - algo: EdDSA
+    curves: [Ed25519, Ed448]
+    min_bits: 255
 ```
 
 Keys using weaker algorithms are rejected during encryption and signing operations.
@@ -217,13 +220,45 @@ dotsecenv validate
 
 | Algorithm | Minimum | Recommended |
 |-----------|---------|-------------|
-| RSA | 2048-bit | 3072-bit or 4096-bit |
+| RSA | 2048-bit | Legacy; opt in with 3072-bit or more |
 | ECDSA | P-256 | P-384 or P-521 |
 | EdDSA | Ed25519 | Ed25519 or Ed448 |
 
 <Aside type="caution">
-For new key generation, use Ed25519 (fast, secure, small signatures) or RSA-4096 (broad compatibility). Avoid P-256 ECDSA for new deployments. P-256 is approved, but Ed25519 has better security properties.
+For new key generation, use Ed25519 (fast, secure, small signatures), or P-384 where you need a NIST curve. Avoid P-256 ECDSA for new deployments. P-256 is approved, but Ed25519 has better security properties.
 </Aside>
+
+### RSA keys are legacy
+
+FIPS 186-5 still approves RSA, but dotsecenv's default `approved_algorithms` leaves it out. A config written by `init config` rejects RSA keys, and `identity create --algo RSA4096` fails with an explanation and the snippet to opt in.
+
+The reason is how OpenPGP encrypts to RSA keys. Every secret is encrypted with a session key, and for an RSA recipient that session key is wrapped with PKCS #1 v1.5 padding. Go 1.26 deprecated PKCS #1 v1.5 encryption as unsafe: a decryptor that reveals whether the padding was valid gives an attacker a decryption oracle (Bleichenbacher's attack). OpenPGP has no OAEP mode for RSA, so there is no safer RSA option to switch to. RSA keys are also much larger and slower than elliptic-curve keys of similar strength.
+
+Existing setups keep working. A config that already lists RSA keeps accepting RSA keys until you remove the entry. `doctor` warns about each vault that holds RSA identities and names them, and `identity create --algo RSA4096` prints a warning before it generates the key.
+
+To move an RSA identity to a new key:
+
+<Steps>
+
+1. Create the replacement identity with `dotsecenv identity create --algo ED25519` (or `P384`), then `dotsecenv login <NEW_FINGERPRINT>`.
+
+2. From an identity that can read the secrets, share each one with the new key: `dotsecenv secret share SECRET <NEW_FINGERPRINT> --all`.
+
+3. Revoke the old key: `dotsecenv secret revoke SECRET <OLD_FINGERPRINT> --all`.
+
+</Steps>
+
+<Aside>
+Vaults are append-only. Revoking stops the old key from reading new values, but it can still decrypt any value that was encrypted to it. Rotate a secret's value if the old private key may be exposed.
+</Aside>
+
+To keep accepting RSA keys, add the entry back to your config:
+
+```yaml
+approved_algorithms:
+  - algo: RSA
+    min_bits: 3072
+```
 
 ---
 
@@ -376,7 +411,7 @@ These standards define the cryptographic primitives themselves:
 | FIPS 180-4 | SHA-2 hash family | SHA-256/SHA-512 for integrity and signatures |
 
 <Aside type="tip">
-For maximum compliance, build dotsecenv with Go 1.26+ and `GOFIPS140=v1.26.0`, deploy to a validated Operating Environment, and use Ed25519 or RSA-4096 keys.
+For maximum compliance, build dotsecenv with Go 1.26+ and `GOFIPS140=v1.26.0`, deploy to a validated Operating Environment, and use Ed25519 or P-384 keys.
 </Aside>
 
 ## See also

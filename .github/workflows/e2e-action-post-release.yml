@@ -88,10 +88,10 @@ jobs:
         run: |
           cat > /tmp/gpg-key-params <<EOF
           %no-protection
-          Key-Type: RSA
-          Key-Length: 2048
-          Subkey-Type: RSA
-          Subkey-Length: 2048
+          Key-Type: EDDSA
+          Key-Curve: ed25519
+          Subkey-Type: ECDH
+          Subkey-Curve: cv25519
           Name-Real: Test User 4
           Name-Email: test4@dotsecenv.com
           Expire-Date: 0

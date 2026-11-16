@@ -15,7 +15,7 @@ pass() { echo "  PASS: $*"; ((TESTS_PASSED++)) || true; }
 fail() { echo "  FAIL: $*"; ((TESTS_FAILED++)) || true; }
 
 echo "==> Generating test key"
-"$BIN" identity create --name "TF Test" --email "tf@test" --algo RSA4096 --no-passphrase
+"$BIN" identity create --name "TF Test" --email "tf@test" --algo ED25519 --no-passphrase
 
 echo "==> Initializing vault"
 mkdir -p "$XDG_DATA_HOME/dotsecenv"

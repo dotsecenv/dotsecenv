@@ -22,7 +22,7 @@ From inside this directory:
 ./run.sh
 ```
 
-The script generates an ephemeral RSA-4096 key in an isolated `GNUPGHOME`,
+The script generates an ephemeral Ed25519 key in an isolated `GNUPGHOME`,
 walks through the full flow against a tempdir-only config and vault, and
 removes everything on exit.
 
@@ -35,14 +35,14 @@ fingerprints will differ):
 ==> using binary: /path/to/dotsecenv
 ==> tempdir: /tmp/tmp.XXXXXXXX
 ==> GNUPGHOME: /tmp/tmp.XXXXXXXX/gnupg
-==> generating CI-only RSA-4096 key (no passphrase)
+==> generating CI-only Ed25519 key (no passphrase)
 ==> fingerprint: FA5760BB43B4949DDD46342735EF443EF68A9396
 ==> dotsecenv init config (pointing -v at our isolated vault path)
 Initialized config file: /tmp/tmp.XXXXXXXX/config
 ==> dotsecenv init vault
 Initialized empty vault: /tmp/tmp.XXXXXXXX/vault
 ==> dotsecenv login (records a signed login proof in the config)
-Logging in with identity: Quickstart Demo <quickstart@example.invalid> (RSA 4096-bit)
+Logging in with identity: Quickstart Demo <quickstart@example.invalid> (EdDSA Ed25519 255-bit)
 Login successful! Signed proof stored in config.
 ==> dotsecenv secret store DATABASE_PASSWORD
 Secret 'DATABASE_PASSWORD' stored successfully

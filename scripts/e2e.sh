@@ -21,10 +21,10 @@ chmod +x "$BIN"
 echo "==> Generating test keys in $GNUPGHOME"
 
 # Generate two test keys (passwordless for CI)
-# Using RSA4096 which is supported by dotsecenv
+# ED25519 is in the default approved_algorithms (RSA is legacy and opt-in)
 # Keys expire in 2y by default (fine for ephemeral test keys)
-"$BIN" identity create --name "Test User One" --email "test1@dotsecenv.com" --algo RSA4096 --no-passphrase
-"$BIN" identity create --name "Test User Two" --email "test2@dotsecenv.com" --algo RSA4096 --no-passphrase
+"$BIN" identity create --name "Test User One" --email "test1@dotsecenv.com" --algo ED25519 --no-passphrase
+"$BIN" identity create --name "Test User Two" --email "test2@dotsecenv.com" --algo ED25519 --no-passphrase
 
 # Capture fingerprints
 KEY1=$(gpg --list-keys --with-colons test1@dotsecenv.com | awk -F: '/^fpr:/{print $10; exit}')

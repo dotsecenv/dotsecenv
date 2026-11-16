@@ -51,11 +51,10 @@ echo "==> GNUPGHOME: $GNUPGHOME"
 
 # --- generate an ephemeral GPG key ------------------------------------------
 
-# RSA4096 is the most portable choice across GPG versions on CI runners and
-# old Linux distributions. ED25519 is preferable on a modern machine.
-echo "==> generating CI-only RSA-4096 key (no passphrase)"
+# ED25519 needs GnuPG 2.1 or later, which every supported CI runner ships.
+echo "==> generating CI-only Ed25519 key (no passphrase)"
 "$BIN" identity create \
-  --algo RSA4096 \
+  --algo ED25519 \
   --name "Quickstart Demo" \
   --email "quickstart@example.invalid" \
   --no-passphrase \

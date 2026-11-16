@@ -41,7 +41,7 @@ should be readable in CI.
 # 1. On a developer machine, generate ONE org-wide CI key (NO PASSPHRASE
 #    because GitHub Actions cannot answer a pinentry prompt).
 dotsecenv identity create \
-  --algo RSA4096 \
+  --algo ED25519 \
   --name "Org CI" \
   --email "ci@your-org.example" \
   --no-passphrase

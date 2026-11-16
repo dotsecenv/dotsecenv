@@ -69,7 +69,7 @@ echo "==> tempdir: $TMP"
 
 echo "==> [Alice's keyring] generate Alice's key"
 GNUPGHOME="$ALICE_GNUPG" "$BIN" identity create \
-  --algo RSA4096 \
+  --algo ED25519 \
   --name "Alice (demo)" \
   --email "alice@example.invalid" \
   --no-passphrase \
@@ -83,7 +83,7 @@ echo "==> Alice fingerprint: $ALICE_FP"
 
 echo "==> [Bob's keyring] generate Bob's key"
 GNUPGHOME="$BOB_GNUPG" "$BIN" identity create \
-  --algo RSA4096 \
+  --algo ED25519 \
   --name "Bob (demo)" \
   --email "bob@example.invalid" \
   --no-passphrase \
