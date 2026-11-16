@@ -18,7 +18,7 @@ _Unreleased_
 
 ### Other
 
-- `.releasetools.yaml` declares how dotsecenv releases: the two agent plugin manifests carry the version, and pushing a signed `vX.Y.Z` tag starts `release.yml` (#PR)
+- `.releasetools.yaml` declares how dotsecenv releases: the two agent plugin manifests carry the version, and pushing a signed `vX.Y.Z` tag starts `release.yml` (#460)
 - The "Why your .env secrets shouldn't be plaintext on disk" post no longer lists RSA among the default algorithms (#459)
 - Docs, examples, and `identity create` help recommend P-384, the `identity create` default, because NIST approves both its ECDSA signatures and ECDH encryption. Ed25519 signatures are approved, but its X25519 encryption subkey is not. The sandbox's P-384 and Ed25519 keys gain the encryption subkeys dotsecenv requires (#458)
 - `make lint` fails when `go fix -diff ./...` reports pending modernizer changes; `make fmt` applies them. The codebase is updated to pass (#456)
