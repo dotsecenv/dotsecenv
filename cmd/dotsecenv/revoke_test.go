@@ -77,8 +77,8 @@ Expire-Date: 0
 		return "", fmt.Errorf("failed to list keys for %s: %w", email, err)
 	}
 
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(out), "\n")
+	for line := range lines {
 		if strings.HasPrefix(line, "fpr:") {
 			parts := strings.Split(line, ":")
 			if len(parts) > 9 {
@@ -123,8 +123,8 @@ Expire-Date: 0
 		t.Fatalf("failed to list keys for %s: %v", email, err)
 	}
 
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(out), "\n")
+	for line := range lines {
 		if strings.HasPrefix(line, "fpr:") {
 			parts := strings.Split(line, ":")
 			if len(parts) > 9 {

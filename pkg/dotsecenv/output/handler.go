@@ -69,12 +69,12 @@ func (h *Handler) Warn(w *Warning) {
 }
 
 // Warnf creates and emits a warning with a formatted message.
-func (h *Handler) Warnf(code Code, format string, args ...interface{}) {
+func (h *Handler) Warnf(code Code, format string, args ...any) {
 	h.Warn(NewWarningf(code, format, args...))
 }
 
 // WarnWithDetails creates and emits a warning with metadata.
-func (h *Handler) WarnWithDetails(code Code, message string, details map[string]interface{}) {
+func (h *Handler) WarnWithDetails(code Code, message string, details map[string]any) {
 	w := NewWarning(code, message).WithDetails(details)
 	h.Warn(w)
 }
@@ -90,7 +90,7 @@ func (h *Handler) Error(e *Error) {
 }
 
 // Errorf creates and emits an error with a formatted message.
-func (h *Handler) Errorf(code Code, format string, args ...interface{}) {
+func (h *Handler) Errorf(code Code, format string, args ...any) {
 	h.Error(NewErrorf(code, format, args...))
 }
 
@@ -102,13 +102,13 @@ func (h *Handler) Success(message string) {
 }
 
 // Successf emits a formatted success message to stdout.
-func (h *Handler) Successf(format string, args ...interface{}) {
+func (h *Handler) Successf(format string, args ...any) {
 	h.Success(fmt.Sprintf(format, args...))
 }
 
 // WriteData writes data output to stdout (text mode only).
 // Does not add a newline; caller is responsible for formatting.
-func (h *Handler) WriteData(format string, args ...interface{}) {
+func (h *Handler) WriteData(format string, args ...any) {
 	if !h.json {
 		_, _ = fmt.Fprintf(h.stdout, format, args...)
 	}
@@ -127,7 +127,7 @@ func (h *Handler) WriteLine(message string) {
 
 // WriteJSON writes the JSON envelope with collected warnings and optional error.
 // This is the primary output method for JSON mode.
-func (h *Handler) WriteJSON(data interface{}, err *Error) error {
+func (h *Handler) WriteJSON(data any, err *Error) error {
 	env := NewEnvelope(data)
 	env.AddWarnings(h.warnings)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 // Identities are stored as an array of [fingerprint, line] pairs.
 type HeaderV1Raw struct {
 	Version    int                    `json:"version"`
-	Identities [][2]interface{}       `json:"identities"` // [[fingerprint, line], ...]
+	Identities [][2]any               `json:"identities"` // [[fingerprint, line], ...]
 	Secrets    map[string]SecretIndex `json:"secrets"`
 }
 
@@ -30,9 +30,9 @@ func MarshalHeaderV1(h *Header) ([]byte, error) {
 		return idEntries[i].line < idEntries[j].line
 	})
 
-	identities := make([][2]interface{}, len(idEntries))
+	identities := make([][2]any, len(idEntries))
 	for i, e := range idEntries {
-		identities[i] = [2]interface{}{e.fp, e.line}
+		identities[i] = [2]any{e.fp, e.line}
 	}
 
 	raw := HeaderV1Raw{

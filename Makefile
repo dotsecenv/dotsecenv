@@ -72,6 +72,8 @@ build-unlink:
 
 .PHONY: fmt
 fmt:
+	@echo "Applying go fix modernizers..."
+	@go fix ./...
 	@echo "Formatting Go code..."
 	@find . -name '*.go' -not -path './vendor/*' -exec gofmt -s -w {} +
 	@$(GOLANGCI_LINT) run --fix ./...
@@ -86,6 +88,12 @@ lint: install-lint
 		gofmt -l . | grep -vE '(^|/)vendor/'; \
 		exit 1; \
 	fi
+	@echo "Checking go fix modernizers..."
+	@out=$$(go fix -diff ./... 2>&1) || { \
+		printf '%s\n' "$$out"; \
+		echo "go fix has pending changes; apply them with: make fmt"; \
+		exit 1; \
+	}
 	@echo "Checking packages/retracted.txt against go.mod..."
 	@./scripts/extract-retracted.sh go.mod | diff -u packages/retracted.txt - || { \
 		echo "Regenerate it: ./scripts/extract-retracted.sh go.mod > packages/retracted.txt"; \

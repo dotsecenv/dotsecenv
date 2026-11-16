@@ -1247,7 +1247,7 @@ func TestSecretGet_JSONOutput(t *testing.T) {
 		t.Fatalf("SecretGet with jsonOutput=true failed: %v", getErr)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(stdoutBuf.Bytes(), &result); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, stdoutBuf.String())
 	}
@@ -1312,13 +1312,13 @@ func TestSecretGet_JSONOutput_SmartMarshal(t *testing.T) {
 		t.Fatalf("SecretGet with jsonOutput=true failed: %v", getErr)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(stdoutBuf.Bytes(), &result); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, stdoutBuf.String())
 	}
 
 	// The value should be an embedded object, not a double-escaped string
-	valueObj, ok := result["value"].(map[string]interface{})
+	valueObj, ok := result["value"].(map[string]any)
 	if !ok {
 		t.Fatalf("Expected value to be a JSON object (smart marshaled), got %T: %v", result["value"], result["value"])
 	}
@@ -1603,7 +1603,7 @@ func TestSecretGet_JSONOutput_AllMode_IncludesAvailableToAndSignedBy(t *testing.
 		t.Fatalf("SecretGet --all --json failed: %v", err)
 	}
 
-	var results []map[string]interface{}
+	var results []map[string]any
 	if err := json.Unmarshal(stdoutBuf.Bytes(), &results); err != nil {
 		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, stdoutBuf.String())
 	}
@@ -1616,7 +1616,7 @@ func TestSecretGet_JSONOutput_AllMode_IncludesAvailableToAndSignedBy(t *testing.
 	if got["signed_by"] != otherFP {
 		t.Errorf("Expected signed_by=%q on newest value, got: %v", otherFP, got["signed_by"])
 	}
-	availableTo, ok := got["available_to"].([]interface{})
+	availableTo, ok := got["available_to"].([]any)
 	if !ok {
 		t.Fatalf("Expected available_to to be an array on newest value, got %T: %v", got["available_to"], got["available_to"])
 	}
@@ -1677,7 +1677,7 @@ func TestSecretGet_JSONOutput_NoAll_OmitsAvailableToAndSignedBy(t *testing.T) {
 		t.Fatalf("SecretGet --json failed: %v", err)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(stdoutBuf.Bytes(), &result); err != nil {
 		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, stdoutBuf.String())
 	}

@@ -247,7 +247,7 @@ func addKeyHandle(template, handle string) (string, error) {
 // carries handle. It is an error unless exactly one such line exists.
 func createdKeyFingerprint(status, handle string) (string, error) {
 	var found []string
-	for _, line := range strings.Split(status, "\n") {
+	for line := range strings.SplitSeq(status, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) != 5 || fields[0] != "[GNUPG:]" || fields[1] != "KEY_CREATED" || fields[4] != handle {
 			continue

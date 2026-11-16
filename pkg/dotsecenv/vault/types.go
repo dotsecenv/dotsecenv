@@ -113,8 +113,8 @@ func (s Secret) IsDeleted() bool {
 // was never deleted and len(s.Values) when the latest value is a deletion
 // marker.
 func (s Secret) LiveStart() int {
-	for i := len(s.Values) - 1; i >= 0; i-- {
-		if s.Values[i].Deleted {
+	for i, v := range slices.Backward(s.Values) {
+		if v.Deleted {
 			return i + 1
 		}
 	}

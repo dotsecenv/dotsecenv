@@ -56,7 +56,7 @@ func (c *CLI) SecretShareAll(secretKey, targetFingerprint string) *Error {
 	skippedCount := 0
 	failureCount := 0
 
-	for i := 0; i < vaultCount; i++ {
+	for i := range vaultCount {
 		displayPos := i + 1
 		vaultPath := ""
 		if i < len(vaultPaths) {

@@ -8,13 +8,13 @@ import (
 // Envelope wraps command output in a standardized JSON structure.
 // This provides a consistent format for all JSON output with data, warnings, and errors.
 type Envelope struct {
-	Data     interface{} `json:"data,omitempty"`
-	Warnings []*Warning  `json:"warnings,omitempty"`
-	Error    *Error      `json:"error,omitempty"`
+	Data     any        `json:"data,omitempty"`
+	Warnings []*Warning `json:"warnings,omitempty"`
+	Error    *Error     `json:"error,omitempty"`
 }
 
 // NewEnvelope creates a new envelope with the given data.
-func NewEnvelope(data interface{}) *Envelope {
+func NewEnvelope(data any) *Envelope {
 	return &Envelope{
 		Data:     data,
 		Warnings: make([]*Warning, 0),
@@ -40,7 +40,7 @@ func (e *Envelope) AddWarnings(warnings []*Warning) {
 }
 
 // SetData sets the data payload of the envelope.
-func (e *Envelope) SetData(data interface{}) {
+func (e *Envelope) SetData(data any) {
 	e.Data = data
 }
 

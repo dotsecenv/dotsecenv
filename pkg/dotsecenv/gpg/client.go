@@ -262,7 +262,7 @@ func getPublicKeyBinary(fingerprint string) ([]byte, error) {
 }
 
 // extractCurveFromKey extracts the elliptic curve name from a key in pure Go.
-func extractCurveFromKey(pubKey interface{}) string {
+func extractCurveFromKey(pubKey any) string {
 	if pubKey == nil {
 		return ""
 	}
@@ -366,7 +366,7 @@ func getCurveName(curve elliptic.Curve) string {
 }
 
 // getAlgorithmBitsFromKey retrieves the algorithm bit length from a key object.
-func getAlgorithmBitsFromKey(entity interface{}) int {
+func getAlgorithmBitsFromKey(entity any) int {
 	if entity == nil {
 		return 0
 	}
@@ -430,8 +430,8 @@ func getAlgorithmBitsFromFingerprint(fingerprint string) int {
 		return 0
 	}
 
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(output), "\n")
+	for line := range lines {
 		if strings.HasPrefix(line, "pub:") {
 			parts := strings.Split(line, ":")
 			if len(parts) >= 3 && parts[2] != "" {
@@ -456,8 +456,8 @@ func (c *GPGClient) GetKeyCreationTime(fingerprint string) time.Time {
 		return time.Now().UTC()
 	}
 
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(output), "\n")
+	for line := range lines {
 		if strings.HasPrefix(line, "pub:") {
 			parts := strings.Split(line, ":")
 			if len(parts) > 5 && parts[5] != "" {
@@ -482,8 +482,8 @@ func (c *GPGClient) GetKeyExpiration(fingerprint string) *time.Time {
 		return nil
 	}
 
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(output), "\n")
+	for line := range lines {
 		if strings.HasPrefix(line, "pub:") {
 			parts := strings.Split(line, ":")
 			if len(parts) > 6 && parts[6] != "" {
@@ -507,8 +507,8 @@ func (c *GPGClient) isKeyExpired(fingerprint string) bool {
 		return false
 	}
 
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(output), "\n")
+	for line := range lines {
 		parts := strings.Split(line, ":")
 		if len(parts) >= 7 && parts[0] == "pub" {
 			expirationStr := parts[6]
@@ -733,8 +733,8 @@ func (c *GPGClient) ListSecretKeys() ([]SecretKeyInfo, error) {
 	var keys []SecretKeyInfo
 	var currentFingerprint string
 
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(output), "\n")
+	for line := range lines {
 		parts := strings.Split(line, ":")
 		if len(parts) < 2 {
 			continue

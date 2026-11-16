@@ -251,7 +251,7 @@ func TestManagerFragmentationStats(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	// Add some data
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		m.AddIdentity(identity.Identity{
 			AddedAt:     now.Add(time.Duration(i) * time.Second),
 			Fingerprint: fmt.Sprintf("FP%d", i),
@@ -324,7 +324,7 @@ func TestWriterConcurrentReads(t *testing.T) {
 	}
 
 	now := time.Now().UTC().Truncate(time.Second)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		if err := w.AddIdentity(identity.Identity{
 			AddedAt:     now.Add(time.Duration(i) * time.Second),
 			Fingerprint: fmt.Sprintf("FP%d", i),
@@ -337,10 +337,8 @@ func TestWriterConcurrentReads(t *testing.T) {
 	var wg sync.WaitGroup
 	errors := make(chan error, 10)
 
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			r, err := NewReader(vaultPath)
 			if err != nil {
 				errors <- err
@@ -350,7 +348,7 @@ func TestWriterConcurrentReads(t *testing.T) {
 			if len(fps) != 10 {
 				errors <- fmt.Errorf("expected 10 fingerprints, got %d", len(fps))
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -370,7 +368,7 @@ func TestHeaderMarshalRace(t *testing.T) {
 	}
 
 	// Add some data
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		h.Identities[fmt.Sprintf("FP%d", i)] = i + 10
 		h.Secrets[fmt.Sprintf("SEC%d", i)] = SecretIndex{
 			Definition: i + 100,
@@ -382,15 +380,13 @@ func TestHeaderMarshalRace(t *testing.T) {
 	errors := make(chan error, 100)
 
 	// Concurrent marshaling (read-only operations)
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 100 {
+		wg.Go(func() {
 			_, err := MarshalHeader(h)
 			if err != nil {
 				errors <- err
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -425,10 +421,8 @@ func TestEntryParsingRace(t *testing.T) {
 	errors := make(chan error, 100)
 
 	// Concurrent parsing
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 100 {
+		wg.Go(func() {
 			parsed, err := UnmarshalEntry(entryJSON)
 			if err != nil {
 				errors <- err
@@ -438,7 +432,7 @@ func TestEntryParsingRace(t *testing.T) {
 			if err != nil {
 				errors <- err
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -460,7 +454,7 @@ func TestReaderConcurrentLineReads(t *testing.T) {
 	}
 
 	now := time.Now().UTC().Truncate(time.Second)
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		if err := w.AddIdentity(identity.Identity{
 			AddedAt:     now.Add(time.Duration(i) * time.Second),
 			Fingerprint: fmt.Sprintf("FP%02d", i),
@@ -473,7 +467,7 @@ func TestReaderConcurrentLineReads(t *testing.T) {
 	var wg sync.WaitGroup
 	errors := make(chan error, 20)
 
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		wg.Add(1)
 		fp := fmt.Sprintf("FP%02d", i)
 		go func(fingerprint string) {
@@ -542,7 +536,7 @@ func BenchmarkReaderGetIdentity(b *testing.B) {
 	}
 
 	now := time.Now().UTC().Truncate(time.Second)
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		if err := w.AddIdentity(identity.Identity{
 			AddedAt:     now.Add(time.Duration(i) * time.Second),
 			Fingerprint: fmt.Sprintf("FP%04d", i),
@@ -574,10 +568,10 @@ func BenchmarkHeaderMarshal(b *testing.B) {
 	}
 
 	// Populate with 1000 entries
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		h.Identities[fmt.Sprintf("FP%04d", i)] = i + 10
 	}
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		h.Secrets[fmt.Sprintf("SEC%04d", i)] = SecretIndex{
 			Definition: i + 2000,
 			Values:     []int{i + 3000, i + 3001, i + 3002},
@@ -606,7 +600,7 @@ func BenchmarkDefragment(b *testing.B) {
 
 		// Create fragmented vault
 		now := time.Now().UTC().Truncate(time.Second)
-		for j := 0; j < 100; j++ {
+		for j := range 100 {
 			_ = w.AddIdentity(identity.Identity{
 				AddedAt:     now.Add(time.Duration(j) * time.Second),
 				Fingerprint: fmt.Sprintf("FP%03d", j),

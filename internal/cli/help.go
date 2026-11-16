@@ -33,11 +33,21 @@ func cryptoStatus() string {
 	if fipsSetting == "" {
 		return "Go standard library (not FIPS validated)"
 	}
-	status := "FIPS 140-3 mode disabled"
-	if fips140.Enabled() {
-		status = "FIPS 140-3 mode enabled"
+	return fmt.Sprintf("GOFIPS140=%s (module %s, FIPS 140-3 mode %s)", fipsSetting, fips140.Version(), fipsMode())
+}
+
+// fipsMode reports the runtime FIPS 140-3 mode: "disabled", "enabled"
+// (GODEBUG=fips140=on), or "enforced" (GODEBUG=fips140=only, where
+// non-approved algorithms return errors or panic).
+func fipsMode() string {
+	switch {
+	case fips140.Enforced():
+		return "enforced"
+	case fips140.Enabled():
+		return "enabled"
+	default:
+		return "disabled"
 	}
-	return fmt.Sprintf("GOFIPS140=%s (%s)", fipsSetting, status)
 }
 
 // fipsBuildSetting returns the GOFIPS140 setting used at build time, if any.
@@ -65,8 +75,25 @@ type VersionInfo struct {
 
 // CryptoInfo represents cryptographic module information.
 type CryptoInfo struct {
-	GOFIPS140      string `json:"GOFIPS140,omitempty"`
-	FIPS140Enabled bool   `json:"fips140Enabled"`
+	GOFIPS140            string `json:"GOFIPS140,omitempty"`
+	FIPS140ModuleVersion string `json:"fips140ModuleVersion,omitempty"`
+	FIPS140Enabled       bool   `json:"fips140Enabled"`
+	FIPS140Enforced      bool   `json:"fips140Enforced"`
+}
+
+// cryptoInfo collects the crypto module status for JSON output. The module
+// version is only reported for builds that set GOFIPS140, since otherwise
+// fips140.Version returns "latest" and says nothing about the build.
+func cryptoInfo() CryptoInfo {
+	info := CryptoInfo{
+		GOFIPS140:       fipsBuildSetting(),
+		FIPS140Enabled:  fips140.Enabled(),
+		FIPS140Enforced: fips140.Enforced(),
+	}
+	if info.GOFIPS140 != "" {
+		info.FIPS140ModuleVersion = fips140.Version()
+	}
+	return info
 }
 
 // PrintVersionJSON prints version information as JSON.
@@ -86,10 +113,7 @@ func PrintVersionJSON(w io.Writer, version, commit, date string) {
 		Commit:         commit,
 		BuiltAt:        date,
 		GoBuildVersion: runtime.Version(),
-		Crypto: CryptoInfo{
-			GOFIPS140:      fipsBuildSetting(),
-			FIPS140Enabled: fips140.Enabled(),
-		},
+		Crypto:         cryptoInfo(),
 	}
 
 	enc := json.NewEncoder(w)

@@ -37,7 +37,7 @@ func (c *GPGClient) runWithAgentStatus(args []string, input []byte) ([]byte, str
 	}
 
 	pinentryRequired := false
-	for _, line := range strings.Split(stderr.String(), "\n") {
+	for line := range strings.SplitSeq(stderr.String(), "\n") {
 		if !strings.HasPrefix(line, "[GNUPG:] ") {
 			continue
 		}

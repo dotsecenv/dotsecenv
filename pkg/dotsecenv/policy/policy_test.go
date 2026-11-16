@@ -816,8 +816,6 @@ func TestMergedGPGProgram_ChainOfDifferingFragments_NWarnings(t *testing.T) {
 
 // --- MergedBehavior tests ---
 
-func ptrBool(v bool) *bool { return &v }
-
 func TestMergedBehavior_NoFragmentsSet(t *testing.T) {
 	p := Policy{Fragments: []Fragment{
 		{Path: "00.yaml"},
@@ -834,7 +832,7 @@ func TestMergedBehavior_NoFragmentsSet(t *testing.T) {
 func TestMergedBehavior_SingleFragment_OneField(t *testing.T) {
 	p := Policy{Fragments: []Fragment{
 		{Path: "00.yaml", Behavior: config.BehaviorConfig{
-			RestrictToConfiguredVaults: ptrBool(true),
+			RestrictToConfiguredVaults: new(true),
 		}},
 	}}
 	b, origins, conflicts := p.MergedBehavior()
@@ -855,10 +853,10 @@ func TestMergedBehavior_SingleFragment_OneField(t *testing.T) {
 func TestMergedBehavior_PerFieldIndependence(t *testing.T) {
 	p := Policy{Fragments: []Fragment{
 		{Path: "00.yaml", Behavior: config.BehaviorConfig{
-			RequireExplicitVaultUpgrade: ptrBool(true),
+			RequireExplicitVaultUpgrade: new(true),
 		}},
 		{Path: "99.yaml", Behavior: config.BehaviorConfig{
-			RestrictToConfiguredVaults: ptrBool(true),
+			RestrictToConfiguredVaults: new(true),
 		}},
 	}}
 	b, origins, conflicts := p.MergedBehavior()
@@ -882,10 +880,10 @@ func TestMergedBehavior_PerFieldIndependence(t *testing.T) {
 func TestMergedBehavior_SameField_DifferentValues_LastWinsWithConflict(t *testing.T) {
 	p := Policy{Fragments: []Fragment{
 		{Path: "00-corp.yaml", Behavior: config.BehaviorConfig{
-			RestrictToConfiguredVaults: ptrBool(false),
+			RestrictToConfiguredVaults: new(false),
 		}},
 		{Path: "99-team.yaml", Behavior: config.BehaviorConfig{
-			RestrictToConfiguredVaults: ptrBool(true),
+			RestrictToConfiguredVaults: new(true),
 		}},
 	}}
 	b, origins, conflicts := p.MergedBehavior()
@@ -908,10 +906,10 @@ func TestMergedBehavior_SameField_DifferentValues_LastWinsWithConflict(t *testin
 func TestMergedBehavior_SameField_SameValue_NoConflict(t *testing.T) {
 	p := Policy{Fragments: []Fragment{
 		{Path: "00.yaml", Behavior: config.BehaviorConfig{
-			RestrictToConfiguredVaults: ptrBool(true),
+			RestrictToConfiguredVaults: new(true),
 		}},
 		{Path: "99.yaml", Behavior: config.BehaviorConfig{
-			RestrictToConfiguredVaults: ptrBool(true),
+			RestrictToConfiguredVaults: new(true),
 		}},
 	}}
 	_, _, conflicts := p.MergedBehavior()
@@ -979,11 +977,11 @@ func TestApply_GPGProgram_PolicySameAsUser_NoWarning(t *testing.T) {
 
 func TestApply_Behavior_PolicyOverridesUserDifferentValue_Warning(t *testing.T) {
 	cfg := config.Config{Behavior: config.BehaviorConfig{
-		RestrictToConfiguredVaults: ptrBool(false),
+		RestrictToConfiguredVaults: new(false),
 	}}
 	p := Policy{Fragments: []Fragment{
 		{Path: "00.yaml", Behavior: config.BehaviorConfig{
-			RestrictToConfiguredVaults: ptrBool(true),
+			RestrictToConfiguredVaults: new(true),
 		}},
 	}}
 	out, warnings := Apply(cfg, p)
@@ -1003,7 +1001,7 @@ func TestApply_Behavior_PolicyOverridesUserDifferentValue_Warning(t *testing.T) 
 
 func TestApply_Behavior_NoPolicyConstraint_UserValueRetained(t *testing.T) {
 	cfg := config.Config{Behavior: config.BehaviorConfig{
-		RestrictToConfiguredVaults: ptrBool(true),
+		RestrictToConfiguredVaults: new(true),
 	}}
 	// Policy has approved_algorithms but no behavior fields — just to make
 	// the policy non-empty; user behavior should be untouched.

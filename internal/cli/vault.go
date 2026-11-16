@@ -383,7 +383,14 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 		Details: gpgDetails,
 	})
 
-	// Check 2: Vault format versions
+	// Check 2: Crypto module (informational; never affects overall status)
+	checks = append(checks, DoctorCheckJSON{
+		Name:    "crypto_module",
+		Status:  "ok",
+		Message: "crypto: " + cryptoStatus(),
+	})
+
+	// Check 3: Vault format versions
 	for i, entry := range cfg.Entries {
 		manager := c.vaultResolver.GetVaultManager(i)
 		if manager == nil {
@@ -446,7 +453,7 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 		}
 	}
 
-	// Check 3: Vault fragmentation
+	// Check 4: Vault fragmentation
 	// Determine target vault(s) for fragmentation check
 	var targetIndices []int
 	if vaultPath != "" || fromIndex != 0 {
