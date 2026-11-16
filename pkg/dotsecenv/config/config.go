@@ -103,9 +103,12 @@ func (c *Config) ShouldRestrictToConfiguredVaults() bool {
 
 // DefaultConfig returns a new Config with FIPS 186-5 compliant algorithm defaults.
 // Algorithm minimums are set per the Digital Signature Standard:
-//   - RSA: 2048 bits minimum (FIPS 186-5)
 //   - ECC: P-384 and P-521 curves (FIPS 186-5, P-256 excluded)
 //   - EdDSA: Ed25519 and Ed448 (FIPS 186-5)
+//
+// RSA is deliberately absent. FIPS 186-5 still approves it, but OpenPGP
+// encrypts to RSA keys with PKCS #1 v1.5 padding, which Go deprecated in
+// 1.26. Users who need RSA add it to approved_algorithms explicitly.
 func DefaultConfig() Config {
 	return Config{
 		ApprovedAlgorithms: []ApprovedAlgorithm{
@@ -124,10 +127,6 @@ func DefaultConfig() Config {
 					"Ed448",
 				},
 				MinBits: 255,
-			},
-			{
-				Algo:    "RSA",
-				MinBits: 2048,
 			},
 		},
 		Vault: []string{},                 // No default vaults from library; caller must populate

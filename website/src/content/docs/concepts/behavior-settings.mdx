@@ -112,8 +112,9 @@ gpg:
 
 ```yaml
 approved_algorithms:
-  - algo: RSA
-    min_bits: 2048
+  - algo: EdDSA
+    curves: [Ed25519]
+    min_bits: 255
 vault:
   - ~/.local/share/dotsecenv/vault
 gpg:
@@ -140,8 +141,12 @@ gpg:
 
 ```yaml
 approved_algorithms:
-  - algo: RSA
-    min_bits: 4096
+  - algo: ECC
+    curves: [P-384, P-521]
+    min_bits: 384
+  - algo: EdDSA
+    curves: [Ed25519]
+    min_bits: 255
 vault:
   - ~/projects/myapp/.dotsecenv/vault
 behavior:

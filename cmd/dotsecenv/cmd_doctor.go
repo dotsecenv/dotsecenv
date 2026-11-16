@@ -24,6 +24,7 @@ Checks performed:
   - GPG agent availability
   - Crypto module (GOFIPS140 build setting, module version, FIPS mode)
   - Vault format version (upgrades outdated vaults)
+  - Legacy RSA identities (warning only; owners replace their keys)
   - Vault fragmentation (defragments if needed)
 
 In CI environments (CI=true, GITHUB_ACTIONS, GITLAB_CI, etc.),

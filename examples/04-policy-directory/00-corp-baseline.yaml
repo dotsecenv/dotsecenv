@@ -21,7 +21,8 @@
 # cannot exceed the policy.
 #
 # This baseline matches FIPS 186-5: P-384/P-521 ECC, Ed25519/Ed448 EdDSA,
-# RSA >= 3072. Notably stricter than the dotsecenv default (RSA >= 2048).
+# RSA >= 3072. The dotsecenv default leaves RSA out entirely; this entry only
+# matters for users whose own config opts back in to RSA.
 approved_algorithms:
   - algo: ECC
     curves:

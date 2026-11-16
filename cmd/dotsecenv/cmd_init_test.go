@@ -276,23 +276,21 @@ func TestInitConfig_HasDefaultAlgorithms(t *testing.T) {
 		t.Errorf("expected approved_algorithms to be set")
 	}
 
-	// Check for expected algorithms (RSA, ECC, EdDSA)
+	// Check for expected algorithms (ECC, EdDSA). RSA is legacy and must
+	// not be in a freshly written config.
 	hasRSA, hasECC, hasEdDSA := false, false, false
 	for _, alg := range cfg.ApprovedAlgorithms {
 		switch alg.Algo {
 		case "RSA":
 			hasRSA = true
-			if alg.MinBits < 2048 {
-				t.Errorf("RSA min_bits should be >= 2048, got %d", alg.MinBits)
-			}
 		case "ECC":
 			hasECC = true
 		case "EdDSA":
 			hasEdDSA = true
 		}
 	}
-	if !hasRSA {
-		t.Errorf("expected RSA in approved_algorithms")
+	if hasRSA {
+		t.Errorf("expected RSA to be absent from default approved_algorithms")
 	}
 	if !hasECC {
 		t.Errorf("expected ECC in approved_algorithms")
