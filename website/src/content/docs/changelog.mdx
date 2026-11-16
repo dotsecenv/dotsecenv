@@ -16,6 +16,10 @@ _Unreleased_
 - **Breaking**: RSA is no longer in the default `approved_algorithms`, because OpenPGP encrypts to RSA keys with PKCS #1 v1.5 padding, which Go 1.26 deprecated. New configs from `init config` reject RSA keys, and the error shows the entry to opt back in. Existing configs that list RSA are unchanged. `identity create --algo RSA4096` warns when RSA is allowed, and `doctor` warns about vaults holding RSA identities. See [RSA keys are legacy](/concepts/compliance/#rsa-keys-are-legacy) (#457)
 - `dotsecenv version` reports the FIPS 140-3 module version and whether FIPS mode is disabled, enabled, or enforced (`GODEBUG=fips140=only`); `--json` adds `fips140ModuleVersion` and `fips140Enforced`. `doctor` shows the same status as an informational `crypto_module` check (#456)
 
+### Bug Fixes
+
+- `secret share` and `secret revoke` with `-v <path>` now act on the vault at that path. Before, they used the config's first vault and reported "skipped, secret not found in vault" when the secret lived elsewhere. `-v N` was not affected (#462)
+
 ### Other
 
 - Website dependency updates: astro 7.4.11, @astrojs/starlight 0.42.11, and eslint-plugin-mdx 3.9.5 (#440, #452, #439)
