@@ -3,7 +3,7 @@ module github.com/dotsecenv/dotsecenv
 go 1.27.4
 
 require (
-	charm.land/bubbletea/v2 v2.1.1
+	charm.land/bubbletea/v2 v2.1.2
 	charm.land/lipgloss/v2 v2.1.0
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/ProtonMail/gopenpgp/v3 v3.5.2
