@@ -594,6 +594,29 @@ run_test "missing checksums.txt.sig fails" expect_fail "Could not download check
 rm -rf "${STUB_DIR}" "${NOHASH_DIR}"
 
 # ===================================================================
+# N. Installed-version check (sourced, no network)
+# ===================================================================
+echo ""
+echo "==> N. Installed-version check"
+
+# has_version REPORTED REQUESTED: run binary_has_version against a stub binary
+# whose `version` output reports REPORTED.
+has_version() (
+    tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+    printf '#!/usr/bin/env bash\necho "version: %s"\necho "commit: abc"\n' "$1" > "$tmp/dotsecenv"
+    chmod +x "$tmp/dotsecenv"
+    binary_has_version "$tmp/dotsecenv" "$2"
+)
+
+lacks_version() { ! has_version "$@"; }
+
+run_test "installed 1.2.30 does not match v1.2.3" lacks_version 1.2.30 v1.2.3
+run_test "installed 1.2.3 does not match v1.2.30" lacks_version 1.2.3 v1.2.30
+run_test "installed 1.2.3 matches v1.2.3" has_version 1.2.3 v1.2.3
+run_test "installed v1.2.3 matches 1.2.3" has_version v1.2.3 1.2.3
+run_test "unparseable version output does not match" lacks_version "" v1.2.3
+
+# ===================================================================
 # Final Report
 # ===================================================================
 echo ""
