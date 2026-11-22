@@ -113,7 +113,8 @@ echo "    JSON lines (1 header + records): $(grep -c '^{' "$VAULT")"
 
 echo
 echo "==> compaction plan (dry run; --json without --yes writes nothing):"
-"$BIN" -c "$CONFIG" vault compact --json
+# Exit 10 means "changes found, not applied", which is the point of a dry run.
+"$BIN" -c "$CONFIG" vault compact --json || [ $? -eq 10 ]
 
 # --- back up and apply ------------------------------------------------------
 

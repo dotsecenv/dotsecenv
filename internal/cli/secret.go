@@ -43,23 +43,42 @@ func allValuesLine(item SecretValueJSON) string {
 
 // historyValue is one value of a secret as 'secret get --all' lists it.
 type historyValue struct {
-	value     vault.SecretValue
-	vaultPath string
-	deleted   bool // a later deletion marker in the same vault deleted it
+	value      vault.SecretValue
+	secret     *vault.Secret
+	vaultIndex int
+	vaultPath  string
+	deleted    bool // a later deletion marker in the same vault deleted it
 }
 
 // secretHistory returns every value of a secret except its deletion markers,
 // oldest first, flagging the values that a later deletion marker deleted.
-func secretHistory(secretObj *vault.Secret, vaultPath string) []historyValue {
+func secretHistory(secretObj *vault.Secret, vaultIndex int, vaultPath string) []historyValue {
 	liveStart := secretObj.LiveStart()
 	var history []historyValue
 	for i, val := range secretObj.Values {
 		if val.Deleted {
 			continue
 		}
-		history = append(history, historyValue{value: val, vaultPath: vaultPath, deleted: i < liveStart})
+		history = append(history, historyValue{value: val, secret: secretObj, vaultIndex: vaultIndex, vaultPath: vaultPath, deleted: i < liveStart})
 	}
 	return history
+}
+
+// verifyBeforeDecrypt fails unless the secret definition and the value carry
+// valid hashes and signatures from identities in the vault at index.
+func (c *CLI) verifyBeforeDecrypt(index int, key string, secretObj *vault.Secret, val *vault.SecretValue) *Error {
+	err := fmt.Errorf("secret definition not found")
+	if secretObj != nil {
+		err = c.vaultResolver.VerifySecretValue(index, secretObj, val)
+	}
+	if err == nil {
+		return nil
+	}
+	vaultPath := fmt.Sprintf("%d", index+1)
+	if entries := c.vaultResolver.GetConfig().Entries; index >= 0 && index < len(entries) {
+		vaultPath = entries[index].Path
+	}
+	return NewError(fmt.Sprintf("secret '%s' in vault %s failed verification: %v; run 'dotsecenv validate'", key, vaultPath, err), ExitValidationError)
 }
 
 // decryptHistory decrypts history values in order. A value that fails to
@@ -68,6 +87,9 @@ func (c *CLI) decryptHistory(history []historyValue, fp string) ([]SecretValueJS
 	var decrypted []SecretValueJSON
 	for _, item := range history {
 		val := item.value
+		if verifyErr := c.verifyBeforeDecrypt(item.vaultIndex, item.secret.Key, item.secret, &val); verifyErr != nil {
+			return nil, verifyErr
+		}
 
 		encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
 		if decodeErr != nil {
@@ -532,7 +554,7 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 		var history []historyValue
 		for i, entry := range c.vaultResolver.GetConfig().Entries {
 			if secretObj := c.vaultResolver.GetSecretByKeyFromVault(i, secretKey); secretObj != nil {
-				history = append(history, secretHistory(secretObj, entry.Path)...)
+				history = append(history, secretHistory(secretObj, i, entry.Path)...)
 			}
 		}
 
@@ -574,6 +596,10 @@ func (c *CLI) SecretGet(secretKey string, all bool, last bool, jsonOutput bool, 
 
 		if entries := c.vaultResolver.GetConfig().Entries; idx < len(entries) {
 			secretVaultPath = entries[idx].Path
+		}
+
+		if verifyErr := c.verifyBeforeDecrypt(idx, secretKey, c.vaultResolver.GetSecretByKeyFromVault(idx, secretKey), secret); verifyErr != nil {
+			return verifyErr
 		}
 
 		encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(secret.Value)
@@ -652,7 +678,7 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 
 	if all {
 		// The vault's whole history, deleted values included, newest first.
-		history := secretHistory(secretObj, vaultPath)
+		history := secretHistory(secretObj, index, vaultPath)
 		slices.Reverse(history)
 		var histErr *Error
 		decryptedValuesWithTime, histErr = c.decryptHistory(history, fp)
@@ -682,6 +708,10 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 		notGranted := val == nil
 		if val == nil {
 			val = &secretObj.Values[len(secretObj.Values)-1]
+		}
+
+		if verifyErr := c.verifyBeforeDecrypt(index, key, secretObj, val); verifyErr != nil {
+			return verifyErr
 		}
 
 		encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(val.Value)
@@ -742,6 +772,8 @@ func (c *CLI) vaultGetFromIndex(key string, index int, all bool, jsonOutput bool
 // vaultGetLastFromAllVaults retrieves the most recent value (by added_at) across all vaults
 func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) *Error {
 	var mostRecentValue *vault.SecretValue
+	var mostRecentSecret *vault.Secret
+	mostRecentIndex := -1
 	var mostRecentTime time.Time
 	var mostRecentVaultPath string
 	secretExists := false
@@ -773,6 +805,8 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 
 			if mostRecentValue == nil || val.AddedAt.After(mostRecentTime) {
 				mostRecentValue = val
+				mostRecentSecret = secretObj
+				mostRecentIndex = i
 				mostRecentTime = val.AddedAt
 				mostRecentVaultPath = entry.Path
 			}
@@ -787,6 +821,10 @@ func (c *CLI) vaultGetLastFromAllVaults(key string, jsonOutput bool, fp string) 
 			return NewError(fmt.Sprintf("secret '%s' has been deleted", key), ExitVaultError)
 		}
 		return NewError(fmt.Sprintf("secret '%s' not found in any vault", key), ExitVaultError)
+	}
+
+	if verifyErr := c.verifyBeforeDecrypt(mostRecentIndex, key, mostRecentSecret, mostRecentValue); verifyErr != nil {
+		return verifyErr
 	}
 
 	encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(mostRecentValue.Value)
