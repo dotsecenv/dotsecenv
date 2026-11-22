@@ -225,17 +225,19 @@ func (vr *VaultResolver) AddIdentity(identity Identity, index int) error {
 		if manager.IsReadOnly() {
 			return fmt.Errorf("is read-only")
 		}
-		manager.AddIdentity(identity)
-		return nil
+		return manager.AddIdentity(identity)
 	}
 
 	// Add to all writable vaults
+	var errs []error
 	for _, manager := range vr.vaults {
 		if manager != nil && !manager.IsReadOnly() {
-			manager.AddIdentity(identity)
+			if err := manager.AddIdentity(identity); err != nil {
+				errs = append(errs, fmt.Errorf("%s: %w", manager.Path(), err))
+			}
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // AddSecret adds a secret to a specific vault index (0-based)
@@ -258,8 +260,7 @@ func (vr *VaultResolver) AddSecret(secret Secret, index int) error {
 		return fmt.Errorf("is read-only")
 	}
 
-	manager.AddSecret(secret)
-	return nil
+	return manager.AddSecret(secret)
 }
 
 // GetIdentityByFingerprint finds an identity by fingerprint in any vault

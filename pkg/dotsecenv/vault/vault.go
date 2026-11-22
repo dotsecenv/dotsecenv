@@ -188,7 +188,7 @@ func (m *Manager) Save() error {
 }
 
 // AddIdentity adds an identity to the vault
-func (m *Manager) AddIdentity(id Identity) {
+func (m *Manager) AddIdentity(id Identity) error {
 	// Check if identity already exists
 	for i, existing := range m.vault.Identities {
 		if existing.Fingerprint == id.Fingerprint {
@@ -196,46 +196,43 @@ func (m *Manager) AddIdentity(id Identity) {
 			m.vault.Identities[i] = id
 			// For the efficient format, we need to handle updates differently
 			// For now, we append and the reader will use the latest
-			return
+			return nil
 		}
 	}
 
 	// Add to writer (persists immediately)
 	if err := m.writer.AddIdentity(id); err != nil {
-		// Log error but continue - the in-memory vault is still valid
-		return
+		return err
 	}
 
-	// Update in-memory cache
 	m.vault.Identities = append(m.vault.Identities, id)
+	return nil
 }
 
 // AddSecret adds a new secret or updates an existing one with a new value.
 // Secret keys are compared case-insensitively using CompareSecretKeys.
-func (m *Manager) AddSecret(secret Secret) {
+func (m *Manager) AddSecret(secret Secret) error {
 	// Check if secret already exists (case-insensitive comparison)
 	for i, s := range m.vault.Secrets {
 		if CompareSecretKeys(s.Key, secret.Key) {
 			// Add new values to existing secret
 			for _, newVal := range secret.Values {
 				if err := m.writer.AddSecretValue(s.Key, newVal); err != nil {
-					// Log error but continue
-					continue
+					return err
 				}
 				m.vault.Secrets[i].Values = append(m.vault.Secrets[i].Values, newVal)
 			}
-			return
+			return nil
 		}
 	}
 
 	// Add new secret with all its values
 	if err := m.writer.AddSecretWithValues(secret); err != nil {
-		// Log error but continue
-		return
+		return err
 	}
 
-	// Update in-memory cache
 	m.vault.Secrets = append(m.vault.Secrets, secret)
+	return nil
 }
 
 // GetIdentityByFingerprint retrieves an identity by fingerprint
