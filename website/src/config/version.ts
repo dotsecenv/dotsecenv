@@ -4,11 +4,15 @@
  * Priority:
  * 1. DOTSECENV_VERSION environment variable (if set)
  * 2. Fetches the latest release version from GitHub at build time
- * 3. Falls back to a hardcoded version if the API is unavailable
+ * 3. Falls back to the agent plugin manifest's version if the API is unavailable
  */
 
+// The release bump command (.releasetools.yaml) sets this version every
+// release, so the fallback never goes stale like a hardcoded constant did.
+import pluginManifest from '../../../.claude-plugin/plugin.json';
+
 const GITHUB_REPO = 'dotsecenv/dotsecenv';
-const FALLBACK_VERSION = '0.2.1';
+const FALLBACK_VERSION: string = pluginManifest.version;
 
 async function getVersion(): Promise<string> {
   // Check for environment variable override first
