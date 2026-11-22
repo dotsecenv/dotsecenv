@@ -187,6 +187,10 @@ func (c *CLI) secretRevokeInVault(secretKey, targetFingerprint string, vaultInde
 		return NewError("cannot revoke: this would remove all access to the secret", ExitGeneralError)
 	}
 
+	if verifyErr := c.verifyBeforeDecrypt(vaultIndex, secretKey, secretObj, &currentValue); verifyErr != nil {
+		return verifyErr
+	}
+
 	// Decrypt the current value
 	encryptedArmored, decodeErr := base64.StdEncoding.DecodeString(currentValue.Value)
 	if decodeErr != nil {
