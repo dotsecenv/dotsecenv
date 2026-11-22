@@ -259,17 +259,13 @@ Output:
 ✓ All signatures verified
 ```
 
-### Auto-fix issues
+### Fix issues
+
+`validate` only reports problems. `doctor --fix` upgrades outdated vault formats and defragments vaults:
 
 ```bash
-dotsecenv validate --fix
+dotsecenv doctor --fix
 ```
-
-This can fix:
-
-- Regenerate corrupted header indexes
-- Remove orphaned entries
-- Update outdated format versions
 
 ### Validate specific vault
 

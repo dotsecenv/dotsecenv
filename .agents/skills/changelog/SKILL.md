@@ -48,6 +48,10 @@ subsection, as part of the PR's own diff:
 
 This per-PR edit is the whole point: the release notes accumulate as work lands.
 
+Make the same edit to `docs/changelog.mdx`, the Docs7 copy of the page. Its
+internal links drop the trailing slash; see "Two copies of the docs" in
+[AGENTS.md](../../AGENTS.md).
+
 ## Assess (release PR, or any spot check)
 
 List merged PRs since the last release tag that are not yet under "Next
@@ -71,6 +75,7 @@ In the PR that cuts `vX.Y.Z`:
 3. Remove any subsection that ended up with no entries.
 4. Add a fresh, empty `## Upcoming` section (with `_Unreleased_`) at the top
    of the version list, ready for the next cycle.
+5. Repeat steps 2 to 4 in `docs/changelog.mdx`.
 
 Then proceed with the tag per [CLAUDE.md](../../CLAUDE.md) "Release new version".
 The optional Twitter/X announcement guidance lives in

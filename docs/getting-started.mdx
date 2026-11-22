@@ -133,6 +133,7 @@ This tells the shell plugin to fetch `DATABASE_PASSWORD` from your vault wheneve
 ```bash
 cd ~/my-project
 # dotsecenv: found .secenv in /home/you/my-project
+#   DATABASE_PASSWORD={dotsecenv}
 # Load secrets? [y]es / [n]o / [a]lways: a
 # dotsecenv: loaded 1 secret(s) from .secenv: DATABASE_PASSWORD
 
@@ -168,6 +169,6 @@ Before moving on, verify:
 - [Reloading Secrets](/tutorials/reload-secrets): what to do when vault updates don't appear in your shell
 - [Migrate from .env](/tutorials/migrate-from-dotenv): move existing secrets from plaintext `.env` files
 - [Share a Secret](/tutorials/share-secret): share encrypted secrets with teammates
-- [Shell Plugins](/guides/shell-plugins): trust system, `dse up`, nested `.secenv` files
+- [Shell Plugins](/guides/shell-plugins): trust system, `dotsecenv secret reload`, nested `.secenv` files
 - [Security Model](/concepts/security-model): understand how encryption works
 - [CLI Reference](/reference): full command documentation

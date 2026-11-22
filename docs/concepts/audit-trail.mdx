@@ -32,7 +32,7 @@ Git commit timestamps are recorded by git, not by dotsecenv, so they corroborate
 
 Concretely:
 
-- **Detected:** an attacker who edits or deletes an existing entry in the vault file. Hash and signature verification fails on read, and `dotsecenv validate` flags it.
+- **Detected:** an attacker who edits or deletes an existing entry in the vault file. `secret get`, `share` and `revoke` verify the hash and signature of the value they decrypt and of its secret, and refuse an edited one. `dotsecenv validate` checks every entry.
 - **Detected:** an attacker without a recipient's private key adding entries. They can't produce a valid signature.
 - **Bounded:** a legitimate key holder writing a fresh entry with a chosen `added_at`. The signature commits the signer to that timestamp but doesn't prove it matches when the entry actually landed in the shared repo. Cross-reference the git commit that introduced the line.
 
