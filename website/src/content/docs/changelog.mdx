@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Bug Fixes
+
+- `doctor -v N` now checks and fixes only vault N. Before, the format check covered every configured vault, so `doctor -v 1 --fix` also upgraded outdated vaults that were not selected
+
 ### Other
 
 - The documentation website loads Docs7 analytics to measure page views. The privacy policy describes the data sent to Context7. (#482)

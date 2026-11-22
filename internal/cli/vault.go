@@ -390,8 +390,21 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 		Message: "crypto: " + cryptoStatus(),
 	})
 
+	// With -v, every check below (and every --fix) is limited to that vault.
+	selected := -1
+	if vaultPath != "" || fromIndex != 0 {
+		idx, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex)
+		if resolveErr != nil {
+			return resolveErr
+		}
+		selected = idx
+	}
+
 	// Check 3: Vault format versions
 	for i, entry := range cfg.Entries {
+		if selected >= 0 && i != selected {
+			continue
+		}
 		manager := c.vaultResolver.GetVaultManager(i)
 		if manager == nil {
 			loadErr := c.vaultResolver.GetLoadError(i)
@@ -456,6 +469,9 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 	// Check 4: Legacy RSA identities. Warn only; there is nothing to auto-fix,
 	// since replacing a key means its owner creates a new identity.
 	for i, entry := range cfg.Entries {
+		if selected >= 0 && i != selected {
+			continue
+		}
 		manager := c.vaultResolver.GetVaultManager(i)
 		if manager == nil {
 			continue
@@ -469,15 +485,9 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 	}
 
 	// Check 5: Vault fragmentation
-	// Determine target vault(s) for fragmentation check
 	var targetIndices []int
-	if vaultPath != "" || fromIndex != 0 {
-		// Specific vault selected
-		targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex)
-		if resolveErr != nil {
-			return resolveErr
-		}
-		targetIndices = []int{targetIndex}
+	if selected >= 0 {
+		targetIndices = []int{selected}
 	} else {
 		// Check all available vaults
 		available := c.vaultResolver.GetAvailableVaultPathsWithIndices()
