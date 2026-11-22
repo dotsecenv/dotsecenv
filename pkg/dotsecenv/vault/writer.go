@@ -20,23 +20,26 @@ type Writer struct {
 	version  int      // current vault format version
 	lines    []string // cached lines for header rewriting
 	readOnly bool     // if true, don't try to create/modify files
+	lock     *os.File // the locked vault file a Manager holds; nil without one
 }
 
 // NewWriter creates a new vault writer
 // If the file doesn't exist, it creates a new vault
 // If it exists, it loads the current header
 func NewWriter(path string) (*Writer, error) {
-	return newWriter(path, false)
+	return newWriter(path, false, nil)
 }
 
 // NewWriterReadOnly creates a vault writer in read-only mode
 // It will not create new vaults or temp files - only read existing data
 func NewWriterReadOnly(path string) (*Writer, error) {
-	return newWriter(path, true)
+	return newWriter(path, true, nil)
 }
 
-func newWriter(path string, readOnly bool) (*Writer, error) {
-	w := &Writer{path: path, readOnly: readOnly}
+// newWriter creates a writer. A non-nil lock is the locked vault file; flush
+// moves the lock to each file it renames into place.
+func newWriter(path string, readOnly bool, lock *os.File) (*Writer, error) {
+	w := &Writer{path: path, readOnly: readOnly, lock: lock}
 
 	// Check if file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -197,41 +200,49 @@ func (w *Writer) flush() error {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 
+	fail := func(err error) error {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+
 	writer := bufio.NewWriter(tmpFile)
 	for i, line := range w.lines {
 		if _, err := writer.WriteString(line); err != nil {
-			_ = tmpFile.Close()
-			_ = os.Remove(tmpPath)
-			return fmt.Errorf("failed to write line %d: %w", i, err)
+			return fail(fmt.Errorf("failed to write line %d: %w", i, err))
 		}
 		if _, err := writer.WriteString("\n"); err != nil {
-			_ = tmpFile.Close()
-			_ = os.Remove(tmpPath)
-			return fmt.Errorf("failed to write newline at line %d: %w", i, err)
+			return fail(fmt.Errorf("failed to write newline at line %d: %w", i, err))
 		}
 	}
 
 	if err := writer.Flush(); err != nil {
-		_ = tmpFile.Close()
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("failed to flush writer: %w", err)
+		return fail(fmt.Errorf("failed to flush writer: %w", err))
 	}
 
 	if err := tmpFile.Sync(); err != nil {
-		_ = tmpFile.Close()
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("failed to sync temp file: %w", err)
+		return fail(fmt.Errorf("failed to sync temp file: %w", err))
 	}
 
-	if err := tmpFile.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("failed to close temp file: %w", err)
+	if w.lock != nil {
+		// Lock the new file before it replaces the old one, so the lock always
+		// covers the file the path names.
+		if err := lockFile(tmpFile, true); err != nil {
+			return fail(fmt.Errorf("failed to lock temp file: %w", err))
+		}
+	} else if err := tmpFile.Close(); err != nil {
+		return fail(fmt.Errorf("failed to close temp file: %w", err))
 	}
 
 	// Atomic rename
 	if err := os.Rename(tmpPath, w.path); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("failed to rename temp file: %w", err)
+		return fail(fmt.Errorf("failed to rename temp file: %w", err))
+	}
+
+	if w.lock != nil {
+		_ = unlockFile(w.lock)
+		_ = w.lock.Close()
+		w.lock = tmpFile
 	}
 
 	// Restore original ownership if we captured it and are running as root.
