@@ -1257,7 +1257,7 @@ Granular settings that control how dotsecenv handles edge cases. See [Behavior S
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `require_explicit_vault_upgrade` | `false` | Prevent automatic vault format upgrades; upgrade with `vault doctor` |
+| `require_explicit_vault_upgrade` | `false` | Stop commands that write to a vault from also upgrading its format; upgrade with `doctor --fix`. Commands that only read never upgrade |
 | `restrict_to_configured_vaults` | `false` | Ignore CLI `-v` flags; only use vaults from config file |
 
 ### GPG Program Configuration

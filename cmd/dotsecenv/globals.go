@@ -70,12 +70,22 @@ func effectiveConfigPath(configPath string) string {
 
 // createCLI creates a CLI instance with resolved vault paths
 func createCLI() (*clilib.CLI, error) {
+	return createCLIWith(clilib.NewCLI)
+}
+
+// createReadCLI is createCLI for commands that only read vaults: loading
+// never upgrades a vault's format.
+func createReadCLI() (*clilib.CLI, error) {
+	return createCLIWith(clilib.NewCLIForReading)
+}
+
+func createCLIWith(newCLI func([]string, string, bool, bool, io.Reader, io.Writer, io.Writer) (*clilib.CLI, error)) (*clilib.CLI, error) {
 	resolvedPaths, err := resolveVaultPaths(globalOpts.ConfigPath, globalOpts.VaultPaths)
 	if err != nil {
 		return nil, err
 	}
 
-	return clilib.NewCLI(resolvedPaths, globalOpts.ConfigPath, globalOpts.Silent, globalOpts.NoPinentry, os.Stdin, os.Stdout, os.Stderr)
+	return newCLI(resolvedPaths, globalOpts.ConfigPath, globalOpts.Silent, globalOpts.NoPinentry, os.Stdin, os.Stdout, os.Stderr)
 }
 
 // parseVaultSpec parses a vault specification (-v value) and returns the vault path and index

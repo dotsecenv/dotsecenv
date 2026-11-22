@@ -21,7 +21,7 @@ Validation only reports problems. To repair a vault, run 'dotsecenv doctor --fix
 			exitWithError(clilib.NewError("validate only reports problems; to repair a vault, run 'dotsecenv doctor --fix'", clilib.ExitGeneralError))
 		}
 
-		cli, err := createCLI()
+		cli, err := createReadCLI()
 		if err != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, err)))
 		}

@@ -69,6 +69,14 @@ func NewCLI(vaultPaths []string, configPath string, silent, noPinentry bool, std
 	return newCLI(vaultPaths, configPath, silent, noPinentry, stdin, stdout, stderr, nil)
 }
 
+// NewCLIForReading is NewCLI for commands that only read vaults: loading
+// never upgrades a vault's format, whatever require_explicit_vault_upgrade
+// says. An outdated vault still loads, with a hint naming the upgrade command.
+func NewCLIForReading(vaultPaths []string, configPath string, silent, noPinentry bool, stdin io.Reader, stdout, stderr io.Writer) (*CLI, error) {
+	noUpgrade := true
+	return newCLI(vaultPaths, configPath, silent, noPinentry, stdin, stdout, stderr, &noUpgrade)
+}
+
 // NewCLIConfigOnly creates a CLI instance that only loads config and GPG,
 // without opening any vaults. This is used by commands like `login` that
 // operate purely on config and do not need vault access.

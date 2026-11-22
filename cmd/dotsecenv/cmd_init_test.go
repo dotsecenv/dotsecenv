@@ -89,7 +89,7 @@ func TestInitConfig_BehaviorCommentsExist(t *testing.T) {
 	// Verify comments are present
 	expectedComments := []string{
 		"# Behavior settings control how dotsecenv handles edge cases",
-		"# Prevent automatic vault format upgrades",
+		"# Stop writes from upgrading the vault format",
 		"# Ignore CLI -v flags",
 		"# 'PATH' resolves gpg from the system PATH at runtime.",
 	}
