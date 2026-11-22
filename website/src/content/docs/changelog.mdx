@@ -14,6 +14,7 @@ _Unreleased_
 ### Bug Fixes
 
 - `validate --fix` now fails and points to `doctor --fix`. The flag was accepted but did nothing, and the docs listed repairs it never made. `validate` only reports problems (#483)
+- Pointing dotsecenv at a file of fewer than 3 lines that is not a vault no longer overwrites it. `vault describe -v notes.txt`, or a configured vault path holding such a file, replaced its contents with an empty vault. It now fails with "not a dotsecenv vault" and leaves the file alone. An empty or whitespace-only file still starts a new vault (#494)
 
 ### Other
 
