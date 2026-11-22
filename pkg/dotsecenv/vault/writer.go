@@ -193,17 +193,22 @@ func (w *Writer) flush() error {
 		originalUID, originalGID = getFileOwner(info)
 	}
 
-	// Write to temp file first for atomicity
-	tmpPath := w.path + ".tmp"
-	tmpFile, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, originalMode)
+	// Write to a new temp file first for atomicity. CreateTemp opens with
+	// O_EXCL under a random name, so it never follows a planted symlink.
+	tmpFile, err := os.CreateTemp(filepath.Dir(w.path), "."+filepath.Base(w.path)+".tmp-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
+	tmpPath := tmpFile.Name()
 
 	fail := func(err error) error {
 		_ = tmpFile.Close()
 		_ = os.Remove(tmpPath)
 		return err
+	}
+
+	if err := tmpFile.Chmod(originalMode); err != nil {
+		return fail(fmt.Errorf("failed to set temp file mode: %w", err))
 	}
 
 	writer := bufio.NewWriter(tmpFile)
