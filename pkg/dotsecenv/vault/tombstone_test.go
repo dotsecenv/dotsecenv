@@ -21,10 +21,16 @@ func appendHistory(t *testing.T, path, key string, values ...SecretValue) {
 	defer func() { _ = m.Unlock() }()
 
 	base := values[0].AddedAt
-	m.AddIdentity(identity.Identity{AddedAt: base, Fingerprint: "FP1"})
-	m.AddIdentity(identity.Identity{AddedAt: base, Fingerprint: "FP2"})
+	if err := m.AddIdentity(identity.Identity{AddedAt: base, Fingerprint: "FP1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.AddIdentity(identity.Identity{AddedAt: base, Fingerprint: "FP2"}); err != nil {
+		t.Fatal(err)
+	}
 	for _, v := range values {
-		m.AddSecret(Secret{AddedAt: base, Key: key, SignedBy: "FP1", Values: []SecretValue{v}})
+		if err := m.AddSecret(Secret{AddedAt: base, Key: key, SignedBy: "FP1", Values: []SecretValue{v}}); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

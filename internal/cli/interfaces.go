@@ -16,6 +16,7 @@ type VaultResolver interface {
 	GetSecretByKeyFromVault(index int, key string) *vault.Secret
 	FindSecretVaultIndex(key string) int
 	GetVaultManager(index int) *vault.Manager
+	VerifySecretValue(index int, secret *vault.Secret, value *vault.SecretValue) error
 	AddIdentity(identity vault.Identity, index int) error
 	GetConfig() vault.VaultConfig
 	GetVaultPaths() []string
