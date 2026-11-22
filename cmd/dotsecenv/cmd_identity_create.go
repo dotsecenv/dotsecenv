@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"io"
 	"os"
 
 	clilib "github.com/dotsecenv/dotsecenv/internal/cli"
@@ -60,10 +62,11 @@ which Go deprecated in 1.26.`,
 			NoPinentry:   globalOpts.NoPinentry,
 		}
 
-		// Try to create CLI (may fail if no config exists)
-		cli, err := createCLI()
-		if err != nil {
-			// If config doesn't exist, use standalone mode with default config
+		// Only a missing config falls back to the defaults (plus system policy).
+		// Any other startup error is the user's to fix, not a reason to drop
+		// their approved_algorithms.
+		configPath := clilib.ResolveConfigPath(globalOpts.ConfigPath, true, io.Discard)
+		if _, statErr := os.Stat(configPath); errors.Is(statErr, os.ErrNotExist) {
 			out := output.NewHandler(os.Stdout, os.Stderr,
 				output.WithSilent(globalOpts.Silent),
 				output.WithStdin(os.Stdin),
@@ -71,6 +74,12 @@ which Go deprecated in 1.26.`,
 			exitErr := clilib.IdentityCreateStandalone(opts, out)
 			exitWithError(exitErr)
 			return
+		}
+
+		// Key generation needs config, policy and GPG, never the vaults.
+		cli, err := clilib.NewCLIConfigOnly(globalOpts.ConfigPath, globalOpts.Silent, globalOpts.NoPinentry, os.Stdin, os.Stdout, os.Stderr)
+		if err != nil {
+			os.Exit(int(clilib.PrintError(os.Stderr, err)))
 		}
 		defer func() { _ = cli.Close() }()
 
