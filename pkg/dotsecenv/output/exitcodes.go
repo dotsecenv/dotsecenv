@@ -15,6 +15,8 @@ const (
 	ExitFingerprintRequired ExitCode = 7
 	ExitAccessDenied        ExitCode = 8
 	ExitAlgorithmNotAllowed ExitCode = 9
+	// ExitChangesRequired: a check found changes it can make, but they were not applied.
+	ExitChangesRequired ExitCode = 10
 )
 
 // codeToExitCode maps structured codes to numeric exit codes.
@@ -68,6 +70,8 @@ var codeToExitCode = map[Code]ExitCode{
 	// Algorithm errors (exit code 9)
 	CodeAlgorithmNotAllowed: ExitAlgorithmNotAllowed,
 	CodeAlgorithmWeak:       ExitAlgorithmNotAllowed,
+
+	CodeChangesRequired: ExitChangesRequired,
 }
 
 // exitCodeToCode provides reverse mapping for compatibility helpers.
@@ -81,6 +85,7 @@ var exitCodeToCode = map[ExitCode]Code{
 	ExitFingerprintRequired: CodeFingerprintRequired,
 	ExitAccessDenied:        CodeAccessDenied,
 	ExitAlgorithmNotAllowed: CodeAlgorithmNotAllowed,
+	ExitChangesRequired:     CodeChangesRequired,
 }
 
 // GetExitCode returns the numeric exit code for a structured code.

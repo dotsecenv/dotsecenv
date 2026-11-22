@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Bug Fixes
+
+- **Breaking**: `doctor` and `vault doctor` now exit non-zero when they find problems. They used to exit 0 even when gpg-agent was missing, a vault failed to load, or a `--fix` failed. A failed check or fix exits with its error code (`3` for vaults, `4` for gpg-agent). Changes doctor found but did not apply, such as an outdated format, exit with the new code `10` and print the `doctor --fix` command to run. CI jobs that run `doctor` as a health check now fail in these cases
+
 ### Other
 
 - The documentation website loads Docs7 analytics to measure page views. The privacy policy describes the data sent to Context7. (#482)
