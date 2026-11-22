@@ -938,20 +938,13 @@ Checks for:
 - Identity entries
 - Secret entries and signatures
 
-**Options:**
-
-| Flag | Description |
-|------|-------------|
-| `--fix` | Attempt to fix any issues found |
+`validate` only reports problems. To repair a vault, use [`doctor --fix`](#doctor).
 
 **Examples:**
 
 ```bash
 # Validate configuration and vault
 dotsecenv validate
-
-# Validate and fix issues
-dotsecenv validate --fix
 
 # Validate specific vault
 dotsecenv validate -v ./project/vault
