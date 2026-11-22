@@ -1,9 +1,7 @@
 package main_test
 
 import (
-	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -51,16 +49,4 @@ func TestIdentityCreate_MissingConfigUsesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("identity create without a config: %v\nstderr: %s", err, stderr)
 	}
-}
-
-func exitCode(t *testing.T, err error) int {
-	t.Helper()
-	if err == nil {
-		return 0
-	}
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) {
-		t.Fatalf("command did not run: %v", err)
-	}
-	return exitErr.ExitCode()
 }
