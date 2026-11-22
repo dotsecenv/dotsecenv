@@ -1,0 +1,152 @@
+---
+title: Migrate from .env
+description: Move sensitive values from plaintext .env files into your encrypted vault
+---
+## Goal
+
+Take an existing `.env` file, move the sensitive values into your dotsecenv vault, and set up `.secenv` so everything still loads automatically.
+
+## Prerequisites
+
+- [Getting Started](/getting-started) completed
+
+## Mental model
+
+| `.env` file                        | dotsecenv                                                              |
+|------------------------------------|------------------------------------------------------------------------|
+| One file per project, plain text   | One vault file per project, encrypted                                  |
+| Edit a line to change a value      | `secret store NAME` writes a new entry; old values stay as history    |
+| Cannot commit safely               | Vault file commits safely to git                                       |
+| No history of who could read what  | Append-only; recipients tracked per entry                              |
+| Loaded by `source .env` at runtime | Loaded by the [shell plugin](/guides/shell-plugins) on `cd`           |
+
+The unit of encryption and audit is the individual secret, not the file. There is no bulk-import command for that reason; the loop below loops the single-secret store call over your `.env` lines.
+
+## Steps
+
+<Steps>
+  <Step title="Start with your `.env` file">
+A typical project `.env` looks like this:
+
+```bash
+# .env
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=myapp
+DATABASE_PASSWORD=super-secret-password
+API_KEY=sk-live-abc123xyz
+```
+
+Three of these are non-sensitive configuration. Two are secrets you would not want in a public repo.
+  </Step>
+  <Step title="Identify the secrets">
+Ask yourself: *would I panic if this value appeared on a public GitHub repo?* If yes, it belongs in the vault.
+
+In this example: `DATABASE_PASSWORD` and `API_KEY`.
+  </Step>
+  <Step title="Store the secrets in your vault">
+```bash
+echo "super-secret-password" | dotsecenv secret store DATABASE_PASSWORD
+echo "sk-live-abc123xyz" | dotsecenv secret store API_KEY
+```
+  </Step>
+  <Step title="Create a `.secenv` file">
+Now that the secrets are in your vault, generate `.secenv` from them:
+
+```bash
+dotsecenv init secenv --all
+```
+
+This writes one reference per vault secret:
+
+```bash
+# .secenv
+DATABASE_PASSWORD={dotsecenv/}
+API_KEY={dotsecenv/}
+```
+
+Run `dotsecenv init secenv` without `--all` to pick interactively. The `{dotsecenv/}` syntax tells the shell plugin to fetch the secret with the same name as the variable. To write the file by hand instead:
+
+```bash
+cat > .secenv << 'EOF'
+DATABASE_PASSWORD={dotsecenv}
+API_KEY={dotsecenv}
+EOF
+```
+  </Step>
+  <Step title="Remove the secrets from `.env`">
+Your `.env` now contains only non-sensitive values:
+
+```bash
+# .env
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=myapp
+```
+  </Step>
+  <Step title="Verify everything loads">
+```bash
+cd ~
+cd ~/my-project
+# dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_PASSWORD, API_KEY
+
+echo $DATABASE_HOST
+# Output: localhost
+
+echo $DATABASE_PASSWORD
+# Output: super-secret-password
+
+echo $API_KEY
+# Output: sk-live-abc123xyz
+```
+
+All five variables are available. Only three are on disk in plaintext.
+  </Step>
+  <Step title="Update version control">
+```bash
+echo ".env" >> .gitignore
+git add .secenv .gitignore
+git commit -m "chore: move secrets to dotsecenv vault"
+```
+
+<Tip>
+`.secenv` is safe to commit -- it contains only variable names and `{dotsecenv}` references, never actual secret values.
+</Tip>
+  </Step>
+</Steps>
+
+## Expected result
+
+| Variable | Source | On disk in plaintext? |
+|----------|--------|-----------------------|
+| `DATABASE_HOST` | `.env` | Yes |
+| `DATABASE_PORT` | `.env` | Yes |
+| `DATABASE_NAME` | `.env` | Yes |
+| `DATABASE_PASSWORD` | vault via `.secenv` | No |
+| `API_KEY` | vault via `.secenv` | No |
+
+## Variations
+
+### Bulk migration from a large `.env`
+
+For a `.env` with many keys, a shell loop is faster than copy-pasting:
+
+```bash
+while IFS='=' read -r name value; do
+  case "$name" in ''|\#*) continue ;; esac
+  printf '%s' "$value" | dotsecenv secret store "$name"
+done < .env
+```
+
+Inspect any quoted or multi-line values manually before relying on this; `IFS='='` splits on the first `=` only and does not handle escapes.
+
+## What changes about your workflow
+
+- **Editing values.** Instead of editing a line in `.env`, run `echo NEW | dotsecenv secret store NAME`. The old value is preserved in the vault history. See [Vault Format: append-only semantics](/concepts/vault-format#append-only-semantics).
+- **Sharing values.** Instead of sending the secret over a chat, add a teammate as a recipient: `dotsecenv secret share NAME <THEIR_FINGERPRINT> --all`.
+- **Rotating values.** See [Offboard a Departing Team Member](/runbooks/team-member-offboarding) for planned exits, or [Rotate a Compromised GPG Key](/runbooks/rotate-compromised-key) for compromise scenarios.
+
+## Next steps
+
+- [Reloading Secrets](/tutorials/reload-secrets) -- what to do when you rotate a secret
+- [Share a Secret](/tutorials/share-secret) -- share the encrypted secrets with teammates
