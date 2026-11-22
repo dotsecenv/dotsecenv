@@ -14,6 +14,7 @@ _Unreleased_
 ### Bug Fixes
 
 - The git and Terraform credential helpers no longer hide dotsecenv errors. Their `get` treated every failure as "no credential", so a missing config, a missing login or a stopped gpg-agent looked the same as a secret that was never stored. A missing secret still answers silently; any other failure gives the same answer to git or Terraform and prints dotsecenv's error on stderr (#492)
+- Pointing dotsecenv at a file of fewer than 3 lines that is not a vault no longer overwrites it. `vault describe -v notes.txt`, or a configured vault path holding such a file, replaced its contents with an empty vault. It now fails with "not a dotsecenv vault" and leaves the file alone. An empty or whitespace-only file still starts a new vault (#494)
 
 ### Other
 
