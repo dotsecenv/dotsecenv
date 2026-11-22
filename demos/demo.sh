@@ -88,7 +88,7 @@ pe "cd \"\$PWD\""
 # the recording reflects real-world behavior.
 # Pre-trust the dir for the session so the plugin's first-time trust prompt
 # (read -r) doesn't hang the recorded shell, which has a TTY but no typist.
-_dotsecenv_trust_session "$PWD" 2>/dev/null || true
+_dotsecenv_trust_session "$PWD" "$(_dotsecenv_file_hash "$PWD/.secenv")" 2>/dev/null || true
 _dotsecenv_chpwd_hook 2>/dev/null || true
 p "# DATABASE_PASSWORD is now available as an env var:"
 pe "echo \$DATABASE_PASSWORD"

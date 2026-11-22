@@ -111,7 +111,7 @@ type dse   # should report a function, not "not found"
 
 ## First load and the trust prompt
 
-The plugin never loads a file you have not approved. The first time you `cd` into a directory with a `.secenv`, it asks.
+The plugin never loads a file you have not approved. The first time you `cd` into a directory with a `.secenv`, it prints the file and asks.
 
 Add a second plain variable so the prompt has more to report:
 
@@ -125,6 +125,8 @@ Now `cd` into the project:
 ```text
 ~ $ cd myapp/
 dotsecenv: found .secenv in /home/user/myapp
+  APP_ENV=production
+  NODE_ENV=production
 Load secrets? [y]es / [n]o / [a]lways: y
 dotsecenv: loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV
 ```
@@ -135,12 +137,14 @@ Your answer decides what happens:
 | ------------------ | ---------------------------------- |
 | `y` / `yes`        | Load for this session only         |
 | `n` / `no`         | Skip loading for this session      |
-| `a` / `always`     | Remember this directory and stop asking |
+| `a` / `always`     | Remember this file and stop asking |
 
-Answering `a` records the directory in `~/.config/dotsecenv/trusted_dirs`. To stop trusting it, delete that line:
+Trust covers the file's contents, not just its path. The plugin stores a SHA-256 of the `.secenv` with the directory, so when the file changes (a `git pull` adds a key, say) it prints the new contents and asks again. Directories trusted by an older plugin release prompt once more for the same reason. If neither `sha256sum` nor `shasum` is installed, the plugin asks on every visit.
+
+Answering `a` writes a `<sha256> <directory>` line to `~/.config/dotsecenv/trusted_dirs`, replacing any earlier line for that directory. Only the contents you trusted last load silently, so going back to an older version of the file prompts again. To stop trusting the directory, delete its line:
 
 ```bash
-vim ~/.config/dotsecenv/trusted_dirs   # remove the directory's path
+vim ~/.config/dotsecenv/trusted_dirs   # remove the line ending in the directory's path
 ```
 
 Before any load, the plugin checks the file. It must be owned by you or root, and it must not be world-writable. A file that fails is refused:
@@ -396,10 +400,11 @@ Secrets did not load when you entered the directory:
 3. Run `dse reload` to load it by hand.
 </Steps>
 
-The prompt never appears and you see `No TTY for trust prompt`. The trust prompt needs an interactive terminal, so scripts and non-interactive shells cannot answer it. Pre-trust the directory instead:
+The prompt never appears and you see `no TTY for trust prompt`. The trust prompt needs an interactive terminal, so scripts and non-interactive shells cannot answer it. Pre-trust the directory's current `.secenv` instead (use `shasum -a 256` where `sha256sum` is missing):
 
 ```bash
-echo "/home/user/myapp" >> ~/.config/dotsecenv/trusted_dirs
+cd /home/user/myapp
+printf '%s %s\n' "$(sha256sum < .secenv | cut -d' ' -f1)" "$PWD" >> ~/.config/dotsecenv/trusted_dirs
 ```
 
 A reference failed to resolve:
