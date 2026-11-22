@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -475,7 +474,7 @@ func InspectVault(path string) (*VaultInfo, error) {
 		}, nil
 	}
 
-	scanner := bufio.NewScanner(file)
+	scanner := newLineScanner(file)
 	lineNum := 0
 	var markerLine, headerLine string
 

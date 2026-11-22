@@ -9,6 +9,17 @@ import (
 	"strings"
 )
 
+// MaxLineSize is the longest vault line, newline included, that a vault
+// scanner reads. Writers refuse to write a longer one.
+const MaxLineSize = 1024 * 1024
+
+// newLineScanner returns a line scanner that accepts lines up to MaxLineSize.
+func newLineScanner(r io.Reader) *bufio.Scanner {
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 0, 64*1024), MaxLineSize)
+	return sc
+}
+
 // Reader provides efficient access to vault data using the header index
 type Reader struct {
 	path        string
@@ -55,7 +66,7 @@ func (r *Reader) loadHeader() error {
 
 	// Build line offset index and parse header
 	r.lineOffsets = make([]int64, 0, 100)
-	scanner := bufio.NewScanner(file)
+	scanner := newLineScanner(file)
 	var offset int64
 	lineNum := 0
 	var markerLine string
@@ -199,7 +210,7 @@ func (r *Reader) readLine(lineNum int) (string, error) {
 		return "", fmt.Errorf("failed to seek to line %d: %w", lineNum, err)
 	}
 
-	scanner := bufio.NewScanner(file)
+	scanner := newLineScanner(file)
 	if !scanner.Scan() {
 		if err := scanner.Err(); err != nil {
 			return "", fmt.Errorf("failed to read line %d: %w", lineNum, err)
@@ -320,7 +331,7 @@ func (r *Reader) StreamEntries(handler func(entry *Entry) error) error {
 	}
 	defer func() { _ = file.Close() }()
 
-	scanner := bufio.NewScanner(file)
+	scanner := newLineScanner(file)
 	lineNum := 0
 
 	for scanner.Scan() {

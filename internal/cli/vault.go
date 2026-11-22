@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
@@ -363,6 +364,13 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 
 	var checks []DoctorCheckJSON
 	overallStatus := "healthy"
+	var errCode ExitCode // first failure's category; decides the exit code
+	failed := func(code ExitCode) {
+		overallStatus = "error"
+		if errCode == ExitSuccess {
+			errCode = code
+		}
+	}
 	var upgradeCandidates []upgradeCandidate
 	var defragCandidates []defragCandidate
 
@@ -374,7 +382,7 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 		gpgStatus = "error"
 		gpgMessage = "gpg-agent is not available"
 		gpgDetails = "See: https://dotsecenv.com/guides/gpg-agent/"
-		overallStatus = "error"
+		failed(ExitGPGError)
 	}
 	checks = append(checks, DoctorCheckJSON{
 		Name:    "gpg_agent",
@@ -415,9 +423,7 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 					Message: fmt.Sprintf("%s: failed to load", entry.Path),
 					Details: loadErr.Error(),
 				})
-				if overallStatus != "error" {
-					overallStatus = "error"
-				}
+				failed(ExitVaultError)
 			}
 			continue
 		}
@@ -430,9 +436,7 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 				Message: fmt.Sprintf("%s: failed to detect version", entry.Path),
 				Details: err.Error(),
 			})
-			if overallStatus != "error" {
-				overallStatus = "error"
-			}
+			failed(ExitVaultError)
 			continue
 		}
 
@@ -511,9 +515,7 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 				Message: fmt.Sprintf("%s: failed to get stats", entry.Path),
 				Details: err.Error(),
 			})
-			if overallStatus != "error" {
-				overallStatus = "error"
-			}
+			failed(ExitVaultError)
 			continue
 		}
 
@@ -551,6 +553,7 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 					Status:  "error",
 					Message: fmt.Sprintf("failed to upgrade %s: %s", expandedPath, upgradeErr.Message),
 				})
+				failed(ExitVaultError)
 			} else {
 				fixes = append(fixes, DoctorFixJSON{
 					Name:    fmt.Sprintf("upgrade_vault_%d", candidate.index+1),
@@ -570,6 +573,7 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 					Status:  "error",
 					Message: fmt.Sprintf("failed to defragment %s: %v", expandedPath, defragErr),
 				})
+				failed(ExitVaultError)
 			} else {
 				fixes = append(fixes, DoctorFixJSON{
 					Name:    fmt.Sprintf("defrag_vault_%d", candidate.index+1),
@@ -578,6 +582,12 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 				})
 			}
 		}
+	}
+
+	// Changes found but not applied; --fix attempts every one.
+	pending := len(upgradeCandidates) + len(defragCandidates)
+	if fix {
+		pending = 0
 	}
 
 	// Output results
@@ -592,7 +602,7 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 		if err := encoder.Encode(result); err != nil {
 			return NewError(fmt.Sprintf("failed to encode json: %v", err), ExitGeneralError)
 		}
-		return nil
+		return doctorExit(errCode, pending)
 	}
 
 	// Text output
@@ -628,7 +638,8 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 
 	// Skip interactive prompts if --fix was used or in CI
 	if fix || isCI() {
-		return nil
+		c.printDoctorFixCommand(errCode, pending, vaultPath, fromIndex)
+		return doctorExit(errCode, pending)
 	}
 
 	// Offer to upgrade vaults that need it
@@ -642,6 +653,7 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 		if !confirmed {
 			continue
 		}
+		pending--
 
 		// Perform the upgrade
 		if upgradeErr := c.performVaultUpgrade(candidate.index, candidate.path, candidate.currentVersion); upgradeErr != nil {
@@ -660,6 +672,7 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 		if !confirmed {
 			continue
 		}
+		pending--
 
 		// Perform defragmentation
 		manager := c.vaultResolver.GetVaultManager(candidate.index)
@@ -672,7 +685,40 @@ func (c *CLI) VaultDoctor(jsonOutput bool, fix bool, vaultPath string, fromIndex
 			expandedPath, candidate.stats.FragmentationRatio*100, newStats.FragmentationRatio*100)
 	}
 
+	c.printDoctorFixCommand(errCode, pending, vaultPath, fromIndex)
+	return doctorExit(errCode, pending)
+}
+
+// doctorExit maps doctor's outcome to an exit code. A failed check or fix
+// wins over changes that were found but not applied. The report is already
+// printed, so the error carries no message.
+func doctorExit(errCode ExitCode, pending int) *Error {
+	if errCode != ExitSuccess {
+		return NewError("", errCode)
+	}
+	if pending > 0 {
+		return NewError("", ExitChangesRequired)
+	}
 	return nil
+}
+
+// printDoctorFixCommand prints the command that applies pending changes, with
+// the same config and vault selection, quoted for a POSIX shell.
+func (c *CLI) printDoctorFixCommand(errCode ExitCode, pending int, vaultPath string, fromIndex int) {
+	if errCode != ExitSuccess || pending == 0 {
+		return
+	}
+	cmd := "dotsecenv doctor --fix -c " + shellQuote(c.configPath)
+	if vaultPath != "" {
+		cmd += " -v " + shellQuote(vaultPath)
+	} else if fromIndex != 0 {
+		cmd += fmt.Sprintf(" -v %d", fromIndex)
+	}
+	_, _ = fmt.Fprintf(c.output.Stdout(), "\nChanges required.\nRun: %s\n", cmd)
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // performVaultUpgrade upgrades a single vault to the latest format version
@@ -684,20 +730,12 @@ func (c *CLI) performVaultUpgrade(index int, vaultPath string, currentVersion in
 		return writeErr
 	}
 
-	// Perform the upgrade
-	writer, err := vault.NewWriter(expandedPath)
-	if err != nil {
-		return NewError(fmt.Sprintf("failed to open vault for upgrade: %v", err), ExitVaultError)
+	// Rewrite through the Manager that holds the vault lock
+	manager := c.vaultResolver.GetVaultManager(index)
+	if manager == nil {
+		return NewError(fmt.Sprintf("failed to open vault for upgrade: %s is not loaded", expandedPath), ExitVaultError)
 	}
-
-	// Read entire vault
-	vaultData, err := writer.ReadVault()
-	if err != nil {
-		return NewError(fmt.Sprintf("failed to read vault for upgrade: %v", err), ExitVaultError)
-	}
-
-	// Rewrite vault using latest version format
-	if err := writer.RewriteFromVaultWithVersion(vaultData, vault.LatestFormatVersion); err != nil {
+	if err := manager.Rewrite(manager.Get(), vault.LatestFormatVersion); err != nil {
 		return NewError(fmt.Sprintf("failed to upgrade vault: %v", err), ExitVaultError)
 	}
 

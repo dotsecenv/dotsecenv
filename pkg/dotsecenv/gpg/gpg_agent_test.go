@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -14,9 +13,6 @@ const testFPR = "0123456789ABCDEF0123456789ABCDEF01234567"
 func useAgentGPG(t *testing.T, script string) {
 	t.Helper()
 	t.Setenv("TEST_FPR", testFPR)
-	if runtime.GOOS == "windows" {
-		t.Skip("fixture requires a POSIX shell")
-	}
 	previous := GetGPGProgram()
 	t.Cleanup(func() { setGPGProgramInternal(previous) })
 	program := filepath.Join(t.TempDir(), "gpg")

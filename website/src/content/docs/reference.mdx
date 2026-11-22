@@ -779,6 +779,17 @@ After displaying health check results, the command offers to fix any issues foun
 In CI environments (`CI=true`, `GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL`, `CIRCLECI`, etc.), interactive prompts are automatically skipped to avoid blocking pipelines. Use `--json` for machine-readable output in CI.
 :::
 
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Nothing needs attention, or every requested fix succeeded. A legacy RSA identity is a warning with nothing to fix, so it also exits `0` |
+| `10` | Doctor found changes it can make (an outdated format, high fragmentation) but did not apply them. It prints the `doctor --fix` command to run, with the same `-c` and `-v` |
+| `3` | A vault check or fix failed, for example a vault that fails to load |
+| `4` | gpg-agent is not available |
+
+A failed check or fix takes precedence over `10`.
+
 **Options:**
 
 | Flag | Description |
@@ -831,7 +842,7 @@ For each secret, compaction keeps the newest value every current identity can de
 
 Compaction never decrypts. It reads only access lists (`available_to` fingerprints) and value order, then rewrites the file preserving every kept value verbatim, so signatures stay valid. Identities are never touched.
 
-Without `--yes`, the command prints the plan and asks for confirmation before writing. Confirmation is skipped automatically in CI.
+Compaction writes only with `--yes`, in a terminal and in CI alike. Without it, the command prints the plan and the `--yes` command to run, leaves the vault unchanged, and exits `10` when there is something to drop. A vault that is already compact exits `0`.
 
 Compaction records the running dotsecenv release in the vault header as [`dotsecenv_version`](/concepts/vault-format/#header-format). If a newer release created the vault or last rewrote it, the command warns you to upgrade dotsecenv, then continues.
 
@@ -843,16 +854,16 @@ Compaction rewrites the vault file. Back it up first (`cp <vault> <vault>.bak`).
 
 | Flag | Description |
 |------|-------------|
-| `--yes` | Skip the confirmation prompt |
+| `--yes` | Rewrite the vault. Without it, only the plan is shown |
 | `--json` | Output as JSON (writes only when combined with `--yes`) |
 
 **Examples:**
 
 ```bash
-# Show the plan, then confirm before writing
+# Show the plan without writing (exits 10 if there is something to drop)
 dotsecenv vault compact
 
-# Compact without prompting (also auto-skips the prompt in CI)
+# Compact
 dotsecenv vault compact --yes
 
 # Preview the plan as JSON without writing
@@ -1205,6 +1216,7 @@ dotsecenv version [flags]
 | `7` | Fingerprint required |
 | `8` | Access denied |
 | `9` | Algorithm not allowed |
+| `10` | Changes required: `doctor` found changes it can make but did not apply them |
 
 ---
 
