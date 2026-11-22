@@ -111,6 +111,14 @@ export default defineConfig({
 
       head: [
         {
+          tag: 'script',
+          attrs: {
+            defer: true,
+            src: 'https://context7.com/docs7-analytics.js',
+            'data-site': 'b5046317-9710-4be9-88dd-bdc7d4ec404c',
+          },
+        },
+        {
           tag: 'meta',
           attrs: {
             name: 'theme-color',
