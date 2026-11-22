@@ -42,7 +42,7 @@ gpg:
 		t.Fatal(err)
 	}
 
-	env := []string{"GNUPGHOME=" + filepath.Join(tmpDir, "gnupg")}
+	env := doctorEnv(t) // doctor exits 4 without a live gpg-agent
 	if _, stderr, err := runCmdWithEnv(env, "-c", configPath, "doctor", "-v", "1", "--fix"); err != nil {
 		t.Fatalf("doctor -v 1 --fix: %v\nstderr: %s", err, stderr)
 	}
