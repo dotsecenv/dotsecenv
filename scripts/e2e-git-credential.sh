@@ -52,22 +52,23 @@ fi
 # Test 2: get on a never-stored host prints nothing and exits 0
 ((TESTS_RUN++)) || true
 rc=0
-get_out=$(printf 'protocol=https\nhost=never.stored.example\n\n' | "$HELPER" get 2>/dev/null) || rc=$?
-if [ -z "$get_out" ] && [ "$rc" -eq 0 ]; then
-    pass "get on never-stored host is empty, exit 0"
+get_err=$(mktemp)
+get_out=$(printf 'protocol=https\nhost=never.stored.example\n\n' | "$HELPER" get 2>"$get_err") || rc=$?
+if [ -z "$get_out" ] && [ "$rc" -eq 0 ] && [ ! -s "$get_err" ]; then
+    pass "get on never-stored host is empty and silent, exit 0"
 else
-    fail "get on never-stored host should be empty/exit0, got: '$get_out' rc=$rc"
+    fail "get on never-stored host should be empty/silent/exit0, got: '$get_out' rc=$rc stderr: $(cat "$get_err")"
 fi
 
 # Test 3: get degrades to empty/exit 0 when the environment has no login/config
 ((TESTS_RUN++)) || true
 brokencfg=$(mktemp -d)
 rc=0
-get_out=$(printf 'protocol=https\nhost=gitlab.com\n\n' | XDG_CONFIG_HOME="$brokencfg" XDG_DATA_HOME="$brokencfg" "$HELPER" get 2>/dev/null) || rc=$?
-if [ -z "$get_out" ] && [ "$rc" -eq 0 ]; then
-    pass "get with no login/config degrades to empty, exit 0"
+get_out=$(printf 'protocol=https\nhost=gitlab.com\n\n' | XDG_CONFIG_HOME="$brokencfg" XDG_DATA_HOME="$brokencfg" "$HELPER" get 2>"$get_err") || rc=$?
+if [ -z "$get_out" ] && [ "$rc" -eq 0 ] && grep -q "^git-credential-dotsecenv: dotsecenv secret get failed:" "$get_err" && grep -q "config file not found" "$get_err"; then
+    pass "get with no login/config degrades to empty, exit 0, and says why on stderr"
 else
-    fail "get should degrade to empty/exit0, got: '$get_out' rc=$rc"
+    fail "get should degrade to empty/exit0 and explain on stderr, got: '$get_out' rc=$rc stderr: $(cat "$get_err")"
 fi
 rm -rf "$brokencfg"
 

@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Bug Fixes
+
+- The git and Terraform credential helpers no longer hide dotsecenv errors. Their `get` treated every failure as "no credential", so a missing config, a missing login or a stopped gpg-agent looked the same as a secret that was never stored. A missing secret still answers silently; any other failure gives the same answer to git or Terraform and prints dotsecenv's error on stderr
+
 ### Other
 
 - The documentation website loads Docs7 analytics to measure page views. The privacy policy describes the data sent to Context7. (#482)
