@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -343,5 +344,38 @@ func TestDirectoryPermissionsOnNewVault(t *testing.T) {
 	}
 	if dirInfo.Mode().Perm() != 0o700 {
 		t.Errorf("expected directory permissions 0700, got %o", dirInfo.Mode().Perm())
+	}
+}
+
+// A short file that is not a vault must be refused, never replaced with an
+// empty vault: `vault describe -v ~/notes.txt` used to wipe notes.txt.
+func TestNewWriter_ShortNonVaultFileIsNotOverwritten(t *testing.T) {
+	for _, readOnly := range []bool{false, true} {
+		path := filepath.Join(t.TempDir(), "notes.txt")
+		content := []byte("export FOO=1\nalias ll='ls -l'\n")
+		if err := os.WriteFile(path, content, 0600); err != nil {
+			t.Fatal(err)
+		}
+		var err error
+		if readOnly {
+			_, err = NewWriterReadOnly(path)
+		} else {
+			_, err = NewWriter(path)
+		}
+		if err == nil {
+			t.Errorf("readOnly=%v: want an error for a non-vault file", readOnly)
+		}
+		if got, _ := os.ReadFile(path); !bytes.Equal(got, content) {
+			t.Errorf("readOnly=%v: file was modified: %q", readOnly, got)
+		}
+	}
+
+	// Whitespace only still counts as an empty vault.
+	path := filepath.Join(t.TempDir(), "blank")
+	if err := os.WriteFile(path, []byte("\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewWriter(path); err != nil {
+		t.Errorf("whitespace-only file: %v", err)
 	}
 }

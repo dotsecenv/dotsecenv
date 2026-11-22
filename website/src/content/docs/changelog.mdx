@@ -14,6 +14,7 @@ _Unreleased_
 ### Bug Fixes
 
 - Commands that only read a vault (`secret get`, `vault describe`, `validate`, `doctor` without `--fix`, `init secenv`) no longer rewrite it. With the default `require_explicit_vault_upgrade: false`, opening an outdated vault upgraded it in place, so running a check changed the file it checked. They now warn and point to `dotsecenv doctor --fix`; commands that write still upgrade as before (#488)
+- Pointing dotsecenv at a file of fewer than 3 lines that is not a vault no longer overwrites it. `vault describe -v notes.txt`, or a configured vault path holding such a file, replaced its contents with an empty vault. It now fails with "not a dotsecenv vault" and leaves the file alone. An empty or whitespace-only file still starts a new vault (#494)
 
 ### Other
 
