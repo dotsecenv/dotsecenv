@@ -11,6 +11,12 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+---
+
+## v0.13.0
+
+_November 22, 2026_
+
 This release fixes problems found in a whole-repo audit. Six of the fixes are security fixes and are marked **Security** below. The most important: `secret get` now verifies a value's signatures before decrypting it (#516), and the installer and the GitHub Action stop when a download cannot be verified (#522, #523).
 
 Three changes need action from you:
@@ -62,6 +68,12 @@ Three changes need action from you:
 - Remove the Windows-only source files. Windows was never built or supported (#532)
 - The shell plugin fetches secrets through one helper per shell, and the installer computes the system share directory once (#533)
 - `go.sum` drops the checksums for bubbletea v2.1.1 and lipgloss v2.1.0, which the bubbletea and lipgloss updates left behind, so `make lint` passes (#538)
+- The documentation is also published on Docs7, built from a copy of the website pages in `docs/` (#481)
+- The Docs7 copy in `docs/` carries every website page change since #464 and shows 0.13.0 in its install and version examples. `AGENTS.md` requires each PR to change both copies (#539)
+- The Upcoming changelog opens with the security fixes and the three changes that need action (#535)
+- Go dependency updates: bubbletea 2.1.2 and lipgloss 2.1.1 (#477, #471)
+- Website dependency updates: astro 7.4.13, @astrojs/starlight 0.43.0, eslint 10.15.0, eslint-plugin-mdx 3.10.1, typescript-eslint 8.73.0, and asciinema-player 3.18.1 (#478, #468, #465, #466, #470, #473, #472)
+- CI updates: pnpm 12.21.0, uv 0.13.9, actions/setup-go 7.1.0, actions/create-github-app-token 3.4.0, and step-security/harden-runner 2.23.0 (#467, #475, #474, #479, #476)
 
 ---
 

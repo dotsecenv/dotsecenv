@@ -163,7 +163,7 @@ dotsecenv uses FIPS 186-5 compliant defaults out of the box:
 
 ## Signature Verification
 
-Every vault entry is signed. Verification happens on read:
+Every vault entry is signed. Before `secret get`, `secret share` or `secret revoke` decrypts a value, it verifies that value, its secret definition and the identity entries of their signers, and refuses one that fails. Each identity's public key must match its fingerprint. `dotsecenv validate` verifies every entry.
 
 ```text
 Entry signature covers:

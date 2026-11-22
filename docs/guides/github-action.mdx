@@ -53,7 +53,7 @@ If your workflow needs a dotsecenv configuration, use the `init-config` input:
 ```
 
 <Tip>
-     Set `init-config` to an empty string `''` to run `dotsecenv init config` with defaults, or provide specific flags like `--login FINGERPRINT` or `--gpg-program /usr/bin/gpg`.
+     Set `init-config` to an empty string `''` to run `dotsecenv init config` with defaults, or provide specific flags like `--login FINGERPRINT` or `--gpg-program /usr/bin/gpg`. The value is split on whitespace and never run through the shell, so quotes and `$(...)` are passed as literal text.
 </Tip>
   </Step>
   <Step title="Use dotsecenv in subsequent steps">
@@ -217,7 +217,7 @@ The `init-config` input controls whether `dotsecenv init config` runs after inst
 
 ### Disabling Provenance Verification
 
-By default, the action verifies GPG signatures, checksums, and attestations. To disable this (not recommended):
+By default, the action verifies GPG signatures, checksums, and attestations. It fetches the release key over HTTPS and requires `checksums.txt.sig` to come from a release key fingerprint pinned in [`scripts/install.sh`](https://github.com/dotsecenv/dotsecenv/blob/main/scripts/install.sh). Any failure stops the job. To disable this (not recommended):
 
 ```yaml
 - uses: dotsecenv/dotsecenv@v0
@@ -283,7 +283,7 @@ Windows runners are not supported, and support is not planned.
 If GPG verification fails:
 
 1. Ensure your workflow has network access to `get.dotsecenv.com`
-2. Check if there's a key rotation announcement in the [dotsecenv releases](https://github.com/dotsecenv/dotsecenv/releases)
+2. If the error says the signature is not from a dotsecenv release key, the key was rotated after the action ref you use. Update to a newer action ref; check the [dotsecenv releases](https://github.com/dotsecenv/dotsecenv/releases) for the rotation
 3. As a last resort, use `verify-provenance: false` (not recommended)
 
 ### Attestation Verification Failed

@@ -73,6 +73,9 @@ If the project has a `.secenv` file, secrets load automatically:
 ```bash
 cd ~/project
 # dotsecenv: found .secenv in /home/you/project
+#   DATABASE_PASSWORD={dotsecenv}
+#   API_KEY={dotsecenv}
+#   JWT_SECRET={dotsecenv}
 # Load secrets? [y]es / [n]o / [a]lways: a
 # dotsecenv: loaded 3 secret(s) from .secenv: DATABASE_PASSWORD, API_KEY, JWT_SECRET
 

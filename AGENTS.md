@@ -248,6 +248,20 @@ What the script does NOT do — handle manually if needed:
   Features, `fix` -> Bug Fixes, else Other), ending with the PR number. Release
   notes build up per PR; the release PR stamps "Upcoming" to the tag.
   `bash .agents/skills/changelog/assess.sh` reports any merged PRs missing from it.
+- **Two copies of the docs:** `website/src/content/docs/` builds dotsecenv.com
+  with Starlight, and `docs/` holds the same pages for Docs7. A PR that changes
+  a page in one makes the same change to the other, changelog entries
+  included. A new page in `docs/` also goes into the navigation in
+  `docs/docs.json`. The `docs/` copy uses Docs7 markup and has no imports:
+  `<Note>`, `<Tip>`, `<Warning>` and `<Danger>` replace `<Aside>`,
+  `<Tab title="...">` replaces `<TabItem label="...">`, each numbered item
+  under `<Steps>` becomes a `<Step title="...">`, `Experimental` becomes
+  `<Warning title="Experimental">`, and internal links drop the trailing slash
+  (`/concepts/compliance#rsa-keys-are-legacy`). Docs7 cannot run the Astro
+  components, so `docs/` holds what `DownloadCommands`, `VersionOutput` and
+  `VersionExample` render, with the version written out; the release PR sets
+  it to the new version. Compare the two copies of a page before merging:
+  only the markup should differ.
 - **Marking a feature experimental on the website:** use the shared
   `Experimental` component, don't hand-roll an aside. Import it from
   `website/src/components/Experimental.astro` and put it directly under the

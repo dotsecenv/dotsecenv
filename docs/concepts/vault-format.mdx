@@ -163,7 +163,7 @@ The header indexes point to line numbers where each entry can be found, enabling
 The format version lets dotsecenv evolve while maintaining compatibility. Older vaults remain readable, new features can land without breaking existing vaults, and future versions may include automatic upgrades.
 
 <Note>
-  v1 vaults store identities as an array of `[fingerprint, line]` pairs under a `# === VAULT HEADER v1 ===` marker. dotsecenv upgrades them to v2 when it opens them, unless `behavior.require_explicit_vault_upgrade` is set. Future format changes will be announced in release notes with migration guidance.
+  v1 vaults store identities as an array of `[fingerprint, line]` pairs under a `# === VAULT HEADER v1 ===` marker. Commands that write to a vault upgrade it to v2, unless `behavior.require_explicit_vault_upgrade` is set. Commands that only read never upgrade it; `dotsecenv doctor --fix` always does. Future format changes will be announced in release notes with migration guidance.
 </Note>
 
 ## Validation
