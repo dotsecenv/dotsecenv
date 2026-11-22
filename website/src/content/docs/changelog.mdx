@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Bug Fixes
+
+- A numeric `-v N` now resolves against the config named by `DOTSECENV_CONFIG`. Before, the index was looked up in the default config, so commands failed with "failed to load config" or picked a vault from the wrong file
+
 ### Other
 
 - The documentation website loads Docs7 analytics to measure page views. The privacy policy describes the data sent to Context7. (#482)

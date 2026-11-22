@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	clilib "github.com/dotsecenv/dotsecenv/internal/cli"
-	"github.com/dotsecenv/dotsecenv/internal/xdg"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/config"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 )
@@ -32,11 +31,7 @@ func resolveVaultPaths(configPath string, vaultPaths []string) ([]string, error)
 	for i, vPath := range resolvedPaths {
 		if idx, err := strconv.Atoi(vPath); err == nil {
 			// It's a number, resolve from config
-			cfgPath := configPath
-			if cfgPath == "" {
-				xdgPaths, _ := xdg.NewPaths()
-				cfgPath = xdgPaths.ConfigPath()
-			}
+			cfgPath := effectiveConfigPath(configPath)
 
 			cfg, configErr := config.Load(cfgPath)
 			if configErr != nil {
@@ -67,6 +62,12 @@ func resolveVaultPaths(configPath string, vaultPaths []string) ([]string, error)
 	return resolvedPaths, nil
 }
 
+// effectiveConfigPath resolves -c, then DOTSECENV_CONFIG, then the XDG default.
+// Silent because NewCLI warns about a -c/DOTSECENV_CONFIG conflict itself.
+func effectiveConfigPath(configPath string) string {
+	return clilib.ResolveConfigPath(configPath, true, io.Discard)
+}
+
 // createCLI creates a CLI instance with resolved vault paths
 func createCLI() (*clilib.CLI, error) {
 	resolvedPaths, err := resolveVaultPaths(globalOpts.ConfigPath, globalOpts.VaultPaths)
@@ -95,11 +96,7 @@ func parseVaultSpec(configPath string, vaultPaths []string) (vaultPath string, f
 		}
 
 		// Validate against config
-		cfgPath := configPath
-		if cfgPath == "" {
-			xdgPaths, _ := xdg.NewPaths()
-			cfgPath = xdgPaths.ConfigPath()
-		}
+		cfgPath := effectiveConfigPath(configPath)
 
 		cfg, configErr := config.Load(cfgPath)
 		if configErr != nil {
@@ -143,11 +140,7 @@ func parseVaultSpecScoped() (vaultPath string, fromIndex int, err error) {
 
 // printVaultList prints the list of configured vaults to the given writer
 func printVaultList(configPath string, w io.Writer) {
-	cfgPath := configPath
-	if cfgPath == "" {
-		xdgPaths, _ := xdg.NewPaths()
-		cfgPath = xdgPaths.ConfigPath()
-	}
+	cfgPath := effectiveConfigPath(configPath)
 
 	cfg, configErr := config.Load(cfgPath)
 	if configErr != nil {
