@@ -11,9 +11,11 @@ readonly GITHUB_REPO="dotsecenv"
 readonly GPG_KEY_URL="https://get.dotsecenv.com/key.asc"
 readonly RETRACTED_URL="https://get.dotsecenv.com/retracted.txt"
 # Primary fingerprints of the release signing keys; checksums.txt.sig must come
-# from one of them. The second key signed releases up to v0.6.3.
+# from one of them. The second key signed releases up to v0.6.3. action.yml
+# sources this script and uses the same check.
 readonly RELEASE_KEY_FINGERPRINTS="0B8DB28079ACFA7497F0B8FE647E9C8219626442 E60A1740BAEF49284D22EA7D3C376348F0921C59"
-readonly NO_VERIFY_HINT="rerun with --no-verify (or VERIFY=0) to install without verification"
+# action.yml sets its own hint.
+readonly NO_VERIFY_HINT="${NO_VERIFY_HINT:-rerun with --no-verify (or VERIFY=0) to install without verification}"
 
 # ---------------------------------------------------------------------------
 # Color setup (conditional on tty)

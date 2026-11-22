@@ -14,7 +14,7 @@ For initial release-signing setup or key replacement, run [`bash scripts/generat
 
 The script prompts for a non-empty passphrase and prints ASCII-armored public and private keys before deleting its temporary keyring. Publish the public key at `https://get.dotsecenv.com/key.asc`, set the private key as release CI's `GPG_PRIVATE_KEY`, and set its passphrase as `GPG_PASSPHRASE`. This key signs releases; vault-decryption keys used in application CI have a separate role.
 
-A key replacement must also update the pinned fingerprint in `RELEASE_KEY_FINGERPRINTS` in `scripts/install.sh`, and the fingerprints in the installation guide (`website/src/content/docs/tutorials/installation.mdx`) and `packages/README.md`.
+A key replacement must also update the pinned fingerprint in `RELEASE_KEY_FINGERPRINTS` in `scripts/install.sh` (`action.yml` reads it from there), and the fingerprints in the installation guide (`website/src/content/docs/tutorials/installation.mdx`) and `packages/README.md`.
 
 ## Satellite repositories (plugin, packages)
 
