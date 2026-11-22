@@ -137,7 +137,9 @@ func TestSecretMutations_PinentryRequired(t *testing.T) {
 					Key: "HCLOUD_TOKEN", AddedAt: now,
 					Values: []vault.SecretValue{{AddedAt: now, Value: "c3ludGhldGlj", AvailableTo: []string{"MYFINGERPRINT", "OTHER"}}},
 				}
-				manager.AddSecret(secret)
+				if err := manager.AddSecret(secret); err != nil {
+					t.Fatal(err)
+				}
 				if manager.GetSecretByKey("HCLOUD_TOKEN") == nil {
 					t.Fatal("fixture secret was not added")
 				}

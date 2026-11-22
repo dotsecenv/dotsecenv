@@ -165,6 +165,11 @@ func (m *MockVaultResolver) GetVaultManager(index int) *vault.Manager {
 	return nil // Mock returns nil manager usually, but tests might need to mock this if they call methods on manager
 }
 
+// VerifySecretValue accepts every entry: mock vaults carry placeholder signatures.
+func (m *MockVaultResolver) VerifySecretValue(index int, secret *vault.Secret, value *vault.SecretValue) error {
+	return nil
+}
+
 func (m *MockVaultResolver) GetConfig() vault.VaultConfig {
 	m.mu.Lock()
 	defer m.mu.Unlock()

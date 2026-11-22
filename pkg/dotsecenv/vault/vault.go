@@ -10,12 +10,10 @@ import (
 // Manager handles vault file operations with locking
 type Manager struct {
 	path                        string
-	file                        *os.File
-	locked                      bool
 	readOnly                    bool
-	requireExplicitVaultUpgrade bool // if true, don't auto-upgrade vaults
-	writer                      *Writer
-	vault                       Vault // cached vault for fast access
+	requireExplicitVaultUpgrade bool    // if true, don't auto-upgrade vaults
+	writer                      *Writer // holds the locked vault file while open
+	vault                       Vault   // cached vault for fast access
 }
 
 // NewManager creates a new vault manager for the specified path.
@@ -24,7 +22,6 @@ func NewManager(path string, requireExplicitUpgrade bool) *Manager {
 	return &Manager{
 		path:                        path,
 		requireExplicitVaultUpgrade: requireExplicitUpgrade,
-		locked:                      false,
 	}
 }
 
@@ -39,51 +36,17 @@ func (m *Manager) OpenAndLock() error {
 		_ = err
 	}
 
-	// Determine if we should open read-only
-	var flags int
-	if _, err := os.Stat(m.path); os.IsNotExist(err) {
-		// File doesn't exist, create it
-		flags = os.O_CREATE | os.O_RDWR
-	} else {
-		// File exists, open it
-		flags = os.O_RDWR
-	}
-
-	file, err := os.OpenFile(m.path, flags, 0600)
+	file, err := m.openLocked()
 	if err != nil {
-		// If failed with permission error and we tried RW, try ReadOnly
-		if os.IsPermission(err) && (flags&os.O_RDWR != 0) {
-			flags = os.O_RDONLY
-			file, err = os.OpenFile(m.path, flags, 0)
-			if err == nil {
-				m.readOnly = true
-			}
-		}
-		if err != nil {
-			return fmt.Errorf("failed to open vault file: %w", err)
-		}
+		return err
 	}
 
-	// Lock the file
-	// Use shared lock for read-only access, exclusive for read-write
-	if err := lockFile(file, !m.readOnly); err != nil {
-		_ = file.Close()
-		return fmt.Errorf("failed to lock vault file: %w", err)
-	}
-
-	m.file = file
-	m.locked = true
-
-	// Initialize the writer (which handles loading)
+	// Initialize the writer (which handles loading). It takes over the lock.
 	// Use read-only writer if we're in read-only mode to avoid temp file creation
-	var writer *Writer
-	if m.readOnly {
-		writer, err = NewWriterReadOnly(m.path)
-	} else {
-		writer, err = NewWriter(m.path)
-	}
+	writer, err := newWriter(m.path, m.readOnly, file)
 	if err != nil {
-		_ = m.Unlock()
+		_ = unlockFile(file)
+		_ = file.Close()
 		return fmt.Errorf("failed to initialize vault: %w", err)
 	}
 	m.writer = writer
@@ -115,6 +78,57 @@ func (m *Manager) OpenAndLock() error {
 	return nil
 }
 
+// openLocked opens and locks the vault file: shared for read-only access,
+// exclusive for read-write. A writer may rename a new file over the path while
+// this process waits for the lock, so it retries until the locked file is the
+// one the path names.
+func (m *Manager) openLocked() (*os.File, error) {
+	for {
+		// Determine if we should open read-only
+		var flags int
+		if _, err := os.Stat(m.path); os.IsNotExist(err) {
+			// File doesn't exist, create it
+			flags = os.O_CREATE | os.O_RDWR
+		} else {
+			// File exists, open it
+			flags = os.O_RDWR
+		}
+
+		file, err := os.OpenFile(m.path, flags, 0600)
+		if err != nil {
+			// If failed with permission error and we tried RW, try ReadOnly
+			if os.IsPermission(err) && (flags&os.O_RDWR != 0) {
+				file, err = os.OpenFile(m.path, os.O_RDONLY, 0)
+				if err == nil {
+					m.readOnly = true
+				}
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to open vault file: %w", err)
+			}
+		}
+
+		if err := lockFile(file, !m.readOnly); err != nil {
+			_ = file.Close()
+			return nil, fmt.Errorf("failed to lock vault file: %w", err)
+		}
+
+		held, err := file.Stat()
+		if err == nil {
+			var current os.FileInfo
+			current, err = os.Stat(m.path)
+			if err == nil && os.SameFile(held, current) {
+				return file, nil
+			}
+		}
+		_ = unlockFile(file)
+		_ = file.Close()
+		if err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to stat vault file: %w", err)
+		}
+	}
+}
+
 // IsReadOnly returns true if the vault is opened in read-only mode
 func (m *Manager) IsReadOnly() bool {
 	return m.readOnly
@@ -130,17 +144,13 @@ func (m *Manager) Version() int {
 
 // Unlock releases the lock and closes the vault file
 func (m *Manager) Unlock() error {
-	if m.file == nil {
+	if m.writer == nil || m.writer.lock == nil {
 		return nil
 	}
-
-	if m.locked {
-		_ = unlockFile(m.file)
-		m.locked = false
-	}
-
+	file := m.writer.lock
 	m.writer = nil
-	return m.file.Close()
+	_ = unlockFile(file)
+	return file.Close()
 }
 
 // Get returns the vault data
@@ -174,7 +184,7 @@ func (m *Manager) GetLines() []string {
 // Save is a no-op kept for API compatibility.
 // Writer methods already persist changes via flush().
 func (m *Manager) Save() error {
-	if m.file == nil {
+	if m.writer == nil {
 		return fmt.Errorf("vault file not open")
 	}
 	if m.readOnly {
@@ -188,7 +198,7 @@ func (m *Manager) Save() error {
 }
 
 // AddIdentity adds an identity to the vault
-func (m *Manager) AddIdentity(id Identity) {
+func (m *Manager) AddIdentity(id Identity) error {
 	// Check if identity already exists
 	for i, existing := range m.vault.Identities {
 		if existing.Fingerprint == id.Fingerprint {
@@ -196,46 +206,60 @@ func (m *Manager) AddIdentity(id Identity) {
 			m.vault.Identities[i] = id
 			// For the efficient format, we need to handle updates differently
 			// For now, we append and the reader will use the latest
-			return
+			return nil
 		}
 	}
 
 	// Add to writer (persists immediately)
 	if err := m.writer.AddIdentity(id); err != nil {
-		// Log error but continue - the in-memory vault is still valid
-		return
+		return err
 	}
 
-	// Update in-memory cache
 	m.vault.Identities = append(m.vault.Identities, id)
+	return nil
 }
 
 // AddSecret adds a new secret or updates an existing one with a new value.
 // Secret keys are compared case-insensitively using CompareSecretKeys.
-func (m *Manager) AddSecret(secret Secret) {
+func (m *Manager) AddSecret(secret Secret) error {
 	// Check if secret already exists (case-insensitive comparison)
 	for i, s := range m.vault.Secrets {
 		if CompareSecretKeys(s.Key, secret.Key) {
 			// Add new values to existing secret
 			for _, newVal := range secret.Values {
 				if err := m.writer.AddSecretValue(s.Key, newVal); err != nil {
-					// Log error but continue
-					continue
+					return err
 				}
 				m.vault.Secrets[i].Values = append(m.vault.Secrets[i].Values, newVal)
 			}
-			return
+			return nil
 		}
 	}
 
 	// Add new secret with all its values
 	if err := m.writer.AddSecretWithValues(secret); err != nil {
-		// Log error but continue
-		return
+		return err
 	}
 
-	// Update in-memory cache
 	m.vault.Secrets = append(m.vault.Secrets, secret)
+	return nil
+}
+
+// Rewrite replaces the vault's contents with v in the given format version,
+// under the lock this Manager holds.
+func (m *Manager) Rewrite(v Vault, version int) error {
+	if m.writer == nil || m.readOnly {
+		return fmt.Errorf("vault is not open for writing")
+	}
+	if err := m.writer.RewriteFromVaultWithVersion(v, version); err != nil {
+		return err
+	}
+	vault, err := m.writer.ReadVault()
+	if err != nil {
+		return fmt.Errorf("failed to reload vault after rewrite: %w", err)
+	}
+	m.vault = vault
+	return nil
 }
 
 // GetIdentityByFingerprint retrieves an identity by fingerprint

@@ -11,16 +11,48 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+This release fixes problems found in a whole-repo audit. Six of the fixes are security fixes and are marked **Security** below. The most important: `secret get` now verifies a value's signatures before decrypting it (#516), and the installer and the GitHub Action stop when a download cannot be verified (#522, #523).
+
+Three changes need action from you:
+
+- The shell plugin's `dse` commands moved under `dotsecenv secret`, and `dse` is now a plain alias for `dotsecenv` (#528).
+- `plugin/install.sh` installs the plugin to `~/.local/share/dotsecenv/plugin`. Rerun it to move an existing install (#521).
+- Directories you told the shell plugin to always trust prompt once more, because trust now covers the `.secenv` contents (#525).
+
+### Features
+
+- **Breaking**: `dse` is now a plain alias for `dotsecenv`, and the shell plugin's own commands moved under `secret`. `dse reload`, `dse sync`, `dse up` and `reloadsecenv` became `dotsecenv secret reload`, which unloads everything and loads every `.secenv` from the git root (or `/`) down to the current directory. `dse cp NAME` became `dotsecenv secret cp NAME`, and `dse get NAME` is now `dse secret get NAME`. This also fixes `dse sync` leaving secrets exported after you left the directory (#528)
+
 ### Bug Fixes
 
 - **Breaking**: `vault compact` writes only with `--yes`. It used to rewrite the vault in CI without `--yes`, and to ask for confirmation in a terminal. Without `--yes` it now prints the plan and the command to apply it, leaves the vault unchanged, and exits `10` when there is something to drop. CI jobs that compact without `--yes` must add it (#487)
 - **Breaking**: `doctor` and `vault doctor` now exit non-zero when they find problems. They used to exit 0 even when gpg-agent was missing, a vault failed to load, or a `--fix` failed. A failed check or fix exits with its error code (`3` for vaults, `4` for gpg-agent). Changes doctor found but did not apply, such as an outdated format, exit with the new code `10` and print the `doctor --fix` command to run. CI jobs that run `doctor` as a health check now fail in these cases (#486)
 - Pointing dotsecenv at a file of fewer than 3 lines that is not a vault no longer overwrites it. `vault describe -v notes.txt`, or a configured vault path holding such a file, replaced its contents with an empty vault. It now fails with "not a dotsecenv vault" and leaves the file alone. An empty or whitespace-only file still starts a new vault (#494)
+- **Security**: `secret get` now checks a value before decrypting it. It verifies the hash and signature of the value, of its secret and of their signers' identity entries, and requires each identity's public key to match its fingerprint. `secret get --all`, `--last` and `-v`, `secret share` and `secret revoke` run the same checks. Before, only `dotsecenv validate` checked signatures, so an edited value in a vault was decrypted, printed and exported by the shell plugin without warning. A value that fails these checks now exits 6 and names the vault (#516)
+- `secret store`, `share`, `revoke`, `forget` and `identity add` exit non-zero when the vault write fails, for example when the clock check refuses the entry or the disk is full. Before, they printed success and the vault did not change (#517)
+- A secret larger than about 35 KB no longer makes its whole vault unreadable (`bufio.Scanner: token too long`). Vault lines can be up to 1 MiB, and a write that would produce a longer line is refused (#518)
+- Commands that write the same vault at the same time no longer lose entries. The vault lock now stays on the file the path names across each write, and `vault doctor` upgrades and `vault compact` write under that lock (#519)
+- **Security**: Vault writes create their temp file with a random name, so a symlink committed at `<vault>.tmp` can no longer redirect a write into another file (#520)
+- **Breaking**: `plugin/install.sh --uninstall` no longer deletes `~/.local/share/dotsecenv/vault`. The shell plugin now installs to `~/.local/share/dotsecenv/plugin`. Rerun the installer to move an existing install and update the `source` lines it wrote. If you added a `source` line by hand, point it at the new path (#521)
+- **Security**: The installer stops when it cannot verify a download. That covers a bad signature, a signature not made by the pinned release key, a missing `checksums.txt.sig`, and a missing `gpg` or `sha256sum`/`shasum`; before, each of these printed a warning and installed anyway. Verification stays on by default, and `--no-verify` or `VERIFY=0` turns it off (#522)
+- **Security**: The GitHub Action fetches the release key over HTTPS instead of HTTP and requires the signature to come from the pinned release key. Inputs now reach its scripts through environment variables, so a branch name passed as `version` can no longer run shell commands. `init-config` is split on whitespace and no longer evaluates quotes or `$(...)` (#523)
+- Leaving a directory with a `.secenv` puts each variable back to the value it had before you entered, instead of unsetting it. An `AWS_PROFILE` you exported before entering a project is back after `cd ..` (#524)
+- **Security**: The shell plugin trusts a `.secenv` by its contents, not only by its directory, and asks again when the file changes. Before, an "always" answer kept loading the file after a `git pull` added keys such as `PROMPT_COMMAND` or `BASH_ENV`, which can run code in your shell. The prompt now shows the file before you answer. Directories you trusted with an earlier release prompt once more (#525)
+- **Security**: The fish plugin refuses a world-writable `.secenv` with mode 777 (or any mode with `o+wx`), as bash and zsh already did (#526)
+- Multi-line secrets such as PEM keys keep their newlines in fish, and copying a secret to the clipboard keeps its newlines and backslashes in every shell (#527)
+- In bash, the plugin's prompt hook no longer resets `$?`, so prompt tools such as starship and `__git_ps1` show the real exit status of your last command (#530)
+- Plugin uninstall removes only the lines the installer added to `.bashrc`, `.zshrc` and `config.fish`, and keeps your own lines that mention dotsecenv, such as completions, `DOTSECENV_*` exports and aliases (#531)
+- The installer compares the installed version exactly. With 1.2.30 installed, asking for v1.2.3 used to report "already installed" and skip the install (#534)
 
 ### Other
 
 - The documentation website loads Docs7 analytics to measure page views. The privacy policy describes the data sent to Context7. (#482)
 - `.releasetools.yaml` declares `scripts/set-plugin-version.py` as the version bump command, so `/release:release` sets both agent plugin manifests (#464)
+- The CI merge gate checks sibling workflow runs every 120 seconds instead of every 3, so a few pull requests in an hour no longer exhaust the repository's GitHub API quota and fail the required `allow` check (#536)
+- Plugin CI builds fish 3.7.1 from source again on ubuntu-26.04. CMake 4 rejected its `install(SCRIPT CODE ...)` call, so the fish 3.x leg failed on every plugin pull request (#537)
+- `validate` and the read path share one set of signature checks. This removes unused exported functions from `pkg/dotsecenv/vault` (`ValidateSecret`, `ValidateSecretValue`, `ValidateSecretsOrder`, `ValidateAvailableToOrder`, `ValidateSecretMetadata`, `GetSecretSigningData`, `GetSecretValueSigningData`, `SortAvailableTo`) and all of `pkg/dotsecenv/gpg/gpg_verify.go`, so a Go program importing those packages directly may need a change (#529)
+- Remove the Windows-only source files. Windows was never built or supported (#532)
+- The shell plugin fetches secrets through one helper per shell, and the installer computes the system share directory once (#533)
 
 ---
 

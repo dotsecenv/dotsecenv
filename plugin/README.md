@@ -7,11 +7,11 @@ Shell plugins for [dotsecenv](https://github.com/dotsecenv/dotsecenv) that autom
 ## Features
 
 - Automatically loads `.env` and `.secenv` files when you `cd` into a directory
-- Unsets environment variables when you leave the directory
+- Restores the previous values of its variables when you leave the directory
 - Fetches secrets from your dotsecenv vault using the `{dotsecenv}` or `{dotsecenv/KEY}` syntax
 - Security checks: refuses to load world-writable files or files not owned by you (or root)
 - Trust system: prompts before loading `.secenv` files from untrusted directories
-- Convenient aliases: `dse`, `secret`, `copysecret`
+- `dotsecenv secret reload` and `dotsecenv secret cp`, plus `dse` as an alias for `dotsecenv`
 
 ## Installation
 
@@ -20,6 +20,8 @@ Shell plugins for [dotsecenv](https://github.com/dotsecenv/dotsecenv) that autom
 ```bash
 curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
 ```
+
+The installer copies the plugin to `~/.local/share/dotsecenv/plugin` and adds a `source` line to each shell's RC file. Earlier versions installed into `~/.local/share/dotsecenv`; rerunning the installer moves the plugin and updates those `source` lines.
 
 ### Plugin Managers
 
@@ -139,18 +141,21 @@ Secret names must start with a letter or underscore, followed by letters, number
 
 If both `.env` and `.secenv` define the same variable, `.secenv` takes precedence (with a warning).
 
-## Aliases
+## Commands
 
-| Alias           | Command                                  | Description                          |
-| --------------- | ---------------------------------------- | ------------------------------------ |
-| `dse`           | `dotsecenv`                              | Shorthand for dotsecenv CLI          |
-| `secret NAME`   | `dotsecenv secret get NAME`              | Retrieve a secret                    |
-| `copysecret NAME` | `dotsecenv secret get NAME \| clipboard` | Copy secret to clipboard           |
-| `dse up [DIR]`  | *(built-in)*                             | Load ancestor `.secenv` files        |
+The plugin wraps `dotsecenv` in a shell function. It runs these two commands itself and passes everything else to the binary.
+
+| Command                    | Description                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| `dotsecenv secret reload`  | Unload everything, then load each `.secenv` from the git root (or `/`) down to `$PWD` |
+| `dotsecenv secret cp NAME` | Copy a secret to the clipboard                                                       |
+| `dse ...`                  | Alias for `dotsecenv ...`                                                            |
+
+`dse reload`, `dse sync`, `dse up`, `dse get`, `dse cp` and `reloadsecenv` were removed. Use `dotsecenv secret reload`, `dotsecenv secret cp NAME` and `dse secret get NAME`.
 
 ### Clipboard Support
 
-The `copysecret` alias supports:
+`dotsecenv secret cp` uses:
 
 - **macOS**: `pbcopy`
 - **Linux (X11)**: `xclip` or `xsel`
@@ -158,10 +163,11 @@ The `copysecret` alias supports:
 
 ## Trust System
 
-When you first enter a directory containing a `.secenv` file, you'll be prompted:
+When you first enter a directory containing a `.secenv` file, the plugin prints the file and asks:
 
 ```shell
 dotsecenv: found .secenv in /path/to/project
+  DATABASE_PASSWORD={dotsecenv}
 Load secrets? [y]es / [n]o / [a]lways:
 ```
 
@@ -169,9 +175,9 @@ Load secrets? [y]es / [n]o / [a]lways:
 | -------------- | ------------------------------------------ |
 | `y` / `yes`    | Load secrets for this shell session only   |
 | `n` / `no`     | Skip loading, don't ask again this session |
-| `a` / `always` | Trust this directory permanently           |
+| `a` / `always` | Trust this file permanently                |
 
-Permanently trusted directories are stored in `~/.config/dotsecenv/trusted_dirs`.
+Trust covers the file's contents. The plugin stores a SHA-256 of the `.secenv` with the directory (one `<sha256> <directory>` line per directory in `~/.config/dotsecenv/trusted_dirs`), and asks again when the file changes, including a change back to older contents. Without `sha256sum` or `shasum` it asks on every visit.
 
 ## Security
 
@@ -206,6 +212,8 @@ dotsecenv: refusing to load /path/.secenv - not owned by current user or root
 ```shell
 curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash -s -- --uninstall
 ```
+
+Uninstall removes only the files the plugin installed and the `source` lines the installer added. Your vault, anything else in `~/.local/share/dotsecenv`, and your own RC lines that mention dotsecenv stay.
 
 Or manually remove the source line from your shell's RC file.
 

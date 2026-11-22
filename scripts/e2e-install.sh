@@ -300,10 +300,11 @@ verify_output="$(bash "${INSTALL_SCRIPT}" \
     --no-install-completions \
     --no-install-man-pages \
     --verify 2>&1)" || true
-if echo "${verify_output}" | grep -qi "Checksum verified"; then
+if echo "${verify_output}" | grep -q "GPG signature verified (key 0B8DB28079ACFA7497F0B8FE647E9C8219626442)" \
+    && echo "${verify_output}" | grep -qi "Checksum verified"; then
     pass "Verify mode prints Checksum verified"
 else
-    fail "Verify mode should print 'Checksum verified', got: ${verify_output}"
+    fail "Verify mode should verify the pinned key and checksum, got: ${verify_output}"
 fi
 
 # Test 24: Run with --no-verify — should skip checksum message
@@ -517,6 +518,103 @@ run_test "missing TF helper stays out of the summary" bash -c "
     rm -rf \"\$tmp\"
     [ -z \"\${TF_HELPER_TARGET}\" ] && ! echo \"\$summary\" | grep -q 'TF helper:'
 "
+
+# ===================================================================
+# M. Fail-closed verification (sourced, no network)
+# ===================================================================
+echo ""
+echo "==> M. Fail-closed verification"
+
+# Stub gpg: it reports STUB_GPG_SIGNER as the VALIDSIG fingerprint, or a bad
+# signature when that is empty. download() is stubbed to write empty files.
+STUB_DIR="$(mktemp -d)"
+cat > "${STUB_DIR}/gpg" <<'STUB'
+#!/usr/bin/env bash
+case " $* " in *" --verify "*) ;; *) exit 0 ;; esac
+[ -n "${STUB_GPG_SIGNER:-}" ] || { echo "[GNUPG:] BADSIG 0 x"; exit 1; }
+echo "[GNUPG:] VALIDSIG ${STUB_GPG_SIGNER} 2026-01-01 0 0 4 0 1 10 00 ${STUB_GPG_SIGNER}"
+STUB
+chmod +x "${STUB_DIR}/gpg"
+# Only the tools verify_checksums needs before it looks for a hash tool.
+NOHASH_DIR="$(mktemp -d)"
+ln -s "$(command -v awk)" "$(command -v basename)" "${NOHASH_DIR}/"
+
+# expect_fail MESSAGE CMD...: CMD must exit non-zero and print MESSAGE.
+expect_fail() {
+    local msg="$1" out; shift
+    if out="$("$@" 2>&1)"; then echo "$out"; return 1; fi
+    grep -qF -- "$msg" <<<"$out" || { echo "$out"; return 1; }
+}
+
+# The helpers below run in subshells: error() exits, and stubs must not leak.
+# They set install.sh globals and override its download(), which shellcheck
+# cannot see being used.
+# shellcheck disable=SC2034,SC2329
+verify_signed_by() (
+    PATH="${STUB_DIR}:${PATH}"
+    export STUB_GPG_SIGNER="$1"
+    download() { : > "$2"; }
+    tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+    : > "$tmp/checksums.txt"; : > "$tmp/checksums.txt.sig"
+    verify_gpg "$tmp/checksums.txt" "$tmp/checksums.txt.sig"
+)
+verify_gpg_without_gpg() ( PATH="${NOHASH_DIR}"; verify_gpg a b )
+verify_checksums_without_hash_tool() (
+    tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+    printf 'abc  x.tar.gz\n' > "$tmp/checksums.txt"; : > "$tmp/x.tar.gz"
+    PATH="${NOHASH_DIR}"
+    verify_checksums "$tmp/x.tar.gz" "$tmp/checksums.txt"
+)
+# shellcheck disable=SC2034,SC2329
+install_without_sig() (
+    VERSION=v9.9.9 OS=Linux ARCH=x86_64
+    download() { case "$1" in *.sig) return 1 ;; *) : > "$2" ;; esac; }
+    tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+    install_binary "$tmp"
+)
+
+run_test "VERIFY defaults to 1" bash -c "unset VERIFY; source '${INSTALL_SCRIPT}'; [ \"\$VERIFY\" = 1 ]"
+verify_pinned_key_passes() {
+    local out
+    if out="$(verify_signed_by 0B8DB28079ACFA7497F0B8FE647E9C8219626442 2>&1)" \
+        && grep -qF "GPG signature verified" <<<"$out"; then return 0; fi
+    echo "$out"; return 1
+}
+run_test "signature from the pinned release key passes" verify_pinned_key_passes
+run_test "signature from another key fails" expect_fail "not signed by a dotsecenv release key" \
+    verify_signed_by AAAABBBBCCCCDDDDEEEEFFFF0000111122223333
+run_test "bad signature fails" expect_fail "GPG signature verification failed" verify_signed_by ""
+run_test "missing gpg fails" expect_fail "gpg not found; install gpg, or rerun with --no-verify" \
+    verify_gpg_without_gpg
+run_test "missing sha256sum and shasum fails" expect_fail "Neither sha256sum nor shasum found" \
+    verify_checksums_without_hash_tool
+run_test "missing checksums.txt.sig fails" expect_fail "Could not download checksums.txt.sig" \
+    install_without_sig
+
+rm -rf "${STUB_DIR}" "${NOHASH_DIR}"
+
+# ===================================================================
+# N. Installed-version check (sourced, no network)
+# ===================================================================
+echo ""
+echo "==> N. Installed-version check"
+
+# has_version REPORTED REQUESTED: run binary_has_version against a stub binary
+# whose `version` output reports REPORTED.
+has_version() (
+    tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+    printf '#!/usr/bin/env bash\necho "version: %s"\necho "commit: abc"\n' "$1" > "$tmp/dotsecenv"
+    chmod +x "$tmp/dotsecenv"
+    binary_has_version "$tmp/dotsecenv" "$2"
+)
+
+lacks_version() { ! has_version "$@"; }
+
+run_test "installed 1.2.30 does not match v1.2.3" lacks_version 1.2.30 v1.2.3
+run_test "installed 1.2.3 does not match v1.2.30" lacks_version 1.2.3 v1.2.30
+run_test "installed 1.2.3 matches v1.2.3" has_version 1.2.3 v1.2.3
+run_test "installed v1.2.3 matches 1.2.3" has_version v1.2.3 1.2.3
+run_test "unparseable version output does not match" lacks_version "" v1.2.3
 
 # ===================================================================
 # Final Report

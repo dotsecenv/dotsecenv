@@ -49,28 +49,24 @@ func (c *CLI) VaultCompact(jsonOutput bool, yes bool, vaultPath string, fromInde
 		return writeErr
 	}
 
-	writer, err := vault.NewWriter(expandedPath)
-	if err != nil {
-		return NewError(fmt.Sprintf("failed to open vault: %v", err), ExitVaultError)
+	// Rewrite through the Manager that holds the vault lock
+	manager := c.vaultResolver.GetVaultManager(targetIndex)
+	if manager == nil {
+		return NewError(fmt.Sprintf("failed to open vault: %s is not loaded", expandedPath), ExitVaultError)
 	}
 
-	if stamp := writer.Header().DotsecenvVersion; vault.IsNewerRelease(stamp, vault.BinaryVersion) {
+	if stamp := manager.GetHeader().DotsecenvVersion; vault.IsNewerRelease(stamp, vault.BinaryVersion) {
 		c.Output().Warnf(output.CodeWarnVaultNewer,
 			"vault %s was written by dotsecenv %s, newer than this dotsecenv %s; upgrade dotsecenv before compacting it",
 			entry.Path, stamp, vault.BinaryVersion)
 	}
 
-	v, err := writer.ReadVault()
-	if err != nil {
-		return NewError(fmt.Sprintf("failed to read vault: %v", err), ExitVaultError)
-	}
-
-	compacted, stats := vault.PlanCompaction(v)
+	compacted, stats := vault.PlanCompaction(manager.Get())
 
 	if jsonOutput {
 		applied := false
 		if stats.Changed() && yes {
-			if rewriteErr := writer.RewriteFromVault(compacted); rewriteErr != nil {
+			if rewriteErr := manager.Rewrite(compacted, vault.LatestFormatVersion); rewriteErr != nil {
 				return NewError(fmt.Sprintf("failed to rewrite vault: %v", rewriteErr), ExitVaultError)
 			}
 			applied = true
@@ -97,7 +93,7 @@ func (c *CLI) VaultCompact(jsonOutput bool, yes bool, vaultPath string, fromInde
 		return NewError("", ExitChangesRequired)
 	}
 
-	if rewriteErr := writer.RewriteFromVault(compacted); rewriteErr != nil {
+	if rewriteErr := manager.Rewrite(compacted, vault.LatestFormatVersion); rewriteErr != nil {
 		return NewError(fmt.Sprintf("failed to rewrite vault: %v", rewriteErr), ExitVaultError)
 	}
 
