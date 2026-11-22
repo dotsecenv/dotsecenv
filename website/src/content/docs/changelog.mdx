@@ -14,6 +14,7 @@ _Unreleased_
 ### Bug Fixes
 
 - `doctor -v N` now checks and fixes only vault N. Before, the format check covered every configured vault, so `doctor -v 1 --fix` also upgraded outdated vaults that were not selected (#485)
+- Pointing dotsecenv at a file of fewer than 3 lines that is not a vault no longer overwrites it. `vault describe -v notes.txt`, or a configured vault path holding such a file, replaced its contents with an empty vault. It now fails with "not a dotsecenv vault" and leaves the file alone. An empty or whitespace-only file still starts a new vault (#494)
 
 ### Other
 
