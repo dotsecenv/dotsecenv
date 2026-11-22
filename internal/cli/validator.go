@@ -1,16 +1,11 @@
 package cli
 
 import (
-	"bytes"
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/identity"
 	"github.com/dotsecenv/dotsecenv/pkg/dotsecenv/vault"
 	"gopkg.in/yaml.v3"
@@ -151,44 +146,44 @@ func validateVaultData(vaultData vault.Vault, manager *vault.Manager) []Validati
 	}
 
 	// Check 2: Required fields in identities
-	for i, identity := range vaultData.Identities {
-		if identity.Signature == "" {
+	for i, id := range vaultData.Identities {
+		if id.Signature == "" {
 			errors = append(errors, ValidationError{
 				Level:   "IDENTITY",
 				Message: "missing signature field",
-				Path:    fmt.Sprintf("identities[%d] (%s)", i, identity.UID),
+				Path:    fmt.Sprintf("identities[%d] (%s)", i, id.UID),
 			})
 		}
-		if identity.PublicKey == "" {
+		if id.PublicKey == "" {
 			errors = append(errors, ValidationError{
 				Level:   "IDENTITY",
 				Message: "missing public_key field",
-				Path:    fmt.Sprintf("identities[%d] (%s)", i, identity.UID),
+				Path:    fmt.Sprintf("identities[%d] (%s)", i, id.UID),
 			})
 		}
 
 		// Check 3: Verify identity signatures are valid (cryptographic verification)
-		if identity.Signature != "" {
-			if !isValidHex(identity.Signature) {
+		if id.Signature != "" {
+			if !isValidHex(id.Signature) {
 				errors = append(errors, ValidationError{
 					Level:   "IDENTITY",
 					Message: "identity signature is not valid hex encoding",
-					Path:    fmt.Sprintf("identities[%d] (%s)", i, identity.UID),
+					Path:    fmt.Sprintf("identities[%d] (%s)", i, id.UID),
 				})
 			} else {
 				// Cryptographically verify the signature
-				valid, err := verifyIdentitySignature(&vaultData.Identities[i], &vaultData)
+				valid, err := identity.VerifyIdentitySignature(&vaultData.Identities[i], vaultData.GetIdentityByFingerprint(id.SignedBy))
 				if err != nil {
 					errors = append(errors, ValidationError{
 						Level:   "IDENTITY",
 						Message: fmt.Sprintf("failed to verify identity signature: %v", err),
-						Path:    fmt.Sprintf("identities[%d] (%s)", i, identity.UID),
+						Path:    fmt.Sprintf("identities[%d] (%s)", i, id.UID),
 					})
 				} else if !valid {
 					errors = append(errors, ValidationError{
 						Level:   "IDENTITY",
 						Message: "identity signature verification failed - possible tampering",
-						Path:    fmt.Sprintf("identities[%d] (%s)", i, identity.UID),
+						Path:    fmt.Sprintf("identities[%d] (%s)", i, id.UID),
 					})
 				}
 			}
@@ -283,7 +278,7 @@ func validateVaultData(vaultData vault.Vault, manager *vault.Manager) []Validati
 				})
 			} else {
 				// Cryptographically verify the signature
-				valid, err := verifySecretSignature(&vaultData.Secrets[i], signingIdentity)
+				valid, err := vault.VerifySecretSignature(&vaultData.Secrets[i], signingIdentity)
 				if err != nil {
 					errors = append(errors, ValidationError{
 						Level:   "SECRET",
@@ -322,7 +317,7 @@ func validateVaultData(vaultData vault.Vault, manager *vault.Manager) []Validati
 					})
 				} else if valueSigningIdentity != nil {
 					// Cryptographically verify the value signature
-					valid, err := verifySecretValueSignature(&vaultData.Secrets[i].Values[j], secret.Key, valueSigningIdentity)
+					valid, err := vault.VerifySecretValueSignature(&vaultData.Secrets[i].Values[j], secret.Key, valueSigningIdentity)
 					if err != nil {
 						errors = append(errors, ValidationError{
 							Level:   "SECRET",
@@ -586,127 +581,6 @@ func isValidBase64(s string) bool {
 		}
 	}
 	return true
-}
-
-// NOTE: Hash computation functions are now in pkg/dotsecenv/identity and pkg/dotsecenv/vault
-// to ensure consistent hash formats across signing and validation.
-
-// verifyIdentitySignature verifies the cryptographic signature of an identity
-func verifyIdentitySignature(vaultIdentity *vault.Identity, vaultData *vault.Vault) (bool, error) {
-	// Look up the signer's identity
-	signingIdentity := vaultData.GetIdentityByFingerprint(vaultIdentity.SignedBy)
-	if signingIdentity == nil {
-		return false, fmt.Errorf("signing identity not found: %s", vaultIdentity.SignedBy)
-	}
-
-	// vault.Identity is an alias for identity.Identity, so we can cast directly
-	id := (*identity.Identity)(vaultIdentity)
-
-	// Step 1: Compute hash of canonical data and verify it matches stored hash
-	computedHash := identity.ComputeIdentityHash(id)
-
-	if computedHash != vaultIdentity.Hash {
-		return false, fmt.Errorf("hash mismatch: computed %s, stored %s", computedHash, vaultIdentity.Hash)
-	}
-
-	// Both keys must be the ones their fingerprints name
-	if err := identity.VerifyKeyFingerprint(id); err != nil {
-		return false, err
-	}
-	if err := identity.VerifyKeyFingerprint(signingIdentity); err != nil {
-		return false, err
-	}
-
-	// Step 2: Verify signature of the hash using the signer's public key
-	return verifySignatureWithPublicKey(signingIdentity.PublicKey, []byte(vaultIdentity.Hash), vaultIdentity.Signature)
-}
-
-// verifySecretSignature verifies the cryptographic signature of a secret
-func verifySecretSignature(secret *vault.Secret, signingIdentity *vault.Identity) (bool, error) {
-	// Step 1: Verify hash (tampering detection) using shared hash computation
-	computedHash := vault.ComputeSecretHash(secret, signingIdentity.AlgorithmBits)
-	if computedHash != secret.Hash {
-		return false, fmt.Errorf("hash mismatch: computed %s, stored %s", computedHash, secret.Hash)
-	}
-
-	// Step 2: Verify signature of hash (identity verification)
-	return verifySignatureWithPublicKey(signingIdentity.PublicKey, []byte(secret.Hash), secret.Signature)
-}
-
-// verifySecretValueSignature verifies the cryptographic signature of a secret value
-func verifySecretValueSignature(value *vault.SecretValue, secretKey string, signingIdentity *vault.Identity) (bool, error) {
-	// Step 1: Verify hash (tampering detection) using shared hash computation
-	computedHash := vault.ComputeSecretValueHash(value, secretKey, signingIdentity.AlgorithmBits)
-	if computedHash != value.Hash {
-		return false, fmt.Errorf("hash mismatch: computed %s, stored %s", computedHash, value.Hash)
-	}
-
-	// Step 2: Verify signature of hash (identity verification)
-	return verifySignatureWithPublicKey(signingIdentity.PublicKey, []byte(value.Hash), value.Signature)
-}
-
-// verifySignatureWithPublicKey performs cryptographic verification of a detached signature.
-// The signature is stored as hex-encoded binary (created by gpg --detach-sign).
-// The public key is base64-encoded and stored in the vault's identities list.
-//
-// Verification process:
-// 1. Decode the public key from base64 encoding
-// 2. Parse the public key using ProtonMail's openpgp library
-// 3. Decode the signature from hex encoding
-// 4. Use openpgp.CheckDetachedSignature to verify the signature against the data
-//
-// This approach catches:
-// - Any modification to the signed data (verification fails)
-// - Forged signatures (verification fails without correct private key)
-// - Corrupted or tampered signatures (invalid hex or parsing errors)
-// - Invalid public key encoding or format
-//
-// Implementation uses github.com/ProtonMail/go-crypto/openpgp which:
-// - Supports both armored and binary public key formats
-// - Verifies detached signatures in OpenPGP format
-// - Does not require external GPG process
-// - Is compatible with standard GPG detached signatures
-func verifySignatureWithPublicKey(publicKeyBase64 string, data []byte, signatureHex string) (bool, error) {
-	// Decode the public key from base64
-	publicKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyBase64)
-	if err != nil {
-		return false, fmt.Errorf("failed to decode public key from base64: %v", err)
-	}
-
-	// Parse the public key using ProtonMail's openpgp
-	keyReader := bytes.NewReader(publicKeyBytes)
-	keyEntities, err := openpgp.ReadArmoredKeyRing(keyReader)
-	if err != nil {
-		// If armored format fails, try binary format
-		keyReader = bytes.NewReader(publicKeyBytes)
-		keyEntities, err = openpgp.ReadKeyRing(keyReader)
-		if err != nil {
-			return false, fmt.Errorf("failed to parse public key: %v", err)
-		}
-	}
-
-	if len(keyEntities) == 0 {
-		return false, fmt.Errorf("no public keys found in key data")
-	}
-
-	// Decode signature from hex
-	sigBytes, err := hex.DecodeString(signatureHex)
-	if err != nil {
-		return false, fmt.Errorf("failed to decode signature from hex: %v", err)
-	}
-
-	// Verify the signature against the data
-	// The signature should be a detached signature (binary format)
-	sigReader := bytes.NewReader(sigBytes)
-	dataReader := bytes.NewReader(data)
-
-	// CheckDetachedSignature expects an EntityList (KeyRing interface)
-	_, err = openpgp.CheckDetachedSignature(keyEntities, dataReader, sigReader, &packet.Config{})
-	if err == nil {
-		return true, nil // Signature verified
-	}
-
-	return false, fmt.Errorf("signature verification failed: %v", err)
 }
 
 /*
