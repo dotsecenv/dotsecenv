@@ -22,6 +22,7 @@ _Unreleased_
 
 - The documentation website loads Docs7 analytics to measure page views. The privacy policy describes the data sent to Context7. (#482)
 - `.releasetools.yaml` declares `scripts/set-plugin-version.py` as the version bump command, so `/release:release` sets both agent plugin manifests (#464)
+- The CI merge gate checks sibling workflow runs every 120 seconds instead of every 3, so a few pull requests in an hour no longer exhaust the repository's GitHub API quota and fail the required `allow` check (#536)
 
 ---
 
