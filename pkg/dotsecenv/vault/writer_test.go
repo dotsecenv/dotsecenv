@@ -320,10 +320,42 @@ func TestTempFileCleanupOnError(t *testing.T) {
 		t.Fatalf("AddIdentity failed: %v", err)
 	}
 
-	// Verify no .tmp file exists after successful write
-	tmpPath := vaultPath + ".tmp"
-	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
-		t.Errorf("temp file should not exist after successful write")
+	// Verify no temp file exists after successful write
+	if leftovers, _ := filepath.Glob(filepath.Join(tmpDir, ".vault.tmp-*")); len(leftovers) != 0 {
+		t.Errorf("temp files left after a successful write: %v", leftovers)
+	}
+}
+
+// A symlink planted at the old fixed temp path must not be followed.
+func TestFlushIgnoresPlantedTempSymlink(t *testing.T) {
+	tmpDir := t.TempDir()
+	vaultPath := filepath.Join(tmpDir, "vault")
+	w, err := NewWriter(vaultPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	target := filepath.Join(tmpDir, "bashrc")
+	content := []byte("export PATH=/usr/bin\n")
+	if err := os.WriteFile(target, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, vaultPath+".tmp"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := w.AddIdentity(identity.Identity{AddedAt: time.Now().UTC(), Fingerprint: "FP1"}); err != nil {
+		t.Fatalf("AddIdentity: %v", err)
+	}
+	if got, _ := os.ReadFile(target); !bytes.Equal(got, content) {
+		t.Errorf("symlink target was overwritten: %q", got)
+	}
+	if info, err := os.Lstat(vaultPath); err != nil || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("vault is not a regular file: %v", err)
+	}
+	r, err := NewReader(vaultPath)
+	if err != nil || !r.HasIdentity("FP1") {
+		t.Fatalf("vault does not hold the new identity: %v", err)
 	}
 }
 
