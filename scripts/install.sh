@@ -290,6 +290,14 @@ resolve_install_dir() {
     fi
 }
 
+# binary_has_version BINARY VERSION: true when the "version:" line of
+# `BINARY version` equals VERSION exactly, ignoring a leading v on either side.
+binary_has_version() {
+    local reported
+    reported="$("$1" version 2>/dev/null | awk '$1 == "version:" { print $2; exit }')" || true
+    [ -n "${reported}" ] && [ "${reported#v}" = "${2#v}" ]
+}
+
 install_binary() {
     local tmp_dir="$1"
     local archive_name="dotsecenv_${VERSION#v}_${OS}_${ARCH}.tar.gz"
@@ -311,14 +319,9 @@ install_binary() {
     info "Extracting archive..."
     tar -xzf "${tmp_dir}/${archive_name}" -C "${tmp_dir}"
 
-    # Check existing installation
-    if [ -x "${INSTALL_DIR}/dotsecenv" ]; then
-        local existing_version
-        existing_version="$("${INSTALL_DIR}/dotsecenv" version 2>/dev/null || true)"
-        if printf '%s' "${existing_version}" | grep -q "${VERSION#v}"; then
-            success "dotsecenv ${VERSION} is already installed"
-            return 0
-        fi
+    if [ -x "${INSTALL_DIR}/dotsecenv" ] && binary_has_version "${INSTALL_DIR}/dotsecenv" "${VERSION}"; then
+        success "dotsecenv ${VERSION} is already installed"
+        return 0
     fi
 
     info "Installing binary to ${INSTALL_DIR}..."
