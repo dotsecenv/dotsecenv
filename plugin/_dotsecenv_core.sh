@@ -60,13 +60,6 @@ _dotsecenv_stack_pop() {
     fi
 }
 
-_dotsecenv_stack_top() {
-    local len=${#_DOTSECENV_SOURCE_STACK[@]}
-    if [[ $len -gt 0 ]]; then
-        echo "${_DOTSECENV_SOURCE_STACK[-1]}"
-    fi
-}
-
 # Check if a file passes security checks
 # Returns 0 if safe, 1 if unsafe
 _dotsecenv_security_check() {
@@ -355,6 +348,31 @@ _dotsecenv_join_comma() {
     printf '%s' "$result"
 }
 
+# Fetch one secret and export it as key, recording the value it replaces.
+# Shows CLI warnings and warns about multi-line values. On failure prints the
+# error and returns 1.
+_dotsecenv_fetch_secret() {
+    local dir_hash="$1" key="$2" secret_name="$3"
+    # Initialize to empty to prevent zsh from printing existing values
+    local secret_result="" secret_stderr_file=""
+    secret_stderr_file=$(mktemp)
+    # Capture stderr separately to preserve the secret value
+    if secret_result=$(command dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
+        _dotsecenv_track_key "$dir_hash" "$key"
+        export "$key=$secret_result"
+        [[ -s "$secret_stderr_file" ]] && cat "$secret_stderr_file" >&2
+        if [[ "$secret_result" == *$'\n'* ]]; then
+            echo "dotsecenv: warning: $key contains newlines; always quote it: \"\$$key\"" >&2
+        fi
+        rm -f "$secret_stderr_file"
+        return 0
+    fi
+    echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
+    cat "$secret_stderr_file" >&2
+    rm -f "$secret_stderr_file"
+    return 1
+}
+
 # Load a single .secenv file
 # Arguments: file_path, phase (1=plain vars only, 2=secrets only), dir
 _dotsecenv_load_file() {
@@ -394,26 +412,11 @@ _dotsecenv_load_file() {
                     continue
                 fi
 
-                # Fetch secret from vault (capture stderr separately to preserve secret value)
-                # Note: Initialize to empty to prevent zsh from printing existing values on re-declaration
-                local secret_result="" secret_stderr_file=""
-                secret_stderr_file=$(mktemp)
-                if secret_result=$(command dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
-                    _dotsecenv_track_key "$dir_hash" "$key"
-                    export "$key=$secret_result"
+                if _dotsecenv_fetch_secret "$dir_hash" "$key" "$secret_name"; then
                     _DOTSECENV_SECRETS_LOADED+=("$key")
-                    # Show any warnings that were emitted
-                    [[ -s "$secret_stderr_file" ]] && cat "$secret_stderr_file" >&2
-                    # Warn if value contains newlines
-                    if [[ "$secret_result" == *$'\n'* ]]; then
-                        echo "dotsecenv: warning: $key contains newlines; always quote it: \"\$$key\"" >&2
-                    fi
                 else
-                    echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
-                    cat "$secret_stderr_file" >&2
                     failed_secrets="${failed_secrets}${secret_name} "
                 fi
-                rm -f "$secret_stderr_file"
             fi
         fi
     done <"$file"
@@ -500,25 +503,9 @@ _dotsecenv_load_key() {
                 _dotsecenv_array_append "$envvars_var" "$key"
                 return 0
             elif [[ "$ptype" == "secret_same" || "$ptype" == "secret_named" ]]; then
-                local secret_name="$value"
-                local secret_result="" secret_stderr_file=""
-                secret_stderr_file=$(mktemp)
-                if secret_result=$(command dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
-                    _dotsecenv_track_key "$dir_hash" "$key"
-                    export "$key=$secret_result"
-                    _dotsecenv_array_append "$secrets_var" "$key"
-                    _DOTSECENV_SECRETS_LOADED+=("$key")
-                    [[ -s "$secret_stderr_file" ]] && cat "$secret_stderr_file" >&2
-                    if [[ "$secret_result" == *$'\n'* ]]; then
-                        echo "dotsecenv: warning: $key contains newlines; always quote it: \"\$$key\"" >&2
-                    fi
-                    rm -f "$secret_stderr_file"
-                    return 0
-                fi
-                echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
-                cat "$secret_stderr_file" >&2
-                rm -f "$secret_stderr_file"
-                return 1
+                _dotsecenv_fetch_secret "$dir_hash" "$key" "$value" || return 1
+                _dotsecenv_array_append "$secrets_var" "$key"
+                return 0
             fi
             return 1
         fi

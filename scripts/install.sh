@@ -57,6 +57,10 @@ INSTALL_MAN_PAGES="${INSTALL_MAN_PAGES:-1}"
 SYSTEM_INSTALL="${SYSTEM_INSTALL:-0}"
 VERIFY="${VERIFY:-1}"
 
+# Share dir for --system installs. macOS SIP prevents writes to /usr/share.
+SHARE_PREFIX="/usr/share"
+if [ "$(uname -s)" = "Darwin" ]; then SHARE_PREFIX="/usr/local/share"; fi
+
 TMPDIR_ROOT=""
 GNUPG_TMP=""
 
@@ -357,12 +361,9 @@ install_completions() {
 
     local bash_comp_dir zsh_comp_dir fish_comp_dir
     if is_system_install; then
-        local share_prefix="/usr/share"
-        # macOS SIP prevents writes to /usr/share; use /usr/local/share instead
-        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
-        bash_comp_dir="${share_prefix}/bash-completion/completions"
-        zsh_comp_dir="${share_prefix}/zsh/site-functions"
-        fish_comp_dir="${share_prefix}/fish/vendor_completions.d"
+        bash_comp_dir="${SHARE_PREFIX}/bash-completion/completions"
+        zsh_comp_dir="${SHARE_PREFIX}/zsh/site-functions"
+        fish_comp_dir="${SHARE_PREFIX}/fish/vendor_completions.d"
     else
         bash_comp_dir="${HOME}/.local/share/bash-completion/completions"
         zsh_comp_dir="${HOME}/.local/share/zsh/site-functions"
@@ -489,9 +490,7 @@ install_shell_plugin() {
     local plugin_repo="https://github.com/${GITHUB_ORG}/plugin.git"
     local plugin_dir
     if is_system_install; then
-        local share_prefix="/usr/share"
-        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
-        plugin_dir="${share_prefix}/dotsecenv/plugin"
+        plugin_dir="${SHARE_PREFIX}/dotsecenv/plugin"
     else
         plugin_dir="${HOME}/.local/share/dotsecenv/plugin"
     fi
@@ -597,9 +596,7 @@ install_tf_helper() {
 
     local tf_plugin_dir
     if is_system_install; then
-        local share_prefix="/usr/share"
-        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
-        tf_plugin_dir="${share_prefix}/terraform/plugins"
+        tf_plugin_dir="${SHARE_PREFIX}/terraform/plugins"
     else
         tf_plugin_dir="${HOME}/.terraform.d/plugins"
     fi
@@ -698,11 +695,9 @@ check_git_version_for_helper() {
 # Summary
 # ---------------------------------------------------------------------------
 print_summary() {
-    local share_prefix comp_dir man_dir
+    local comp_dir man_dir
     if is_system_install; then
-        share_prefix="/usr/share"
-        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
-        comp_dir="${share_prefix}"
+        comp_dir="${SHARE_PREFIX}"
         man_dir="/usr/local/share/man/man1"
     else
         comp_dir="${HOME}/.local/share"
@@ -718,9 +713,7 @@ print_summary() {
     if [ "${INSTALL_SHELL_PLUGIN}" = "1" ]; then
         local plugin_summary_dir
         if is_system_install; then
-            local sp="/usr/share"
-            [ "$(uname -s)" = "Darwin" ] && sp="/usr/local/share"
-            plugin_summary_dir="${sp}/dotsecenv/plugin"
+            plugin_summary_dir="${SHARE_PREFIX}/dotsecenv/plugin"
         else
             plugin_summary_dir="${HOME}/.local/share/dotsecenv/plugin"
         fi
