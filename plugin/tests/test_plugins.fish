@@ -315,32 +315,33 @@ function test_missing_secret_error_deduped
 end
 
 function test_security_check_world_writable
-    log "[fish] Testing security check (world-writable)..."
+    log "[fish] Testing security check (world-writable 666 and 777)..."
     set TESTS_RUN (math $TESTS_RUN + 1)
 
     set test_dir "$TEMP_DIR/test_security"
     mkdir -p "$test_dir"
-
     echo 'UNSAFE_VAR=should-not-load' >"$test_dir/.secenv"
-    chmod 666 "$test_dir/.secenv" # World-writable
 
     set mock_path (create_mock_dotsecenv)
 
-    trust_dirs "$TEMP_DIR/config" "$test_dir"
-    set result (fish --no-config -i -c "
-        set -gx PATH '$mock_path' \$PATH
-        set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
-        mkdir -p '$TEMP_DIR/config'
-        source '$SHELL_DIR/conf.d/dotsecenv.fish'
-        cd '$test_dir'
-        _dotsecenv_on_cd '' '$test_dir'
-        echo \"VAR=\"(test -n \"\$UNSAFE_VAR\"; and echo \$UNSAFE_VAR; or echo 'unset')
-    " 2>&1)
+    set -l failed
+    for mode in 666 777
+        chmod $mode "$test_dir/.secenv"
+        # Pre-trust the directory (but security check should still fail)
+        trust_dirs "$TEMP_DIR/config" "$test_dir"
+        set result (run_plugin "$TEMP_DIR/config" "$mock_path" "
+            cd '$test_dir'
+            echo VAR=(set -q UNSAFE_VAR; and echo \$UNSAFE_VAR; or echo unset)
+        ")
+        if not string match -q "*refusing*world-writable*" "$result"; or not string match -q "*VAR=unset*" "$result"
+            set -a failed "$mode: $result"
+        end
+    end
 
-    if string match -q "*refusing*" "$result"; and string match -q "*world-writable*" "$result"
+    if test (count $failed) -eq 0
         pass "[fish] World-writable file rejected correctly"
     else
-        fail "[fish] World-writable file not rejected, got: $result"
+        fail "[fish] World-writable file not rejected, got: $failed"
     end
 end
 

@@ -99,9 +99,10 @@ function _dotsecenv_security_check
         return 1
     end
 
-    # Check permissions: must not be world-writable
+    # Check permissions: must not be world-writable (test the o+w bit; fish
+    # math is floating point, so floor before taking the remainder)
     set -l world_perms (math "$file_perms % 10")
-    if test (math "$world_perms % 4 / 2") -eq 1
+    if test (math "floor($world_perms / 2) % 2") -eq 1
         echo "dotsecenv: refusing to load $file - world-writable" >&2
         return 1
     end

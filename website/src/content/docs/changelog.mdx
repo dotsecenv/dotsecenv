@@ -24,6 +24,7 @@ _Unreleased_
 - **Security**: The GitHub Action fetches the release key over HTTPS instead of HTTP and requires the signature to come from the pinned release key. Inputs now reach its scripts through environment variables, so a branch name passed as `version` can no longer run shell commands. `init-config` is split on whitespace and no longer evaluates quotes or `$(...)` (#523)
 - Leaving a directory with a `.secenv` puts each variable back to the value it had before you entered, instead of unsetting it. An `AWS_PROFILE` you exported before entering a project is back after `cd ..` (#524)
 - **Security**: The shell plugin trusts a `.secenv` by its contents, not only by its directory, and asks again when the file changes. Before, an "always" answer kept loading the file after a `git pull` added keys such as `PROMPT_COMMAND` or `BASH_ENV`, which can run code in your shell. The prompt now shows the file before you answer. Directories you trusted with an earlier release prompt once more (#525)
+- **Security**: The fish plugin refuses a world-writable `.secenv` with mode 777 (or any mode with `o+wx`), as bash and zsh already did (#526)
 
 ### Other
 
