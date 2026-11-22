@@ -53,6 +53,7 @@ Three changes need action from you:
 - `validate` and the read path share one set of signature checks. This removes unused exported functions from `pkg/dotsecenv/vault` (`ValidateSecret`, `ValidateSecretValue`, `ValidateSecretsOrder`, `ValidateAvailableToOrder`, `ValidateSecretMetadata`, `GetSecretSigningData`, `GetSecretValueSigningData`, `SortAvailableTo`) and all of `pkg/dotsecenv/gpg/gpg_verify.go`, so a Go program importing those packages directly may need a change (#529)
 - Remove the Windows-only source files. Windows was never built or supported (#532)
 - The shell plugin fetches secrets through one helper per shell, and the installer computes the system share directory once (#533)
+- `go.sum` drops the checksums for bubbletea v2.1.1 and lipgloss v2.1.0, which the bubbletea and lipgloss updates left behind, so `make lint` passes (#538)
 
 ---
 
