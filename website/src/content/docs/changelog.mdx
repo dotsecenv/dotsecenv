@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Features
+
+- **Breaking**: `dse` is now a plain alias for `dotsecenv`, and the shell plugin's own commands moved under `secret`. `dse reload`, `dse sync`, `dse up` and `reloadsecenv` became `dotsecenv secret reload`, which unloads everything and loads every `.secenv` from the git root (or `/`) down to the current directory. `dse cp NAME` became `dotsecenv secret cp NAME`, and `dse get NAME` is now `dse secret get NAME`. This also fixes `dse sync` leaving secrets exported after you left the directory (#528)
+
 ### Bug Fixes
 
 - Pointing dotsecenv at a file of fewer than 3 lines that is not a vault no longer overwrites it. `vault describe -v notes.txt`, or a configured vault path holding such a file, replaced its contents with an empty vault. It now fails with "not a dotsecenv vault" and leaves the file alone. An empty or whitespace-only file still starts a new vault (#494)

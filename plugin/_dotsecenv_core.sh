@@ -398,7 +398,7 @@ _dotsecenv_load_file() {
                 # Note: Initialize to empty to prevent zsh from printing existing values on re-declaration
                 local secret_result="" secret_stderr_file=""
                 secret_stderr_file=$(mktemp)
-                if secret_result=$(dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
+                if secret_result=$(command dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
                     _dotsecenv_track_key "$dir_hash" "$key"
                     export "$key=$secret_result"
                     _DOTSECENV_SECRETS_LOADED+=("$key")
@@ -503,7 +503,7 @@ _dotsecenv_load_key() {
                 local secret_name="$value"
                 local secret_result="" secret_stderr_file=""
                 secret_stderr_file=$(mktemp)
-                if secret_result=$(dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
+                if secret_result=$(command dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
                     _dotsecenv_track_key "$dir_hash" "$key"
                     export "$key=$secret_result"
                     _dotsecenv_array_append "$secrets_var" "$key"
@@ -739,79 +739,6 @@ _dotsecenv_on_cd() {
     fi
 }
 
-# Walk up from current directory and load ancestor .secenv files (root-first)
-# Arguments: [boundary_dir]
-#   boundary_dir: stop walking at this directory (default: git root, fallback: filesystem root)
-_dotsecenv_load_ancestors() {
-    local original_dir="$PWD"
-    local boundary="${1:-}"
-
-    # Determine boundary
-    if [[ -z "$boundary" ]]; then
-        boundary=$(git rev-parse --show-toplevel 2>/dev/null) || boundary=""
-    fi
-
-    # Walk up from current dir (exclusive) to boundary (inclusive), collect dirs with .secenv
-    local -a ancestor_secenvs=()
-    local dir="$original_dir"
-    local parent=""
-    while true; do
-        parent=$(dirname "$dir")
-        [[ "$parent" == "$dir" ]] && break # reached filesystem root
-        dir="$parent"
-        if [[ -f "$dir/.secenv" ]]; then
-            ancestor_secenvs+=("$dir")
-        fi
-        [[ -n "$boundary" && "$dir" == "$boundary" ]] && break
-    done
-
-    # Filter out directories already on the stack
-    local -a to_load=()
-    local ancestor="" stack_entry="" already_loaded=0
-    for ancestor in "${ancestor_secenvs[@]}"; do
-        already_loaded=0
-        for stack_entry in "${_DOTSECENV_SOURCE_STACK[@]}"; do
-            [[ "$stack_entry" == "$ancestor" ]] && {
-                already_loaded=1
-                break
-            }
-        done
-        [[ $already_loaded -eq 0 ]] && to_load+=("$ancestor")
-    done
-
-    if [[ ${#to_load[@]} -eq 0 ]]; then
-        echo "dotsecenv: no new ancestor .secenv files found" >&2
-        return 0
-    fi
-
-    # Process root-first (reverse the collected list) by cd-ing into each directory.
-    # Actual cd is required so dotsecenv CLI resolves vault paths relative to the
-    # .secenv directory. In zsh, cd triggers chpwd hook automatically. In bash,
-    # PROMPT_COMMAND won't fire mid-function so we trigger the hook manually.
-    # Note: zsh arrays are 1-indexed, bash arrays are 0-indexed
-    local i=0 start_idx=0 end_idx=0
-    if [[ -n "$ZSH_VERSION" ]]; then
-        start_idx=${#to_load[@]}
-        end_idx=1
-    else
-        start_idx=$((${#to_load[@]} - 1))
-        end_idx=0
-    fi
-
-    for ((i = start_idx; i >= end_idx; i--)); do
-        cd "${to_load[$i]}" || continue
-        if [[ -z "$ZSH_VERSION" ]]; then
-            _dotsecenv_chpwd_hook
-        fi
-    done
-
-    # Return to the original directory
-    cd "$original_dir" || return 1
-    if [[ -z "$ZSH_VERSION" ]]; then
-        _dotsecenv_chpwd_hook
-    fi
-}
-
 # Clipboard helper - copies stdin to clipboard
 _dotsecenv_clipboard_copy() {
     # macOS - use pbcopy
@@ -843,76 +770,106 @@ _dotsecenv_clipboard_copy() {
     return 1
 }
 
-# Reload all .secenv files - clears stack and re-fetches everything fresh
-# Use when vault secrets have been updated and you want to refresh without cd-ing out
+# dotsecenv secret reload: unload everything, then load, root-first, each
+# .secenv from the git root (or / outside a repository) down to $PWD, plus any
+# loaded directory above the git root. Each load cds into the directory, so the
+# CLI resolves vault paths from there, and runs the normal hook, so trust
+# prompts apply and every loaded directory is pushed onto the stack.
 _dotsecenv_reload() {
-    # Save current stack entries (ancestor → descendant order)
-    local -a dirs_to_reload=("${_DOTSECENV_SOURCE_STACK[@]}")
+    local orig="$PWD" oldpwd="$OLDPWD" dir="$PWD" cdup="" entry=""
+    local levels=-1 i=0
+    local -a dirs=()
 
-    # Clear the entire stack and unload all variables
-    while [[ ${#_DOTSECENV_SOURCE_STACK[@]} -gt 0 ]]; do
-        local top="${_DOTSECENV_SOURCE_STACK[-1]}"
-        _dotsecenv_stack_pop
-        _dotsecenv_unload_dir "$top"
-    done
-
-    # Re-load each directory in original order (ancestor → descendant)
-    local dir
-    for dir in "${dirs_to_reload[@]}"; do
-        if [[ -f "$dir/.secenv" ]]; then
-            _dotsecenv_on_cd "" "$dir"
-        fi
-    done
-
-    # Also pick up current dir if it now has .secenv and wasn't previously loaded
-    if [[ -f "$PWD/.secenv" ]]; then
-        local already_loaded=0
-        for dir in "${dirs_to_reload[@]}"; do
-            [[ "$dir" == "$PWD" ]] && {
-                already_loaded=1
-                break
-            }
+    # --show-cdup counts the levels up to the git root without resolving
+    # symlinks in $PWD; outside a repository (levels=-1) walk to /
+    if cdup=$(git rev-parse --show-cdup 2>/dev/null); then
+        levels=0
+        while [[ "$cdup" == ../* ]]; do
+            cdup="${cdup#../}"
+            ((levels++)) || true
         done
-        if [[ $already_loaded -eq 0 ]]; then
-            _dotsecenv_on_cd "" "$PWD"
-        fi
     fi
+
+    while true; do
+        if [[ -f "$dir/.secenv" ]]; then
+            if [[ $levels -lt 0 || $i -le $levels ]]; then
+                dirs=("$dir" "${dirs[@]}")
+            else
+                for entry in "${_DOTSECENV_SOURCE_STACK[@]}"; do
+                    if [[ "$entry" == "$dir" ]]; then
+                        dirs=("$dir" "${dirs[@]}")
+                        break
+                    fi
+                done
+            fi
+        fi
+        [[ "$dir" == / ]] && break
+        dir="${dir%/*}"
+        [[ -n "$dir" ]] || dir=/
+        ((i++)) || true
+    done
+
+    while [[ ${#_DOTSECENV_SOURCE_STACK[@]} -gt 0 ]]; do
+        dir="${_DOTSECENV_SOURCE_STACK[-1]}"
+        _dotsecenv_stack_pop
+        _dotsecenv_unload_dir "$dir"
+    done
+
+    if [[ ${#dirs[@]} -eq 0 ]]; then
+        echo "dotsecenv: no .secenv to load" >&2
+        return 0
+    fi
+
+    for dir in "${dirs[@]}"; do
+        if [[ "$dir" == "$PWD" ]]; then
+            # No directory change, so no hook fires; run the loader directly
+            _dotsecenv_on_cd "$dir" "$dir"
+        else
+            _dotsecenv_reload_cd "$dir" || continue
+        fi
+    done
+    [[ "$PWD" == "$orig" ]] || _dotsecenv_reload_cd "$orig"
+    OLDPWD="$oldpwd"
 }
 
-# Aliases - defined as functions to work in both bash and zsh
-dse() {
-    case "${1:-}" in
-    reload)
-        _dotsecenv_reload
-        ;;
-    sync)
-        # Pick up keys added to the current dir's .secenv without unloading first.
-        # Cross-shell manual trigger for shells that do not fire a hook on `cd .`.
-        _dotsecenv_sync_new_keys "$PWD"
-        ;;
-    get)
-        shift
-        dotsecenv secret get "$@"
-        ;;
-    cp)
-        shift
-        local output
-        if output=$(dotsecenv secret get "$@"); then
-            if printf '%s' "$output" | _dotsecenv_clipboard_copy; then
-                echo "dotsecenv: secret copied to clipboard" >&2
-            else
-                return 1
+# cd for reload; bash has no chpwd hook, so run it here (zsh runs its own)
+_dotsecenv_reload_cd() {
+    builtin cd "$1" || return 1
+    [[ -n "$ZSH_VERSION" ]] || _dotsecenv_chpwd_hook
+}
+
+# dotsecenv secret cp NAME [flags]: copy a secret to the clipboard
+_dotsecenv_copy_secret() {
+    local output
+    output=$(command dotsecenv secret get "$@") || return 1
+    printf '%s' "$output" | _dotsecenv_clipboard_copy || return 1
+    echo "dotsecenv: secret copied to clipboard" >&2
+}
+
+# The plugin handles `dotsecenv secret reload` and `dotsecenv secret cp`
+# itself and passes everything else to the binary
+dotsecenv() {
+    if [[ "${1:-}" == "secret" ]]; then
+        case "${2:-}" in
+        reload)
+            if [[ $# -gt 2 ]]; then
+                echo "dotsecenv: secret reload takes no arguments" >&2
+                return 2
             fi
-        else
-            return 1
-        fi
-        ;;
-    up)
-        shift
-        _dotsecenv_load_ancestors "$@"
-        ;;
-    *)
-        dotsecenv "$@"
-        ;;
-    esac
+            _dotsecenv_reload
+            return
+            ;;
+        cp)
+            shift 2
+            _dotsecenv_copy_secret "$@"
+            return
+            ;;
+        esac
+    fi
+    command dotsecenv "$@"
+}
+
+# dse is a flat alias of dotsecenv
+dse() {
+    dotsecenv "$@"
 }

@@ -5,7 +5,7 @@ description: Automatic secret loading with shell plugins for Bash, Zsh, and Fish
 
 import { Tabs, TabItem, Aside, Steps } from "@astrojs/starlight/components";
 
-The dotsecenv shell plugin loads secrets from a `.secenv` file when you `cd` into a directory, and unloads them when you leave. Your secrets stay in environment variables for as long as you work in the project, and your environment goes back to clean when you walk away.
+The dotsecenv shell plugin loads secrets from a `.secenv` file when you `cd` into a directory, and unloads them when you leave. Your secrets stay in environment variables for as long as you work in the project, and when you walk away every variable goes back to the value it had before.
 
 This guide builds one `.secenv` file step by step. Each section shows the exact lines you would have at that point, so you can follow along in your own project.
 
@@ -21,7 +21,7 @@ PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL}
 
 ## Install the plugin
 
-Pick your shell. Each method gives you the auto-load behavior and the `dse` command.
+Pick your shell. Each method gives you the auto-load behavior, the `dotsecenv secret reload` and `dotsecenv secret cp` commands, and the `dse` alias.
 
 If you installed dotsecenv with Homebrew or a Linux package, the plugin files are already on disk: under `$(brew --prefix)/share/dotsecenv/plugin/` for Homebrew, `/usr/share/dotsecenv/plugin/` for deb/rpm/Arch.
 
@@ -178,10 +178,16 @@ DATABASE_URL={dotsecenv}
 
 `DATABASE_URL={dotsecenv}` means "load the vault secret named `DATABASE_URL` into the variable `DATABASE_URL`." The name on the left and the name in the vault match, so you can leave the braces empty.
 
-Reload the directory to pick up the new line:
+Reload to pick up the new line. The file changed, so the plugin shows it and asks again:
 
 ```text
-~/myapp $ cd .                # or: dse reload
+~/myapp $ dotsecenv secret reload
+dotsecenv: unloaded 2 env var(s): APP_ENV, NODE_ENV
+dotsecenv: found .secenv in /home/user/myapp
+  APP_ENV=production
+  NODE_ENV=production
+  DATABASE_URL={dotsecenv}
+Load secrets? [y]es / [n]o / [a]lways: y
 dotsecenv: loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV
 dotsecenv: loaded 1 secret(s) from .secenv: DATABASE_URL
 
@@ -211,7 +217,8 @@ PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL}
 `{dotsecenv/prod::DATABASE_URL}` reads the `DATABASE_URL` key from the `prod` namespace and loads it into `PROD_DB_PASSWORD`. Now `DATABASE_URL` and `PROD_DB_PASSWORD` can hold different values from different vaults.
 
 ```text
-~/myapp $ dse reload
+~/myapp $ dotsecenv secret reload
+...                            # unload lines and the trust prompt, as above
 dotsecenv: loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV
 dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, PROD_DB_PASSWORD
 ```
@@ -245,14 +252,14 @@ dotsecenv: unloaded 2 env var(s): APP_ENV, NODE_ENV
 dotsecenv: unloaded 2 secret(s): DATABASE_URL, PROD_DB_PASSWORD
 ```
 
-Auto-loading happens when you `cd` through the directory that holds the `.secenv`. If your shell starts straight inside a subdirectory, for example a tmux pane or an editor terminal, the parent file was never crossed, so nothing loaded. Run `dse up` to walk up the tree and load ancestor files:
+Auto-loading happens when you `cd` through the directory that holds the `.secenv`. If your shell starts straight inside a subdirectory, for example a tmux pane or an editor terminal, the parent file was never crossed, so nothing loaded. Run `dotsecenv secret reload` to load every `.secenv` from the git root down to where you are:
 
 ```text
 ~ $ cd myapp/src/components/    # opened directly here; parent .secenv not crossed
 ~/myapp/src/components $ echo $DATABASE_URL
                                # empty
 
-~/myapp/src/components $ dse up
+~/myapp/src/components $ dotsecenv secret reload
 dotsecenv: loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV
 dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, PROD_DB_PASSWORD
 
@@ -278,7 +285,7 @@ dotsecenv: unloaded 1 secret(s): API_KEY
 # API_KEY gone; the parent's 4 remain
 ```
 
-When a child sets a variable that the parent already set, the child wins while you are inside it. On the way out, the parent's value is fetched again from the vault and restored.
+When a child sets a variable that the parent already set, the child wins while you are inside it. On the way out, the plugin restores the parent's value. The same goes for a variable you set before entering the project: leaving puts your value back, and a variable that was unset is unset again.
 
 <Aside type="tip">
   Returning to a directory reloads its secrets fresh from the vault, so you always get current values after a rotation, without leaving and re-entering by hand.
@@ -329,66 +336,52 @@ dotsecenv init secenv --all    # add every vault reference
 
 </Aside>
 
-## The dse command
+## Plugin commands and dse
 
-The plugin adds `dse`, a short front end for everyday work against the same `.secenv`.
+The plugin wraps `dotsecenv` in a shell function. It runs two commands itself and passes everything else to the binary.
 
-```bash title="~/myapp/.secenv"
-APP_ENV=production
-NODE_ENV=production
-DATABASE_URL={dotsecenv}
-PROD_DB_PASSWORD={dotsecenv/prod::DATABASE_URL}
-```
+| Command                     | What it does                                                    |
+| --------------------------- | --------------------------------------------------------------- |
+| `dotsecenv secret reload`   | Unload everything, then load each `.secenv` from the git root down |
+| `dotsecenv secret cp NAME`  | Copy a secret to the clipboard                                  |
+| `dse ...`                   | Alias for `dotsecenv ...`                                       |
 
-| Command          | What it does                                          |
-| ---------------- | ----------------------------------------------------- |
-| `dse`            | Pass-through to `dotsecenv`                            |
-| `dse get NAME`   | Short form of `dotsecenv secret get NAME`             |
-| `dse cp NAME`    | Copy a secret straight to the clipboard               |
-| `dse reload`     | Reload the current directory's secrets                |
-| `dse up [DIR]`   | Load ancestor `.secenv` files above the current one   |
-
-`dse` on its own forwards to `dotsecenv`:
+`dse` takes exactly the arguments `dotsecenv` takes:
 
 ```bash
-dse vault describe       # same as: dotsecenv vault describe
+dse vault describe            # same as: dotsecenv vault describe
+dse secret get DATABASE_URL   # same as: dotsecenv secret get DATABASE_URL
 ```
 
-`dse get` reads one secret. For a value referenced by the example file:
+`dotsecenv secret cp` copies a secret to the clipboard without printing it, so it never lands on screen or in shell history. It takes the same arguments as `dotsecenv secret get`:
 
 ```bash
-dse get DATABASE_URL     # same as: dotsecenv secret get DATABASE_URL
-```
-
-`dse cp` copies a secret to the clipboard without printing it, so it never lands on screen or in shell history:
-
-```bash
-dse cp PROD_DB_PASSWORD
+dotsecenv secret cp PROD_DB_PASSWORD
 # dotsecenv: secret copied to clipboard
 ```
 
 Clipboard backends: `pbcopy` on macOS, `wl-copy` on Wayland, `xclip` or `xsel` on X11.
 
-`dse reload` re-runs the loader for the current directory. Use it after you edit the `.secenv`, after you change a secret in the vault, or to retry a fetch that failed:
+`dotsecenv secret reload` unloads every loaded `.secenv`. It then loads, root-first, each `.secenv` from the git root (or `/` outside a repository) down to the current directory. A directory above the git root reloads only if it was loaded before. Each load goes through the normal loader, so a changed file prompts again. Use it after you edit a `.secenv`, after a secret changes in the vault, to retry a failed fetch, or when the shell started below the directory that holds the `.secenv`:
 
 ```text
-~/myapp $ dse reload
+~/myapp $ dotsecenv secret reload
+dotsecenv: unloaded 2 env var(s): APP_ENV, NODE_ENV
+dotsecenv: unloaded 2 secret(s): DATABASE_URL, PROD_DB_PASSWORD
 dotsecenv: loaded 2 env var(s) from .secenv: APP_ENV, NODE_ENV
 dotsecenv: loaded 2 secret(s) from .secenv: DATABASE_URL, PROD_DB_PASSWORD
 ```
 
-<Aside type="note" title="dse reload semantics (v0.5.1+)">
-  Since v0.5.1, `dse reload` clears the current secret stack and re-fetches. Earlier versions re-ran the loader without clearing what was already loaded.
+<Aside type="caution" title="Removed dse subcommands">
+  `dse` used to have its own subcommands. They are gone, with no fallbacks:
+
+  | Old                                 | New                          |
+  | ----------------------------------- | ---------------------------- |
+  | `dse reload`, `dse sync`, `dse up`  | `dotsecenv secret reload`    |
+  | `reloadsecenv`                      | `dotsecenv secret reload`    |
+  | `dse cp NAME`                       | `dotsecenv secret cp NAME`   |
+  | `dse get NAME`                      | `dse secret get NAME`        |
 </Aside>
-
-`dse up` walks from the current directory toward the git root (or the filesystem root if you are not in a repo), collects every ancestor that holds a `.secenv`, and loads them root-first so layering stays correct. Ancestors already loaded are skipped. Pass a directory to stop the walk early:
-
-```bash
-dse up                   # walk to the git root
-dse up /home/user        # stop the walk at this directory
-```
-
-`dse up` was introduced in v0.5.0.
 
 ## Troubleshooting
 
@@ -397,7 +390,7 @@ Secrets did not load when you entered the directory:
 <Steps>
 1. Confirm the plugin is active with `type dse`. It should report a function.
 2. Check the file with `ls -la .secenv`. Confirm you own it and it is not world-writable.
-3. Run `dse reload` to load it by hand.
+3. Run `dotsecenv secret reload` to load it by hand.
 </Steps>
 
 The prompt never appears and you see `no TTY for trust prompt`. The trust prompt needs an interactive terminal, so scripts and non-interactive shells cannot answer it. Pre-trust the directory's current `.secenv` instead (use `shasum -a 256` where `sha256sum` is missing):
@@ -414,7 +407,7 @@ dotsecenv: error fetching secret 'DATABASE_URL' for DATABASE_URL:
 <error details>
 ```
 
-Common causes: the secret is not in the vault, the GPG agent is not running, or the vault is locked. Confirm the secret exists with `dse get DATABASE_URL`, then `dse reload`.
+Common causes: the secret is not in the vault, the GPG agent is not running, or the vault is locked. Confirm the secret exists with `dotsecenv secret get DATABASE_URL`, then run `dotsecenv secret reload`.
 
 ## Next steps
 
