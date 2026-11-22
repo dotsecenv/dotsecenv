@@ -109,7 +109,8 @@ source, and getting a private key onto the runner.
 ## Security
 
 Vault entries use AES-256-GCM inside RFC 9580 multi-recipient OpenPGP. Every entry carries a signature and a
-SHA-256 hash, and dotsecenv verifies both on each read. Algorithm defaults meet FIPS 186-5 minimums, release
+SHA-256 hash. Before decrypting a value, dotsecenv verifies both for that value and its secret, and
+`dotsecenv validate` verifies every entry. Algorithm defaults meet FIPS 186-5 minimums, release
 binaries link Go's FIPS 140-3 module, and every release ships SLSA Build Level 3 provenance. Each pull request
 runs the end-to-end suite inside a network-isolated namespace that proves the binary opens no outbound connection.
 

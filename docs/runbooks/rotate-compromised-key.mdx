@@ -1,0 +1,74 @@
+---
+title: Rotate a compromised GPG key
+description: Remove a compromised private key from your dotsecenv vaults and rotate the underlying secrets it could decrypt
+---
+Remove a compromised private key from every vault it could read and rotate the underlying secrets at their source. Applies whether the compromised key is yours or a teammate's.
+
+<Warning title="Append-only contract">
+`secret revoke` only stops *future* writes from encrypting to the compromised key. Past entries remain in the vault file and in `git` history, encrypted to whoever held the recipient list at the time. The compromised private key still decrypts them. Source rotation is the only durable mitigation.
+</Warning>
+
+<Tip title="Planned departure rather than a key compromise?">
+Use [Offboard a Departing Team Member](/runbooks/team-member-offboarding) instead.
+</Tip>
+
+## Runbook
+
+<Steps>
+  <Step title="Generate or import a replacement identity.">
+If the compromised key is yours, generate a new pair (`gpg --full-generate-key`), publish the new public key, and have each teammate import it.
+  </Step>
+  <Step title="Revoke the compromised fingerprint from every affected secret.">
+`secret revoke` takes one secret name per call, so loop over the key list that `secret get` (no arguments) prints.
+
+```bash
+for s in $(dotsecenv secret get); do
+     dotsecenv secret revoke "$s" <COMPROMISED_FP> --all
+done
+```
+  </Step>
+  <Step title="Add the replacement recipient.">
+```bash
+dotsecenv secret share <SECRET_NAME> <NEW_FP> --all
+```
+  </Step>
+  <Step title="Rotate each affected secret at its source.">
+Generate a new credential at the originating system (database, IDP, cloud provider, API issuer) and store it. This is what neutralizes the compromise.
+
+```bash
+echo "<new-value>" | dotsecenv secret store <SECRET_NAME>
+```
+  </Step>
+  <Step title="Verify.">
+Every current secret should list the new key as a recipient and not the compromised one.
+
+```bash
+dotsecenv vault doctor
+dotsecenv vault describe
+```
+  </Step>
+  <Step title="Commit.">
+```bash
+git add path/to/vault
+git commit -m "Rotate compromised key <COMPROMISED_FP>, rotate N secrets"
+```
+  </Step>
+</Steps>
+
+## Blast radius: repo-scoped vs org-wide keys
+
+The scope of the compromised key sets the scope of the rotation. A repo-scoped CI key (`GPG_PRIVATE_KEY`) only decrypts one repository's vault, so revoke, re-share, and source-rotate stay contained to that repo. An org-wide key (`ORG_GPG_PRIVATE_KEY`) decrypts every vault that listed it as a recipient, so you must run the runbook against each affected repo: revoke the fingerprint, share the replacement, rotate the secret at its source, and commit in every one. Track the full list before you start so none are missed. See [Key Scope](/concepts/key-scope) for the trade-offs.
+
+## What you cannot do
+
+- **Erase a leaked entry from the vault file.** Append-only by design. Rewriting `git` history with `git filter-repo` is possible, but anyone who already cloned the repo still has the old data and the compromised key still decrypts it.
+- **Re-encrypt an existing entry to a different recipient set.** `secret share` and `secret revoke` only affect future writes. Source rotation is the only fix.
+
+## See also
+
+- Runbook: [Offboard a Departing Team Member](/runbooks/team-member-offboarding)
+- Tutorial: [Revoke Access](/tutorials/revoke-access)
+- Concept: [Vault Format — append-only semantics](/concepts/vault-format#append-only-semantics)
+- Concept: [Key Scope](/concepts/key-scope)
+- Concept: [Threat Model](/concepts/threat-model)
+- Runnable example: [`examples/02-team-share-revoke/`](https://github.com/dotsecenv/dotsecenv/tree/main/examples/02-team-share-revoke)

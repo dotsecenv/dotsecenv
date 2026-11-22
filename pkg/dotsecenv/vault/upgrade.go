@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 )
@@ -29,7 +28,7 @@ func DetectVaultVersion(path string) (int, error) {
 		return 0, nil
 	}
 
-	scanner := bufio.NewScanner(f)
+	scanner := newLineScanner(f)
 
 	// Line 1: Header marker
 	if !scanner.Scan() {

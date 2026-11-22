@@ -71,8 +71,10 @@ jobs:
           fi
 
           echo "Watching ${WORKFLOW} run ${RUN_ID}..."
-          # exits non-zero on failure/cancelled/timed_out, zero on success/skipped
-          gh run watch "$RUN_ID" --exit-status --repo "$GH_REPO"
+          # exits non-zero on failure/cancelled/timed_out, zero on success/skipped.
+          # --interval 120: the default 3s, times 7 shards, exhausts the repo's
+          # hourly GITHUB_TOKEN API quota within a single gate run.
+          gh run watch "$RUN_ID" --exit-status --repo "$GH_REPO" --interval 120
 
   allow:
     name: allow
