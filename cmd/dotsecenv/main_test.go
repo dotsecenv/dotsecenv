@@ -157,9 +157,7 @@ gpg:
 		},
 		{
 			name: "flag after command with other flags",
-			// We can't easily test this without a command that takes other flags and validates config
-			// validate takes --fix. Let's try that.
-			args: []string{"validate", "--fix", "-c", configPath},
+			args: []string{"validate", "-s", "-c", configPath},
 		},
 	}
 

@@ -106,22 +106,7 @@ homebrew_casks:
 
         Details: https://dotsecenv.com/guides/shell-plugins/
     manpages:
-      - man/man1/dotsecenv.1
-      - man/man1/dotsecenv-completion.1
-      - man/man1/dotsecenv-init.1
-      - man/man1/dotsecenv-init-config.1
-      - man/man1/dotsecenv-init-vault.1
-      - man/man1/dotsecenv-login.1
-      - man/man1/dotsecenv-secret.1
-      - man/man1/dotsecenv-secret-get.1
-      - man/man1/dotsecenv-secret-store.1
-      - man/man1/dotsecenv-secret-revoke.1
-      - man/man1/dotsecenv-secret-share.1
-      - man/man1/dotsecenv-validate.1
-      - man/man1/dotsecenv-vault.1
-      - man/man1/dotsecenv-vault-describe.1
-      - man/man1/dotsecenv-vault-doctor.1
-      - man/man1/dotsecenv-version.1
+      - man/man1/*.1
     completions:
       bash: completions/dotsecenv.bash
       zsh: completions/dotsecenv.zsh

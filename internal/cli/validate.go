@@ -12,7 +12,7 @@ import (
 )
 
 // Validate validates the configuration and vault files
-func (c *CLI) Validate(fix bool) *Error {
+func (c *CLI) Validate() *Error {
 	_, _ = fmt.Fprintf(c.output.Stdout(), "=== DotSecEnv Configuration Validation ===\n\n")
 
 	absConfigPath, err := filepath.Abs(c.configPath)
