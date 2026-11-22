@@ -37,6 +37,7 @@ _Unreleased_
 - `.releasetools.yaml` declares `scripts/set-plugin-version.py` as the version bump command, so `/release:release` sets both agent plugin manifests (#464)
 - The CI merge gate checks sibling workflow runs every 120 seconds instead of every 3, so a few pull requests in an hour no longer exhaust the repository's GitHub API quota and fail the required `allow` check (#536)
 - Plugin CI builds fish 3.7.1 from source again on ubuntu-26.04. CMake 4 rejected its `install(SCRIPT CODE ...)` call, so the fish 3.x leg failed on every plugin pull request (#537)
+- `validate` and the read path share one set of signature checks. This removes unused exported functions from `pkg/dotsecenv/vault` (`ValidateSecret`, `ValidateSecretValue`, `ValidateSecretsOrder`, `ValidateAvailableToOrder`, `ValidateSecretMetadata`, `GetSecretSigningData`, `GetSecretValueSigningData`, `SortAvailableTo`) and all of `pkg/dotsecenv/gpg/gpg_verify.go`, so a Go program importing those packages directly may need a change (#529)
 
 ---
 
