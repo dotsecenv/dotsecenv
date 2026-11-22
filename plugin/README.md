@@ -213,7 +213,7 @@ dotsecenv: refusing to load /path/.secenv - not owned by current user or root
 curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash -s -- --uninstall
 ```
 
-Uninstall removes only the files the plugin installed. Your vault and anything else in `~/.local/share/dotsecenv` stay.
+Uninstall removes only the files the plugin installed and the `source` lines the installer added. Your vault, anything else in `~/.local/share/dotsecenv`, and your own RC lines that mention dotsecenv stay.
 
 Or manually remove the source line from your shell's RC file.
 

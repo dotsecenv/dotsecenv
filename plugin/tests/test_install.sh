@@ -96,6 +96,7 @@ test_uninstall_keeps_vault_next_to_legacy_copy_install() {
     run_installer --uninstall
     assert_vault
     assert_no_legacy_files
+    ! grep -q dotsecenv "$T_HOME/.zshrc" || fail "old-path rc lines left: $(cat "$T_HOME/.zshrc")"
 }
 
 test_uninstall_keeps_vault_next_to_legacy_clone_install() {
@@ -148,6 +149,26 @@ test_install_migrates_legacy_clone_install() {
     [[ -f "$NEW/dotsecenv.plugin.zsh" ]] || fail "plugin not installed to $NEW"
 }
 
+test_uninstall_removes_only_installer_rc_lines() {
+    local user_lines rc
+    # shellcheck disable=SC2016 # literal rc lines
+    user_lines='eval "$(dotsecenv completion zsh)"
+export DOTSECENV_CONFIG="$HOME/.config/dotsecenv/config"
+alias dsv="dotsecenv secret get"
+# dotsecenv shell plugin
+echo "user line under a lookalike marker"'
+    printf '%s\n' "$user_lines" >"$T_HOME/.zshrc"
+    make_legacy_copy_install
+    printf '%s\n' "$user_lines" >>"$T_HOME/.zshrc"
+    run_installer
+    run_installer --uninstall
+    for rc in "$T_HOME/.bashrc" "$T_HOME/.config/fish/config.fish"; do
+        ! grep -q . "$rc" || fail "$rc not emptied: $(cat "$rc")"
+    done
+    rc="$T_HOME/.zshrc"
+    [[ "$(grep -v '^$' "$rc")" == "$user_lines"$'\n'"$user_lines" ]] || fail "user lines changed: $(cat "$rc")"
+}
+
 echo "install.sh tests"
 run_test test_uninstall_keeps_vault_next_to_legacy_copy_install
 run_test test_uninstall_keeps_vault_next_to_legacy_clone_install
@@ -155,6 +176,7 @@ run_test test_uninstall_keeps_vault_next_to_new_install
 run_test test_uninstall_keeps_unknown_files_in_plugin_dir
 run_test test_install_migrates_legacy_install
 run_test test_install_migrates_legacy_clone_install
+run_test test_uninstall_removes_only_installer_rc_lines
 
 echo "Passed: $PASSED, Failed: $FAILED"
 [[ $FAILED -eq 0 ]]
