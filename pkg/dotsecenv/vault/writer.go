@@ -134,8 +134,12 @@ func (w *Writer) loadExisting() error {
 	}
 
 	if lineNum < 3 {
+		// Whitespace only counts as empty. Anything else is not a vault, and
+		// recreating it would destroy whatever file the user pointed at.
+		if strings.TrimSpace(strings.Join(w.lines, "")) != "" {
+			return fmt.Errorf("invalid vault file: not a dotsecenv vault (%d line(s); a vault has at least 3)", lineNum)
+		}
 		if w.readOnly {
-			// In read-only mode, treat malformed file as empty vault
 			w.header = NewHeader()
 			w.version = LatestFormatVersion
 			w.lines = []string{
@@ -145,7 +149,6 @@ func (w *Writer) loadExisting() error {
 			}
 			return nil
 		}
-		// File exists but is malformed, recreate it
 		return w.createNewVault()
 	}
 
