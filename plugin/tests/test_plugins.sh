@@ -418,48 +418,33 @@ EOF
 
 test_security_check_world_writable() {
     local shell="$1"
-    log "[$shell] Testing security check (world-writable)..."
+    log "[$shell] Testing security check (world-writable 666 and 777)..."
     ((TESTS_RUN++)) || true
 
     local test_dir="$TEMP_DIR/test_security"
     mkdir -p "$test_dir"
-
-    cat >"$test_dir/.secenv" <<'EOF'
-UNSAFE_VAR=should-not-load
-EOF
-    chmod 666 "$test_dir/.secenv" # World-writable
-
-    # Pre-trust the directory (but security check should still fail)
-    local config_dir="$TEMP_DIR/config"
-    mkdir -p "$config_dir"
-    trust_dirs "$config_dir" "$test_dir"
+    echo 'UNSAFE_VAR=should-not-load' >"$test_dir/.secenv"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
 
-    local result
-    if [[ "$shell" == "bash" ]]; then
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/_dotsecenv_core.sh'
-            source '$SHELL_DIR/dotsecenv.plugin.bash'
-            cd '$test_dir'
-            _dotsecenv_chpwd_hook
-            echo \"VAR=\${UNSAFE_VAR:-unset}\"
-        " 2>&1)
-    else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+    local mode result failed=""
+    for mode in 666 777; do
+        chmod "$mode" "$test_dir/.secenv"
+        # Pre-trust the directory (but security check should still fail)
+        trust_dirs "$TEMP_DIR/config" "$test_dir"
+        result=$(run_plugin "$shell" "$TEMP_DIR/config" "$mock_path" "
             cd '$test_dir'
             echo \"VAR=\${UNSAFE_VAR:-unset}\"
-        " 2>&1)
-    fi
+        ")
+        [[ "$result" == *"refusing"*"world-writable"* && "$result" == *"VAR=unset"* ]] ||
+            failed+=" $mode: $result"
+    done
 
-    if [[ "$result" == *"refusing"* && "$result" == *"world-writable"* ]]; then
+    if [[ -z "$failed" ]]; then
         pass "[$shell] World-writable file rejected correctly"
     else
-        fail "[$shell] World-writable file not rejected, got: $result"
+        fail "[$shell] World-writable file not rejected, got:$failed"
     fi
 }
 
