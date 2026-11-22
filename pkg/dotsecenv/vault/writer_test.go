@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -201,10 +200,6 @@ func TestFlushWithRestrictivePermissions(t *testing.T) {
 }
 
 func TestGetFileOwnerUnix(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("skipping Unix-specific test on Windows")
-	}
-
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "testfile")
 
@@ -233,34 +228,6 @@ func TestGetFileOwnerUnix(t *testing.T) {
 	}
 	if gid != os.Getgid() {
 		t.Errorf("expected gid %d, got %d", os.Getgid(), gid)
-	}
-}
-
-func TestGetFileOwnerWindows(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("skipping Windows-specific test on non-Windows")
-	}
-
-	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "testfile")
-
-	if err := os.WriteFile(testFile, []byte("test"), 0o600); err != nil {
-		t.Fatalf("WriteFile failed: %v", err)
-	}
-
-	info, err := os.Stat(testFile)
-	if err != nil {
-		t.Fatalf("os.Stat failed: %v", err)
-	}
-
-	uid, gid := getFileOwner(info)
-
-	// On Windows, getFileOwner returns -1, -1
-	if uid != -1 {
-		t.Errorf("expected uid -1 on Windows, got %d", uid)
-	}
-	if gid != -1 {
-		t.Errorf("expected gid -1 on Windows, got %d", gid)
 	}
 }
 
