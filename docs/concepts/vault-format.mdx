@@ -1,0 +1,182 @@
+---
+title: Vault Format
+description: Understanding dotsecenv vault file format and structure
+---
+## Overview
+
+dotsecenv vaults use a versioned JSONL format. The format includes a version field in the header JSON, allowing the format to evolve over time while maintaining backward compatibility.
+
+## Current Format (v2) <Badge>Current</Badge>
+
+The vault file consists of:
+
+1. A header marker line that identifies the file as a dotsecenv vault
+2. A header JSON line that indexes identities and secrets for efficient lookup
+3. A data marker line that separates header from data
+4. Data entries: one JSON object per line (identities, secrets, values)
+
+### Structure
+
+```text
+# === VAULT HEADER ===
+{"version":2,"dotsecenv_version":"0.11.0","identities":{"fingerprint1":4,"fingerprint2":5},"secrets":{...}}
+# === VAULT DATA ===
+{"type":"identity","data":{...}}
+{"type":"secret","data":{...}}
+{"type":"value","secret":"KEY","data":{...}}
+```
+
+### Header Format
+
+The header maps each identity fingerprint, and each secret, to the lines that hold its entries:
+
+```json
+{
+  "version": 2,
+  "dotsecenv_version": "0.11.0",
+  "identities": {
+    "ABC123DEF456": 4,
+    "XYZ789GHI012": 5
+  },
+  "secrets": {
+    "DATABASE_URL": {
+      "secret": 6,
+      "values": [7, 8]
+    }
+  }
+}
+```
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `version` | `int` | Format version (currently 2) |
+| `dotsecenv_version` | `string` | dotsecenv release that created the vault or last rewrote it; absent in older vaults |
+| `identities` | `object` | Map of fingerprint to the line of its identity entry |
+| `secrets` | `object` | Map of secret name to definition line and value lines |
+
+Keys are written in sorted order, so the same vault always produces the same header line.
+
+### Release stamp
+
+`dotsecenv_version` names the release, as `X.Y.Z`, that created the vault or last rewrote the whole file: `vault compact`, defragmentation in `vault doctor`, and format upgrades. `secret store`, `secret share`, `secret forget` and other appends leave it unchanged. `vault compact` warns you to upgrade dotsecenv when the stamp names a newer release than the one running.
+
+A build made between releases, such as `v0.11.0-3-gabc1234` from `make build`, records the release it was built after (`0.11.0`). The field is absent when the vault was last rewritten by a release before 0.11.0 or by a build whose version has no `X.Y.Z` (`unknown`, or a bare commit hash). A release before 0.11.0 also drops the field whenever it appends to the vault. A missing stamp never triggers the warning.
+
+<Tip>
+For querying the audit trail (who signed each entry, who could decrypt each version, when changes happened), see [Audit Trail](/concepts/audit-trail).
+</Tip>
+
+## Append-only semantics
+
+`secret store` always appends a new line to the vault. The file only grows forward; no dotsecenv command mutates or removes a past entry.
+
+On read, `secret get` returns the latest entry. `vault describe` shows every entry the vault holds, including the recipient list each was encrypted to and the signature on each line. Together with `git log` on the vault file, that history is the audit trail.
+
+Three properties follow from this:
+
+- **Audit trail.** What value was stored, when, and to whom it was encrypted is provable, going back to the first `secret store` in the repo's history.
+- **Rotation safety.** Adding a new value never overwrites or destroys the prior one. To replace a value, the new entry is written; the old entry remains as evidence.
+- **No edits in place.** No CLI subcommand mutates a past entry. Every change is a new line.
+
+### What this means for revocation
+
+`secret revoke` and `secret share` only affect *future* writes. They do not rewrite past entries. A revoked recipient still decrypts every entry that was written while their fingerprint was on the recipient list, including entries already in the repo's `git` history. The durable mitigation is to rotate the underlying secret at its source (issue a new database password, reissue the API key) and store the new value. See [Rotate a Compromised GPG Key](/runbooks/rotate-compromised-key) and [Offboard a Departing Team Member](/runbooks/team-member-offboarding) for the end-to-end runbooks.
+
+## Entry Types
+
+### Identity Entry
+
+```json
+{
+  "type": "identity",
+  "data": {
+    "added_at": "2025-01-01T00:00:00Z",
+    "algorithm": "RSA",
+    "algorithm_bits": 4096,
+    "fingerprint": "ABC123DEF456789012345678901234567890ABCD",
+    "hash": "sha256:...",
+    "public_key": "-----BEGIN PGP PUBLIC KEY BLOCK-----...",
+    "signed_by": "ABC123DEF456789012345678901234567890ABCD",
+    "signature": "...",
+    "uid": "alice@example.com"
+  }
+}
+```
+
+### Secret Definition
+
+```json
+{
+  "type": "secret",
+  "data": {
+    "added_at": "2025-01-01T00:00:00Z",
+    "hash": "sha256:...",
+    "key": "DATABASE_URL",
+    "signature": "...",
+    "signed_by": "ABC123DEF456789012345678901234567890ABCD"
+  }
+}
+```
+
+### Secret Value
+
+```json
+{
+  "type": "value",
+  "secret": "DATABASE_URL",
+  "data": {
+    "added_at": "2025-01-01T00:00:00Z",
+    "available_to": ["ABC123DEF456...", "XYZ789GHI012..."],
+    "hash": "sha256:...",
+    "signature": "...",
+    "signed_by": "ABC123DEF456789012345678901234567890ABCD",
+    "value": "base64-encoded-encrypted-blob"
+  }
+}
+```
+
+## Version Detection
+
+dotsecenv detects the format version from the `version` field in the header JSON:
+
+```json
+{"version":2,"identities":{...},"secrets":{...}}
+```
+
+This allows efficient version detection by parsing just the header line.
+
+## Line Numbers
+
+Line numbers in the header are 1-indexed (first line = 1):
+
+| Line | Content |
+|------|---------|
+| 1 | Header marker (`# === VAULT HEADER ===`) |
+| 2 | Header JSON |
+| 3 | Data marker (`# === VAULT DATA ===`) |
+| 4+ | Data entries (identities, secrets, values) |
+
+The header indexes point to line numbers where each entry can be found, enabling O(1) lookups.
+
+## Future Versioning
+
+The format version lets dotsecenv evolve while maintaining compatibility. Older vaults remain readable, new features can land without breaking existing vaults, and future versions may include automatic upgrades.
+
+<Note>
+  v1 vaults store identities as an array of `[fingerprint, line]` pairs under a `# === VAULT HEADER v1 ===` marker. dotsecenv upgrades them to v2 when it opens them, unless `behavior.require_explicit_vault_upgrade` is set. Future format changes will be announced in release notes with migration guidance.
+</Note>
+
+## Validation
+
+dotsecenv validates vault structure on read:
+
+1. Header marker must match expected format
+2. Header JSON must parse successfully
+3. Data marker must be present
+4. Line numbers in header must point to valid entries
+
+Use the validate command to check vault integrity:
+
+```bash
+dotsecenv validate
+```

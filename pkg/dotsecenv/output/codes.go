@@ -55,6 +55,9 @@ const (
 	// Algorithm errors (exit code 9)
 	CodeAlgorithmNotAllowed Code = "ALGORITHM_NOT_ALLOWED"
 	CodeAlgorithmWeak       Code = "ALGORITHM_WEAK"
+
+	// Changes found but not applied (exit code 10)
+	CodeChangesRequired Code = "CHANGES_REQUIRED"
 )
 
 // Warning codes

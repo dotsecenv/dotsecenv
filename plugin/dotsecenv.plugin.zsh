@@ -37,11 +37,6 @@ _dotsecenv_chpwd_hook() {
     _dotsecenv_on_cd "$old_dir" "$PWD"
 }
 
-# Reload secrets in current directory (for when cd . doesn't trigger chpwd)
-reloadsecenv() {
-    _dotsecenv_reload
-}
-
 # Register the chpwd hook using zsh's hook system
 autoload -Uz add-zsh-hook
 add-zsh-hook chpwd _dotsecenv_chpwd_hook

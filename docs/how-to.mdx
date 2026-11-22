@@ -1,0 +1,496 @@
+---
+title: How-To Guides
+description: Common tasks and solutions for working with dotsecenv
+---
+Quick solutions for common tasks. Each section is a self-contained guide.
+
+---
+
+## Work with .env Files
+
+dotsecenv works seamlessly alongside `.env` files. Use `.env` for non-sensitive config and `.secenv` for secrets.
+
+### Recommended Setup
+
+```bash
+# .env: non-sensitive configuration
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=myapp
+LOG_LEVEL=debug
+
+# .secenv: encrypted secrets from vault
+DATABASE_PASSWORD={dotsecenv}
+API_KEY={dotsecenv/prod::API_KEY}
+```
+
+### Loading Both Files
+
+With the shell plugin installed, both files load automatically when you `cd` into the directory:
+
+1. `.env` loads first (plain values)
+2. `.secenv` loads second (decrypted secrets)
+
+Variables from `.secenv` can override `.env` if names match.
+
+---
+
+## Migrate Secrets from .env
+
+See the [Migrate from .env tutorial](/tutorials/migrate-from-dotenv). It walks the full sequence: identify which values are secret, store each in the vault, write a `.secenv` file, drop the plaintext `.env`, and commit only the encrypted vault.
+
+---
+
+## Generate a .secenv from Your Vault
+
+Build a `.secenv` from the secrets already in your vault instead of writing it by hand.
+
+### Pick interactively
+
+```bash
+dotsecenv init secenv
+```
+
+Opens one tab per vault. Use `←`/`→` to switch tabs, `↑`/`↓` to move, `space` to select, and `enter` to reach the Apply tab and confirm.
+
+### Add everything at once
+
+```bash
+dotsecenv init secenv --all
+```
+
+Adds every reference not already present. Use `-v` to restrict to one vault:
+
+```bash
+dotsecenv init secenv -v 2 --all
+```
+
+It writes references, never values, and leaves existing keys untouched. See [`init secenv`](/reference#init-secenv) for the full key map.
+
+---
+
+## Create a Secret
+
+Store a new encrypted secret in your vault.
+
+### From stdin (recommended)
+
+```bash
+echo "my-secret-value" | dotsecenv secret store SECRET_NAME
+```
+
+### Interactive input
+
+```bash
+dotsecenv secret store SECRET_NAME
+# Type or paste the value
+# Press Ctrl+D when done
+```
+
+### From a file
+
+```bash
+cat ~/.ssh/private_key | dotsecenv secret store SSH_PRIVATE_KEY
+```
+
+### With a namespace
+
+```bash
+echo "prod-password" | dotsecenv secret store prod::DATABASE_PASSWORD
+echo "dev-password" | dotsecenv secret store dev::DATABASE_PASSWORD
+```
+
+### To a specific vault
+
+```bash
+echo "value" | dotsecenv secret store -v ./project/vault PROJECT_SECRET
+```
+
+<Tip>
+Reading from stdin prevents the secret from appearing in shell history.
+</Tip>
+
+---
+
+## Retrieve a Secret
+
+Get a decrypted secret value.
+
+### Basic retrieval
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD
+# Output: my-secret-value
+```
+
+### As JSON
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD --json
+# {"added_at":"2026-04-12T10:22:01Z","value":"my-secret-value","vault":"~/.config/dotsecenv/vault"}
+```
+
+### Get all versions
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD --all
+# Lists all historical values
+```
+
+`--all` with `--json` additionally returns `available_to` and `signed_by` per version, which is the supported audit interface — see [Audit Trail](/concepts/audit-trail).
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD --all --json
+# [
+#   {
+#     "added_at": "2026-04-12T10:22:01Z",
+#     "value": "my-secret-value",
+#     "vault": "~/.config/dotsecenv/vault",
+#     "available_to": ["ALICE_FP", "BOB_FP"],
+#     "signed_by": "ALICE_FP"
+#   }
+# ]
+```
+
+### Get latest version only
+
+```bash
+dotsecenv secret get DATABASE_PASSWORD --last
+```
+
+### From a specific vault
+
+```bash
+dotsecenv secret get -v 2 DATABASE_PASSWORD  # Vault index (1-based)
+dotsecenv secret get -v ./path/to/vault DATABASE_PASSWORD
+```
+
+---
+
+## Share a Secret
+
+See the [Share a Secret tutorial](/tutorials/share-secret). The short form is `dotsecenv secret share NAME THEIR_FINGERPRINT --all`; the tutorial covers the public-key exchange, the access-list semantics, and the team-onboarding follow-up. To share every secret with a new teammate in one pass, use the wildcard form: `dotsecenv secret share "*" THEIR_FINGERPRINT --all`.
+
+---
+
+## Revoke Access to a Secret
+
+See the [Revoke Access tutorial](/tutorials/revoke-access) for the full sequence including the rotate-after-revoke caveat (the revoked recipient can still decrypt the previous value; rotating at the source is what neutralizes it). The short form is `dotsecenv secret revoke NAME THEIR_FINGERPRINT --all`. To strip a leaving teammate's key entirely from every vault, see the [Offboard a Departing Team Member](/runbooks/team-member-offboarding) runbook.
+
+---
+
+## Audit Secret History
+
+Query who could decrypt a secret, who signed each version, and when each change happened.
+
+```bash
+# Current authorization snapshot per secret
+dotsecenv vault describe --json
+
+# Full version history with signed_by and available_to per value
+dotsecenv secret get DATABASE_PASSWORD --all --json
+
+# Real-world authorship and commit timeline
+git log -p -- path/to/vault
+```
+
+For example queries (filter by signer, diff access changes, query past commits) and a discussion of what append-only can and cannot prove, see [Audit Trail](/concepts/audit-trail).
+
+---
+
+## Recover from a Compromised GPG Key
+
+See the dedicated runbook: [Rotate a Compromised GPG Key](/runbooks/rotate-compromised-key). It covers the full revoke → share → rotate-at-source → verify sequence and the append-only caveats.
+
+For a planned departure rather than a key compromise, see [Offboard a Departing Team Member](/runbooks/team-member-offboarding) instead.
+
+---
+
+## Validate Configuration and Vault
+
+Check for issues with your config and vault files.
+
+<Danger title="Breaking Change in v0.4">
+v0.4 changed the hash computation format to improve security (prevents value transplantation attacks). Secrets created with v0.3.x will fail validation with "hash mismatch" errors.
+
+**To migrate your vault:**
+
+<Steps>
+  <Step title="Re-sign your secret values">
+Each user must re-sign their own values. You cannot edit another user's secret values:
+
+```bash
+# List all secrets
+dotsecenv vault describe
+
+# For each secret you created, re-sign it
+dotsecenv secret get DATABASE_PASSWORD | dotsecenv secret store DATABASE_PASSWORD
+dotsecenv secret get API_KEY | dotsecenv secret store API_KEY
+# ... repeat for each secret
+```
+  </Step>
+  <Step title="Remove old values from the vault file">
+Edit the vault file manually and delete the old value entries that no longer validate. Each secret may have multiple values; keep only the newly signed ones.
+  </Step>
+  <Step title="Commit the updated vault">
+```bash
+git add vault
+git commit -m "Migrate vault to v0.4 hash format"
+```
+  </Step>
+</Steps>
+
+This is a one-time migration. New secrets created with v0.4+ will validate correctly.
+</Danger>
+
+### Basic validation
+
+```bash
+dotsecenv validate
+```
+
+Output:
+
+```text
+✓ Config file: valid
+✓ Vault header: valid
+✓ Identity entries: 2 valid
+✓ Secret entries: 5 valid
+✓ All signatures verified
+```
+
+### Auto-fix issues
+
+```bash
+dotsecenv validate --fix
+```
+
+This can fix:
+
+- Regenerate corrupted header indexes
+- Remove orphaned entries
+- Update outdated format versions
+
+### Validate specific vault
+
+```bash
+dotsecenv validate -v ./project/vault
+```
+
+---
+
+## List All Secrets
+
+View identities and secrets in your vaults.
+
+### Describe vaults
+
+```bash
+dotsecenv vault describe
+```
+
+Output:
+
+```text
+Vault 1 (~/.config/dotsecenv/vault):
+  Identities:
+    - Alice <alice@example.com> (E60A1740...)
+    - Bob <bob@example.com> (ABC12345...)
+  Secrets:
+    - DATABASE_PASSWORD
+    - API_KEY
+    - prod::API_KEY
+```
+
+### JSON output
+
+```bash
+dotsecenv vault describe --json
+```
+
+### Filter by namespace
+
+```bash
+dotsecenv vault describe | grep "prod::"
+```
+
+---
+
+## Use Multiple Vaults
+
+Work with secrets from different vaults.
+
+### Configure multiple vaults
+
+```yaml
+# ~/.config/dotsecenv/config
+vault:
+  - name: personal
+    path: ~/.config/dotsecenv/vault
+  - name: work
+    path: ~/work/secrets/vault
+```
+
+### Access by name
+
+```bash
+dotsecenv secret get -v personal DATABASE_PASSWORD
+dotsecenv secret get -v work CORP_API_KEY
+```
+
+### Access by index
+
+```bash
+dotsecenv secret get -v 1 DATABASE_PASSWORD  # personal (1-based)
+dotsecenv secret get -v 2 CORP_API_KEY       # work
+```
+
+---
+
+## Set Up Shell Completions
+
+Enable tab completion for dotsecenv commands.
+
+<Tabs>
+  <Tab title="Bash">
+    ```bash
+    # Add to ~/.bashrc
+    eval "$(dotsecenv completion bash)"
+
+    # Or install system-wide
+    dotsecenv completion bash | sudo tee /etc/bash_completion.d/dotsecenv
+    ```
+  </Tab>
+
+  <Tab title="Zsh">
+    ```bash
+    # Add to ~/.zshrc
+    eval "$(dotsecenv completion zsh)"
+    ```
+  </Tab>
+
+  <Tab title="Fish">
+    ```bash
+    # Add to ~/.config/fish/config.fish
+    dotsecenv completion fish | source
+    ```
+  </Tab>
+</Tabs>
+
+Reload your shell to activate:
+
+```bash
+source ~/.bashrc  # or ~/.zshrc
+```
+
+---
+
+## Export Secrets as Environment Variables
+
+Export all secrets for a shell session or script.
+
+### Install shell plugins
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
+```
+
+### Auto-load secrets
+
+```bash
+# define a secret: /path/to/directory/.secenv
+
+# the secret(s) will be auto-loaded on cd
+cd /path/to/directory
+
+# and your app can use them
+./my-app
+```
+
+### Export specific secrets
+
+```bash
+export DATABASE_PASSWORD=$(dotsecenv secret get DATABASE_PASSWORD)
+export API_KEY=$(dotsecenv secret get API_KEY)
+```
+
+---
+
+## Run Vault Health Checks
+
+Run health checks on vaults and the GPG environment, and fix any issues.
+
+### Run doctor
+
+```bash
+dotsecenv vault doctor
+```
+
+Output:
+
+```text
+Health checks:
+  [✓] gpg-agent is available
+  [✓] ~/.config/dotsecenv/vault: format v2 (latest)
+  [✓] ~/.config/dotsecenv/vault: 0.0% fragmentation
+
+Status: healthy
+
+All vaults are up to date.
+```
+
+### Doctor checks and fixes
+
+The `doctor` command performs these checks:
+
+- GPG agent availability: verifies that gpg-agent is running
+- Vault format version: checks whether vaults need upgrading
+- Vault fragmentation: checks whether defragmentation is needed
+
+After displaying health check results, doctor offers to fix any issues found (upgrade outdated vaults, defragment fragmented vaults).
+
+### Auto-fix without prompting
+
+Use `--fix` to automatically apply all fixes without interactive confirmation:
+
+```bash
+dotsecenv vault doctor --fix
+```
+
+This is useful in scripts or when you already know fixes are safe to apply.
+
+### JSON output (for CI)
+
+```bash
+dotsecenv vault doctor --json
+```
+
+<Note>
+In CI environments (`CI=true`, `GITHUB_ACTIONS`, `GITLAB_CI`, etc.), interactive prompts are automatically skipped to avoid blocking pipelines. You can also use `--fix` to explicitly auto-fix in any environment.
+</Note>
+
+<Warning>
+Defragmenting removes historical values. Make sure you don't need the history before confirming.
+</Warning>
+
+---
+
+## Use with CI/CD
+
+See the [CI/CD Secrets tutorial](/tutorials/ci-cd-secrets) for the end-to-end first-time setup (CI-only identity creation, sealed-secret import, vault decryption, masked-env injection). For the published `dotsecenv/dotsecenv` GitHub Action's inputs, outputs, and provenance verification, see the [GitHub Action guide](/guides/github-action). For running multiple environments side-by-side in one workflow, see [Multi-environment Vaults](/guides/multi-environment).
+
+---
+
+## Troubleshooting Quick Reference
+
+| Problem | Solution |
+|---------|----------|
+| "Not logged in" | `dotsecenv login FINGERPRINT` |
+| "Secret not found" | Check vault: `dotsecenv vault describe` |
+| "Cannot decrypt" | Verify you're in `available_to` |
+| "GPG error" | Check key: `gpg --list-secret-keys` |
+| "Config not found" | Run: `dotsecenv init config` |
+| "Vault not found" | Run: `dotsecenv init vault` |
+| "Permission denied" on vault | Check file permissions: `ls -la /path/to/vault` |
+| Config error running as root | Use: `sudo dotsecenv init config` |
+| Vault path not in config | Add path to config or use `restrict_to_configured_vaults: false` |
