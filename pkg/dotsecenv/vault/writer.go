@@ -107,7 +107,7 @@ func (w *Writer) loadExisting() error {
 		return w.createNewVault()
 	}
 
-	scanner := bufio.NewScanner(file)
+	scanner := newLineScanner(file)
 	w.lines = make([]string, 0, 100)
 	lineNum := 0
 	var markerLine string
@@ -176,6 +176,11 @@ func (w *Writer) flush() error {
 		return fmt.Errorf("failed to marshal header: %w", err)
 	}
 	w.lines[1] = string(headerJSON)
+	for i, line := range w.lines {
+		if len(line)+1 > MaxLineSize {
+			return fmt.Errorf("refusing to write vault: line %d is too large (%d bytes; the limit is %d)", i+1, len(line)+1, MaxLineSize)
+		}
+	}
 
 	// Capture original file's permissions and ownership before writing
 	var originalMode os.FileMode = 0o600 // default for new files
