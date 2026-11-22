@@ -14,6 +14,7 @@ _Unreleased_
 ### Bug Fixes
 
 - A numeric `-v N` now resolves against the config named by `DOTSECENV_CONFIG`. Before, the index was looked up in the default config, so commands failed with "failed to load config" or picked a vault from the wrong file (#484)
+- Pointing dotsecenv at a file of fewer than 3 lines that is not a vault no longer overwrites it. `vault describe -v notes.txt`, or a configured vault path holding such a file, replaced its contents with an empty vault. It now fails with "not a dotsecenv vault" and leaves the file alone. An empty or whitespace-only file still starts a new vault (#494)
 
 ### Other
 
