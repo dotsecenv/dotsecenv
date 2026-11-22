@@ -41,6 +41,7 @@ _Unreleased_
 - Plugin CI builds fish 3.7.1 from source again on ubuntu-26.04. CMake 4 rejected its `install(SCRIPT CODE ...)` call, so the fish 3.x leg failed on every plugin pull request (#537)
 - `validate` and the read path share one set of signature checks. This removes unused exported functions from `pkg/dotsecenv/vault` (`ValidateSecret`, `ValidateSecretValue`, `ValidateSecretsOrder`, `ValidateAvailableToOrder`, `ValidateSecretMetadata`, `GetSecretSigningData`, `GetSecretValueSigningData`, `SortAvailableTo`) and all of `pkg/dotsecenv/gpg/gpg_verify.go`, so a Go program importing those packages directly may need a change (#529)
 - Remove the Windows-only source files. Windows was never built or supported (#532)
+- The shell plugin fetches secrets through one helper per shell, and the installer computes the system share directory once (#533)
 
 ---
 
