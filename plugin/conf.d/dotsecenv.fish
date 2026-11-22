@@ -63,12 +63,6 @@ function _dotsecenv_stack_pop
     end
 end
 
-function _dotsecenv_stack_top
-    if test (count $_DOTSECENV_SOURCE_STACK) -gt 0
-        echo $_DOTSECENV_SOURCE_STACK[-1]
-    end
-end
-
 # Check if a file passes security checks
 function _dotsecenv_security_check
     set -l file $argv[1]
@@ -329,6 +323,33 @@ function _dotsecenv_restore_key
     end
 end
 
+# Fetch one secret and export it as key, recording the value it replaces.
+# Shows CLI warnings and warns about multi-line values. On failure prints the
+# error and returns 1.
+function _dotsecenv_fetch_secret
+    set -l dir_hash $argv[1]
+    set -l key $argv[2]
+    set -l secret_name $argv[3]
+    # Capture stderr separately to preserve the secret value
+    set -l secret_stderr_file (mktemp)
+    set -l secret_result (command dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
+    if test $status -eq 0
+        _dotsecenv_track_key $dir_hash $key
+        # Command substitution splits lines into list elements; join them back
+        set -gx $key (string join \n -- $secret_result | string collect)
+        test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
+        if test (count $secret_result) -gt 1
+            echo "dotsecenv: warning: $key contains newlines" >&2
+        end
+        rm -f "$secret_stderr_file"
+        return 0
+    end
+    echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
+    cat "$secret_stderr_file" >&2
+    rm -f "$secret_stderr_file"
+    return 1
+end
+
 # Load a single .secenv file
 function _dotsecenv_load_file
     set -l file $argv[1]
@@ -369,26 +390,11 @@ function _dotsecenv_load_file
                     continue
                 end
 
-                # Fetch secret from vault (capture stderr separately to preserve secret value)
-                set -l secret_stderr_file (mktemp)
-                set -l secret_result (command dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
-                set -l secret_status $status
-                if test $secret_status -eq 0
-                    _dotsecenv_track_key $dir_hash $key
-                    set -gx $key (string join \n -- $secret_result | string collect)
+                if _dotsecenv_fetch_secret $dir_hash $key "$secret_name"
                     set -g -a _DOTSECENV_SECRETS_LOADED "$key"
-                    # Show any warnings that were emitted
-                    test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
-                    # Command substitution splits lines into list elements; join them back
-                    if test (count $secret_result) -gt 1
-                        echo "dotsecenv: warning: $key contains newlines" >&2
-                    end
                 else
-                    echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
-                    cat "$secret_stderr_file" >&2
                     set -a failed_secrets "$secret_name"
                 end
-                rm -f "$secret_stderr_file"
             end
         end
     end <"$file"
@@ -474,27 +480,9 @@ function _dotsecenv_load_key
                 set -g -a _DOTSECENV_ENVVARS_$dir_hash "$key"
                 return 0
             else if test "$ptype" = secret_same; or test "$ptype" = secret_named
-                set -l secret_name "$value"
-                set -l secret_stderr_file (mktemp)
-                set -l secret_result (command dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
-                set -l secret_status $status
-                if test $secret_status -eq 0
-                    _dotsecenv_track_key $dir_hash $key
-                    set -gx $key (string join \n -- $secret_result | string collect)
-                    set -g -a _DOTSECENV_SECRETS_$dir_hash "$key"
-                    set -g -a _DOTSECENV_SECRETS_LOADED "$key"
-                    test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
-                    if test (count $secret_result) -gt 1
-                        echo "dotsecenv: warning: $key contains newlines" >&2
-                    end
-                    rm -f "$secret_stderr_file"
-                    return 0
-                else
-                    echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
-                    cat "$secret_stderr_file" >&2
-                    rm -f "$secret_stderr_file"
-                    return 1
-                end
+                _dotsecenv_fetch_secret $dir_hash $key "$value"; or return 1
+                set -g -a _DOTSECENV_SECRETS_$dir_hash "$key"
+                return 0
             end
             return 1
         end
