@@ -13,7 +13,7 @@ importers:
         version: 0.43.1(@astrojs/markdown-remark@7.3.1(supports-color@9.4.0))(astro@7.4.12(@astrojs/markdown-remark@7.3.1(supports-color@9.4.0))(@types/node@24.13.3)(esbuild@0.28.2)(yaml@2.9.1))(supports-color@9.4.0)(typescript@6.0.3)
       asciinema-player:
         specifier: ^3.17.0
-        version: 3.18.0
+        version: 3.18.1
       astro:
         specifier: ^7.3.2
         version: 7.4.12(@astrojs/markdown-remark@7.3.1(supports-color@9.4.0))(@types/node@24.13.3)(esbuild@0.28.2)(yaml@2.9.1)
@@ -1215,8 +1215,8 @@ packages:
   array-iterate@2.0.1:
     resolution: {integrity: sha512-I1jXZMjAgCMmxT4qxXfPXa6SthSoE8h6gkSI9BGGNv8mP8G/v0blc+qFnZu6K42vTOiuME596QaLO0TP3Lk0xg==}
 
-  asciinema-player@3.18.0:
-    resolution: {integrity: sha512-5gpt2ipFcy4NKmgkv+c/QXnJ9zMicxqWROCOuJqgwwtiYKM8Qe9hnDOvfqke5bW6M2DW/seO3uQYkQ0xeUUVtw==}
+  asciinema-player@3.18.1:
+    resolution: {integrity: sha512-H3blHwZYerDkjUVNABB0zjIzZhZu+JT0/FXT7Skc+4cpa2i7bDab49uOztsIguej4Ppfw6JS0V8J5/6VNqIIkQ==}
 
   astring@1.9.0:
     resolution: {integrity: sha512-LElXdjswlqjWrPpJFg1Fx4wpkOCxj1TDHlSV4PlaRxHGWko024xICaa97ZkMfs6DRKlCguiAI+rbXv5GWwXIkg==}
@@ -4232,7 +4232,7 @@ snapshots:
 
   array-iterate@2.0.1: {}
 
-  asciinema-player@3.18.0:
+  asciinema-player@3.18.1:
     dependencies:
       solid-js: 1.9.18
 
