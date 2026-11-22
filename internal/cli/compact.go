@@ -32,9 +32,10 @@ type CompactResultJSON struct {
 // entirely. It never decrypts: it reads only access lists and value order, then
 // rewrites the file preserving every kept value verbatim (signatures intact).
 //
-// Without --yes it prints the plan and asks for confirmation (skipped in CI).
-// In JSON mode it reports the plan and only writes when --yes is set. It warns
-// when a newer dotsecenv release created or last rewrote the vault.
+// It writes only with --yes, in a terminal, in CI and in JSON mode alike.
+// Without --yes it reports the plan and, when there is something to drop,
+// exits with ExitChangesRequired. It warns when a newer dotsecenv release
+// created or last rewrote the vault.
 func (c *CLI) VaultCompact(jsonOutput bool, yes bool, vaultPath string, fromIndex int) *Error {
 	targetIndex, resolveErr := c.resolveWritableVaultIndex(vaultPath, fromIndex, "Select vault to compact:")
 	if resolveErr != nil {
@@ -48,33 +49,35 @@ func (c *CLI) VaultCompact(jsonOutput bool, yes bool, vaultPath string, fromInde
 		return writeErr
 	}
 
-	writer, err := vault.NewWriter(expandedPath)
-	if err != nil {
-		return NewError(fmt.Sprintf("failed to open vault: %v", err), ExitVaultError)
+	// Rewrite through the Manager that holds the vault lock
+	manager := c.vaultResolver.GetVaultManager(targetIndex)
+	if manager == nil {
+		return NewError(fmt.Sprintf("failed to open vault: %s is not loaded", expandedPath), ExitVaultError)
 	}
 
-	if stamp := writer.Header().DotsecenvVersion; vault.IsNewerRelease(stamp, vault.BinaryVersion) {
+	if stamp := manager.GetHeader().DotsecenvVersion; vault.IsNewerRelease(stamp, vault.BinaryVersion) {
 		c.Output().Warnf(output.CodeWarnVaultNewer,
 			"vault %s was written by dotsecenv %s, newer than this dotsecenv %s; upgrade dotsecenv before compacting it",
 			entry.Path, stamp, vault.BinaryVersion)
 	}
 
-	v, err := writer.ReadVault()
-	if err != nil {
-		return NewError(fmt.Sprintf("failed to read vault: %v", err), ExitVaultError)
-	}
-
-	compacted, stats := vault.PlanCompaction(v)
+	compacted, stats := vault.PlanCompaction(manager.Get())
 
 	if jsonOutput {
 		applied := false
 		if stats.Changed() && yes {
-			if rewriteErr := writer.RewriteFromVault(compacted); rewriteErr != nil {
+			if rewriteErr := manager.Rewrite(compacted, vault.LatestFormatVersion); rewriteErr != nil {
 				return NewError(fmt.Sprintf("failed to rewrite vault: %v", rewriteErr), ExitVaultError)
 			}
 			applied = true
 		}
-		return c.printCompactJSON(entry.Path, stats, applied)
+		if jsonErr := c.printCompactJSON(entry.Path, stats, applied); jsonErr != nil {
+			return jsonErr
+		}
+		if stats.Changed() && !applied {
+			return NewError("", ExitChangesRequired)
+		}
+		return nil
 	}
 
 	c.printCompactPlan(entry.Path, stats)
@@ -84,20 +87,13 @@ func (c *CLI) VaultCompact(jsonOutput bool, yes bool, vaultPath string, fromInde
 		return nil
 	}
 
-	if !yes && !isCI() {
-		confirmed, confirmErr := PromptConfirm(
-			fmt.Sprintf("Compact vault %s? This rewrites the vault file.", expandedPath),
-			c.output.Stderr())
-		if confirmErr != nil {
-			return confirmErr
-		}
-		if !confirmed {
-			_, _ = fmt.Fprintf(c.output.Stdout(), "Aborted; vault unchanged.\n")
-			return nil
-		}
+	if !yes {
+		_, _ = fmt.Fprintf(c.output.Stdout(), "\nChanges required; vault unchanged.\nRun: dotsecenv vault compact --yes -c %s -v %s\n",
+			shellQuote(c.configPath), shellQuote(expandedPath))
+		return NewError("", ExitChangesRequired)
 	}
 
-	if rewriteErr := writer.RewriteFromVault(compacted); rewriteErr != nil {
+	if rewriteErr := manager.Rewrite(compacted, vault.LatestFormatVersion); rewriteErr != nil {
 		return NewError(fmt.Sprintf("failed to rewrite vault: %v", rewriteErr), ExitVaultError)
 	}
 

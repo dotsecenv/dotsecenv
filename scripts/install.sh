@@ -10,6 +10,12 @@ readonly GITHUB_ORG="dotsecenv"
 readonly GITHUB_REPO="dotsecenv"
 readonly GPG_KEY_URL="https://get.dotsecenv.com/key.asc"
 readonly RETRACTED_URL="https://get.dotsecenv.com/retracted.txt"
+# Primary fingerprints of the release signing keys; checksums.txt.sig must come
+# from one of them. The second key signed releases up to v0.6.3. action.yml
+# sources this script and uses the same check.
+readonly RELEASE_KEY_FINGERPRINTS="0B8DB28079ACFA7497F0B8FE647E9C8219626442 E60A1740BAEF49284D22EA7D3C376348F0921C59"
+# action.yml sets its own hint.
+readonly NO_VERIFY_HINT="${NO_VERIFY_HINT:-rerun with --no-verify (or VERIFY=0) to install without verification}"
 
 # ---------------------------------------------------------------------------
 # Color setup (conditional on tty)
@@ -51,7 +57,12 @@ INSTALL_MAN_PAGES="${INSTALL_MAN_PAGES:-1}"
 SYSTEM_INSTALL="${SYSTEM_INSTALL:-0}"
 VERIFY="${VERIFY:-1}"
 
+# Share dir for --system installs. macOS SIP prevents writes to /usr/share.
+SHARE_PREFIX="/usr/share"
+if [ "$(uname -s)" = "Darwin" ]; then SHARE_PREFIX="/usr/local/share"; fi
+
 TMPDIR_ROOT=""
+GNUPG_TMP=""
 
 # Where the optional helpers actually landed. Empty means nothing was written,
 # either because the component was turned off or because the release archive
@@ -64,9 +75,12 @@ GIT_HELPER_TARGET=""
 # Cleanup
 # ---------------------------------------------------------------------------
 cleanup() {
-    if [ -n "${TMPDIR_ROOT}" ] && [ -d "${TMPDIR_ROOT}" ]; then
-        rm -rf "${TMPDIR_ROOT}"
-    fi
+    local dir
+    for dir in "${TMPDIR_ROOT}" "${GNUPG_TMP}"; do
+        if [ -n "${dir}" ] && [ -d "${dir}" ]; then
+            rm -rf "${dir}"
+        fi
+    done
 }
 trap cleanup EXIT
 
@@ -225,8 +239,7 @@ verify_checksums() {
     elif command -v shasum >/dev/null 2>&1; then
         actual="$(shasum -a 256 "$archive" | awk '{print $1}')"
     else
-        warn "Neither sha256sum nor shasum found; skipping checksum verification"
-        return 0
+        error "Neither sha256sum nor shasum found; install one, or ${NO_VERIFY_HINT}"
     fi
 
     if [ "$expected" != "$actual" ]; then
@@ -238,23 +251,28 @@ verify_checksums() {
 verify_gpg() {
     local checksums_file="$1" signature_file="$2"
 
-    if ! command -v gpg >/dev/null 2>&1; then
-        warn "gpg not found; skipping GPG signature verification"
-        return 0
-    fi
+    command -v gpg >/dev/null 2>&1 || error "gpg not found; install gpg, or ${NO_VERIFY_HINT}"
 
     info "Verifying GPG signature..."
-    local gnupg_tmp
-    gnupg_tmp="$(mktemp -d)"
+    # A fresh mktemp dir keeps gpg-agent's socket path short; cleanup() removes it.
+    local status signers fpr
+    GNUPG_TMP="$(mktemp -d)"
 
-    download "${GPG_KEY_URL}" "${gnupg_tmp}/key.asc"
-    gpg --homedir "${gnupg_tmp}" --batch --quiet --import "${gnupg_tmp}/key.asc" 2>/dev/null
-    if gpg --homedir "${gnupg_tmp}" --batch --quiet --verify "$signature_file" "$checksums_file" 2>/dev/null; then
-        success "GPG signature verified"
-    else
-        warn "GPG signature verification failed; continuing anyway"
-    fi
-    rm -rf "${gnupg_tmp}"
+    download "${GPG_KEY_URL}" "${GNUPG_TMP}/key.asc" || error "Could not download the release key from ${GPG_KEY_URL}"
+    gpg --homedir "${GNUPG_TMP}" --batch --quiet --import "${GNUPG_TMP}/key.asc" 2>/dev/null \
+        || error "Could not import the release key from ${GPG_KEY_URL}"
+    status="$(gpg --homedir "${GNUPG_TMP}" --batch --status-fd 1 --verify "$signature_file" "$checksums_file" 2>/dev/null)" \
+        || error "GPG signature verification failed for checksums.txt; ${NO_VERIFY_HINT}"
+
+    # VALIDSIG's last field is the signing key's primary fingerprint.
+    signers="$(printf '%s\n' "$status" | awk '$1 == "[GNUPG:]" && $2 == "VALIDSIG" { print $NF }')"
+    for fpr in ${RELEASE_KEY_FINGERPRINTS}; do
+        if printf '%s\n' "$signers" | grep -qxF "$fpr"; then
+            success "GPG signature verified (key ${fpr})"
+            return 0
+        fi
+    done
+    error "checksums.txt is not signed by a dotsecenv release key (signer: ${signers:-none}); ${NO_VERIFY_HINT}"
 }
 
 # ---------------------------------------------------------------------------
@@ -272,6 +290,14 @@ resolve_install_dir() {
     fi
 }
 
+# binary_has_version BINARY VERSION: true when the "version:" line of
+# `BINARY version` equals VERSION exactly, ignoring a leading v on either side.
+binary_has_version() {
+    local reported
+    reported="$("$1" version 2>/dev/null | awk '$1 == "version:" { print $2; exit }')" || true
+    [ -n "${reported}" ] && [ "${reported#v}" = "${2#v}" ]
+}
+
 install_binary() {
     local tmp_dir="$1"
     local archive_name="dotsecenv_${VERSION#v}_${OS}_${ARCH}.tar.gz"
@@ -284,24 +310,18 @@ install_binary() {
 
     if [ "${VERIFY}" = "1" ]; then
         download "${checksums_url}" "${tmp_dir}/checksums.txt"
-        download "${signature_url}" "${tmp_dir}/checksums.txt.sig" 2>/dev/null || true
+        download "${signature_url}" "${tmp_dir}/checksums.txt.sig" 2>/dev/null \
+            || error "Could not download checksums.txt.sig for ${VERSION}; ${NO_VERIFY_HINT}"
+        verify_gpg "${tmp_dir}/checksums.txt" "${tmp_dir}/checksums.txt.sig"
         verify_checksums "${tmp_dir}/${archive_name}" "${tmp_dir}/checksums.txt"
-        if [ -f "${tmp_dir}/checksums.txt.sig" ]; then
-            verify_gpg "${tmp_dir}/checksums.txt" "${tmp_dir}/checksums.txt.sig"
-        fi
     fi
 
     info "Extracting archive..."
     tar -xzf "${tmp_dir}/${archive_name}" -C "${tmp_dir}"
 
-    # Check existing installation
-    if [ -x "${INSTALL_DIR}/dotsecenv" ]; then
-        local existing_version
-        existing_version="$("${INSTALL_DIR}/dotsecenv" version 2>/dev/null || true)"
-        if printf '%s' "${existing_version}" | grep -q "${VERSION#v}"; then
-            success "dotsecenv ${VERSION} is already installed"
-            return 0
-        fi
+    if [ -x "${INSTALL_DIR}/dotsecenv" ] && binary_has_version "${INSTALL_DIR}/dotsecenv" "${VERSION}"; then
+        success "dotsecenv ${VERSION} is already installed"
+        return 0
     fi
 
     info "Installing binary to ${INSTALL_DIR}..."
@@ -344,12 +364,9 @@ install_completions() {
 
     local bash_comp_dir zsh_comp_dir fish_comp_dir
     if is_system_install; then
-        local share_prefix="/usr/share"
-        # macOS SIP prevents writes to /usr/share; use /usr/local/share instead
-        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
-        bash_comp_dir="${share_prefix}/bash-completion/completions"
-        zsh_comp_dir="${share_prefix}/zsh/site-functions"
-        fish_comp_dir="${share_prefix}/fish/vendor_completions.d"
+        bash_comp_dir="${SHARE_PREFIX}/bash-completion/completions"
+        zsh_comp_dir="${SHARE_PREFIX}/zsh/site-functions"
+        fish_comp_dir="${SHARE_PREFIX}/fish/vendor_completions.d"
     else
         bash_comp_dir="${HOME}/.local/share/bash-completion/completions"
         zsh_comp_dir="${HOME}/.local/share/zsh/site-functions"
@@ -476,9 +493,7 @@ install_shell_plugin() {
     local plugin_repo="https://github.com/${GITHUB_ORG}/plugin.git"
     local plugin_dir
     if is_system_install; then
-        local share_prefix="/usr/share"
-        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
-        plugin_dir="${share_prefix}/dotsecenv/plugin"
+        plugin_dir="${SHARE_PREFIX}/dotsecenv/plugin"
     else
         plugin_dir="${HOME}/.local/share/dotsecenv/plugin"
     fi
@@ -584,9 +599,7 @@ install_tf_helper() {
 
     local tf_plugin_dir
     if is_system_install; then
-        local share_prefix="/usr/share"
-        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
-        tf_plugin_dir="${share_prefix}/terraform/plugins"
+        tf_plugin_dir="${SHARE_PREFIX}/terraform/plugins"
     else
         tf_plugin_dir="${HOME}/.terraform.d/plugins"
     fi
@@ -685,11 +698,9 @@ check_git_version_for_helper() {
 # Summary
 # ---------------------------------------------------------------------------
 print_summary() {
-    local share_prefix comp_dir man_dir
+    local comp_dir man_dir
     if is_system_install; then
-        share_prefix="/usr/share"
-        [ "$(uname -s)" = "Darwin" ] && share_prefix="/usr/local/share"
-        comp_dir="${share_prefix}"
+        comp_dir="${SHARE_PREFIX}"
         man_dir="/usr/local/share/man/man1"
     else
         comp_dir="${HOME}/.local/share"
@@ -705,9 +716,7 @@ print_summary() {
     if [ "${INSTALL_SHELL_PLUGIN}" = "1" ]; then
         local plugin_summary_dir
         if is_system_install; then
-            local sp="/usr/share"
-            [ "$(uname -s)" = "Darwin" ] && sp="/usr/local/share"
-            plugin_summary_dir="${sp}/dotsecenv/plugin"
+            plugin_summary_dir="${SHARE_PREFIX}/dotsecenv/plugin"
         else
             plugin_summary_dir="${HOME}/.local/share/dotsecenv/plugin"
         fi
@@ -781,7 +790,8 @@ Options:
   --[no-]install-man-pages           Install man pages (default: yes)
   --system                           Install system-wide (/usr/local/bin, shared
                                      completions/man pages) instead of user home
-  --[no-]verify                      Verify checksums and GPG (default: yes)
+  --[no-]verify                      Verify the GPG signature and checksum, and
+                                     stop on any failure (default: yes)
   -h, --help                         Show this help
 
 Environment variables:
