@@ -88,6 +88,8 @@ if [[ "$1" == "secret" && "$2" == "get" ]]; then
         "PROD_SECRET") echo "production-secret-value" ;;
         "MISSING_SECRET") exit 1 ;;
         "MULTILINE_SECRET") printf "line1\nline2\nline3" ;;
+        "PEM_KEY") printf -- "-----BEGIN TEST KEY-----\nAAAA\n\nBBBB\n-----END TEST KEY-----" ;;
+        "ESCAPED") printf "%s" "a\\\\nb\\\\c" ;;
         *) exit 1 ;;
     esac
 else
@@ -776,10 +778,56 @@ function test_multiline_warning
         _dotsecenv_on_cd '' '$test_dir'
     " 2>&1)
 
-    if string match -q "*contains newlines*" "$result"; and string match -q "*string join*" "$result"
+    if string match -q "*contains newlines*" "$result"
         pass "[fish] Multiline value warning displayed correctly"
     else
         fail "[fish] Multiline value warning not displayed, got: $result"
+    end
+end
+
+function test_multiline_and_escapes_byte_exact
+    log "[fish] Testing multi-line and backslash values arrive byte for byte..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_bytes"
+    set out "$test_dir/out"
+    mkdir -p "$out"
+    printf '%s\n' 'PEM_KEY={dotsecenv}' 'ESCAPED={dotsecenv}' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+    printf '%s\n%s\n\n%s\n%s' '-----BEGIN TEST KEY-----' AAAA BBBB '-----END TEST KEY-----' >"$out/want_pem"
+    printf '%s' 'a\\nb\\c' >"$out/want_esc"
+
+    set config_dir "$TEMP_DIR/config_bytes"
+    trust_dirs "$config_dir" "$test_dir"
+
+    # Clipboard stubs write what they receive to $CLIP_OUT
+    set mock_path (create_mock_dotsecenv)
+    for tool in pbcopy wl-copy xclip
+        printf '#!/bin/sh\ncat >"$CLIP_OUT"\n' >"$mock_path/$tool"
+        chmod +x "$mock_path/$tool"
+    end
+
+    run_plugin "$config_dir" "$mock_path" "
+        set -gx CLIP_OUT '$out/clip'
+        set -gx WAYLAND_DISPLAY test
+        cd '$test_dir'
+        printf '%s' \"\$PEM_KEY\" >'$out/env_pem'
+        printf '%s' \"\$ESCAPED\" >'$out/env_esc'
+        dse cp PEM_KEY; and mv '$out/clip' '$out/clip_pem'
+        dse cp ESCAPED; and mv '$out/clip' '$out/clip_esc'
+    " >/dev/null
+
+    set -l bad
+    for f in env_pem clip_pem
+        cmp -s "$out/want_pem" "$out/$f"; or set -a bad $f
+    end
+    for f in env_esc clip_esc
+        cmp -s "$out/want_esc" "$out/$f"; or set -a bad $f
+    end
+    if test (count $bad) -eq 0
+        pass "[fish] Multi-line and backslash values exact in env and clipboard"
+    else
+        fail "[fish] Values mangled in: $bad"
     end
 end
 
@@ -1289,6 +1337,7 @@ function main
     test_tree_scope_no_reload_from_subdir
     test_multiline_warning
     test_unload_restores_previous_values
+    test_multiline_and_escapes_byte_exact
 
     # dse up tests
     test_dse_up_basic

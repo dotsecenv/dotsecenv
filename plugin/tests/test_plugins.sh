@@ -125,6 +125,8 @@ if [[ "$1" == "secret" && "$2" == "get" ]]; then
         "PROD_SECRET") echo "production-secret-value" ;;
         "MISSING_SECRET") exit 1 ;;
         "MULTILINE_SECRET") printf 'line1\nline2\nline3' ;;
+        "PEM_KEY") printf -- '-----BEGIN TEST KEY-----\nAAAA\n\nBBBB\n-----END TEST KEY-----' ;;
+        "ESCAPED") printf '%s' 'a\nb\c' ;;
         *) exit 1 ;;
     esac
 else
@@ -1076,6 +1078,49 @@ EOF
         pass "[$shell] Multiline value warning displayed correctly"
     else
         fail "[$shell] Multiline value warning not displayed, got: $result"
+    fi
+}
+
+test_multiline_and_escapes_byte_exact() {
+    local shell="$1"
+    log "[$shell] Testing multi-line and backslash values arrive byte for byte..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_bytes_$shell"
+    local out="$test_dir/out"
+    mkdir -p "$out"
+    printf '%s\n' 'PEM_KEY={dotsecenv}' 'ESCAPED={dotsecenv}' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+    printf -- '-----BEGIN TEST KEY-----\nAAAA\n\nBBBB\n-----END TEST KEY-----' >"$out/want_pem"
+    printf '%s' 'a\nb\c' >"$out/want_esc"
+
+    local config_dir="$TEMP_DIR/config_bytes_$shell"
+    trust_dirs "$config_dir" "$test_dir"
+
+    # Clipboard stubs write what they receive to \$CLIP_OUT
+    local mock_path tool
+    mock_path=$(create_mock_dotsecenv)
+    for tool in pbcopy wl-copy xclip; do
+        printf '#!/bin/sh\ncat >"$CLIP_OUT"\n' >"$mock_path/$tool"
+        chmod +x "$mock_path/$tool"
+    done
+
+    run_plugin "$shell" "$config_dir" "$mock_path" "
+        export CLIP_OUT='$out/clip' WAYLAND_DISPLAY=test
+        cd '$test_dir'
+        printf '%s' \"\$PEM_KEY\" >'$out/env_pem'
+        printf '%s' \"\$ESCAPED\" >'$out/env_esc'
+        dse cp PEM_KEY && mv '$out/clip' '$out/clip_pem'
+        dse cp ESCAPED && mv '$out/clip' '$out/clip_esc'
+    " >/dev/null
+
+    local f bad=""
+    for f in env_pem clip_pem; do cmp -s "$out/want_pem" "$out/$f" || bad+=" $f"; done
+    for f in env_esc clip_esc; do cmp -s "$out/want_esc" "$out/$f" || bad+=" $f"; done
+    if [[ -z "$bad" ]]; then
+        pass "[$shell] Multi-line and backslash values exact in env and clipboard"
+    else
+        fail "[$shell] Values mangled in:$bad"
     fi
 }
 
@@ -2059,6 +2104,7 @@ main() {
         test_tree_scope_no_reload_from_subdir "bash"
         test_multiline_warning "bash"
         test_unload_restores_previous_values "bash"
+        test_multiline_and_escapes_byte_exact "bash"
         test_dse_up_basic "bash"
         test_dse_up_multiple_ancestors "bash"
         test_dse_up_skips_already_loaded "bash"
@@ -2105,6 +2151,7 @@ main() {
             test_tree_scope_no_reload_from_subdir "zsh"
             test_multiline_warning "zsh"
             test_unload_restores_previous_values "zsh"
+            test_multiline_and_escapes_byte_exact "zsh"
             test_dse_up_basic "zsh"
             test_dse_up_multiple_ancestors "zsh"
             test_dse_up_skips_already_loaded "zsh"

@@ -898,7 +898,7 @@ dse() {
         shift
         local output
         if output=$(dotsecenv secret get "$@"); then
-            if echo -n "$output" | _dotsecenv_clipboard_copy; then
+            if printf '%s' "$output" | _dotsecenv_clipboard_copy; then
                 echo "dotsecenv: secret copied to clipboard" >&2
             else
                 return 1

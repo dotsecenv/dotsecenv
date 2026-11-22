@@ -375,13 +375,13 @@ function _dotsecenv_load_file
                 set -l secret_status $status
                 if test $secret_status -eq 0
                     _dotsecenv_track_key $dir_hash $key
-                    set -gx $key "$secret_result"
+                    set -gx $key (string join \n -- $secret_result | string collect)
                     set -g -a _DOTSECENV_SECRETS_LOADED "$key"
                     # Show any warnings that were emitted
                     test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
-                    # Warn if value contains newlines (fish splits on newlines into list elements)
+                    # Command substitution splits lines into list elements; join them back
                     if test (count $secret_result) -gt 1
-                        echo "dotsecenv: warning: $key contains newlines; use (string join \\n \$$key) to reconstruct the full value" >&2
+                        echo "dotsecenv: warning: $key contains newlines" >&2
                     end
                 else
                     echo "dotsecenv: error fetching secret '$secret_name' for $key:" >&2
@@ -480,12 +480,12 @@ function _dotsecenv_load_key
                 set -l secret_status $status
                 if test $secret_status -eq 0
                     _dotsecenv_track_key $dir_hash $key
-                    set -gx $key "$secret_result"
+                    set -gx $key (string join \n -- $secret_result | string collect)
                     set -g -a _DOTSECENV_SECRETS_$dir_hash "$key"
                     set -g -a _DOTSECENV_SECRETS_LOADED "$key"
                     test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
                     if test (count $secret_result) -gt 1
-                        echo "dotsecenv: warning: $key contains newlines; use (string join \\n \$$key) to reconstruct the full value" >&2
+                        echo "dotsecenv: warning: $key contains newlines" >&2
                     end
                     rm -f "$secret_stderr_file"
                     return 0
@@ -851,7 +851,7 @@ function dse
         case cp
             set -l output
             if set output (dotsecenv secret get $argv[2..])
-                if echo -n "$output" | _dotsecenv_clipboard_copy
+                if string join \n -- $output | string collect | _dotsecenv_clipboard_copy
                     echo "dotsecenv: secret copied to clipboard" >&2
                 else
                     return 1
