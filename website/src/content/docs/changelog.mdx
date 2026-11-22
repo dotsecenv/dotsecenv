@@ -46,6 +46,7 @@ Three changes need action from you:
 - When the website build cannot reach the GitHub API, install commands and version strings use the version in `.claude-plugin/plugin.json`, which the release bump sets. They used a hardcoded 0.2.1 that nobody updated after v0.2.1 (#491)
 - **Security**: The fish plugin refuses a world-writable `.secenv` with mode 777 (or any mode with `o+wx`), as bash and zsh already did (#526)
 - Multi-line secrets such as PEM keys keep their newlines in fish, and copying a secret to the clipboard keeps its newlines and backslashes in every shell (#527)
+- The git and Terraform credential helpers no longer hide dotsecenv errors. Their `get` treated every failure as "no credential", so a missing config, a missing login or a stopped gpg-agent looked the same as a secret that was never stored. A missing secret still answers silently; any other failure gives the same answer to git or Terraform and prints dotsecenv's error on stderr (#492)
 - In bash, the plugin's prompt hook no longer resets `$?`, so prompt tools such as starship and `__git_ps1` show the real exit status of your last command (#530)
 - Plugin uninstall removes only the lines the installer added to `.bashrc`, `.zshrc` and `config.fish`, and keeps your own lines that mention dotsecenv, such as completions, `DOTSECENV_*` exports and aliases (#531)
 - The installer compares the installed version exactly. With 1.2.30 installed, asking for v1.2.3 used to report "already installed" and skip the install (#534)

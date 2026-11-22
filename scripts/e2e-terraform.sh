@@ -118,6 +118,26 @@ else
     fail "get after forget should return {}, got: $get_after_forget"
 fi
 
+# Test 10a: a deleted secret is a normal miss: {} and nothing on stderr
+((TESTS_RUN++)) || true
+tf_err=$(mktemp)
+"$HELPER" get app.terraform.io >/dev/null 2>"$tf_err"
+if [ ! -s "$tf_err" ]; then
+    pass "get of a deleted secret is silent"
+else
+    fail "get of a deleted secret should be silent, stderr: $(cat "$tf_err")"
+fi
+
+# Test 10b: any other failure still answers {} but says why on stderr
+((TESTS_RUN++)) || true
+brokencfg=$(mktemp -d)
+broken_out=$(XDG_CONFIG_HOME="$brokencfg" XDG_DATA_HOME="$brokencfg" "$HELPER" get app.terraform.io 2>"$tf_err") || true
+if [ "$broken_out" = "{}" ] && grep -q "^terraform-credentials-dotsecenv: dotsecenv secret get failed:" "$tf_err" && grep -q "config file not found" "$tf_err"; then
+    pass "get with no config returns {} and explains on stderr"
+else
+    fail "get with no config should return {} and explain on stderr, got: '$broken_out' stderr: $(cat "$tf_err")"
+fi
+
 # Test 11: forget on nonexistent host exits 0 (idempotent)
 ((TESTS_RUN++)) || true
 if "$HELPER" forget never.stored.host 2>/dev/null; then
