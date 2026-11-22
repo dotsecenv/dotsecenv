@@ -160,10 +160,11 @@ The `copysecret` alias supports:
 
 ## Trust System
 
-When you first enter a directory containing a `.secenv` file, you'll be prompted:
+When you first enter a directory containing a `.secenv` file, the plugin prints the file and asks:
 
 ```shell
 dotsecenv: found .secenv in /path/to/project
+  DATABASE_PASSWORD={dotsecenv}
 Load secrets? [y]es / [n]o / [a]lways:
 ```
 
@@ -171,9 +172,9 @@ Load secrets? [y]es / [n]o / [a]lways:
 | -------------- | ------------------------------------------ |
 | `y` / `yes`    | Load secrets for this shell session only   |
 | `n` / `no`     | Skip loading, don't ask again this session |
-| `a` / `always` | Trust this directory permanently           |
+| `a` / `always` | Trust this file permanently                |
 
-Permanently trusted directories are stored in `~/.config/dotsecenv/trusted_dirs`.
+Trust covers the file's contents. The plugin stores a SHA-256 of the `.secenv` with the directory (one `<sha256> <directory>` line per directory in `~/.config/dotsecenv/trusted_dirs`), and asks again when the file changes, including a change back to older contents. Without `sha256sum` or `shasum` it asks on every visit.
 
 ## Security
 

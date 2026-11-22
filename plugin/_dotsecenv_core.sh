@@ -108,6 +108,24 @@ _dotsecenv_security_check() {
     return 0
 }
 
+# Print the SHA-256 of a file's contents. Fails when no hashing tool exists,
+# so the file is never trusted and every visit prompts.
+_dotsecenv_file_hash() {
+    local out=""
+    if command -v sha256sum >/dev/null 2>&1; then
+        out=$(sha256sum <"$1") || return 1
+    elif command -v shasum >/dev/null 2>&1; then
+        out=$(shasum -a 256 <"$1") || return 1
+    else
+        return 1
+    fi
+    printf '%s' "${out%% *}"
+}
+
+# Trust entries are "<sha256 of .secenv> <dir>", in the session list and in
+# the trusted_dirs file, so a changed .secenv prompts again. Old path-only
+# entries never match.
+
 # Check if directory is trusted
 # Returns 0 if trusted, 1 if not trusted, 2 if denied
 _dotsecenv_is_trusted() {
@@ -121,44 +139,54 @@ _dotsecenv_is_trusted() {
         fi
     done
 
+    local hash
+    hash=$(_dotsecenv_file_hash "$dir/.secenv") || return 1
+
     # Check session-trusted list
     local trusted
     for trusted in "${_DOTSECENV_SESSION_TRUSTED_DIRS[@]}"; do
-        if [[ "$trusted" == "$dir" ]]; then
+        if [[ "$trusted" == "$hash $dir" ]]; then
             return 0
         fi
     done
 
     # Check persistent trusted_dirs file
-    if [[ -f "$DOTSECENV_TRUSTED_DIRS_FILE" ]]; then
-        if grep -qxF "$dir" "$DOTSECENV_TRUSTED_DIRS_FILE" 2>/dev/null; then
-            return 0
-        fi
-    fi
-
-    return 1
+    [[ -f "$DOTSECENV_TRUSTED_DIRS_FILE" ]] &&
+        grep -qxF "$hash $dir" "$DOTSECENV_TRUSTED_DIRS_FILE" 2>/dev/null
 }
 
-# Check if directory is trusted in the persistent file ONLY (always-trusted)
-# Returns 0 if always-trusted, 1 if not in the persistent file
-# Used to distinguish always-trusted dirs from session-trusted ones
-_dotsecenv_is_trusted_always() {
-    local dir="$1"
-    [[ -f "$DOTSECENV_TRUSTED_DIRS_FILE" ]] || return 1
-    grep -qxF "$dir" "$DOTSECENV_TRUSTED_DIRS_FILE" 2>/dev/null
+# Drop every trust entry for a directory, session and persistent, so only the
+# contents trusted last load silently and a revert to older contents prompts
+_dotsecenv_forget_trust() {
+    local dir="$1" entry="" tmp="$DOTSECENV_TRUSTED_DIRS_FILE.tmp.$$"
+    local -a keep=()
+    for entry in "${_DOTSECENV_SESSION_TRUSTED_DIRS[@]}"; do
+        [[ "${entry#* }" == "$dir" ]] || keep+=("$entry")
+    done
+    _DOTSECENV_SESSION_TRUSTED_DIRS=("${keep[@]}")
+
+    [[ -f "$DOTSECENV_TRUSTED_DIRS_FILE" ]] || return 0
+    # "${entry#* }" strips the hash; an old path-only entry is the path itself
+    while IFS= read -r entry || [[ -n "$entry" ]]; do
+        [[ "$entry" == "$dir" || "${entry#* }" == "$dir" ]] || printf '%s\n' "$entry"
+    done <"$DOTSECENV_TRUSTED_DIRS_FILE" >"$tmp" && mv "$tmp" "$DOTSECENV_TRUSTED_DIRS_FILE"
 }
 
 # Add directory to persistent trusted list
+# Arguments: dir, hash of the .secenv contents the user saw
 _dotsecenv_trust_always() {
-    local dir="$1"
+    [[ -n "$2" ]] || return 0
     _dotsecenv_ensure_config_dir
-    echo "$dir" >>"$DOTSECENV_TRUSTED_DIRS_FILE"
+    _dotsecenv_forget_trust "$1"
+    printf '%s %s\n' "$2" "$1" >>"$DOTSECENV_TRUSTED_DIRS_FILE"
 }
 
 # Add directory to session-only trusted list
+# Arguments: dir, hash of the .secenv contents the user saw
 _dotsecenv_trust_session() {
-    local dir="$1"
-    _DOTSECENV_SESSION_TRUSTED_DIRS+=("$dir")
+    [[ -n "$2" ]] || return 0
+    _dotsecenv_forget_trust "$1"
+    _DOTSECENV_SESSION_TRUSTED_DIRS+=("$2 $1")
 }
 
 # Add directory to session-denied list
@@ -167,21 +195,30 @@ _dotsecenv_deny_session() {
     _DOTSECENV_SESSION_DENIED_DIRS+=("$dir")
 }
 
-# Prompt user for trust decision
+# True when stdin is a terminal the trust prompt can read from
+_dotsecenv_has_tty() {
+    [[ -t 0 ]]
+}
+
+# Prompt user for trust decision, showing the .secenv first
 # Optional second arg replaces the default "found .secenv" lead line
 # Returns 0 if should load, 1 if should not load
 _dotsecenv_prompt_trust() {
     local dir="$1"
     local lead="${2:-dotsecenv: found .secenv in $dir}"
-    local response
+    local response hash=""
 
     # Only prompt if we have a TTY
-    if [[ ! -t 0 ]]; then
+    if ! _dotsecenv_has_tty; then
         echo "dotsecenv: skipping $dir/.secenv - no TTY for trust prompt" >&2
         return 1
     fi
 
+    # Hash what is shown, so trust covers exactly these contents. cat -v keeps
+    # control characters from rewriting the terminal.
+    hash=$(_dotsecenv_file_hash "$dir/.secenv")
     echo "$lead" >&2
+    cat -v "$dir/.secenv" | awk '{ print "  " $0 }' >&2
     echo -n "Load secrets? [y]es / [n]o / [a]lways: " >&2
     read -r response
 
@@ -189,15 +226,19 @@ _dotsecenv_prompt_trust() {
     response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
 
     case "$response" in
-    y | yes)
-        _dotsecenv_trust_session "$dir"
+    y | yes | a | always)
+        if [[ "$(_dotsecenv_file_hash "$dir/.secenv")" != "$hash" ]]; then
+            echo "dotsecenv: $dir/.secenv changed during the prompt; not loading" >&2
+            return 1
+        fi
+        if [[ "$response" == a* ]]; then
+            _dotsecenv_trust_always "$dir" "$hash"
+        else
+            _dotsecenv_trust_session "$dir" "$hash"
+        fi
         return 0
         ;;
-    a | always)
-        _dotsecenv_trust_always "$dir"
-        return 0
-        ;;
-    n | no | *)
+    *)
         _dotsecenv_deny_session "$dir"
         return 1
         ;;
@@ -487,7 +528,8 @@ _dotsecenv_load_key() {
 }
 
 # Detect keys in a directory's .secenv that are not yet loaded, then load them.
-# Always-trusted dirs (persistent file) load silently; otherwise re-prompt first.
+# New keys change the contents, so this prompts unless the new contents are
+# already trusted.
 # Fast no-op when nothing changed - this matters because zsh fires chpwd on every
 # `cd .`, so without it session/untrusted dirs would re-prompt on every benign cd.
 _dotsecenv_sync_new_keys() {
@@ -514,8 +556,8 @@ _dotsecenv_sync_new_keys() {
         return 1
     fi
 
-    # Always-trusted dirs load silently; otherwise re-prompt before loading
-    if ! _dotsecenv_is_trusted_always "$dir"; then
+    # Load silently if these exact contents are trusted; otherwise prompt first
+    if ! _dotsecenv_is_trusted "$dir"; then
         local keys_lead
         keys_lead=$(
             IFS=' '

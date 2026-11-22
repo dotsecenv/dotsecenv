@@ -97,10 +97,16 @@ fi' >"$mock_dir/dotsecenv"
     echo $mock_dir
 end
 
-# Trust directories "always" by writing them to a config dir's trusted_dirs
+# Trust directories "always" for their current .secenv contents, as
+# answering [a]lways to the prompt would
 function trust_dirs
     mkdir -p $argv[1]
-    printf '%s\n' $argv[2..] >$argv[1]/trusted_dirs
+    for dir in $argv[2..]
+        set -l hash (begin
+                sha256sum 2>/dev/null; or shasum -a 256
+            end <$dir/.secenv | string sub -l 64)
+        printf '%s %s\n' $hash $dir
+    end >$argv[1]/trusted_dirs
 end
 
 # Run a script in an interactive fish with the plugin loaded; output is one string
@@ -167,11 +173,11 @@ APP_NAME="My Application"' >"$test_dir/.secenv"
     set mock_path (create_mock_dotsecenv)
 
     # Run fish with the plugin loaded
+    trust_dirs "$TEMP_DIR/config" "$test_dir"
     set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
-        echo '$test_dir' >'$TEMP_DIR/config/trusted_dirs'
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         cd '$test_dir'
         _dotsecenv_on_cd '' '$test_dir'
@@ -197,11 +203,11 @@ function test_parse_secret_same_name
 
     set mock_path (create_mock_dotsecenv)
 
+    trust_dirs "$TEMP_DIR/config" "$test_dir"
     set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
-        echo '$test_dir' >'$TEMP_DIR/config/trusted_dirs'
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         cd '$test_dir'
         _dotsecenv_on_cd '' '$test_dir'
@@ -227,11 +233,11 @@ function test_parse_secret_named
 
     set mock_path (create_mock_dotsecenv)
 
+    trust_dirs "$TEMP_DIR/config" "$test_dir"
     set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
-        echo '$test_dir' >'$TEMP_DIR/config/trusted_dirs'
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         cd '$test_dir'
         _dotsecenv_on_cd '' '$test_dir'
@@ -257,11 +263,11 @@ function test_missing_secret_warning
 
     set mock_path (create_mock_dotsecenv)
 
+    trust_dirs "$TEMP_DIR/config" "$test_dir"
     set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
-        echo '$test_dir' >'$TEMP_DIR/config/trusted_dirs'
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         cd '$test_dir'
         _dotsecenv_on_cd '' '$test_dir'
@@ -288,11 +294,11 @@ function test_missing_secret_error_deduped
 
     set mock_path (create_mock_dotsecenv)
 
+    trust_dirs "$TEMP_DIR/config" "$test_dir"
     set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
-        echo '$test_dir' >'$TEMP_DIR/config/trusted_dirs'
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         # cd alone triggers the --on-variable PWD hook; calling _dotsecenv_on_cd
         # as well would run a second load and defeat the single-error assertion
@@ -320,11 +326,11 @@ function test_security_check_world_writable
 
     set mock_path (create_mock_dotsecenv)
 
+    trust_dirs "$TEMP_DIR/config" "$test_dir"
     set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
-        echo '$test_dir' >'$TEMP_DIR/config/trusted_dirs'
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         cd '$test_dir'
         _dotsecenv_on_cd '' '$test_dir'
@@ -351,11 +357,11 @@ SECRET_VAR={dotsecenv/API_KEY}' >"$test_dir/.secenv"
 
     set mock_path (create_mock_dotsecenv)
 
+    trust_dirs "$TEMP_DIR/config" "$test_dir"
     set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
-        echo '$test_dir' >'$TEMP_DIR/config/trusted_dirs'
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         cd '$test_dir'
         _dotsecenv_on_cd '' '$test_dir'
@@ -385,7 +391,7 @@ SVC_KEY={dotsecenv/API_KEY}' >"$test_dir/.secenv"
 
     set config_dir "$TEMP_DIR/config_msg_split"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -422,7 +428,7 @@ function test_empty_secenv_no_message
 
     set config_dir "$TEMP_DIR/config_empty_secenv"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -503,11 +509,11 @@ DATABASE_PORT=5432
 
     set mock_path (create_mock_dotsecenv)
 
+    trust_dirs "$TEMP_DIR/config" "$test_dir"
     set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
-        echo '$test_dir' >'$TEMP_DIR/config/trusted_dirs'
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         cd '$test_dir'
         _dotsecenv_on_cd '' '$test_dir'
@@ -535,11 +541,11 @@ UNQUOTED=helloworld' >"$test_dir/.secenv"
 
     set mock_path (create_mock_dotsecenv)
 
+    trust_dirs "$TEMP_DIR/config" "$test_dir"
     set result (fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$TEMP_DIR/config'
         mkdir -p '$TEMP_DIR/config'
-        echo '$test_dir' >'$TEMP_DIR/config/trusted_dirs'
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         cd '$test_dir'
         _dotsecenv_on_cd '' '$test_dir'
@@ -571,7 +577,7 @@ function test_tree_scope_persist_in_subdir
     # Pre-trust the directory
     set config_dir "$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir/parent" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/parent"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -607,7 +613,7 @@ function test_tree_scope_unload_on_leave
     # Pre-trust the directory
     set config_dir "$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/project"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -646,8 +652,7 @@ function test_tree_scope_nested_secenv
     # Pre-trust both directories
     set config_dir "$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir/parent" >"$config_dir/trusted_dirs"
-    echo "$test_dir/parent/child" >>"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/parent" "$test_dir/parent/child"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -683,7 +688,7 @@ function test_tree_scope_sibling_navigation
     # Pre-trust the directory
     set config_dir "$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir/parent" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/parent"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -719,7 +724,7 @@ function test_tree_scope_no_reload_from_subdir
     # Pre-trust the directory
     set config_dir "$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/project"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -757,7 +762,7 @@ function test_multiline_warning
 
     set config_dir "$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -825,7 +830,7 @@ function test_dse_up_basic
 
     set config_dir "$TEMP_DIR/config_dse_up_basic"
     mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/project"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -861,8 +866,7 @@ function test_dse_up_multiple_ancestors
 
     set config_dir "$TEMP_DIR/config_dse_up_multi"
     mkdir -p "$config_dir"
-    echo "$test_dir/root" >"$config_dir/trusted_dirs"
-    echo "$test_dir/root/project" >>"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/root" "$test_dir/root/project"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -895,7 +899,7 @@ function test_dse_up_skips_already_loaded
 
     set config_dir "$TEMP_DIR/config_dse_up_skip"
     mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/project"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -985,7 +989,7 @@ function test_load_crlf_empty_name_resolves
 
     set config_dir "$TEMP_DIR/config_crlf"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -1010,40 +1014,124 @@ end
 # Reload / new-key detection tests (FIX A)
 # ============================================================================
 
-function test_sync_new_key_always_trusted
-    log "[fish] Testing new key auto-loads in always-trusted dir (no prompt)..."
+function test_trust_follows_content
+    log "[fish] Testing trust follows .secenv contents and the prompt shows them..."
     set TESTS_RUN (math $TESTS_RUN + 1)
 
-    set test_dir "$TEMP_DIR/test_sync_always"
-    mkdir -p "$test_dir"
+    set base "$TEMP_DIR/test_trust_content"
+    set proj "$base/proj"
+    set legacy "$base/legacy"
+    mkdir -p "$proj/src" "$legacy" "$base/other"
+    echo 'DB_PASSWORD={dotsecenv}' >"$proj/.secenv"
+    echo 'LEGACY=1' >"$legacy/.secenv"
+    chmod 644 "$proj/.secenv" "$legacy/.secenv"
 
-    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/.secenv"
-    chmod 644 "$test_dir/.secenv"
-
-    set config_dir "$TEMP_DIR/config_sync_always"
-    mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    # proj is trusted "always" for its current contents; legacy has an old
+    # path-only entry, which must count as changed
+    set config_dir "$TEMP_DIR/config_trust_content"
+    trust_dirs "$config_dir" "$proj"
+    printf '%s\n' "$legacy" >>"$config_dir/trusted_dirs"
 
     set mock_path (create_mock_dotsecenv)
 
-    # Fish only fires its hook on a real PWD change, so use dse reload / direct
-    # sync to ingest the newly-appended key.
-    set result (fish --no-config -i -c "
-        set -gx PATH '$mock_path' \$PATH
-        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
-        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
-        source '$SHELL_DIR/conf.d/dotsecenv.fish'
-        cd '$test_dir'
-        _dotsecenv_on_cd '' '$test_dir'
-        echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
-        _dotsecenv_sync_new_keys '$test_dir'
-        echo 'DB='\$DB_PASSWORD'|API='\$API_KEY
-    " 2>&1)
+    # Answers on stdin: [a]lways for the edited proj, [n]o for legacy
+    set result (printf 'a\nn\n' | run_plugin "$config_dir" "$mock_path" "
+        function _dotsecenv_has_tty; return 0; end
+        cd '$proj'
+        echo 'API_KEY={dotsecenv}' >> '$proj/.secenv'
+        cd src
+        cd ..
+        echo API=\$API_KEY
+        cd '$base/other'
+        cd '$proj'
+        cd '$legacy'
+        echo LEGACY=(set -q LEGACY; and echo \$LEGACY; or echo unset)
+    ")
 
-    if string match -q "*DB=super-secret-password|API=mock-api-key-12345*" "$result"; and not string match -q "*Load secrets*" "$result"
-        pass "[fish] Always-trusted new key auto-loaded without prompt"
+    if string match -q "*new keys in $proj/.secenv*" "$result"
+        and string match -q "*  API_KEY={dotsecenv}*" "$result"
+        and string match -q "*API=mock-api-key-12345*" "$result"
+        and not string match -q "*found .secenv in $proj*" "$result"
+        and string match -q "*found .secenv in $legacy*" "$result"
+        and string match -q "*LEGACY=unset*" "$result"
+        pass "[fish] Changed .secenv and path-only entries prompt; unchanged trusted file does not"
     else
-        fail "[fish] Always-trusted new key not auto-loaded, got: $result"
+        fail "[fish] Content-based trust wrong, got: $result"
+    end
+end
+
+function test_trust_one_line_per_dir
+    log "[fish] Testing re-trust replaces the old line, so a revert prompts..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set base "$TEMP_DIR/test_trust_revert"
+    set proj "$base/proj"
+    mkdir -p "$proj" "$base/other"
+    echo 'APP=a' >"$proj/.secenv"
+    chmod 644 "$proj/.secenv"
+
+    set config_dir "$TEMP_DIR/config_trust_revert"
+    trust_dirs "$config_dir" "$proj"
+    set mock_path (create_mock_dotsecenv)
+
+    # Contents A are trusted; edit to B and trust it, then revert to A
+    set result (printf 'a\na\n' | run_plugin "$config_dir" "$mock_path" "
+        function _dotsecenv_has_tty; return 0; end
+        cd '$proj'
+        echo 'APP=b' >'$proj/.secenv'
+        cd '$base/other'
+        cd '$proj'
+        echo 'APP=a' >'$proj/.secenv'
+        cd '$base/other'
+        cd '$proj'
+        echo APP=\$APP
+    ")
+
+    set -l prompts (count (string match -a -- "*found .secenv in $proj*" (string split \n -- $result)))
+    set -l lines (count (cat "$config_dir/trusted_dirs"))
+    if test $prompts -eq 2; and test $lines -eq 1; and string match -q "*APP=a*" "$result"
+        pass "[fish] One trust line per directory; reverting to older contents prompts"
+    else
+        fail "[fish] Revert handling wrong ($prompts prompts, $lines lines), got: $result"
+    end
+end
+
+function test_trust_without_hash_tool
+    log "[fish] Testing no sha256sum/shasum means every visit prompts..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set base "$TEMP_DIR/test_trust_nohash"
+    set proj "$base/proj"
+    mkdir -p "$proj" "$base/other"
+    echo 'APP=1' >"$proj/.secenv"
+    chmod 644 "$proj/.secenv"
+
+    set config_dir "$TEMP_DIR/config_trust_nohash"
+    trust_dirs "$config_dir" "$proj"
+    set mock_path (create_mock_dotsecenv)
+
+    # A PATH with what the plugin needs, minus the hashing tools
+    set nohash "$TEMP_DIR/nohash_bin"
+    mkdir -p "$nohash"
+    for tool in bash cat awk grep tr id stat mktemp rm mv cut md5sum md5 mkdir
+        set -l path (command -s $tool); and ln -sf $path "$nohash/$tool"
+    end
+
+    set result (printf 'a\ny\n' | run_plugin "$config_dir" "$mock_path" "
+        set -gx PATH '$mock_path' '$nohash'
+        function _dotsecenv_has_tty; return 0; end
+        cd '$proj'
+        cd '$base/other'
+        cd '$proj'
+        echo APP=\$APP
+    ")
+
+    set -l prompts (count (string match -a -- "*found .secenv in $proj*" (string split \n -- $result)))
+    set -l lines (count (cat "$config_dir/trusted_dirs"))
+    if test $prompts -eq 2; and test $lines -eq 1; and string match -q "*APP=1*" "$result"
+        pass "[fish] Without a hashing tool every visit prompts and nothing is stored"
+    else
+        fail "[fish] No-hash-tool handling wrong ($prompts prompts, $lines lines), got: $result"
     end
 end
 
@@ -1059,7 +1147,7 @@ function test_sync_no_new_keys_noop
 
     set config_dir "$TEMP_DIR/config_sync_noop"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     set mock_path (create_mock_dotsecenv)
 
@@ -1095,23 +1183,25 @@ function test_sync_new_key_unload_integrity
 
     set config_dir "$TEMP_DIR/config_sync_unload"
     mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/project"
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -i -c "
+    set result (echo y | fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        function _dotsecenv_has_tty; return 0; end
         cd '$test_dir/project'
         echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
         _dotsecenv_sync_new_keys '$test_dir/project'
+        echo IN=\$API_KEY
         cd '$test_dir/other'
         echo 'DB='(test -n \"\$DB_PASSWORD\"; and echo \$DB_PASSWORD; or echo unset)'|API='(test -n \"\$API_KEY\"; and echo \$API_KEY; or echo unset)
     " 2>&1)
 
-    if string match -q "*DB=unset|API=unset*" "$result"
+    if string match -q "*IN=mock-api-key-12345*" "$result"; and string match -q "*DB=unset|API=unset*" "$result"
         pass "[fish] Synced key tracked and unloaded on leave"
     else
         fail "[fish] Synced key leaked on leave, got: $result"
@@ -1130,17 +1220,18 @@ function test_reload_ingests_new_key
 
     set config_dir "$TEMP_DIR/config_reload_newkey"
     mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/project"
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -i -c "
+    set result (echo y | fish --no-config -i -c "
         set -gx PATH '$mock_path' \$PATH
         set -gx DOTSECENV_CONFIG_DIR '$config_dir'
         set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
         source '$SHELL_DIR/conf.d/dotsecenv.fish'
         cd '$test_dir/project'
         echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
+        function _dotsecenv_has_tty; return 0; end
         dse reload
         echo 'DB='\$DB_PASSWORD'|API='\$API_KEY
     " 2>&1)
@@ -1209,7 +1300,9 @@ function main
     test_load_crlf_empty_name_resolves
 
     # FIX A: reload / new-key detection
-    test_sync_new_key_always_trusted
+    test_trust_follows_content
+    test_trust_one_line_per_dir
+    test_trust_without_hash_tool
     test_sync_no_new_keys_noop
     test_sync_new_key_unload_integrity
     test_reload_ingests_new_key
