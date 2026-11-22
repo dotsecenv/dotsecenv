@@ -10,6 +10,10 @@ readonly GITHUB_ORG="dotsecenv"
 readonly GITHUB_REPO="dotsecenv"
 readonly GPG_KEY_URL="https://get.dotsecenv.com/key.asc"
 readonly RETRACTED_URL="https://get.dotsecenv.com/retracted.txt"
+# Primary fingerprints of the release signing keys; checksums.txt.sig must come
+# from one of them. The second key signed releases up to v0.6.3.
+readonly RELEASE_KEY_FINGERPRINTS="0B8DB28079ACFA7497F0B8FE647E9C8219626442 E60A1740BAEF49284D22EA7D3C376348F0921C59"
+readonly NO_VERIFY_HINT="rerun with --no-verify (or VERIFY=0) to install without verification"
 
 # ---------------------------------------------------------------------------
 # Color setup (conditional on tty)
@@ -52,6 +56,7 @@ SYSTEM_INSTALL="${SYSTEM_INSTALL:-0}"
 VERIFY="${VERIFY:-1}"
 
 TMPDIR_ROOT=""
+GNUPG_TMP=""
 
 # Where the optional helpers actually landed. Empty means nothing was written,
 # either because the component was turned off or because the release archive
@@ -64,9 +69,12 @@ GIT_HELPER_TARGET=""
 # Cleanup
 # ---------------------------------------------------------------------------
 cleanup() {
-    if [ -n "${TMPDIR_ROOT}" ] && [ -d "${TMPDIR_ROOT}" ]; then
-        rm -rf "${TMPDIR_ROOT}"
-    fi
+    local dir
+    for dir in "${TMPDIR_ROOT}" "${GNUPG_TMP}"; do
+        if [ -n "${dir}" ] && [ -d "${dir}" ]; then
+            rm -rf "${dir}"
+        fi
+    done
 }
 trap cleanup EXIT
 
@@ -225,8 +233,7 @@ verify_checksums() {
     elif command -v shasum >/dev/null 2>&1; then
         actual="$(shasum -a 256 "$archive" | awk '{print $1}')"
     else
-        warn "Neither sha256sum nor shasum found; skipping checksum verification"
-        return 0
+        error "Neither sha256sum nor shasum found; install one, or ${NO_VERIFY_HINT}"
     fi
 
     if [ "$expected" != "$actual" ]; then
@@ -238,23 +245,28 @@ verify_checksums() {
 verify_gpg() {
     local checksums_file="$1" signature_file="$2"
 
-    if ! command -v gpg >/dev/null 2>&1; then
-        warn "gpg not found; skipping GPG signature verification"
-        return 0
-    fi
+    command -v gpg >/dev/null 2>&1 || error "gpg not found; install gpg, or ${NO_VERIFY_HINT}"
 
     info "Verifying GPG signature..."
-    local gnupg_tmp
-    gnupg_tmp="$(mktemp -d)"
+    # A fresh mktemp dir keeps gpg-agent's socket path short; cleanup() removes it.
+    local status signers fpr
+    GNUPG_TMP="$(mktemp -d)"
 
-    download "${GPG_KEY_URL}" "${gnupg_tmp}/key.asc"
-    gpg --homedir "${gnupg_tmp}" --batch --quiet --import "${gnupg_tmp}/key.asc" 2>/dev/null
-    if gpg --homedir "${gnupg_tmp}" --batch --quiet --verify "$signature_file" "$checksums_file" 2>/dev/null; then
-        success "GPG signature verified"
-    else
-        warn "GPG signature verification failed; continuing anyway"
-    fi
-    rm -rf "${gnupg_tmp}"
+    download "${GPG_KEY_URL}" "${GNUPG_TMP}/key.asc" || error "Could not download the release key from ${GPG_KEY_URL}"
+    gpg --homedir "${GNUPG_TMP}" --batch --quiet --import "${GNUPG_TMP}/key.asc" 2>/dev/null \
+        || error "Could not import the release key from ${GPG_KEY_URL}"
+    status="$(gpg --homedir "${GNUPG_TMP}" --batch --status-fd 1 --verify "$signature_file" "$checksums_file" 2>/dev/null)" \
+        || error "GPG signature verification failed for checksums.txt; ${NO_VERIFY_HINT}"
+
+    # VALIDSIG's last field is the signing key's primary fingerprint.
+    signers="$(printf '%s\n' "$status" | awk '$1 == "[GNUPG:]" && $2 == "VALIDSIG" { print $NF }')"
+    for fpr in ${RELEASE_KEY_FINGERPRINTS}; do
+        if printf '%s\n' "$signers" | grep -qxF "$fpr"; then
+            success "GPG signature verified (key ${fpr})"
+            return 0
+        fi
+    done
+    error "checksums.txt is not signed by a dotsecenv release key (signer: ${signers:-none}); ${NO_VERIFY_HINT}"
 }
 
 # ---------------------------------------------------------------------------
@@ -284,11 +296,10 @@ install_binary() {
 
     if [ "${VERIFY}" = "1" ]; then
         download "${checksums_url}" "${tmp_dir}/checksums.txt"
-        download "${signature_url}" "${tmp_dir}/checksums.txt.sig" 2>/dev/null || true
+        download "${signature_url}" "${tmp_dir}/checksums.txt.sig" 2>/dev/null \
+            || error "Could not download checksums.txt.sig for ${VERSION}; ${NO_VERIFY_HINT}"
+        verify_gpg "${tmp_dir}/checksums.txt" "${tmp_dir}/checksums.txt.sig"
         verify_checksums "${tmp_dir}/${archive_name}" "${tmp_dir}/checksums.txt"
-        if [ -f "${tmp_dir}/checksums.txt.sig" ]; then
-            verify_gpg "${tmp_dir}/checksums.txt" "${tmp_dir}/checksums.txt.sig"
-        fi
     fi
 
     info "Extracting archive..."
@@ -781,7 +792,8 @@ Options:
   --[no-]install-man-pages           Install man pages (default: yes)
   --system                           Install system-wide (/usr/local/bin, shared
                                      completions/man pages) instead of user home
-  --[no-]verify                      Verify checksums and GPG (default: yes)
+  --[no-]verify                      Verify the GPG signature and checksum, and
+                                     stop on any failure (default: yes)
   -h, --help                         Show this help
 
 Environment variables:
