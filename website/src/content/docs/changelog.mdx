@@ -14,6 +14,7 @@ _Unreleased_
 ### Bug Fixes
 
 - The Homebrew cask installs every man page. Its list was written by hand and missed 10 of the 26 pages, including `secret forget`, `vault compact`, `doctor`, and the `identity` and `policy` commands. The cask now takes `man/man1/*.1`, so new commands are picked up automatically (#490)
+- Pointing dotsecenv at a file of fewer than 3 lines that is not a vault no longer overwrites it. `vault describe -v notes.txt`, or a configured vault path holding such a file, replaced its contents with an empty vault. It now fails with "not a dotsecenv vault" and leaves the file alone. An empty or whitespace-only file still starts a new vault (#494)
 
 ### Other
 
