@@ -25,6 +25,7 @@ const (
 	ExitFingerprintRequired = output.ExitFingerprintRequired
 	ExitAccessDenied        = output.ExitAccessDenied
 	ExitAlgorithmNotAllowed = output.ExitAlgorithmNotAllowed
+	ExitChangesRequired     = output.ExitChangesRequired
 )
 
 // Error represents a CLI error with an exit code.

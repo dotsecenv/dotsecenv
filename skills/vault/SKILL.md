@@ -115,7 +115,8 @@ superseded secret versions:
    dotsecenv --no-pinentry vault compact --json
    ```
 
-   Without `--yes`, this reports the plan and writes nothing (`"applied": false`).
+   Without `--yes`, this reports the plan, writes nothing (`"applied": false`)
+   and exits 10 when there is something to drop.
    If it warns that a newer dotsecenv release wrote the vault, stop and ask the
    user to upgrade dotsecenv before compacting.
 3. Back up the vault file before applying:
@@ -125,15 +126,8 @@ superseded secret versions:
    ```
 
    Find `<vault-path>` from `dotsecenv --no-pinentry vault describe`.
-4. Apply. In an interactive session, run the bare command and let the user
-   confirm at the prompt:
-
-   ```bash
-   dotsecenv --no-pinentry vault compact
-   ```
-
-   In a non-interactive session (or once the user has approved the plan), skip
-   the prompt with `--yes`:
+4. Apply once the user has approved the plan. Compaction writes only with
+   `--yes`; there is no prompt:
 
    ```bash
    dotsecenv --no-pinentry vault compact --yes

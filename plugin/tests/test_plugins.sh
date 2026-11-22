@@ -125,57 +125,52 @@ if [[ "$1" == "secret" && "$2" == "get" ]]; then
         "PROD_SECRET") echo "production-secret-value" ;;
         "MISSING_SECRET") exit 1 ;;
         "MULTILINE_SECRET") printf 'line1\nline2\nline3' ;;
+        "PEM_KEY") printf -- '-----BEGIN TEST KEY-----\nAAAA\n\nBBBB\n-----END TEST KEY-----' ;;
+        "ESCAPED") printf '%s' 'a\nb\c' ;;
         *) exit 1 ;;
     esac
 else
-    # Pass through to real binary if it exists
-    if [[ -x "$REAL_DOTSECENV" ]]; then
-        "$REAL_DOTSECENV" "$@"
-    else
-        exit 1
-    fi
+    # Any other command: show the arguments the binary received
+    printf 'BIN:'
+    printf '<%s>' "$@"
+    echo
 fi
 MOCK_EOF
     chmod +x "$mock_dir/dotsecenv"
     echo "$mock_dir"
 }
 
-# Test helper: run a command in a subshell with the plugin loaded
-run_with_plugin_bash() {
-    local test_dir="$1"
-    local mock_path="$2"
-    shift 2
-    local cmd="$*"
-
-    # Run bash with the plugin sourced, preserving existing PATH
-    "$BASH_BIN" -c "
-        export PATH='$mock_path:$PATH'
-        export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config'
-        mkdir -p '$TEMP_DIR/config'
-        source '$SHELL_DIR/_dotsecenv_core.sh'
-        source '$SHELL_DIR/dotsecenv.plugin.bash'
-        cd '$test_dir'
-        # Trigger directory change hook
-        _dotsecenv_chpwd_hook
-        $cmd
-    " 2>&1
+# Trust directories "always" for their current .secenv contents, as
+# answering [a]lways to the prompt would
+trust_dirs() {
+    local config_dir="$1" dir hash
+    shift
+    mkdir -p "$config_dir"
+    for dir in "$@"; do
+        hash=$({ sha256sum 2>/dev/null || shasum -a 256; } <"$dir/.secenv")
+        printf '%s %s\n' "${hash%% *}" "$dir"
+    done >"$config_dir/trusted_dirs"
 }
 
-run_with_plugin_zsh() {
-    local test_dir="$1"
-    local mock_path="$2"
-    shift 2
-    local cmd="$*"
-
-    # Run zsh with the plugin sourced, preserving existing PATH
-    zsh -i -f -c "
-        export PATH='$mock_path:$PATH'
-        export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config'
-        mkdir -p '$TEMP_DIR/config'
-        source '$SHELL_DIR/dotsecenv.plugin.zsh'
-        cd '$test_dir'
-        $cmd
-    " 2>&1
+# Run a script in a shell with the plugin loaded. In bash, `cd` also fires the
+# hook, as PROMPT_COMMAND would before the next prompt. Always succeeds, so a
+# failing script fails its test instead of stopping the suite (set -e).
+run_plugin() {
+    local shell="$1" config_dir="$2" mock_path="$3" script="$4"
+    if [[ "$shell" == "bash" ]]; then
+        DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd() { builtin cd \"\$@\" && _dotsecenv_chpwd_hook; }
+            $script
+        " 2>&1 || true
+    else
+        DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            $script
+        " 2>&1 || true
+    fi
 }
 
 # ============================================================================
@@ -200,7 +195,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -247,7 +242,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -294,7 +289,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -341,7 +336,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -390,7 +385,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -424,48 +419,33 @@ EOF
 
 test_security_check_world_writable() {
     local shell="$1"
-    log "[$shell] Testing security check (world-writable)..."
+    log "[$shell] Testing security check (world-writable 666 and 777)..."
     ((TESTS_RUN++)) || true
 
     local test_dir="$TEMP_DIR/test_security"
     mkdir -p "$test_dir"
-
-    cat >"$test_dir/.secenv" <<'EOF'
-UNSAFE_VAR=should-not-load
-EOF
-    chmod 666 "$test_dir/.secenv" # World-writable
-
-    # Pre-trust the directory (but security check should still fail)
-    local config_dir="$TEMP_DIR/config"
-    mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    echo 'UNSAFE_VAR=should-not-load' >"$test_dir/.secenv"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
 
-    local result
-    if [[ "$shell" == "bash" ]]; then
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/_dotsecenv_core.sh'
-            source '$SHELL_DIR/dotsecenv.plugin.bash'
-            cd '$test_dir'
-            _dotsecenv_chpwd_hook
-            echo \"VAR=\${UNSAFE_VAR:-unset}\"
-        " 2>&1)
-    else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+    local mode result failed=""
+    for mode in 666 777; do
+        chmod "$mode" "$test_dir/.secenv"
+        # Pre-trust the directory (but security check should still fail)
+        trust_dirs "$TEMP_DIR/config" "$test_dir"
+        result=$(run_plugin "$shell" "$TEMP_DIR/config" "$mock_path" "
             cd '$test_dir'
             echo \"VAR=\${UNSAFE_VAR:-unset}\"
-        " 2>&1)
-    fi
+        ")
+        [[ "$result" == *"refusing"*"world-writable"* && "$result" == *"VAR=unset"* ]] ||
+            failed+=" $mode: $result"
+    done
 
-    if [[ "$result" == *"refusing"* && "$result" == *"world-writable"* ]]; then
+    if [[ -z "$failed" ]]; then
         pass "[$shell] World-writable file rejected correctly"
     else
-        fail "[$shell] World-writable file not rejected, got: $result"
+        fail "[$shell] World-writable file not rejected, got:$failed"
     fi
 }
 
@@ -487,7 +467,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -538,7 +518,7 @@ EOF
 
     local config_dir="$TEMP_DIR/config_msg_split"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -585,7 +565,7 @@ test_empty_secenv_no_message() {
 
     local config_dir="$TEMP_DIR/config_empty_secenv"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -646,33 +626,27 @@ test_alias_dse() {
     fi
 }
 
-test_alias_dse_get() {
+test_dse_passthrough() {
     local shell="$1"
-    log "[$shell] Testing 'dse get' subcommand..."
+    log "[$shell] Testing dse and dotsecenv pass arguments to the binary..."
     ((TESTS_RUN++)) || true
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
 
     local result
-    if [[ "$shell" == "bash" ]]; then
-        result=$("$BASH_BIN" -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/_dotsecenv_core.sh'
-            dse get API_KEY
-        " 2>&1)
-    else
-        result=$(zsh -i -f -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/dotsecenv.plugin.zsh'
-            dse get API_KEY
-        " 2>&1)
-    fi
+    result=$(run_plugin "$shell" "$TEMP_DIR/config_passthrough" "$mock_path" "
+        dse vault describe 'a b' ''
+        dotsecenv vault describe
+        dse secret get API_KEY
+        dse up
+    ")
 
-    if [[ "$result" == "mock-api-key-12345" ]]; then
-        pass "[$shell] 'dse get' subcommand works correctly"
+    if [[ "$result" == *"BIN:<vault><describe><a b><>"* && "$result" == *"BIN:<vault><describe>"$'\n'* &&
+        "$result" == *"mock-api-key-12345"* && "$result" == *"BIN:<up>"* ]]; then
+        pass "[$shell] dse is a flat alias; other subcommands reach the binary"
     else
-        fail "[$shell] 'dse get' subcommand failed, got: $result"
+        fail "[$shell] Pass-through wrong, got: $result"
     fi
 }
 
@@ -697,7 +671,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -746,7 +720,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -798,7 +772,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir/parent" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/parent"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -850,7 +824,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/project"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -909,8 +883,7 @@ EOF
     # Pre-trust both directories
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir/parent" >"$config_dir/trusted_dirs"
-    echo "$test_dir/parent/child" >>"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/parent" "$test_dir/parent/child"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -962,7 +935,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir/parent" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/parent"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -1016,7 +989,7 @@ EOF
     # Pre-trust the directory
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/project"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -1072,7 +1045,7 @@ EOF
 
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -1101,213 +1074,95 @@ EOF
     fi
 }
 
-# ============================================================================
-# dse up Tests
-# ============================================================================
-
-test_dse_up_basic() {
+test_multiline_and_escapes_byte_exact() {
     local shell="$1"
-    log "[$shell] Testing 'dse up' loads ancestor .secenv..."
+    log "[$shell] Testing multi-line and backslash values arrive byte for byte..."
     ((TESTS_RUN++)) || true
 
-    local test_dir="$TEMP_DIR/test_dse_up_basic"
-    mkdir -p "$test_dir/project/terraform/modules"
+    local test_dir="$TEMP_DIR/test_bytes_$shell"
+    local out="$test_dir/out"
+    mkdir -p "$out"
+    printf '%s\n' 'PEM_KEY={dotsecenv}' 'ESCAPED={dotsecenv}' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+    printf -- '-----BEGIN TEST KEY-----\nAAAA\n\nBBBB\n-----END TEST KEY-----' >"$out/want_pem"
+    printf '%s' 'a\nb\c' >"$out/want_esc"
 
-    cat >"$test_dir/project/.secenv" <<'EOF'
-DB_PASSWORD={dotsecenv}
-EOF
-    chmod 644 "$test_dir/project/.secenv"
+    local config_dir="$TEMP_DIR/config_bytes_$shell"
+    trust_dirs "$config_dir" "$test_dir"
 
-    local config_dir="$TEMP_DIR/config_dse_up_basic"
-    mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+    # Clipboard stubs write what they receive to \$CLIP_OUT
+    local mock_path tool
+    mock_path=$(create_mock_dotsecenv)
+    for tool in pbcopy wl-copy xclip; do
+        printf '#!/bin/sh\ncat >"$CLIP_OUT"\n' >"$mock_path/$tool"
+        chmod +x "$mock_path/$tool"
+    done
+
+    run_plugin "$shell" "$config_dir" "$mock_path" "
+        export CLIP_OUT='$out/clip' WAYLAND_DISPLAY=test
+        cd '$test_dir'
+        printf '%s' \"\$PEM_KEY\" >'$out/env_pem'
+        printf '%s' \"\$ESCAPED\" >'$out/env_esc'
+        dotsecenv secret cp PEM_KEY && mv '$out/clip' '$out/clip_pem'
+        dse secret cp ESCAPED && mv '$out/clip' '$out/clip_esc'
+    " >/dev/null
+
+    local f bad=""
+    for f in env_pem clip_pem; do cmp -s "$out/want_pem" "$out/$f" || bad+=" $f"; done
+    for f in env_esc clip_esc; do cmp -s "$out/want_esc" "$out/$f" || bad+=" $f"; done
+    if [[ -z "$bad" ]]; then
+        pass "[$shell] Multi-line and backslash values exact in env and clipboard"
+    else
+        fail "[$shell] Values mangled in:$bad"
+    fi
+}
+
+test_unload_restores_previous_values() {
+    local shell="$1"
+    log "[$shell] Testing unload restores the values a .secenv replaced..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_restore_$shell"
+    mkdir -p "$test_dir/parent/child" "$test_dir/other"
+    printf '%s\n' 'AWS_PROFILE=dev' 'DB_PASSWORD={dotsecenv}' >"$test_dir/parent/.secenv"
+    printf '%s\n' 'AWS_PROFILE=child' 'DB_PASSWORD=child-pw' 'NEW_KEY=x' >"$test_dir/parent/child/.secenv"
+    chmod 644 "$test_dir/parent/.secenv" "$test_dir/parent/child/.secenv"
+
+    local config_dir="$TEMP_DIR/config_restore_$shell"
+    trust_dirs "$config_dir" "$test_dir/parent" "$test_dir/parent/child"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
 
     local result
-    if [[ "$shell" == "bash" ]]; then
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/_dotsecenv_core.sh'
-            source '$SHELL_DIR/dotsecenv.plugin.bash'
-            cd '$test_dir/project/terraform/modules'
-            _dotsecenv_chpwd_hook
-            dse up '$test_dir'
-            echo \"\$DB_PASSWORD\"
-        " 2>&1)
+    result=$(run_plugin "$shell" "$config_dir" "$mock_path" "
+        export AWS_PROFILE=prod
+        cd '$test_dir/parent'
+        cd child
+        echo \"1:\$AWS_PROFILE:\$DB_PASSWORD:\${NEW_KEY-unset}\"
+        cd ..
+        echo \"2:\$AWS_PROFILE:\$DB_PASSWORD:\${NEW_KEY-unset}\"
+        cd '$test_dir/other'
+        echo \"3:\$AWS_PROFILE:\${DB_PASSWORD-unset}:\${NEW_KEY-unset}\"
+    ")
+
+    if [[ "$result" == *"1:child:child-pw:x"* && "$result" == *"2:dev:super-secret-password:unset"* && "$result" == *"3:prod:unset:unset"* ]]; then
+        pass "[$shell] Unload restores parent values and the original environment"
     else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/dotsecenv.plugin.zsh'
-            cd '$test_dir/project/terraform/modules'
-            dse up '$test_dir'
-            echo \"\$DB_PASSWORD\"
-        " 2>&1)
-    fi
-
-    if [[ "$result" == *"super-secret-password"* ]]; then
-        pass "[$shell] 'dse up' loads ancestor .secenv correctly"
-    else
-        fail "[$shell] 'dse up' failed to load ancestor .secenv, got: $result"
-    fi
-}
-
-test_dse_up_multiple_ancestors() {
-    local shell="$1"
-    log "[$shell] Testing 'dse up' loads multiple ancestor .secenv files..."
-    ((TESTS_RUN++)) || true
-
-    local test_dir="$TEMP_DIR/test_dse_up_multi"
-    mkdir -p "$test_dir/root/project/src"
-
-    cat >"$test_dir/root/.secenv" <<'EOF'
-APP_ENV=production
-EOF
-    chmod 644 "$test_dir/root/.secenv"
-
-    cat >"$test_dir/root/project/.secenv" <<'EOF'
-DB_PASSWORD={dotsecenv}
-EOF
-    chmod 644 "$test_dir/root/project/.secenv"
-
-    local config_dir="$TEMP_DIR/config_dse_up_multi"
-    mkdir -p "$config_dir"
-    echo "$test_dir/root" >"$config_dir/trusted_dirs"
-    echo "$test_dir/root/project" >>"$config_dir/trusted_dirs"
-
-    local mock_path
-    mock_path=$(create_mock_dotsecenv)
-
-    local result
-    if [[ "$shell" == "bash" ]]; then
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/_dotsecenv_core.sh'
-            source '$SHELL_DIR/dotsecenv.plugin.bash'
-            cd '$test_dir/root/project/src'
-            _dotsecenv_chpwd_hook
-            dse up '$test_dir'
-            echo \"\$APP_ENV|\$DB_PASSWORD\"
-        " 2>&1)
-    else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/dotsecenv.plugin.zsh'
-            cd '$test_dir/root/project/src'
-            dse up '$test_dir'
-            echo \"\$APP_ENV|\$DB_PASSWORD\"
-        " 2>&1)
-    fi
-
-    if [[ "$result" == *"production|super-secret-password"* ]]; then
-        pass "[$shell] 'dse up' loads multiple ancestor .secenv files correctly"
-    else
-        fail "[$shell] 'dse up' multi-ancestor failed, got: $result"
-    fi
-}
-
-test_dse_up_skips_already_loaded() {
-    local shell="$1"
-    log "[$shell] Testing 'dse up' skips already-loaded ancestors..."
-    ((TESTS_RUN++)) || true
-
-    local test_dir="$TEMP_DIR/test_dse_up_skip"
-    mkdir -p "$test_dir/project/src"
-
-    cat >"$test_dir/project/.secenv" <<'EOF'
-DB_PASSWORD={dotsecenv}
-EOF
-    chmod 644 "$test_dir/project/.secenv"
-
-    local config_dir="$TEMP_DIR/config_dse_up_skip"
-    mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
-
-    local mock_path
-    mock_path=$(create_mock_dotsecenv)
-
-    local result
-    if [[ "$shell" == "bash" ]]; then
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/_dotsecenv_core.sh'
-            source '$SHELL_DIR/dotsecenv.plugin.bash'
-            cd '$test_dir/project'
-            _dotsecenv_chpwd_hook
-            cd '$test_dir/project/src'
-            _dotsecenv_chpwd_hook
-            dse up '$test_dir'
-            echo \"\$DB_PASSWORD\"
-        " 2>&1)
-    else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/dotsecenv.plugin.zsh'
-            cd '$test_dir/project'
-            cd '$test_dir/project/src'
-            dse up '$test_dir'
-            echo \"\$DB_PASSWORD\"
-        " 2>&1)
-    fi
-
-    if [[ "$result" == *"no new ancestor"* && "$result" == *"super-secret-password"* ]]; then
-        pass "[$shell] 'dse up' correctly skips already-loaded ancestors"
-    else
-        fail "[$shell] 'dse up' skip-already-loaded failed, got: $result"
-    fi
-}
-
-test_dse_up_no_ancestors() {
-    local shell="$1"
-    log "[$shell] Testing 'dse up' graceful when no ancestor .secenv exists..."
-    ((TESTS_RUN++)) || true
-
-    local test_dir="$TEMP_DIR/test_dse_up_none"
-    mkdir -p "$test_dir/project/src"
-
-    local config_dir="$TEMP_DIR/config_dse_up_none"
-    mkdir -p "$config_dir"
-
-    local mock_path
-    mock_path=$(create_mock_dotsecenv)
-
-    local result
-    if [[ "$shell" == "bash" ]]; then
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/_dotsecenv_core.sh'
-            source '$SHELL_DIR/dotsecenv.plugin.bash'
-            cd '$test_dir/project/src'
-            _dotsecenv_chpwd_hook
-            dse up '$test_dir'
-        " 2>&1)
-    else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/dotsecenv.plugin.zsh'
-            cd '$test_dir/project/src'
-            dse up '$test_dir'
-        " 2>&1)
-    fi
-
-    if [[ "$result" == *"no new ancestor .secenv files found"* ]]; then
-        pass "[$shell] 'dse up' gracefully reports no ancestors"
-    else
-        fail "[$shell] 'dse up' no-ancestors failed, got: $result"
+        fail "[$shell] Unload did not restore previous values, got: $result"
     fi
 }
 
 # ============================================================================
-# dse reload Tests
+# secret reload Tests
 # ============================================================================
 
-test_dse_reload_refreshes_values() {
+test_secret_reload_refreshes_values() {
     local shell="$1"
-    log "[$shell] Testing 'dse reload' refreshes secret values..."
+    log "[$shell] Testing 'secret reload' refreshes secret values..."
     ((TESTS_RUN++)) || true
 
-    local test_dir="$TEMP_DIR/test_dse_reload_refresh"
+    local test_dir="$TEMP_DIR/test_secret_reload_refresh"
     mkdir -p "$test_dir/project"
 
     cat >"$test_dir/project/.secenv" <<'EOF'
@@ -1338,14 +1193,13 @@ else
 fi
 MOCK_EOF
     chmod +x "$mock_dir/dotsecenv"
+    trust_dirs "$TEMP_DIR/config_reload" "$test_dir/project"
 
     local result
     if [[ "$shell" == "bash" ]]; then
         result=$("$BASH_BIN" -c "
             export PATH='$mock_dir:$PATH'
             export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config_reload'
-            mkdir -p '$TEMP_DIR/config_reload'
-            echo '$test_dir/project' > '$TEMP_DIR/config_reload/trusted_dirs'
             source '$SHELL_DIR/_dotsecenv_core.sh'
             source '$SHELL_DIR/dotsecenv.plugin.bash'
             cd '$test_dir/project'
@@ -1357,15 +1211,14 @@ MOCK_EOF
             # Also update the plain value
             echo 'DB_PASSWORD={dotsecenv}' > '$test_dir/project/.secenv'
             echo 'APP_NAME=updated' >> '$test_dir/project/.secenv'
-            dse reload
+            _dotsecenv_trust_always '$test_dir/project' \"\$(_dotsecenv_file_hash '$test_dir/project/.secenv')\"
+            dotsecenv secret reload
             echo \"before_secret=\$before_secret|after_secret=\$DB_PASSWORD|before_plain=\$before_plain|after_plain=\$APP_NAME\"
         " 2>/dev/null)
     else
         result=$(zsh -i -f -c "
             export PATH='$mock_dir:$PATH'
             export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config_reload'
-            mkdir -p '$TEMP_DIR/config_reload'
-            echo '$test_dir/project' > '$TEMP_DIR/config_reload/trusted_dirs'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/project'
             local before_secret=\"\$DB_PASSWORD\"
@@ -1375,7 +1228,8 @@ MOCK_EOF
             # Also update the plain value
             echo 'DB_PASSWORD={dotsecenv}' > '$test_dir/project/.secenv'
             echo 'APP_NAME=updated' >> '$test_dir/project/.secenv'
-            dse reload
+            _dotsecenv_trust_always '$test_dir/project' \"\$(_dotsecenv_file_hash '$test_dir/project/.secenv')\"
+            dotsecenv secret reload
             echo \"before_secret=\$before_secret|after_secret=\$DB_PASSWORD|before_plain=\$before_plain|after_plain=\$APP_NAME\"
         " 2>/dev/null)
     fi
@@ -1383,18 +1237,18 @@ MOCK_EOF
     rm -f "$test_dir/updated_flag"
 
     if [[ "$result" == *"after_secret=new-secret-password"* && "$result" == *"after_plain=updated"* ]]; then
-        pass "[$shell] 'dse reload' refreshes both secret and plain values"
+        pass "[$shell] 'secret reload' refreshes both secret and plain values"
     else
-        fail "[$shell] 'dse reload' refresh failed, got: $result"
+        fail "[$shell] 'secret reload' refresh failed, got: $result"
     fi
 }
 
-test_dse_reload_clears_and_reloads_stack() {
+test_secret_reload_clears_and_reloads_stack() {
     local shell="$1"
-    log "[$shell] Testing 'dse reload' clears and reloads nested stack..."
+    log "[$shell] Testing 'secret reload' clears and reloads nested stack..."
     ((TESTS_RUN++)) || true
 
-    local test_dir="$TEMP_DIR/test_dse_reload_stack"
+    local test_dir="$TEMP_DIR/test_secret_reload_stack"
     mkdir -p "$test_dir/root/project"
 
     cat >"$test_dir/root/.secenv" <<'EOF'
@@ -1406,6 +1260,7 @@ EOF
 DB_PASSWORD={dotsecenv}
 EOF
     chmod 644 "$test_dir/root/project/.secenv"
+    trust_dirs "$TEMP_DIR/config_reload_stack" "$test_dir/root" "$test_dir/root/project"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -1415,9 +1270,6 @@ EOF
         result=$("$BASH_BIN" -c "
             export PATH='$mock_path:$PATH'
             export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config_reload_stack'
-            mkdir -p '$TEMP_DIR/config_reload_stack'
-            echo '$test_dir/root' > '$TEMP_DIR/config_reload_stack/trusted_dirs'
-            echo '$test_dir/root/project' >> '$TEMP_DIR/config_reload_stack/trusted_dirs'
             source '$SHELL_DIR/_dotsecenv_core.sh'
             source '$SHELL_DIR/dotsecenv.plugin.bash'
             cd '$test_dir/root'
@@ -1428,30 +1280,77 @@ EOF
             local before_env=\"\$APP_ENV\"
             local before_pw=\"\$DB_PASSWORD\"
             # Run reload from the nested dir
-            dse reload
+            dotsecenv secret reload
             echo \"before_env=\$before_env|after_env=\$APP_ENV|before_pw=\$before_pw|after_pw=\$DB_PASSWORD|stack=\${_DOTSECENV_SOURCE_STACK[*]}\"
         " 2>/dev/null)
     else
         result=$(zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config_reload_stack'
-            mkdir -p '$TEMP_DIR/config_reload_stack'
-            echo '$test_dir/root' > '$TEMP_DIR/config_reload_stack/trusted_dirs'
-            echo '$test_dir/root/project' >> '$TEMP_DIR/config_reload_stack/trusted_dirs'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/root'
             cd '$test_dir/root/project'
             local before_env=\"\$APP_ENV\"
             local before_pw=\"\$DB_PASSWORD\"
-            dse reload
+            dotsecenv secret reload
             echo \"before_env=\$before_env|after_env=\$APP_ENV|before_pw=\$before_pw|after_pw=\$DB_PASSWORD|stack=\${_DOTSECENV_SOURCE_STACK[*]}\"
         " 2>/dev/null)
     fi
 
     if [[ "$result" == *"after_env=production"* && "$result" == *"after_pw=super-secret-password"* ]]; then
-        pass "[$shell] 'dse reload' reloads entire nested stack"
+        pass "[$shell] 'secret reload' reloads entire nested stack"
     else
-        fail "[$shell] 'dse reload' nested stack reload failed, got: $result"
+        fail "[$shell] 'secret reload' nested stack reload failed, got: $result"
+    fi
+}
+
+test_secret_reload_walks_to_git_root() {
+    local shell="$1"
+    log "[$shell] Testing 'secret reload' loads up to the git root and keeps loaded ancestors..."
+    ((TESTS_RUN++)) || true
+
+    # outer/.secenv sits above the git root; repo/.secenv is an ancestor of
+    # repo/app that the shell never crossed
+    local base="$TEMP_DIR/test_secret_reload_root_$shell"
+    local outer="$base/outer" repo="$base/outer/repo"
+    mkdir -p "$repo/app"
+    git -C "$repo" init -q
+    echo 'OUTER=1' >"$outer/.secenv"
+    echo 'ROOT=1' >"$repo/.secenv"
+    echo 'APP=1' >"$repo/app/.secenv"
+    chmod 644 "$outer/.secenv" "$repo/.secenv" "$repo/app/.secenv"
+
+    local config_dir="$TEMP_DIR/config_secret_reload_root_$shell"
+    trust_dirs "$config_dir" "$outer" "$repo" "$repo/app"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    # The edited app/.secenv prompts once; answer [a]lways
+    local result
+    result=$(printf 'a\n' | run_plugin "$shell" "$config_dir" "$mock_path" "
+        _dotsecenv_has_tty() { return 0; }
+        show() { echo \"\$1:O=\${OUTER:-unset}|R=\${ROOT:-unset}|A=\${APP:-unset}|N=\${NEW:-unset}\"; }
+        cd '$repo/app'
+        show 1
+        printf '%s\\n' APP=2 NEW=x >'$repo/app/.secenv'
+        dotsecenv secret reload
+        show 2
+        echo \"PWD=\$PWD\"
+        cd '$outer'
+        cd '$repo/app'
+        dotsecenv secret reload
+        show 3
+        cd '$base'
+        show 4
+    ")
+
+    if [[ "$result" == *"1:O=unset|R=unset|A=1|N=unset"* &&
+        "$result" == *"2:O=unset|R=1|A=2|N=x"* && "$result" == *"PWD=$repo/app"* &&
+        "$result" == *"3:O=1|R=1|A=2|N=x"* && "$result" == *"4:O=unset|R=unset|A=unset|N=unset"* ]]; then
+        pass "[$shell] 'secret reload' stops at the git root, keeps loaded ancestors, unloads on leave"
+    else
+        fail "[$shell] 'secret reload' wrong, got: $result"
     fi
 }
 
@@ -1522,7 +1421,7 @@ test_load_crlf_empty_name_resolves() {
 
     local config_dir="$TEMP_DIR/config"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -1557,59 +1456,136 @@ test_load_crlf_empty_name_resolves() {
 # Reload / new-key detection tests (FIX A)
 # ============================================================================
 
-test_sync_new_key_always_trusted() {
+test_trust_follows_content() {
     local shell="$1"
-    log "[$shell] Testing new key auto-loads in always-trusted dir (no prompt)..."
+    log "[$shell] Testing trust follows .secenv contents and the prompt shows them..."
     ((TESTS_RUN++)) || true
 
-    local test_dir="$TEMP_DIR/test_sync_always"
-    mkdir -p "$test_dir/src"
+    local base="$TEMP_DIR/test_trust_content_$shell"
+    local proj="$base/proj" legacy="$base/legacy"
+    mkdir -p "$proj/src" "$legacy" "$base/other"
+    echo 'DB_PASSWORD={dotsecenv}' >"$proj/.secenv"
+    echo 'LEGACY=1' >"$legacy/.secenv"
+    chmod 644 "$proj/.secenv" "$legacy/.secenv"
 
-    cat >"$test_dir/.secenv" <<'EOF'
-DB_PASSWORD={dotsecenv}
-EOF
-    chmod 644 "$test_dir/.secenv"
-
-    local config_dir="$TEMP_DIR/config_sync_always"
-    mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    # proj is trusted "always" for its current contents; legacy has an old
+    # path-only entry, which must count as changed
+    local config_dir="$TEMP_DIR/config_trust_content_$shell"
+    trust_dirs "$config_dir" "$proj"
+    printf '%s\n' "$legacy" >>"$config_dir/trusted_dirs"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
 
-    # Enter dir, append a new key, then trigger the same-dir PHASE 2 sync by
-    # going into a subdir and back (works in both bash and zsh).
+    # Answers on stdin: [a]lways for the edited proj, [n]o for legacy
     local result
-    if [[ "$shell" == "bash" ]]; then
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/_dotsecenv_core.sh'
-            source '$SHELL_DIR/dotsecenv.plugin.bash'
-            cd '$test_dir'
-            _dotsecenv_chpwd_hook
-            echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
-            cd '$test_dir/src'
-            _dotsecenv_chpwd_hook
-            cd '$test_dir'
-            _dotsecenv_chpwd_hook
-            echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
-        " 2>&1)
-    else
-        result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
-            export PATH='$mock_path:$PATH'
-            source '$SHELL_DIR/dotsecenv.plugin.zsh'
-            cd '$test_dir'
-            echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
-            cd '$test_dir/src'
-            cd '$test_dir'
-            echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
-        " 2>&1)
-    fi
+    result=$(printf 'a\nn\n' | run_plugin "$shell" "$config_dir" "$mock_path" "
+        _dotsecenv_has_tty() { return 0; }
+        cd '$proj'
+        echo 'API_KEY={dotsecenv}' >> '$proj/.secenv'
+        cd src
+        cd ..
+        echo \"API=\${API_KEY:-unset}\"
+        cd '$base/other'
+        cd '$proj'
+        cd '$legacy'
+        echo \"LEGACY=\${LEGACY:-unset}\"
+    ")
 
-    if [[ "$result" == *"DB=super-secret-password|API=mock-api-key-12345"* && "$result" != *"Load secrets"* ]]; then
-        pass "[$shell] Always-trusted new key auto-loaded without prompt"
+    local prompts
+    prompts=$(printf '%s\n' "$result" | grep -c 'Load secrets?' || true)
+    if [[ "$prompts" == "2" && "$result" == *"new keys in $proj/.secenv"* &&
+        "$result" == *"  API_KEY={dotsecenv}"* && "$result" == *"API=mock-api-key-12345"* &&
+        "$result" != *"found .secenv in $proj"* && "$result" == *"found .secenv in $legacy"* &&
+        "$result" == *"LEGACY=unset"* ]]; then
+        pass "[$shell] Changed .secenv and path-only entries prompt; unchanged trusted file does not"
     else
-        fail "[$shell] Always-trusted new key not auto-loaded, got: $result"
+        fail "[$shell] Content-based trust wrong ($prompts prompts), got: $result"
+    fi
+}
+
+test_trust_one_line_per_dir() {
+    local shell="$1"
+    log "[$shell] Testing re-trust replaces the old line, so a revert prompts..."
+    ((TESTS_RUN++)) || true
+
+    local base="$TEMP_DIR/test_trust_revert_$shell"
+    local proj="$base/proj"
+    mkdir -p "$proj" "$base/other"
+    echo 'APP=a' >"$proj/.secenv"
+    chmod 644 "$proj/.secenv"
+
+    local config_dir="$TEMP_DIR/config_trust_revert_$shell"
+    trust_dirs "$config_dir" "$proj"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    # Contents A are trusted; edit to B and trust it, then revert to A
+    local result
+    result=$(printf 'a\na\n' | run_plugin "$shell" "$config_dir" "$mock_path" "
+        _dotsecenv_has_tty() { return 0; }
+        cd '$proj'
+        echo 'APP=b' >'$proj/.secenv'
+        cd '$base/other'
+        cd '$proj'
+        echo 'APP=a' >'$proj/.secenv'
+        cd '$base/other'
+        cd '$proj'
+        echo \"APP=\$APP\"
+    ")
+
+    local prompts lines
+    prompts=$(printf '%s\n' "$result" | grep -c "found .secenv in $proj" || true)
+    lines=$(wc -l <"$config_dir/trusted_dirs" | tr -d ' ')
+    if [[ "$prompts" == "2" && "$lines" == "1" && "$result" == *"APP=a"* ]]; then
+        pass "[$shell] One trust line per directory; reverting to older contents prompts"
+    else
+        fail "[$shell] Revert handling wrong ($prompts prompts, $lines lines), got: $result"
+    fi
+}
+
+test_trust_without_hash_tool() {
+    local shell="$1"
+    log "[$shell] Testing no sha256sum/shasum means every visit prompts..."
+    ((TESTS_RUN++)) || true
+
+    local base="$TEMP_DIR/test_trust_nohash_$shell"
+    local proj="$base/proj"
+    mkdir -p "$proj" "$base/other"
+    echo 'APP=1' >"$proj/.secenv"
+    chmod 644 "$proj/.secenv"
+
+    local config_dir="$TEMP_DIR/config_trust_nohash_$shell"
+    trust_dirs "$config_dir" "$proj"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    # A PATH with what the plugin needs, minus the hashing tools
+    local nohash="$TEMP_DIR/nohash_bin" tool path
+    mkdir -p "$nohash"
+    for tool in bash cat awk grep tr id stat mktemp rm mv cut md5sum md5 mkdir; do
+        path=$(command -v "$tool") && ln -sf "$path" "$nohash/$tool"
+    done
+
+    local result
+    result=$(printf 'a\ny\n' | run_plugin "$shell" "$config_dir" "$mock_path" "
+        export PATH='$mock_path:$nohash'
+        _dotsecenv_has_tty() { return 0; }
+        cd '$proj'
+        cd '$base/other'
+        cd '$proj'
+        echo \"APP=\$APP\"
+    ")
+
+    local prompts lines
+    prompts=$(printf '%s\n' "$result" | grep -c "found .secenv in $proj" || true)
+    lines=$(wc -l <"$config_dir/trusted_dirs" | tr -d ' ')
+    if [[ "$prompts" == "2" && "$lines" == "1" && "$result" == *"APP=1"* ]]; then
+        pass "[$shell] Without a hashing tool every visit prompts and nothing is stored"
+    else
+        fail "[$shell] No-hash-tool handling wrong ($prompts prompts, $lines lines), got: $result"
     fi
 }
 
@@ -1628,7 +1604,7 @@ EOF
 
     local config_dir="$TEMP_DIR/config_sync_noop"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -1684,7 +1660,7 @@ EOF
 
     local config_dir="$TEMP_DIR/config_sync_unload"
     mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/project"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -1695,28 +1671,32 @@ EOF
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/_dotsecenv_core.sh'
             source '$SHELL_DIR/dotsecenv.plugin.bash'
+            _dotsecenv_has_tty() { return 0; }
             cd '$test_dir/project'
             _dotsecenv_chpwd_hook
             echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
             cd '$test_dir/project/src'; _dotsecenv_chpwd_hook
             cd '$test_dir/project'; _dotsecenv_chpwd_hook
+            echo \"IN=\${API_KEY:-unset}\"
             cd '$test_dir/other'; _dotsecenv_chpwd_hook
             echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
-        " 2>&1)
+        " 2>&1 <<<y)
     else
         result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            _dotsecenv_has_tty() { return 0; }
             cd '$test_dir/project'
             echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
             cd '$test_dir/project/src'
             cd '$test_dir/project'
+            echo \"IN=\${API_KEY:-unset}\"
             cd '$test_dir/other'
             echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
-        " 2>&1)
+        " 2>&1 <<<y)
     fi
 
-    if [[ "$result" == *"DB=unset|API=unset"* ]]; then
+    if [[ "$result" == *"IN=mock-api-key-12345"* && "$result" == *"DB=unset|API=unset"* ]]; then
         pass "[$shell] Synced key tracked and unloaded on leave"
     else
         fail "[$shell] Synced key leaked on leave, got: $result"
@@ -1725,7 +1705,7 @@ EOF
 
 test_reload_ingests_new_key() {
     local shell="$1"
-    log "[$shell] Testing 'dse reload' ingests a key added to an already-loaded dir..."
+    log "[$shell] Testing 'secret reload' ingests a key added to an already-loaded dir..."
     ((TESTS_RUN++)) || true
 
     local test_dir="$TEMP_DIR/test_reload_newkey"
@@ -1738,7 +1718,7 @@ EOF
 
     local config_dir="$TEMP_DIR/config_reload_newkey"
     mkdir -p "$config_dir"
-    echo "$test_dir/project" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir/project"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -1752,24 +1732,26 @@ EOF
             cd '$test_dir/project'
             _dotsecenv_chpwd_hook
             echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
-            dse reload
+            _dotsecenv_has_tty() { return 0; }
+            dotsecenv secret reload
             echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
-        " 2>&1)
+        " 2>&1 <<<y)
     else
         result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
             cd '$test_dir/project'
             echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
-            dse reload
+            _dotsecenv_has_tty() { return 0; }
+            dotsecenv secret reload
             echo \"DB=\${DB_PASSWORD:-unset}|API=\${API_KEY:-unset}\"
-        " 2>&1)
+        " 2>&1 <<<y)
     fi
 
     if [[ "$result" == *"DB=super-secret-password|API=mock-api-key-12345"* ]]; then
-        pass "[$shell] 'dse reload' ingests newly-added key"
+        pass "[$shell] 'secret reload' ingests newly-added key"
     else
-        fail "[$shell] 'dse reload' did not ingest new key, got: $result"
+        fail "[$shell] 'secret reload' did not ingest new key, got: $result"
     fi
 }
 
@@ -1803,7 +1785,7 @@ EOF
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/_dotsecenv_core.sh'
             source '$SHELL_DIR/dotsecenv.plugin.bash'
-            _dotsecenv_trust_session '$test_dir'
+            _dotsecenv_trust_session '$test_dir' \"\$(_dotsecenv_file_hash '$test_dir/.secenv')\"
             cd '$test_dir'
             _dotsecenv_chpwd_hook
             echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
@@ -1814,7 +1796,7 @@ EOF
         result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
             export PATH='$mock_path:$PATH'
             source '$SHELL_DIR/dotsecenv.plugin.zsh'
-            _dotsecenv_trust_session '$test_dir'
+            _dotsecenv_trust_session '$test_dir' \"\$(_dotsecenv_file_hash '$test_dir/.secenv')\"
             cd '$test_dir'
             echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
             _dotsecenv_sync_new_keys '$test_dir' </dev/null
@@ -1847,7 +1829,7 @@ EOF
 
     local config_dir="$TEMP_DIR/config_bash_asym"
     mkdir -p "$config_dir"
-    echo "$test_dir" >"$config_dir/trusted_dirs"
+    trust_dirs "$config_dir" "$test_dir"
 
     local mock_path
     mock_path=$(create_mock_dotsecenv)
@@ -1862,14 +1844,55 @@ EOF
         echo 'API_KEY={dotsecenv}' >> '$test_dir/.secenv'
         _dotsecenv_prompt_hook
         echo \"AFTER_HOOK=\${API_KEY:-unset}\"
-        dse reload
+        _dotsecenv_has_tty() { return 0; }
+        dotsecenv secret reload
         echo \"AFTER_RELOAD=\${API_KEY:-unset}\"
-    " 2>&1)
+    " 2>&1 <<<y)
 
     if [[ "$result" == *"AFTER_HOOK=unset"* && "$result" == *"AFTER_RELOAD=mock-api-key-12345"* ]]; then
         pass "[$shell] bash unchanged-PWD hook is a no-op; reload ingests"
     else
         fail "[$shell] bash cd-dot asymmetry wrong, got: $result"
+    fi
+}
+
+# bash only: zsh and fish do not run the plugin from a prompt hook
+test_bash_prompt_hook_keeps_status() {
+    local shell="$1"
+    [[ "$shell" == "bash" ]] || return 0
+    log "[$shell] Testing the prompt hook keeps \$? for later PROMPT_COMMAND entries..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_prompt_status"
+    mkdir -p "$test_dir"
+    echo 'FOO=bar' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    local config_dir="$TEMP_DIR/config_prompt_status"
+    trust_dirs "$config_dir" "$test_dir"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    # Run PROMPT_COMMAND as bash would before a prompt: once with nothing to
+    # load, once after a directory change
+    local result
+    result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+        export PATH='$mock_path:$PATH'
+        PROMPT_COMMAND='echo last=\$?'
+        source '$SHELL_DIR/dotsecenv.plugin.bash'
+        false
+        eval \"\$PROMPT_COMMAND\"
+        cd '$test_dir'
+        false
+        eval \"\$PROMPT_COMMAND\"
+        echo FOO=\$FOO
+    " 2>&1)
+
+    if [[ "$(printf '%s\n' "$result" | grep -c '^last=1$')" == "2" && "$result" == *"FOO=bar"* ]]; then
+        pass "[$shell] Prompt hook keeps \$?"
+    else
+        fail "[$shell] Prompt hook reset \$?, got: $result"
     fi
 }
 
@@ -1958,7 +1981,7 @@ main() {
         test_load_unload_message_split "bash"
         test_empty_secenv_no_message "bash"
         test_alias_dse "bash"
-        test_alias_dse_get "bash"
+        test_dse_passthrough "bash"
         test_comments_and_empty_lines "bash"
         test_quoted_values "bash"
         test_tree_scope_persist_in_subdir "bash"
@@ -1967,21 +1990,23 @@ main() {
         test_tree_scope_sibling_navigation "bash"
         test_tree_scope_no_reload_from_subdir "bash"
         test_multiline_warning "bash"
-        test_dse_up_basic "bash"
-        test_dse_up_multiple_ancestors "bash"
-        test_dse_up_skips_already_loaded "bash"
-        test_dse_up_no_ancestors "bash"
-        test_dse_reload_refreshes_values "bash"
-        test_dse_reload_clears_and_reloads_stack "bash"
+        test_unload_restores_previous_values "bash"
+        test_multiline_and_escapes_byte_exact "bash"
+        test_secret_reload_refreshes_values "bash"
+        test_secret_reload_clears_and_reloads_stack "bash"
+        test_secret_reload_walks_to_git_root "bash"
         test_parse_trailing_whitespace_secret "bash"
         test_load_crlf_empty_name_resolves "bash"
-        test_sync_new_key_always_trusted "bash"
+        test_trust_follows_content "bash"
+        test_trust_one_line_per_dir "bash"
+        test_trust_without_hash_tool "bash"
         test_sync_no_new_keys_noop "bash"
         test_sync_new_key_unload_integrity "bash"
         test_reload_ingests_new_key "bash"
         test_sync_new_key_not_always_trusted_no_autoload "bash"
         test_noninteractive_silent "bash"
         test_bash_cd_dot_asymmetry "bash"
+        test_bash_prompt_hook_keeps_status "bash"
     fi
 
     # Run zsh tests
@@ -2001,7 +2026,7 @@ main() {
             test_load_unload_message_split "zsh"
             test_empty_secenv_no_message "zsh"
             test_alias_dse "zsh"
-            test_alias_dse_get "zsh"
+            test_dse_passthrough "zsh"
             test_comments_and_empty_lines "zsh"
             test_quoted_values "zsh"
             test_tree_scope_persist_in_subdir "zsh"
@@ -2010,15 +2035,16 @@ main() {
             test_tree_scope_sibling_navigation "zsh"
             test_tree_scope_no_reload_from_subdir "zsh"
             test_multiline_warning "zsh"
-            test_dse_up_basic "zsh"
-            test_dse_up_multiple_ancestors "zsh"
-            test_dse_up_skips_already_loaded "zsh"
-            test_dse_up_no_ancestors "zsh"
-            test_dse_reload_refreshes_values "zsh"
-            test_dse_reload_clears_and_reloads_stack "zsh"
+            test_unload_restores_previous_values "zsh"
+            test_multiline_and_escapes_byte_exact "zsh"
+            test_secret_reload_refreshes_values "zsh"
+            test_secret_reload_clears_and_reloads_stack "zsh"
+            test_secret_reload_walks_to_git_root "zsh"
             test_parse_trailing_whitespace_secret "zsh"
             test_load_crlf_empty_name_resolves "zsh"
-            test_sync_new_key_always_trusted "zsh"
+            test_trust_follows_content "zsh"
+            test_trust_one_line_per_dir "zsh"
+            test_trust_without_hash_tool "zsh"
             test_sync_no_new_keys_noop "zsh"
             test_sync_new_key_unload_integrity "zsh"
             test_reload_ingests_new_key "zsh"
