@@ -30,6 +30,7 @@ _Unreleased_
 - **Security**: The shell plugin trusts a `.secenv` by its contents, not only by its directory, and asks again when the file changes. Before, an "always" answer kept loading the file after a `git pull` added keys such as `PROMPT_COMMAND` or `BASH_ENV`, which can run code in your shell. The prompt now shows the file before you answer. Directories you trusted with an earlier release prompt once more (#525)
 - **Security**: The fish plugin refuses a world-writable `.secenv` with mode 777 (or any mode with `o+wx`), as bash and zsh already did (#526)
 - Multi-line secrets such as PEM keys keep their newlines in fish, and copying a secret to the clipboard keeps its newlines and backslashes in every shell (#527)
+- In bash, the plugin's prompt hook no longer resets `$?`, so prompt tools such as starship and `__git_ps1` show the real exit status of your last command (#530)
 
 ### Other
 

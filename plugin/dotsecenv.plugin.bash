@@ -33,11 +33,14 @@ _dotsecenv_chpwd_hook() {
     _dotsecenv_on_cd "$old_dir" "$PWD"
 }
 
-# Use PROMPT_COMMAND to detect directory changes (bash has no chpwd hook)
+# Use PROMPT_COMMAND to detect directory changes (bash has no chpwd hook).
+# Return the incoming $? so later PROMPT_COMMAND entries still see it.
 _dotsecenv_prompt_hook() {
+    local s=$?
     if [[ "$_DOTSECENV_PREV_PWD" != "$PWD" ]]; then
         _dotsecenv_chpwd_hook
     fi
+    return $s
 }
 
 # Append to PROMPT_COMMAND without overwriting existing hooks
