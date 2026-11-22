@@ -27,12 +27,14 @@ behavior:
 
 ### `require_explicit_vault_upgrade`
 
-Controls whether vault format upgrades happen automatically or require explicit user action.
+Controls whether commands that write to a vault also upgrade its format.
 
 | Value | Behavior |
 |-------|----------|
-| `false` (default) | Vaults are automatically upgraded to the latest format with a notice |
-| `true` | Warns about outdated format but doesn't modify; upgrade with `dotsecenv vault doctor` |
+| `false` (default) | Commands that write to a vault (`secret store`, `forget`, `share`, `revoke`, `identity add`) upgrade it to the latest format, with a notice |
+| `true` | Those commands warn about the outdated format but leave it; upgrade with `dotsecenv doctor --fix` |
+
+Commands that only read (`secret get`, `vault describe`, `validate`, `doctor` without `--fix`, `init secenv`) never upgrade a vault, whatever this setting says. They warn and keep working.
 
 **Use case:** Set to `true` in shared environments where you want to coordinate vault upgrades across team members.
 
@@ -45,7 +47,7 @@ When enabled, you'll see:
 
 ```shell
 dotsecenv: warning: vault "/path/to/vault" uses format v1, upgrade to v2 recommended
-dotsecenv: run 'dotsecenv vault doctor' to upgrade the vault format
+dotsecenv: run 'dotsecenv doctor --fix' to upgrade the vault format
 ```
 
 ### `restrict_to_configured_vaults`

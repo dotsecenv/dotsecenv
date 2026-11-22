@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Bug Fixes
+
+- Commands that only read a vault (`secret get`, `vault describe`, `validate`, `doctor` without `--fix`, `init secenv`) no longer rewrite it. With the default `require_explicit_vault_upgrade: false`, opening an outdated vault upgraded it in place, so running a check changed the file it checked. They now warn and point to `dotsecenv doctor --fix`; commands that write still upgrade as before
+
 ### Other
 
 - The documentation website loads Docs7 analytics to measure page views. The privacy policy describes the data sent to Context7. (#482)

@@ -43,7 +43,7 @@ Options:
 			os.Exit(int(clilib.PrintError(os.Stderr, clilib.NewError(parseErr.Error(), clilib.ExitGeneralError))))
 		}
 
-		cli, err := createCLI()
+		cli, err := createReadCLI()
 		if err != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, err)))
 		}

@@ -148,7 +148,7 @@ Modes:
 
 		forceBatch := globalOpts.Silent || initSecenvAll || !clilib.HasTTY()
 
-		cli, cliErr := createCLI()
+		cli, cliErr := createReadCLI()
 		if cliErr != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, cliErr)))
 		}

@@ -18,7 +18,7 @@ Options:
   --fix  Attempt to fix any issues found`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		cli, err := createCLI()
+		cli, err := createReadCLI()
 		if err != nil {
 			os.Exit(int(clilib.PrintError(os.Stderr, err)))
 		}
