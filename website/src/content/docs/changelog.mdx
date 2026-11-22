@@ -14,6 +14,7 @@ _Unreleased_
 ### Bug Fixes
 
 - Pointing dotsecenv at a file of fewer than 3 lines that is not a vault no longer overwrites it. `vault describe -v notes.txt`, or a configured vault path holding such a file, replaced its contents with an empty vault. It now fails with "not a dotsecenv vault" and leaves the file alone. An empty or whitespace-only file still starts a new vault (#494)
+- **Security**: `secret get` now checks a value before decrypting it. It verifies the hash and signature of the value, of its secret and of their signers' identity entries, and requires each identity's public key to match its fingerprint. `secret get --all`, `--last` and `-v`, `secret share` and `secret revoke` run the same checks. Before, only `dotsecenv validate` checked signatures, so an edited value in a vault was decrypted, printed and exported by the shell plugin without warning. A value that fails these checks now exits 6 and names the vault (#516)
 
 ### Other
 

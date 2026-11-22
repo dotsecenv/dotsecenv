@@ -609,6 +609,14 @@ func verifyIdentitySignature(vaultIdentity *vault.Identity, vaultData *vault.Vau
 		return false, fmt.Errorf("hash mismatch: computed %s, stored %s", computedHash, vaultIdentity.Hash)
 	}
 
+	// Both keys must be the ones their fingerprints name
+	if err := identity.VerifyKeyFingerprint(id); err != nil {
+		return false, err
+	}
+	if err := identity.VerifyKeyFingerprint(signingIdentity); err != nil {
+		return false, err
+	}
+
 	// Step 2: Verify signature of the hash using the signer's public key
 	return verifySignatureWithPublicKey(signingIdentity.PublicKey, []byte(vaultIdentity.Hash), vaultIdentity.Signature)
 }

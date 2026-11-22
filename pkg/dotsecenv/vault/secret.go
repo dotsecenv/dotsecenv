@@ -52,7 +52,11 @@ func VerifySecretSignature(secret *Secret, signingIdentity *Identity) (bool, err
 		return false, fmt.Errorf("hash mismatch: computed %s, stored %s (data tampering detected)", computedHash, secret.Hash)
 	}
 
-	// Step 2: Verify signature of hash (identity verification)
+	// Step 2: Verify signature of hash (identity verification) with the key
+	// the signer's fingerprint names
+	if err := identity.VerifyKeyFingerprint(signingIdentity); err != nil {
+		return false, err
+	}
 	return identity.VerifySignatureWithPublicKey(signingIdentity.PublicKey, []byte(secret.Hash), secret.Signature)
 }
 
@@ -69,8 +73,48 @@ func VerifySecretValueSignature(value *SecretValue, secretKey string, signingIde
 		return false, fmt.Errorf("hash mismatch: computed %s, stored %s (data tampering detected)", computedHash, value.Hash)
 	}
 
-	// Step 2: Verify signature of hash (identity verification)
+	// Step 2: Verify signature of hash (identity verification) with the key
+	// the signer's fingerprint names
+	if err := identity.VerifyKeyFingerprint(signingIdentity); err != nil {
+		return false, err
+	}
 	return identity.VerifySignatureWithPublicKey(signingIdentity.PublicKey, []byte(value.Hash), value.Signature)
+}
+
+// VerifySecretValue checks the hash and signature of a secret definition and
+// of one of its values. Each signer must be an identity in v whose own entry
+// verifies against its signer in v, and every key involved must match its
+// fingerprint. That makes a valid signature proof that a holder of the named
+// key signed, so the chain of identity signers is not followed further.
+func (v Vault) VerifySecretValue(secret *Secret, value *SecretValue) error {
+	signer, err := v.verifiedSigner(secret.SignedBy)
+	if err != nil {
+		return fmt.Errorf("secret definition: %w", err)
+	}
+	if ok, err := VerifySecretSignature(secret, signer); !ok {
+		return fmt.Errorf("secret definition: %w", err)
+	}
+	signer, err = v.verifiedSigner(value.SignedBy)
+	if err != nil {
+		return fmt.Errorf("value added %s: %w", value.AddedAt.Format(time.RFC3339), err)
+	}
+	if ok, err := VerifySecretValueSignature(value, secret.Key, signer); !ok {
+		return fmt.Errorf("value added %s: %w", value.AddedAt.Format(time.RFC3339), err)
+	}
+	return nil
+}
+
+// verifiedSigner returns the identity in v with fingerprint fp after checking
+// its entry's hash and signature against the identity that signed it.
+func (v Vault) verifiedSigner(fp string) (*Identity, error) {
+	signer := v.GetIdentityByFingerprint(fp)
+	if signer == nil {
+		return nil, fmt.Errorf("signer %s is not an identity in the vault", fp)
+	}
+	if ok, err := identity.VerifyIdentitySignature(signer, v.GetIdentityByFingerprint(signer.SignedBy)); !ok {
+		return nil, fmt.Errorf("identity %s: %w", fp, err)
+	}
+	return signer, nil
 }
 
 // ValidateSecret performs comprehensive validation of a secret.

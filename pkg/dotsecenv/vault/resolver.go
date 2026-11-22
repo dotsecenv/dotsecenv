@@ -327,6 +327,18 @@ func (vr *VaultResolver) GetVaultManager(index int) *Manager {
 	return vr.vaults[index]
 }
 
+// VerifySecretValue checks a secret definition and one of its values against
+// the identities in the vault at index.
+func (vr *VaultResolver) VerifySecretValue(index int, secret *Secret, value *SecretValue) error {
+	vr.mu.RLock()
+	defer vr.mu.RUnlock()
+
+	if index < 0 || index >= len(vr.vaults) || vr.vaults[index] == nil {
+		return fmt.Errorf("vault %d is not loaded", index+1)
+	}
+	return vr.vaults[index].vault.VerifySecretValue(secret, value)
+}
+
 // GetSecretByKeyFromVault gets a secret by key from a specific vault index
 // Used for operations that need to modify a secret in place
 func (vr *VaultResolver) GetSecretByKeyFromVault(index int, key string) *Secret {
