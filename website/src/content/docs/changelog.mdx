@@ -21,6 +21,7 @@ _Unreleased_
 - **Security**: Vault writes create their temp file with a random name, so a symlink committed at `<vault>.tmp` can no longer redirect a write into another file (#520)
 - **Breaking**: `plugin/install.sh --uninstall` no longer deletes `~/.local/share/dotsecenv/vault`. The shell plugin now installs to `~/.local/share/dotsecenv/plugin`. Rerun the installer to move an existing install and update the `source` lines it wrote. If you added a `source` line by hand, point it at the new path (#521)
 - **Security**: The installer stops when it cannot verify a download. That covers a bad signature, a signature not made by the pinned release key, a missing `checksums.txt.sig`, and a missing `gpg` or `sha256sum`/`shasum`; before, each of these printed a warning and installed anyway. Verification stays on by default, and `--no-verify` or `VERIFY=0` turns it off (#522)
+- **Security**: The GitHub Action fetches the release key over HTTPS instead of HTTP and requires the signature to come from the pinned release key. Inputs now reach its scripts through environment variables, so a branch name passed as `version` can no longer run shell commands. `init-config` is split on whitespace and no longer evaluates quotes or `$(...)` (#523)
 
 ### Other
 
