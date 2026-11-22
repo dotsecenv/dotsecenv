@@ -20,6 +20,8 @@ LEGACY_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/dotsecenv"
 DEFAULT_INSTALL_DIR="$LEGACY_DIR/plugin"
 # Files this installer copies into the install directory.
 PLUGIN_FILES=(dotsecenv.plugin.bash dotsecenv.plugin.zsh dotsecenv.fish _dotsecenv_core.sh)
+# Comment the installer writes above each source line.
+RC_MARKER="# dotsecenv shell plugin"
 
 # Colors (if terminal supports them)
 if [[ -t 1 ]]; then
@@ -166,30 +168,15 @@ add_source_line() {
     case "$shell" in
     bash | zsh)
         echo "" >>"$rc_file"
-        echo "# dotsecenv shell plugin" >>"$rc_file"
+        echo "$RC_MARKER" >>"$rc_file"
         echo "source \"$plugin_path\"" >>"$rc_file"
         ;;
     fish)
         echo "" >>"$rc_file"
-        echo "# dotsecenv shell plugin" >>"$rc_file"
+        echo "$RC_MARKER" >>"$rc_file"
         echo "source \"$plugin_path\"" >>"$rc_file"
         ;;
     esac
-}
-
-# Remove source line from RC file
-remove_source_line() {
-    local rc_file="$1"
-    local pattern="$2"
-
-    if [[ -f "$rc_file" ]]; then
-        # Remove lines containing dotsecenv plugin references
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "/dotsecenv/d" "$rc_file"
-        else
-            sed -i "/dotsecenv/d" "$rc_file"
-        fi
-    fi
 }
 
 # Install plugins for a specific shell
@@ -292,20 +279,34 @@ remove_plugin_files() {
     done
 }
 
-# Point the installer's source lines for from_dir at to_dir.
+# Point the installer's exact source lines for from_dir at to_dir. With an empty
+# to_dir, delete them and the marker comment right above each. Other lines stay.
 rewrite_source_lines() {
-    local rc_file="$1" from_dir="$2" to_dir="$3" line f tmp
+    local rc_file="$1" from_dir="$2" to_dir="$3" line f tmp marker=0 ours
     [[ -f "$rc_file" ]] || return 0
     tmp=$(mktemp)
     while IFS= read -r line || [[ -n "$line" ]]; do
+        ours=0
         for f in "${PLUGIN_FILES[@]}"; do
             if [[ "$line" == "source \"$from_dir/$f\"" ]]; then
-                line="source \"$to_dir/$f\""
+                ours=1
+                [[ -n "$to_dir" ]] && line="source \"$to_dir/$f\""
                 break
             fi
         done
-        printf '%s\n' "$line"
+        if [[ $marker -eq 1 && ! ($ours -eq 1 && -z "$to_dir") ]]; then
+            printf '%s\n' "$RC_MARKER"
+        fi
+        marker=0
+        if [[ "$line" == "$RC_MARKER" ]]; then
+            marker=1
+        elif [[ $ours -eq 0 || -n "$to_dir" ]]; then
+            printf '%s\n' "$line"
+        fi
     done <"$rc_file" >"$tmp"
+    if [[ $marker -eq 1 ]]; then
+        printf '%s\n' "$RC_MARKER" >>"$tmp"
+    fi
     # cat keeps the rc file's mode, owner and symlink.
     cat "$tmp" >"$rc_file"
     rm -f "$tmp"
@@ -351,12 +352,12 @@ uninstall() {
         success "Removed plugin files from $LEGACY_DIR"
     fi
 
-    # Remove source lines from RC files
-    for shell in bash zsh fish; do
-        local rc_file
-        rc_file=$(get_rc_file "$shell")
+    # Remove the installer's own source lines, for this and the old install path
+    local rc_file
+    for rc_file in "$HOME/.bashrc" "$HOME/.bash_profile" "$(get_rc_file zsh)" "$(get_rc_file fish)"; do
         if [[ -f "$rc_file" ]]; then
-            remove_source_line "$rc_file" "dotsecenv"
+            rewrite_source_lines "$rc_file" "$INSTALL_DIR" ""
+            rewrite_source_lines "$rc_file" "$LEGACY_DIR" ""
             success "Cleaned $rc_file"
         fi
     done

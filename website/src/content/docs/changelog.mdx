@@ -31,6 +31,7 @@ _Unreleased_
 - **Security**: The fish plugin refuses a world-writable `.secenv` with mode 777 (or any mode with `o+wx`), as bash and zsh already did (#526)
 - Multi-line secrets such as PEM keys keep their newlines in fish, and copying a secret to the clipboard keeps its newlines and backslashes in every shell (#527)
 - In bash, the plugin's prompt hook no longer resets `$?`, so prompt tools such as starship and `__git_ps1` show the real exit status of your last command (#530)
+- Plugin uninstall removes only the lines the installer added to `.bashrc`, `.zshrc` and `config.fish`, and keeps your own lines that mention dotsecenv, such as completions, `DOTSECENV_*` exports and aliases (#531)
 
 ### Other
 
