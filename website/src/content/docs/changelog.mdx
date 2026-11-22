@@ -13,6 +13,7 @@ _Unreleased_
 
 ### Other
 
+- When the website build cannot reach the GitHub API, install commands and version strings use the version in `.claude-plugin/plugin.json`, which the release bump sets. They used a hardcoded 0.2.1 that nobody updated after v0.2.1
 - The documentation website loads Docs7 analytics to measure page views. The privacy policy describes the data sent to Context7. (#482)
 - `.releasetools.yaml` declares `scripts/set-plugin-version.py` as the version bump command, so `/release:release` sets both agent plugin manifests (#464)
 
