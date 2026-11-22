@@ -282,6 +282,27 @@ _dotsecenv_array_append() {
     eval "${array_name}+=(\"\$value\")"
 }
 
+# Record that a directory loads a key, saving the value the key had (or that
+# it was unset) so unloading restores exactly that. Call before exporting.
+_dotsecenv_track_key() {
+    local dir_hash="$1" key="$2" var=""
+    local vars_var="_DOTSECENV_LOADED_${dir_hash}"
+    eval "for var in \"\${${vars_var}[@]}\"; do [[ \"\$var\" == \"\$key\" ]] && return 0; done"
+    eval "[[ -n \${${key}+x} ]] && typeset -g _DOTSECENV_OLD_${dir_hash}_${key}=\"\$${key}\""
+    _dotsecenv_array_append "$vars_var" "$key"
+}
+
+# Put a key back the way it was before the directory loaded it
+_dotsecenv_restore_key() {
+    local old="_DOTSECENV_OLD_${1}_${2}"
+    if eval "[[ -n \${${old}+x} ]]"; then
+        eval "export ${2}=\"\$${old}\""
+        unset "$old"
+    else
+        unset "$2"
+    fi
+}
+
 # Join arguments into a single ", "-separated string (portable across bash and
 # zsh; "${arr[*]}" with IFS=', ' would use only the first IFS char).
 _dotsecenv_join_comma() {
@@ -304,9 +325,6 @@ _dotsecenv_load_file() {
 
     [[ -f "$file" ]] || return 0
 
-    # Variable name for tracking loaded vars for this directory
-    local vars_var="_DOTSECENV_LOADED_${dir_hash}"
-
     # Space-delimited list of secret names that failed to fetch during this
     # load, so the same secret mapped to multiple keys errors in full only once
     local failed_secrets=" "
@@ -320,8 +338,8 @@ _dotsecenv_load_file() {
 
             if [[ "$phase" == "1" && "$ptype" == "plain" ]]; then
                 # Phase 1: load plain variables
+                _dotsecenv_track_key "$dir_hash" "$key"
                 export "$key=$value"
-                _dotsecenv_array_append "$vars_var" "$key"
                 _DOTSECENV_ENVVARS_LOADED+=("$key")
 
             elif [[ "$phase" == "2" && ("$ptype" == "secret_same" || "$ptype" == "secret_named") ]]; then
@@ -340,8 +358,8 @@ _dotsecenv_load_file() {
                 local secret_result="" secret_stderr_file=""
                 secret_stderr_file=$(mktemp)
                 if secret_result=$(dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
+                    _dotsecenv_track_key "$dir_hash" "$key"
                     export "$key=$secret_result"
-                    _dotsecenv_array_append "$vars_var" "$key"
                     _DOTSECENV_SECRETS_LOADED+=("$key")
                     # Show any warnings that were emitted
                     [[ -s "$secret_stderr_file" ]] && cat "$secret_stderr_file" >&2
@@ -360,8 +378,7 @@ _dotsecenv_load_file() {
     done <"$file"
 }
 
-# Unload variables for a directory and return list of unloaded keys
-# Sets _DOTSECENV_UNLOADED_KEYS array with the keys that were unloaded
+# Unload variables for a directory, restoring the values they replaced
 _dotsecenv_unload_dir() {
     local dir="$1"
     local dir_hash
@@ -369,9 +386,6 @@ _dotsecenv_unload_dir() {
     local vars_var="_DOTSECENV_LOADED_${dir_hash}"
     local secrets_var="_DOTSECENV_SECRETS_${dir_hash}"
     local envvars_var="_DOTSECENV_ENVVARS_${dir_hash}"
-
-    # Reset the unloaded keys tracking
-    _DOTSECENV_UNLOADED_KEYS=()
 
     # Report plain env vars and secrets on separate lines before clearing them;
     # skip a line when its category is empty.
@@ -391,52 +405,12 @@ _dotsecenv_unload_dir() {
         unset "$secrets_var"
     fi
 
-    # Check if the tracking variable exists and unload vars
-    # Use eval for zsh/bash compatibility
+    # Restore every key this directory loaded (eval for zsh/bash compatibility)
     if eval "[[ \${#${vars_var}[@]} -gt 0 ]]" 2>/dev/null; then
         local var=""
-        eval "for var in \"\${${vars_var}[@]}\"; do _DOTSECENV_UNLOADED_KEYS+=(\"\$var\"); unset \"\$var\"; done"
+        eval "for var in \"\${${vars_var}[@]}\"; do _dotsecenv_restore_key \"\$dir_hash\" \"\$var\"; done"
         unset "$vars_var"
     fi
-}
-
-# Re-fetch a specific secret key from a directory's .secenv file
-# Used when restoring a shadowed value after popping a child directory
-_dotsecenv_refetch_key() {
-    local dir="$1"
-    local target_key="$2"
-    local file="$dir/.secenv"
-
-    [[ -f "$file" ]] || return 1
-
-    local line
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        if _dotsecenv_parse_line "$line"; then
-            local key="$_DOTSECENV_PARSE_KEY"
-            local value="$_DOTSECENV_PARSE_VALUE"
-            local ptype="$_DOTSECENV_PARSE_TYPE"
-
-            if [[ "$key" == "$target_key" ]]; then
-                if [[ "$ptype" == "secret_same" || "$ptype" == "secret_named" ]]; then
-                    local secret_name="$value"
-                    local secret_result="" secret_stderr_file=""
-                    secret_stderr_file=$(mktemp)
-                    if secret_result=$(dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
-                        export "$key=$secret_result"
-                        [[ -s "$secret_stderr_file" ]] && cat "$secret_stderr_file" >&2
-                        if [[ "$secret_result" == *$'\n'* ]]; then
-                            echo "dotsecenv: warning: $key contains newlines; always quote it: \"\$$key\"" >&2
-                        fi
-                    fi
-                    rm -f "$secret_stderr_file"
-                elif [[ "$ptype" == "plain" ]]; then
-                    export "$key=$value"
-                fi
-                return 0
-            fi
-        fi
-    done <"$file"
-    return 1
 }
 
 # Check if a key is defined in a directory's .secenv file
@@ -465,7 +439,6 @@ _dotsecenv_load_key() {
     local file="$dir/.secenv"
     local dir_hash
     dir_hash=$(_dotsecenv_dir_hash "$dir")
-    local vars_var="_DOTSECENV_LOADED_${dir_hash}"
     local secrets_var="_DOTSECENV_SECRETS_${dir_hash}"
     local envvars_var="_DOTSECENV_ENVVARS_${dir_hash}"
 
@@ -481,8 +454,8 @@ _dotsecenv_load_key() {
             [[ "$key" == "$target_key" ]] || continue
 
             if [[ "$ptype" == "plain" ]]; then
+                _dotsecenv_track_key "$dir_hash" "$key"
                 export "$key=$value"
-                _dotsecenv_array_append "$vars_var" "$key"
                 _dotsecenv_array_append "$envvars_var" "$key"
                 return 0
             elif [[ "$ptype" == "secret_same" || "$ptype" == "secret_named" ]]; then
@@ -490,8 +463,8 @@ _dotsecenv_load_key() {
                 local secret_result="" secret_stderr_file=""
                 secret_stderr_file=$(mktemp)
                 if secret_result=$(dotsecenv secret get "$secret_name" 2>"$secret_stderr_file"); then
+                    _dotsecenv_track_key "$dir_hash" "$key"
                     export "$key=$secret_result"
-                    _dotsecenv_array_append "$vars_var" "$key"
                     _dotsecenv_array_append "$secrets_var" "$key"
                     _DOTSECENV_SECRETS_LOADED+=("$key")
                     [[ -s "$secret_stderr_file" ]] && cat "$secret_stderr_file" >&2
@@ -598,27 +571,10 @@ _dotsecenv_on_cd() {
         stack_dir="${_DOTSECENV_SOURCE_STACK[$i]}"
 
         if ! _dotsecenv_is_subdir "$stack_dir" "$new_dir"; then
-            # We've left this directory tree - pop and unload
+            # We've left this directory tree - pop and unload. Restoring a key
+            # also brings back the value an ancestor set before this one.
             _dotsecenv_stack_pop
             _dotsecenv_unload_dir "$stack_dir"
-
-            # Re-fetch any keys that were shadowed by this directory
-            # (i.e., keys that exist in a remaining ancestor)
-            local unloaded_key
-            for unloaded_key in "${_DOTSECENV_UNLOADED_KEYS[@]}"; do
-                # Check remaining stack entries (ancestors) for this key
-                # Note: Must initialize to avoid zsh printing existing values
-                local j=0 ancestor_dir=""
-                local inner_end_idx=$((end_idx))
-                for ((j = i - 1; j >= inner_end_idx; j--)); do
-                    ancestor_dir="${_DOTSECENV_SOURCE_STACK[$j]}"
-                    if _dotsecenv_dir_has_key "$ancestor_dir" "$unloaded_key"; then
-                        # Re-fetch from the ancestor's .secenv
-                        _dotsecenv_refetch_key "$ancestor_dir" "$unloaded_key"
-                        break
-                    fi
-                done
-            done
         else
             # Still under this directory - stop popping
             break
