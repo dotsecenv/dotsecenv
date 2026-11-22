@@ -93,7 +93,9 @@ if [[ "$1" == "secret" && "$2" == "get" ]]; then
         *) exit 1 ;;
     esac
 else
-    exit 1
+    printf "BIN:"
+    printf "<%s>" "$@"
+    echo
 fi' >"$mock_dir/dotsecenv"
     chmod +x "$mock_dir/dotsecenv"
     echo $mock_dir
@@ -476,22 +478,26 @@ function test_alias_dse
     end
 end
 
-function test_alias_dse_get
-    log "[fish] Testing 'dse get' subcommand..."
+function test_dse_passthrough
+    log "[fish] Testing dse and dotsecenv pass arguments to the binary..."
     set TESTS_RUN (math $TESTS_RUN + 1)
 
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -i -c "
-        set -gx PATH '$mock_path' \$PATH
-        source '$SHELL_DIR/conf.d/dotsecenv.fish'
-        dse get API_KEY
-    " 2>&1)
+    set result (run_plugin "$TEMP_DIR/config_passthrough" "$mock_path" "
+        dse vault describe 'a b' ''
+        dotsecenv vault describe
+        dse secret get API_KEY
+        dse up
+    ")
 
-    if string match -q "*mock-api-key-12345*" "$result"
-        pass "[fish] 'dse get' subcommand works correctly"
+    if string match -q "*BIN:<vault><describe><a b><>*" "$result"
+        and string match -q "*BIN:<vault><describe>"\n"*" "$result"
+        and string match -q "*mock-api-key-12345*" "$result"
+        and string match -q "*BIN:<up>*" "$result"
+        pass "[fish] dse is a flat alias; other subcommands reach the binary"
     else
-        fail "[fish] 'dse get' subcommand failed, got: $result"
+        fail "[fish] Pass-through wrong, got: $result"
     end
 end
 
@@ -813,8 +819,8 @@ function test_multiline_and_escapes_byte_exact
         cd '$test_dir'
         printf '%s' \"\$PEM_KEY\" >'$out/env_pem'
         printf '%s' \"\$ESCAPED\" >'$out/env_esc'
-        dse cp PEM_KEY; and mv '$out/clip' '$out/clip_pem'
-        dse cp ESCAPED; and mv '$out/clip' '$out/clip_esc'
+        dotsecenv secret cp PEM_KEY; and mv '$out/clip' '$out/clip_pem'
+        dse secret cp ESCAPED; and mv '$out/clip' '$out/clip_esc'
     " >/dev/null
 
     set -l bad
@@ -863,138 +869,53 @@ function test_unload_restores_previous_values
     end
 end
 
-# ============================================================================
-# dse up Tests
-# ============================================================================
-
-function test_dse_up_basic
-    log "[fish] Testing 'dse up' loads ancestor .secenv..."
+function test_secret_reload_walks_to_git_root
+    log "[fish] Testing 'secret reload' loads up to the git root and keeps loaded ancestors..."
     set TESTS_RUN (math $TESTS_RUN + 1)
 
-    set test_dir "$TEMP_DIR/test_dse_up_basic"
-    mkdir -p "$test_dir/project/terraform/modules"
+    # outer/.secenv sits above the git root; repo/.secenv is an ancestor of
+    # repo/app that the shell never crossed
+    set base "$TEMP_DIR/test_secret_reload_root"
+    set outer "$base/outer"
+    set repo "$base/outer/repo"
+    mkdir -p "$repo/app"
+    git -C "$repo" init -q
+    echo 'OUTER=1' >"$outer/.secenv"
+    echo 'ROOT=1' >"$repo/.secenv"
+    echo 'APP=1' >"$repo/app/.secenv"
+    chmod 644 "$outer/.secenv" "$repo/.secenv" "$repo/app/.secenv"
 
-    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/project/.secenv"
-    chmod 644 "$test_dir/project/.secenv"
-
-    set config_dir "$TEMP_DIR/config_dse_up_basic"
-    mkdir -p "$config_dir"
-    trust_dirs "$config_dir" "$test_dir/project"
-
+    set config_dir "$TEMP_DIR/config_secret_reload_root"
+    trust_dirs "$config_dir" "$outer" "$repo" "$repo/app"
     set mock_path (create_mock_dotsecenv)
 
-    set result (fish --no-config -i -c "
-        set -gx PATH '$mock_path' \$PATH
-        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
-        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
-        source '$SHELL_DIR/conf.d/dotsecenv.fish'
-        cd '$test_dir/project/terraform/modules'
-        dse up '$test_dir'
-        echo \$DB_PASSWORD
-    " 2>&1)
+    # The edited app/.secenv prompts once; answer [a]lways
+    set result (printf 'a\n' | run_plugin "$config_dir" "$mock_path" "
+        function _dotsecenv_has_tty; return 0; end
+        function v; set -q \$argv[1]; and echo \$\$argv[1]; or echo unset; end
+        function show; echo \$argv[1]:O=(v OUTER)'|'R=(v ROOT)'|'A=(v APP)'|'N=(v NEW); end
+        cd '$repo/app'
+        show 1
+        printf '%s\\n' APP=2 NEW=x >'$repo/app/.secenv'
+        dotsecenv secret reload
+        show 2
+        echo PWD=\$PWD
+        cd '$outer'
+        cd '$repo/app'
+        dotsecenv secret reload
+        show 3
+        cd '$base'
+        show 4
+    ")
 
-    if string match -q "*super-secret-password*" "$result"
-        pass "[fish] 'dse up' loads ancestor .secenv correctly"
+    if string match -q "*1:O=unset|R=unset|A=1|N=unset*" "$result"
+        and string match -q "*2:O=unset|R=1|A=2|N=x*" "$result"
+        and string match -q "*PWD=$repo/app*" "$result"
+        and string match -q "*3:O=1|R=1|A=2|N=x*" "$result"
+        and string match -q "*4:O=unset|R=unset|A=unset|N=unset*" "$result"
+        pass "[fish] 'secret reload' stops at the git root, keeps loaded ancestors, unloads on leave"
     else
-        fail "[fish] 'dse up' failed to load ancestor .secenv, got: $result"
-    end
-end
-
-function test_dse_up_multiple_ancestors
-    log "[fish] Testing 'dse up' loads multiple ancestor .secenv files..."
-    set TESTS_RUN (math $TESTS_RUN + 1)
-
-    set test_dir "$TEMP_DIR/test_dse_up_multi"
-    mkdir -p "$test_dir/root/project/src"
-
-    echo 'APP_ENV=production' >"$test_dir/root/.secenv"
-    chmod 644 "$test_dir/root/.secenv"
-
-    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/root/project/.secenv"
-    chmod 644 "$test_dir/root/project/.secenv"
-
-    set config_dir "$TEMP_DIR/config_dse_up_multi"
-    mkdir -p "$config_dir"
-    trust_dirs "$config_dir" "$test_dir/root" "$test_dir/root/project"
-
-    set mock_path (create_mock_dotsecenv)
-
-    set result (fish --no-config -i -c "
-        set -gx PATH '$mock_path' \$PATH
-        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
-        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
-        source '$SHELL_DIR/conf.d/dotsecenv.fish'
-        cd '$test_dir/root/project/src'
-        dse up '$test_dir'
-        echo \$APP_ENV'|'\$DB_PASSWORD
-    " 2>&1)
-
-    if string match -q "*production|super-secret-password*" "$result"
-        pass "[fish] 'dse up' loads multiple ancestor .secenv files correctly"
-    else
-        fail "[fish] 'dse up' multi-ancestor failed, got: $result"
-    end
-end
-
-function test_dse_up_skips_already_loaded
-    log "[fish] Testing 'dse up' skips already-loaded ancestors..."
-    set TESTS_RUN (math $TESTS_RUN + 1)
-
-    set test_dir "$TEMP_DIR/test_dse_up_skip"
-    mkdir -p "$test_dir/project/src"
-
-    echo 'DB_PASSWORD={dotsecenv}' >"$test_dir/project/.secenv"
-    chmod 644 "$test_dir/project/.secenv"
-
-    set config_dir "$TEMP_DIR/config_dse_up_skip"
-    mkdir -p "$config_dir"
-    trust_dirs "$config_dir" "$test_dir/project"
-
-    set mock_path (create_mock_dotsecenv)
-
-    set result (fish --no-config -i -c "
-        set -gx PATH '$mock_path' \$PATH
-        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
-        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
-        source '$SHELL_DIR/conf.d/dotsecenv.fish'
-        cd '$test_dir/project'
-        cd '$test_dir/project/src'
-        dse up '$test_dir'
-        echo \$DB_PASSWORD
-    " 2>&1)
-
-    if string match -q "*no new ancestor*" "$result"; and string match -q "*super-secret-password*" "$result"
-        pass "[fish] 'dse up' correctly skips already-loaded ancestors"
-    else
-        fail "[fish] 'dse up' skip-already-loaded failed, got: $result"
-    end
-end
-
-function test_dse_up_no_ancestors
-    log "[fish] Testing 'dse up' graceful when no ancestor .secenv exists..."
-    set TESTS_RUN (math $TESTS_RUN + 1)
-
-    set test_dir "$TEMP_DIR/test_dse_up_none"
-    mkdir -p "$test_dir/project/src"
-
-    set config_dir "$TEMP_DIR/config_dse_up_none"
-    mkdir -p "$config_dir"
-
-    set mock_path (create_mock_dotsecenv)
-
-    set result (fish --no-config -i -c "
-        set -gx PATH '$mock_path' \$PATH
-        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
-        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
-        source '$SHELL_DIR/conf.d/dotsecenv.fish'
-        cd '$test_dir/project/src'
-        dse up '$test_dir'
-    " 2>&1)
-
-    if string match -q "*no new ancestor .secenv files found*" "$result"
-        pass "[fish] 'dse up' gracefully reports no ancestors"
-    else
-        fail "[fish] 'dse up' no-ancestors failed, got: $result"
+        fail "[fish] 'secret reload' wrong, got: $result"
     end
 end
 
@@ -1258,7 +1179,7 @@ function test_sync_new_key_unload_integrity
 end
 
 function test_reload_ingests_new_key
-    log "[fish] Testing 'dse reload' ingests a key added to an already-loaded dir..."
+    log "[fish] Testing 'secret reload' ingests a key added to an already-loaded dir..."
     set TESTS_RUN (math $TESTS_RUN + 1)
 
     set test_dir "$TEMP_DIR/test_reload_newkey"
@@ -1281,14 +1202,14 @@ function test_reload_ingests_new_key
         cd '$test_dir/project'
         echo 'API_KEY={dotsecenv}' >> '$test_dir/project/.secenv'
         function _dotsecenv_has_tty; return 0; end
-        dse reload
+        dotsecenv secret reload
         echo 'DB='\$DB_PASSWORD'|API='\$API_KEY
     " 2>&1)
 
     if string match -q "*DB=super-secret-password|API=mock-api-key-12345*" "$result"
-        pass "[fish] 'dse reload' ingests newly-added key"
+        pass "[fish] 'secret reload' ingests newly-added key"
     else
-        fail "[fish] 'dse reload' did not ingest new key, got: $result"
+        fail "[fish] 'secret reload' did not ingest new key, got: $result"
     end
 end
 
@@ -1325,7 +1246,7 @@ function main
     test_load_unload_message_split
     test_empty_secenv_no_message
     test_alias_dse
-    test_alias_dse_get
+    test_dse_passthrough
     test_comments_and_empty_lines
     test_quoted_values
 
@@ -1339,11 +1260,8 @@ function main
     test_unload_restores_previous_values
     test_multiline_and_escapes_byte_exact
 
-    # dse up tests
-    test_dse_up_basic
-    test_dse_up_multiple_ancestors
-    test_dse_up_skips_already_loaded
-    test_dse_up_no_ancestors
+    # secret reload
+    test_secret_reload_walks_to_git_root
 
     # FIX B: trailing-whitespace / CRLF parsing
     test_parse_trailing_whitespace_secret

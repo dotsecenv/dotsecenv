@@ -371,7 +371,7 @@ function _dotsecenv_load_file
 
                 # Fetch secret from vault (capture stderr separately to preserve secret value)
                 set -l secret_stderr_file (mktemp)
-                set -l secret_result (dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
+                set -l secret_result (command dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
                 set -l secret_status $status
                 if test $secret_status -eq 0
                     _dotsecenv_track_key $dir_hash $key
@@ -476,7 +476,7 @@ function _dotsecenv_load_key
             else if test "$ptype" = secret_same; or test "$ptype" = secret_named
                 set -l secret_name "$value"
                 set -l secret_stderr_file (mktemp)
-                set -l secret_result (dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
+                set -l secret_result (command dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
                 set -l secret_status $status
                 if test $secret_status -eq 0
                     _dotsecenv_track_key $dir_hash $key
@@ -687,69 +687,6 @@ function _dotsecenv_on_cd
     end
 end
 
-# Walk up from current directory and load ancestor .secenv files (root-first)
-# Arguments: [boundary_dir]
-#   boundary_dir: stop walking at this directory (default: git root, fallback: filesystem root)
-function _dotsecenv_load_ancestors
-    set -l original_dir "$PWD"
-    set -l boundary ""
-
-    if test (count $argv) -gt 0
-        set boundary $argv[1]
-    end
-
-    # Determine boundary
-    if test -z "$boundary"
-        set boundary (git rev-parse --show-toplevel 2>/dev/null)
-        or set boundary ""
-    end
-
-    # Walk up from current dir (exclusive) to boundary (inclusive), collect dirs with .secenv
-    set -l ancestor_secenvs
-    set -l dir "$original_dir"
-    while true
-        set -l parent (dirname "$dir")
-        test "$parent" = "$dir"; and break # reached filesystem root
-        set dir "$parent"
-        if test -f "$dir/.secenv"
-            set -a ancestor_secenvs "$dir"
-        end
-        if test -n "$boundary"; and test "$dir" = "$boundary"
-            break
-        end
-    end
-
-    # Filter out directories already on the stack
-    set -l to_load
-    for ancestor in $ancestor_secenvs
-        set -l already_loaded 0
-        for stack_entry in $_DOTSECENV_SOURCE_STACK
-            if test "$stack_entry" = "$ancestor"
-                set already_loaded 1
-                break
-            end
-        end
-        if test $already_loaded -eq 0
-            set -a to_load "$ancestor"
-        end
-    end
-
-    if test (count $to_load) -eq 0
-        echo "dotsecenv: no new ancestor .secenv files found" >&2
-        return 0
-    end
-
-    # Process root-first (reverse) by cd-ing into each directory.
-    # Actual cd is required so dotsecenv CLI resolves vault paths relative to the
-    # .secenv directory. Fish's --on-variable PWD hook fires automatically from cd.
-    for i in (seq (count $to_load) -1 1)
-        cd "$to_load[$i]"; or continue
-    end
-
-    # Return to the original directory
-    cd "$original_dir"
-end
-
 # Hook function called on directory change
 function _dotsecenv_cd_hook --on-variable PWD
     # Only act in interactive sessions. conf.d snippets are sourced by *every*
@@ -766,38 +703,6 @@ function _dotsecenv_cd_hook --on-variable PWD
 
     # Process the directory change
     _dotsecenv_on_cd "$old_dir" "$new_dir"
-end
-
-# Reload all .secenv files - clears stack and re-fetches everything fresh
-function _dotsecenv_reload
-    # Save current stack entries (ancestor → descendant order)
-    set -l dirs_to_reload $_DOTSECENV_SOURCE_STACK
-
-    # Clear the entire stack and unload all variables
-    while test (count $_DOTSECENV_SOURCE_STACK) -gt 0
-        set -l top $_DOTSECENV_SOURCE_STACK[-1]
-        _dotsecenv_stack_pop
-        _dotsecenv_unload_dir "$top"
-    end
-
-    # Re-load each directory in original order (ancestor → descendant)
-    for dir in $dirs_to_reload
-        if test -f "$dir/.secenv"
-            _dotsecenv_on_cd "" "$dir"
-        end
-    end
-
-    # Also pick up current dir if it now has .secenv and wasn't previously loaded
-    if test -f "$PWD/.secenv"
-        if not contains "$PWD" $dirs_to_reload
-            _dotsecenv_on_cd "" "$PWD"
-        end
-    end
-end
-
-# Reload secrets in current directory
-function reloadsecenv
-    _dotsecenv_reload
 end
 
 # Clipboard helper - copies stdin to clipboard
@@ -831,39 +736,88 @@ function _dotsecenv_clipboard_copy
     return 1
 end
 
-# Alias: dse (with subcommands: reload, get, cp)
-function dse
-    if test (count $argv) -eq 0
-        dotsecenv
-        return
+# dotsecenv secret reload: unload everything, then load, root-first, each
+# .secenv from the git root (or / outside a repository) down to $PWD, plus any
+# loaded directory above the git root. Each load cds into the directory, so the
+# CLI resolves vault paths from there, and runs the normal hook, so trust
+# prompts apply and every loaded directory is pushed onto the stack.
+function _dotsecenv_reload
+    set -l orig "$PWD"
+
+    # --show-cdup counts the levels up to the git root without resolving
+    # symlinks in $PWD; outside a repository (levels=-1) walk to /
+    set -l levels -1
+    set -l cdup (git rev-parse --show-cdup 2>/dev/null)
+    and set levels (count (string match -ar '\.\./' -- "$cdup"))
+
+    set -l dirs
+    set -l dir "$PWD"
+    set -l i 0
+    while true
+        if test -f "$dir/.secenv"
+            if test $levels -lt 0; or test $i -le $levels; or contains -- "$dir" $_DOTSECENV_SOURCE_STACK
+                set dirs "$dir" $dirs
+            end
+        end
+        test "$dir" = /; and break
+        set dir (string replace -r '/[^/]*$' '' -- "$dir")
+        test -n "$dir"; or set dir /
+        set i (math $i + 1)
     end
 
-    switch $argv[1]
-        case reload
-            _dotsecenv_reload
-        case sync
-            # Pick up keys added to the current dir's .secenv without unloading.
-            # Fish only fires its cd hook on a real PWD change, so this is the
-            # manual path to ingest keys added to the current directory.
-            _dotsecenv_sync_new_keys "$PWD"
-        case get
-            dotsecenv secret get $argv[2..]
-        case cp
-            set -l output
-            if set output (dotsecenv secret get $argv[2..])
-                if string join \n -- $output | string collect | _dotsecenv_clipboard_copy
-                    echo "dotsecenv: secret copied to clipboard" >&2
-                else
-                    return 1
-                end
-            else
-                return 1
-            end
-        case up
-            _dotsecenv_load_ancestors $argv[2..]
-        case '*'
-            dotsecenv $argv
+    while test (count $_DOTSECENV_SOURCE_STACK) -gt 0
+        set -l top $_DOTSECENV_SOURCE_STACK[-1]
+        _dotsecenv_stack_pop
+        _dotsecenv_unload_dir "$top"
     end
+
+    if test (count $dirs) -eq 0
+        echo "dotsecenv: no .secenv to load" >&2
+        return 0
+    end
+
+    # The PWD event runs the hook after each cd
+    for d in $dirs
+        if test "$d" = "$PWD"
+            # No directory change, so no PWD event fires; run the loader directly
+            _dotsecenv_on_cd "$d" "$d"
+        else
+            builtin cd "$d"
+        end
+    end
+    test "$PWD" = "$orig"; or builtin cd "$orig"
+end
+
+# dotsecenv secret cp NAME [flags]: copy a secret to the clipboard
+function _dotsecenv_copy_secret
+    set -l output (command dotsecenv secret get $argv); or return 1
+    string join \n -- $output | string collect | _dotsecenv_clipboard_copy; or return 1
+    echo "dotsecenv: secret copied to clipboard" >&2
+end
+
+# The plugin handles `dotsecenv secret reload` and `dotsecenv secret cp`
+# itself and passes everything else to the binary
+function dotsecenv
+    if test "$argv[1]" = secret
+        switch "$argv[2]"
+            case reload
+                if test (count $argv) -gt 2
+                    echo "dotsecenv: secret reload takes no arguments" >&2
+                    return 2
+                end
+                _dotsecenv_reload
+                return
+            case cp
+                _dotsecenv_copy_secret $argv[3..]
+                return
+        end
+    end
+    command dotsecenv $argv
+end
+
+# dse is a flat alias of dotsecenv
+function dse --wraps dotsecenv
+    dotsecenv $argv
 end
 
 # Process current directory on plugin load.

@@ -7,11 +7,11 @@ Shell plugins for [dotsecenv](https://github.com/dotsecenv/dotsecenv) that autom
 ## Features
 
 - Automatically loads `.env` and `.secenv` files when you `cd` into a directory
-- Unsets environment variables when you leave the directory
+- Restores the previous values of its variables when you leave the directory
 - Fetches secrets from your dotsecenv vault using the `{dotsecenv}` or `{dotsecenv/KEY}` syntax
 - Security checks: refuses to load world-writable files or files not owned by you (or root)
 - Trust system: prompts before loading `.secenv` files from untrusted directories
-- Convenient aliases: `dse`, `secret`, `copysecret`
+- `dotsecenv secret reload` and `dotsecenv secret cp`, plus `dse` as an alias for `dotsecenv`
 
 ## Installation
 
@@ -141,18 +141,21 @@ Secret names must start with a letter or underscore, followed by letters, number
 
 If both `.env` and `.secenv` define the same variable, `.secenv` takes precedence (with a warning).
 
-## Aliases
+## Commands
 
-| Alias           | Command                                  | Description                          |
-| --------------- | ---------------------------------------- | ------------------------------------ |
-| `dse`           | `dotsecenv`                              | Shorthand for dotsecenv CLI          |
-| `secret NAME`   | `dotsecenv secret get NAME`              | Retrieve a secret                    |
-| `copysecret NAME` | `dotsecenv secret get NAME \| clipboard` | Copy secret to clipboard           |
-| `dse up [DIR]`  | *(built-in)*                             | Load ancestor `.secenv` files        |
+The plugin wraps `dotsecenv` in a shell function. It runs these two commands itself and passes everything else to the binary.
+
+| Command                    | Description                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| `dotsecenv secret reload`  | Unload everything, then load each `.secenv` from the git root (or `/`) down to `$PWD` |
+| `dotsecenv secret cp NAME` | Copy a secret to the clipboard                                                       |
+| `dse ...`                  | Alias for `dotsecenv ...`                                                            |
+
+`dse reload`, `dse sync`, `dse up`, `dse get`, `dse cp` and `reloadsecenv` were removed. Use `dotsecenv secret reload`, `dotsecenv secret cp NAME` and `dse secret get NAME`.
 
 ### Clipboard Support
 
-The `copysecret` alias supports:
+`dotsecenv secret cp` uses:
 
 - **macOS**: `pbcopy`
 - **Linux (X11)**: `xclip` or `xsel`

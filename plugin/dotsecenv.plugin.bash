@@ -33,11 +33,6 @@ _dotsecenv_chpwd_hook() {
     _dotsecenv_on_cd "$old_dir" "$PWD"
 }
 
-# Reload secrets in current directory
-reloadsecenv() {
-    _dotsecenv_reload
-}
-
 # Use PROMPT_COMMAND to detect directory changes (bash has no chpwd hook)
 _dotsecenv_prompt_hook() {
     if [[ "$_DOTSECENV_PREV_PWD" != "$PWD" ]]; then
