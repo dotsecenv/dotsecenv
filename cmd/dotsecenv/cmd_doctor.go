@@ -35,7 +35,13 @@ Use -v to target a specific vault for checks.
 
 Options:
   --json  Output as JSON
-  --fix   Auto-fix issues without prompting`,
+  --fix   Auto-fix issues without prompting
+
+Exit codes:
+  0   Nothing needs attention, or every requested fix succeeded
+  10  Changes found but not applied; the output shows the command to apply them
+  3   A vault check or fix failed
+  4   gpg-agent is not available`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		vaultPath, fromIndex, parseErr := parseVaultSpecScoped()

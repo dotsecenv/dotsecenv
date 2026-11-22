@@ -32,7 +32,7 @@ If someone accesses your filesystem (backup, shared drive, stolen laptop), they 
 
 ### Tampering
 
-Every vault entry includes a cryptographic signature. If someone modifies an entry:
+Every vault entry includes a cryptographic signature. `secret get`, `share` and `revoke` refuse to decrypt a value whose hash or signature no longer matches, and `validate` reports any modified entry:
 
 ```bash
 dotsecenv validate

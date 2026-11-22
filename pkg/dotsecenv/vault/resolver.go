@@ -225,17 +225,19 @@ func (vr *VaultResolver) AddIdentity(identity Identity, index int) error {
 		if manager.IsReadOnly() {
 			return fmt.Errorf("is read-only")
 		}
-		manager.AddIdentity(identity)
-		return nil
+		return manager.AddIdentity(identity)
 	}
 
 	// Add to all writable vaults
+	var errs []error
 	for _, manager := range vr.vaults {
 		if manager != nil && !manager.IsReadOnly() {
-			manager.AddIdentity(identity)
+			if err := manager.AddIdentity(identity); err != nil {
+				errs = append(errs, fmt.Errorf("%s: %w", manager.Path(), err))
+			}
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // AddSecret adds a secret to a specific vault index (0-based)
@@ -258,8 +260,7 @@ func (vr *VaultResolver) AddSecret(secret Secret, index int) error {
 		return fmt.Errorf("is read-only")
 	}
 
-	manager.AddSecret(secret)
-	return nil
+	return manager.AddSecret(secret)
 }
 
 // GetIdentityByFingerprint finds an identity by fingerprint in any vault
@@ -325,6 +326,18 @@ func (vr *VaultResolver) GetVaultManager(index int) *Manager {
 		return nil
 	}
 	return vr.vaults[index]
+}
+
+// VerifySecretValue checks a secret definition and one of its values against
+// the identities in the vault at index.
+func (vr *VaultResolver) VerifySecretValue(index int, secret *Secret, value *SecretValue) error {
+	vr.mu.RLock()
+	defer vr.mu.RUnlock()
+
+	if index < 0 || index >= len(vr.vaults) || vr.vaults[index] == nil {
+		return fmt.Errorf("vault %d is not loaded", index+1)
+	}
+	return vr.vaults[index].vault.VerifySecretValue(secret, value)
 }
 
 // GetSecretByKeyFromVault gets a secret by key from a specific vault index

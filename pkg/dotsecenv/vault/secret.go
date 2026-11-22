@@ -2,7 +2,6 @@ package vault
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -52,7 +51,11 @@ func VerifySecretSignature(secret *Secret, signingIdentity *Identity) (bool, err
 		return false, fmt.Errorf("hash mismatch: computed %s, stored %s (data tampering detected)", computedHash, secret.Hash)
 	}
 
-	// Step 2: Verify signature of hash (identity verification)
+	// Step 2: Verify signature of hash (identity verification) with the key
+	// the signer's fingerprint names
+	if err := identity.VerifyKeyFingerprint(signingIdentity); err != nil {
+		return false, err
+	}
 	return identity.VerifySignatureWithPublicKey(signingIdentity.PublicKey, []byte(secret.Hash), secret.Signature)
 }
 
@@ -69,158 +72,46 @@ func VerifySecretValueSignature(value *SecretValue, secretKey string, signingIde
 		return false, fmt.Errorf("hash mismatch: computed %s, stored %s (data tampering detected)", computedHash, value.Hash)
 	}
 
-	// Step 2: Verify signature of hash (identity verification)
+	// Step 2: Verify signature of hash (identity verification) with the key
+	// the signer's fingerprint names
+	if err := identity.VerifyKeyFingerprint(signingIdentity); err != nil {
+		return false, err
+	}
 	return identity.VerifySignatureWithPublicKey(signingIdentity.PublicKey, []byte(value.Hash), value.Signature)
 }
 
-// ValidateSecret performs comprehensive validation of a secret.
-// It checks:
-//   - Required fields are present (Signature, SignedBy)
-//   - Signature is valid hex encoding
-//   - Signature is cryptographically valid
-//   - All secret values are valid
-//
-// Returns nil if valid, or an error describing the validation failure.
-func ValidateSecret(secret *Secret, signingIdentity *Identity) error {
-	if secret.Signature == "" {
-		return fmt.Errorf("missing signature field")
-	}
-	if secret.SignedBy == "" {
-		return fmt.Errorf("missing signed_by field")
-	}
-	if !identity.IsValidHex(secret.Signature) {
-		return fmt.Errorf("signature is not valid hex encoding")
-	}
-
-	// Cryptographically verify the signature
-	valid, err := VerifySecretSignature(secret, signingIdentity)
+// VerifySecretValue checks the hash and signature of a secret definition and
+// of one of its values. Each signer must be an identity in v whose own entry
+// verifies against its signer in v, and every key involved must match its
+// fingerprint. That makes a valid signature proof that a holder of the named
+// key signed, so the chain of identity signers is not followed further.
+func (v Vault) VerifySecretValue(secret *Secret, value *SecretValue) error {
+	signer, err := v.verifiedSigner(secret.SignedBy)
 	if err != nil {
-		return fmt.Errorf("failed to verify signature: %w", err)
+		return fmt.Errorf("secret definition: %w", err)
 	}
-	if !valid {
-		return fmt.Errorf("signature verification failed - possible tampering")
+	if ok, err := VerifySecretSignature(secret, signer); !ok {
+		return fmt.Errorf("secret definition: %w", err)
 	}
-
-	return nil
-}
-
-// ValidateSecretValue performs comprehensive validation of a secret value.
-// It checks:
-//   - Required fields are present (Signature, SignedBy)
-//   - Signature is valid hex encoding
-//   - Value is valid base64 encoding
-//   - Signature is cryptographically valid
-//
-// Returns nil if valid, or an error describing the validation failure.
-func ValidateSecretValue(value *SecretValue, secretKey string, signingIdentity *Identity) error {
-	if value.Signature == "" {
-		return fmt.Errorf("missing signature field")
-	}
-	if value.SignedBy == "" {
-		return fmt.Errorf("missing signed_by field")
-	}
-	if !identity.IsValidHex(value.Signature) {
-		return fmt.Errorf("signature is not valid hex encoding")
-	}
-	if !identity.IsValidBase64(value.Value) {
-		return fmt.Errorf("value is not valid base64 encoding")
-	}
-
-	// Cryptographically verify the signature
-	valid, err := VerifySecretValueSignature(value, secretKey, signingIdentity)
+	signer, err = v.verifiedSigner(value.SignedBy)
 	if err != nil {
-		return fmt.Errorf("failed to verify signature: %w", err)
+		return fmt.Errorf("value added %s: %w", value.AddedAt.Format(time.RFC3339), err)
 	}
-	if !valid {
-		return fmt.Errorf("signature verification failed - possible tampering")
+	if ok, err := VerifySecretValueSignature(value, secret.Key, signer); !ok {
+		return fmt.Errorf("value added %s: %w", value.AddedAt.Format(time.RFC3339), err)
 	}
-
 	return nil
 }
 
-// ValidateSecretsOrder checks that secrets values are sorted by AddedAt (most recent last).
-// This is required for append-only vault operations.
-func ValidateSecretsOrder(secrets []Secret) error {
-	for i, secret := range secrets {
-		if len(secret.Values) <= 1 {
-			continue
-		}
-
-		for j := 0; j < len(secret.Values)-1; j++ {
-			current := secret.Values[j].AddedAt
-			next := secret.Values[j+1].AddedAt
-			if current.After(next) {
-				return fmt.Errorf("secret[%d] values not sorted by added_at (most recent last): value[%d]=%s, value[%d]=%s",
-					i, j, current.Format(time.RFC3339), j+1, next.Format(time.RFC3339))
-			}
-		}
+// verifiedSigner returns the identity in v with fingerprint fp after checking
+// its entry's hash and signature against the identity that signed it.
+func (v Vault) verifiedSigner(fp string) (*Identity, error) {
+	signer := v.GetIdentityByFingerprint(fp)
+	if signer == nil {
+		return nil, fmt.Errorf("signer %s is not an identity in the vault", fp)
 	}
-
-	return nil
-}
-
-// ValidateAvailableToOrder checks that available_to fingerprints are sorted alphabetically.
-// This ensures deterministic output for version control.
-func ValidateAvailableToOrder(value *SecretValue) error {
-	if len(value.AvailableTo) <= 1 {
-		return nil
+	if ok, err := identity.VerifyIdentitySignature(signer, v.GetIdentityByFingerprint(signer.SignedBy)); !ok {
+		return nil, fmt.Errorf("identity %s: %w", fp, err)
 	}
-
-	sortedFPs := make([]string, len(value.AvailableTo))
-	copy(sortedFPs, value.AvailableTo)
-	sort.Strings(sortedFPs)
-
-	for i, fp := range value.AvailableTo {
-		if fp != sortedFPs[i] {
-			return fmt.Errorf("available_to fingerprints not sorted alphabetically at index %d", i)
-		}
-	}
-
-	return nil
-}
-
-// GetSecretSigningData returns the canonical data string used for signing a secret.
-// This is the data that should be hashed and signed when creating a secret signature.
-func GetSecretSigningData(secret *Secret) string {
-	return fmt.Sprintf("%s:%s:%s",
-		secret.AddedAt.Format(time.RFC3339Nano),
-		secret.Key,
-		secret.SignedBy)
-}
-
-// GetSecretValueSigningData returns the canonical data string used for signing a secret value.
-// This is the data that should be hashed and signed when creating a secret value signature.
-func GetSecretValueSigningData(value *SecretValue) string {
-	availableTo := strings.Join(value.AvailableTo, ",")
-	return fmt.Sprintf("%s:%s:%s:%s",
-		value.AddedAt.Format(time.RFC3339Nano),
-		availableTo,
-		value.SignedBy,
-		value.Value)
-}
-
-// SortAvailableTo sorts the available_to fingerprints alphabetically (in-place).
-// This should be called before signing to ensure deterministic output.
-func SortAvailableTo(value *SecretValue) {
-	sort.Strings(value.AvailableTo)
-}
-
-// ValidateSecretMetadata checks that all available_to fingerprints reference valid identities.
-func ValidateSecretMetadata(secret *Secret, vault *Vault) error {
-	// Build a map of valid fingerprints from identities
-	validFPs := make(map[string]bool)
-	for _, identity := range vault.Identities {
-		validFPs[identity.Fingerprint] = true
-	}
-
-	// Check that all available_to fingerprints are valid
-	for i, value := range secret.Values {
-		for _, fp := range value.AvailableTo {
-			if !validFPs[fp] {
-				return fmt.Errorf("unknown fingerprint in values[%d].available_to: %s", i, fp)
-			}
-		}
-	}
-
-	return nil
+	return signer, nil
 }

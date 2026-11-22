@@ -1,8 +1,9 @@
 .PHONY: help
 help:
 	@echo "shell targets:"
-	@echo "  make test-plugins         - Run unit tests (bash/zsh/fish)"
+	@echo "  make test-plugins         - Run unit tests (bash/zsh/fish/install)"
 	@echo "  make test-bash            - Run bash unit tests"
+	@echo "  make test-install         - Run install.sh tests"
 	@echo "  make test-zsh             - Run zsh unit tests"
 	@echo "  make test-fish            - Run fish unit tests"
 	@echo "  make test-managers        - Run plugin manager integration tests (Docker, local)"
@@ -14,8 +15,13 @@ help:
 	@echo "  make install-tools        - Install all dev tools"
 
 .PHONY: test-plugins
-test-plugins: test-bash test-zsh test-fish
+test-plugins: test-bash test-zsh test-fish test-install
 	@echo "All tests passed!"
+
+.PHONY: test-install
+test-install:
+	@echo "Running install.sh tests..."
+	@./tests/test_install.sh
 
 .PHONY: test-bash
 test-bash:
@@ -91,7 +97,7 @@ lint:
 
 # Shell script files to format
 SHELL_FILES := ./_dotsecenv_core.sh ./dotsecenv.plugin.bash ./dotsecenv.plugin.zsh \
-               ./tests/test_plugins.sh ./tests/test_plugin_managers.sh ./install.sh
+               ./tests/test_plugins.sh ./tests/test_plugin_managers.sh ./tests/test_install.sh ./install.sh
 FISH_FILES := ./conf.d/dotsecenv.fish ./tests/test_plugins.fish
 
 .PHONY: fmt

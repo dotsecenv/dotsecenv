@@ -30,7 +30,9 @@ func TestManagerBasicWorkflow(t *testing.T) {
 		Fingerprint:   "ABC123",
 		UID:           "test@example.com",
 	}
-	m.AddIdentity(id)
+	if err := m.AddIdentity(id); err != nil {
+		t.Fatal(err)
+	}
 
 	// Add secret
 	s := Secret{
@@ -47,7 +49,9 @@ func TestManagerBasicWorkflow(t *testing.T) {
 			},
 		},
 	}
-	m.AddSecret(s)
+	if err := m.AddSecret(s); err != nil {
+		t.Fatal(err)
+	}
 
 	// Verify
 	vault := m.Get()
@@ -78,17 +82,21 @@ func TestManagerPersistence(t *testing.T) {
 	}
 
 	now := time.Now().UTC().Truncate(time.Second)
-	m1.AddIdentity(identity.Identity{
+	if err := m1.AddIdentity(identity.Identity{
 		AddedAt:     now,
 		Fingerprint: "FP1",
-	})
-	m1.AddSecret(Secret{
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := m1.AddSecret(Secret{
 		AddedAt: now,
 		Key:     "SEC1",
 		Values: []SecretValue{
 			{AddedAt: now, AvailableTo: []string{"FP1"}, Value: "v1"},
 		},
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := m1.Save(); err != nil {
 		t.Fatalf("Save failed: %v", err)
@@ -129,21 +137,25 @@ func TestManagerAddSecretValues(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	// Add initial secret
-	m.AddSecret(Secret{
+	if err := m.AddSecret(Secret{
 		AddedAt: now,
 		Key:     "MY_SECRET",
 		Values: []SecretValue{
 			{AddedAt: now, AvailableTo: []string{"FP1"}, Value: "v1"},
 		},
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Add more values to same secret
-	m.AddSecret(Secret{
+	if err := m.AddSecret(Secret{
 		Key: "MY_SECRET",
 		Values: []SecretValue{
 			{AddedAt: now.Add(time.Second), AvailableTo: []string{"FP1", "FP2"}, Value: "v2"},
 		},
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Verify
 	secret := m.GetSecretByKey("MY_SECRET")
@@ -168,14 +180,16 @@ func TestManagerGetAccessibleSecretValue(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	// Add secret with multiple values
-	m.AddSecret(Secret{
+	if err := m.AddSecret(Secret{
 		AddedAt: now,
 		Key:     "MY_SECRET",
 		Values: []SecretValue{
 			{AddedAt: now, AvailableTo: []string{"FP1"}, Value: "v1"},                  // FP1 only
 			{AddedAt: now.Add(time.Second), AvailableTo: []string{"FP2"}, Value: "v2"}, // FP2 only
 		},
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	// FP1 should get v1 (falls back to most recent they can access)
 	val := m.GetAccessibleSecretValue("FP1", "MY_SECRET")
@@ -215,12 +229,20 @@ func TestManagerListMethods(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	// Add some identities
-	m.AddIdentity(identity.Identity{AddedAt: now, Fingerprint: "FP2"})
-	m.AddIdentity(identity.Identity{AddedAt: now, Fingerprint: "FP1"})
+	if err := m.AddIdentity(identity.Identity{AddedAt: now, Fingerprint: "FP2"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.AddIdentity(identity.Identity{AddedAt: now, Fingerprint: "FP1"}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Add some secrets
-	m.AddSecret(Secret{AddedAt: now, Key: "SEC2"})
-	m.AddSecret(Secret{AddedAt: now, Key: "SEC1"})
+	if err := m.AddSecret(Secret{AddedAt: now, Key: "SEC2"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.AddSecret(Secret{AddedAt: now, Key: "SEC1"}); err != nil {
+		t.Fatal(err)
+	}
 
 	// List fingerprints
 	fps := m.ListIdentityFingerprints()
@@ -252,10 +274,12 @@ func TestManagerFragmentationStats(t *testing.T) {
 
 	// Add some data
 	for i := range 5 {
-		m.AddIdentity(identity.Identity{
+		if err := m.AddIdentity(identity.Identity{
 			AddedAt:     now.Add(time.Duration(i) * time.Second),
 			Fingerprint: fmt.Sprintf("FP%d", i),
-		})
+		}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	stats, err := m.FragmentationStats()
@@ -281,17 +305,25 @@ func TestManagerDefragment(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	// Add data in fragmented order
-	m.AddIdentity(identity.Identity{AddedAt: now, Fingerprint: "FP1"})
-	m.AddSecret(Secret{AddedAt: now, Key: "SEC1"})
-	m.AddIdentity(identity.Identity{AddedAt: now.Add(time.Second), Fingerprint: "FP2"})
+	if err := m.AddIdentity(identity.Identity{AddedAt: now, Fingerprint: "FP1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.AddSecret(Secret{AddedAt: now, Key: "SEC1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.AddIdentity(identity.Identity{AddedAt: now.Add(time.Second), Fingerprint: "FP2"}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Add value to secret (causes fragmentation)
-	m.AddSecret(Secret{
+	if err := m.AddSecret(Secret{
 		Key: "SEC1",
 		Values: []SecretValue{
-			{AddedAt: now, AvailableTo: []string{"FP1"}, Value: "v1"},
+			{AddedAt: now.Add(time.Second), AvailableTo: []string{"FP1"}, Value: "v1"},
 		},
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Defragment
 	stats, err := m.Defragment()

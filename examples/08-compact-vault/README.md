@@ -88,9 +88,9 @@ per distinct recipient set") would keep more; dotsecenv ships the minimal rule.
 
 ## Safety
 
-- `vault compact` with no flags prints the plan and asks before writing.
-  `--yes` skips the prompt (and prompts are auto-skipped in CI).
-- `--json` reports the plan and writes only when combined with `--yes`.
+- `vault compact` writes only with `--yes`. Without it, it prints the plan,
+  leaves the vault unchanged and exits `10` when there is something to drop.
+- `--json` follows the same rule.
 - The script backs up the vault to `<vault>.bak` before applying. Restore with
   `cp <vault>.bak <vault>` if a run looks wrong.
 

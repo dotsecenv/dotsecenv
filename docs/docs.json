@@ -1,0 +1,99 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "dotsecenv",
+  "colors": {
+    "primary": "#2563eb",
+    "light": "#dbeafe",
+    "dark": "#1d4ed8"
+  },
+  "logo": "/images/logo.png",
+  "favicon": "/images/logo.png",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start Here",
+        "pages": ["index", "getting-started"]
+      },
+      {
+        "group": "Tutorials",
+        "pages": [
+          "tutorials/reload-secrets",
+          "tutorials/migrate-from-dotenv",
+          "tutorials/team-vault-setup",
+          "tutorials/team-onboarding",
+          "tutorials/ci-cd-secrets",
+          "tutorials/org-wide-keypair",
+          "tutorials/share-secret",
+          "tutorials/revoke-access",
+          "tutorials/apply-a-policy",
+          "tutorials/installation",
+          "tutorials/first-secret"
+        ]
+      },
+      {
+        "group": "Concepts",
+        "pages": [
+          "concepts/philosophy",
+          "concepts/security-model",
+          "concepts/threat-model",
+          "concepts/architecture",
+          "concepts/vault-format",
+          "concepts/audit-trail",
+          "concepts/behavior-settings",
+          "concepts/security-policies",
+          "concepts/key-scope",
+          "concepts/compliance",
+          "concepts/comparison"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/shell-plugins",
+          "guides/github-action",
+          "guides/terraform-credentials-helper",
+          "guides/git-credential-helper",
+          "guides/claude-code",
+          "guides/gpg-agent",
+          "guides/multi-environment",
+          "how-to"
+        ]
+      },
+      {
+        "group": "Runbooks",
+        "pages": [
+          "runbooks/rotate-compromised-key",
+          "runbooks/team-member-offboarding"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": ["reference", "changelog"]
+      },
+      {
+        "group": "Blog",
+        "pages": [
+          "blog/why-dotsecenv",
+          "blog/designing-security-policies",
+          "blog/signed-monorepo-releases"
+        ]
+      },
+      {
+        "group": "Legal",
+        "pages": ["privacy"]
+      }
+    ]
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/dotsecenv/dotsecenv"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/dotsecenv/dotsecenv"
+    }
+  }
+}
