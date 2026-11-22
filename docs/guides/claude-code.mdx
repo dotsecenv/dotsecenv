@@ -1,0 +1,127 @@
+---
+title: Claude Code
+description: Choose how to provide dotsecenv secrets to Claude Code and its tools
+---
+Load project secrets into your shell before starting Claude Code, or let the
+dotsecenv agent plugin retrieve them during the session. The options below use
+[dotsecenv](/tutorials/installation) and the Claude Code CLI launched from your
+terminal. IDE and desktop sessions have their own launcher environment.
+
+## Load .secenv before starting Claude
+
+Install the [dotsecenv shell plugin](/guides/shell-plugins) and put vault
+references in your project's `.secenv`:
+
+```bash title=".secenv"
+HCLOUD_TOKEN={dotsecenv}
+```
+
+In your terminal, enter the directory and complete the shell plugin's load
+before starting Claude:
+
+```bash title="Your terminal"
+cd /path/to/project
+claude
+```
+
+The shell plugin fetches the referenced values and exports them as environment
+variables. Claude and the tools it starts inherit those values. The `.secenv`
+file holds references; the exported values are plaintext in the running
+processes' environments.
+
+This option works with GPG policies that require interaction for each
+decryption: you handle the load in your terminal before the agent starts.
+The dotsecenv agent plugin is optional for this workflow.
+
+## Fetch a secret yourself
+
+Use the CLI in your terminal to retrieve selected values and export them
+before launching Claude. For Bash or Zsh:
+
+```bash title="Your terminal"
+HCLOUD_TOKEN=$(dotsecenv secret get HCLOUD_TOKEN) &&
+  export HCLOUD_TOKEN &&
+  claude
+```
+
+Claude and its tools receive `HCLOUD_TOKEN` from the launching shell. You can
+also save a value to a file when a tool expects one. Such files contain
+plaintext; restrict their permissions and keep them outside version control.
+
+Choose the values and destinations yourself. The agent can use the values you
+prepared without fetching them from the vault during the session.
+
+## Let the agent plugin use cached GPG credentials
+
+Install the [agent plugin](#install-the-agent-plugin) to let Claude retrieve
+secrets when you request them during a session.
+
+Set the cache duration in your GPG agent configuration. `default-cache-ttl`
+controls inactivity expiry, and `max-cache-ttl` sets a hard limit even when
+the key is used repeatedly. The [GPG Agent guide](/guides/gpg-agent)
+shows a one-hour inactivity limit and a four-hour maximum, with commands to
+apply and verify the settings.
+
+Before starting Claude, exercise the decryption you need from your terminal:
+
+```bash title="Your terminal"
+dotsecenv secret get HCLOUD_TOKEN >/dev/null &&
+  claude
+```
+
+The plugin can use credentials available to the same gpg-agent during their
+cache lifetime. Longer cache durations give other processes that can access
+the agent a longer window to request operations with the key. Exported values
+in an already running process have their own lifetime, independent of the GPG
+cache.
+
+The agent plugin adds `--no-pinentry` to its calls. See
+[GPG Agent: agent calls](/guides/gpg-agent#agent-calls) for the resulting
+behavior and recovery steps.
+
+## Install the agent plugin
+
+In Claude Code, add the marketplace and install the plugin:
+
+```text title="Inside Claude Code"
+/plugin marketplace add dotsecenv/dotsecenv
+/plugin install dotsecenv@dotsecenv
+```
+
+The plugin provides these skills:
+
+| Skill | Purpose |
+|-------|---------|
+| `/dotsecenv:secrets` | List and retrieve secrets; store, share, revoke, or forget them when requested |
+| `/dotsecenv:secenv` | Read and edit `.secenv` references and diagnose loading problems |
+| `/dotsecenv:vault` | Inspect, validate, and compact vaults |
+
+Metadata operations such as listing key names work independently of the GPG
+passphrase cache. Decryption requires your explicit request. Mutating
+operations require your request and confirmation under the skill's rules.
+
+For example, ask Claude to list your secret names, retrieve a named secret,
+or create a `.secenv` containing selected references. The skills prohibit
+keychain extraction and sending decrypted values to external services.
+
+### Local plugin development
+
+Load the plugin from a checkout when developing dotsecenv:
+
+```bash title="Your terminal"
+claude --plugin-dir /path/to/dotsecenv
+```
+
+### Remove the plugin
+
+```text title="Inside Claude Code"
+/plugin uninstall dotsecenv@dotsecenv
+/plugin marketplace remove dotsecenv
+```
+
+## Documentation from Context7
+
+[Context7](https://context7.com) provides dotsecenv documentation to assistants
+that have its MCP server configured. The project is indexed at
+[context7.com/code-docs/dotsecenv/dotsecenv](https://context7.com/code-docs/dotsecenv/dotsecenv).
+Context7 supplies documentation; the dotsecenv agent plugin runs the local CLI.

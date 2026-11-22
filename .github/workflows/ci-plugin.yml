@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0
         with:
           go-version-file: "go.mod"
 
@@ -69,6 +69,8 @@ jobs:
           tar -xf "$RUNNER_TEMP/fish.tar.xz" -C "$RUNNER_TEMP"
           # fish 3.7.1 sets CMP0037 to OLD for an alias test target, which CMake 4 rejects.
           sed -i 's/^if(POLICY CMP0037)$/if(FALSE)/' "$RUNNER_TEMP/fish-${FISH_VERSION}/cmake/Tests.cmake"
+          # It also calls install(SCRIPT CODE "..."), which CMake 4 rejects ("SCRIPT: missing required value").
+          sed -i 's/install(SCRIPT CODE /install(CODE /' "$RUNNER_TEMP/fish-${FISH_VERSION}/cmake/Install.cmake"
           cmake -S "$RUNNER_TEMP/fish-${FISH_VERSION}" -B "$RUNNER_TEMP/fish-build" \
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DWITH_GETTEXT=OFF
           cmake --build "$RUNNER_TEMP/fish-build" -j"$(nproc)"

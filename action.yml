@@ -44,14 +44,15 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+        INPUT_VERSION: ${{ inputs.version }}
       run: |
-        if [[ "${{ inputs.version }}" == "latest" ]]; then
+        if [[ "$INPUT_VERSION" == "latest" ]]; then
           VERSION=$(gh release view --repo dotsecenv/dotsecenv --json tagName -q .tagName)
           echo "Resolved latest released version: $VERSION"
         else
-          VERSION="${{ inputs.version }}"
+          VERSION="$INPUT_VERSION"
         fi
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
     # ===========================================================
     # Download release
@@ -61,15 +62,15 @@ runs:
       if: inputs.build-from-source != 'true'
       shell: bash
       run: |
-        case "${{ runner.os }}" in
-          Linux)  echo "os=Linux" >> $GITHUB_OUTPUT ;;
-          macOS)  echo "os=Darwin" >> $GITHUB_OUTPUT ;;
-          *)      echo "::error::Unsupported OS: ${{ runner.os }}"; exit 1 ;;
+        case "$RUNNER_OS" in
+          Linux)  echo "os=Linux" >> "$GITHUB_OUTPUT" ;;
+          macOS)  echo "os=Darwin" >> "$GITHUB_OUTPUT" ;;
+          *)      echo "::error::Unsupported OS: $RUNNER_OS"; exit 1 ;;
         esac
-        case "${{ runner.arch }}" in
-          X64)    echo "arch=x86_64" >> $GITHUB_OUTPUT ;;
-          ARM64)  echo "arch=arm64" >> $GITHUB_OUTPUT ;;
-          *)      echo "::error::Unsupported arch: ${{ runner.arch }}"; exit 1 ;;
+        case "$RUNNER_ARCH" in
+          X64)    echo "arch=x86_64" >> "$GITHUB_OUTPUT" ;;
+          ARM64)  echo "arch=arm64" >> "$GITHUB_OUTPUT" ;;
+          *)      echo "::error::Unsupported arch: $RUNNER_ARCH"; exit 1 ;;
         esac
 
     - name: Download release
@@ -78,34 +79,33 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ steps.resolve-version.outputs.version }}
+        OS: ${{ steps.arch.outputs.os }}
+        ARCH: ${{ steps.arch.outputs.arch }}
       run: |
-        VERSION="${{ steps.resolve-version.outputs.version }}"
-        ARCHIVE="dotsecenv_${VERSION#v}_${{ steps.arch.outputs.os }}_${{ steps.arch.outputs.arch }}.tar.gz"
-        DEST="${{ runner.temp }}/dotsecenv-download"
+        ARCHIVE="dotsecenv_${VERSION#v}_${OS}_${ARCH}.tar.gz"
+        DEST="$RUNNER_TEMP/dotsecenv-download"
         mkdir -p "$DEST"
 
         gh release download "$VERSION" --repo dotsecenv/dotsecenv --pattern "$ARCHIVE" --pattern "checksums.txt*" --dir "$DEST"
 
-        echo "dir=$DEST" >> $GITHUB_OUTPUT
-        echo "archive=$ARCHIVE" >> $GITHUB_OUTPUT
+        echo "dir=$DEST" >> "$GITHUB_OUTPUT"
+        echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
 
-    - name: Import GPG key
+    # Reuses the installer's checks: the key comes over HTTPS, the signature must
+    # be from a fingerprint pinned in scripts/install.sh, and any failure stops.
+    - name: Verify GPG signature and checksum
       if: inputs.build-from-source != 'true' && inputs.verify-provenance == 'true'
       shell: bash
+      working-directory: ${{ steps.download.outputs.dir }}
+      env:
+        ARCHIVE: ${{ steps.download.outputs.archive }}
+        NO_VERIFY_HINT: "set verify-provenance: false to skip verification"
       run: |
-        curl -fsSL http://get.dotsecenv.com/key.asc | gpg --import
-
-    - name: Verify GPG signature
-      if: inputs.build-from-source != 'true' && inputs.verify-provenance == 'true'
-      shell: bash
-      working-directory: ${{ steps.download.outputs.dir }}
-      run: gpg --verify checksums.txt.sig checksums.txt
-
-    - name: Verify checksum
-      if: inputs.build-from-source != 'true' && inputs.verify-provenance == 'true'
-      shell: bash
-      working-directory: ${{ steps.download.outputs.dir }}
-      run: grep "${{ steps.download.outputs.archive }}$" checksums.txt | sha256sum -c -
+        source "$GITHUB_ACTION_PATH/scripts/install.sh"
+        detect_downloader
+        verify_gpg checksums.txt checksums.txt.sig
+        verify_checksums "$ARCHIVE" checksums.txt
 
     - name: Verify attestation
       if: inputs.build-from-source != 'true' && inputs.verify-provenance == 'true'
@@ -113,20 +113,23 @@ runs:
       working-directory: ${{ steps.download.outputs.dir }}
       env:
         GH_TOKEN: ${{ github.token }}
-      run: gh attestation verify "${{ steps.download.outputs.archive }}" --repo dotsecenv/dotsecenv
+        ARCHIVE: ${{ steps.download.outputs.archive }}
+      run: gh attestation verify "$ARCHIVE" --repo dotsecenv/dotsecenv
 
     - name: Install release binary
       id: install-release
       if: inputs.build-from-source != 'true'
       shell: bash
+      env:
+        ARCHIVE_PATH: ${{ steps.download.outputs.dir }}/${{ steps.download.outputs.archive }}
       run: |
-        INSTALL_DIR="${{ runner.temp }}/dotsecenv-bin"
+        INSTALL_DIR="$RUNNER_TEMP/dotsecenv-bin"
         mkdir -p "$INSTALL_DIR"
-        tar -xzf "${{ steps.download.outputs.dir }}/${{ steps.download.outputs.archive }}" -C "$INSTALL_DIR"
+        tar -xzf "$ARCHIVE_PATH" -C "$INSTALL_DIR"
         chmod +x "$INSTALL_DIR/dotsecenv"
         "$INSTALL_DIR/dotsecenv" version
-        echo "$INSTALL_DIR" >> $GITHUB_PATH
-        echo "binary-path=$INSTALL_DIR/dotsecenv" >> $GITHUB_OUTPUT
+        echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+        echo "binary-path=$INSTALL_DIR/dotsecenv" >> "$GITHUB_OUTPUT"
 
     # ============================================
     # Build from source path
@@ -137,9 +140,9 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ steps.resolve-version.outputs.version }}
       run: |
-        VERSION="${{ steps.resolve-version.outputs.version }}"
-        DEST="${{ runner.temp }}/dotsecenv-download"
+        DEST="$RUNNER_TEMP/dotsecenv-download"
 
         # Try branch/tag clone first, fall back to SHA checkout
         if git clone --depth 1 --branch "$VERSION" https://github.com/dotsecenv/dotsecenv.git "$DEST" 2>/dev/null; then
@@ -151,7 +154,7 @@ runs:
           git -C "$DEST" checkout FETCH_HEAD
         fi
 
-        echo "dir=$DEST" >> $GITHUB_OUTPUT
+        echo "dir=$DEST" >> "$GITHUB_OUTPUT"
 
     - name: Set up Go
       if: inputs.build-from-source == 'true'
@@ -179,13 +182,13 @@ runs:
       working-directory: ${{ steps.checkout.outputs.dir }}
       shell: bash
       run: |
-        INSTALL_DIR="${{ runner.temp }}/dotsecenv-bin"
+        INSTALL_DIR="$RUNNER_TEMP/dotsecenv-bin"
         mkdir -p "$INSTALL_DIR"
         cp bin/dotsecenv "$INSTALL_DIR/dotsecenv"
         chmod +x "$INSTALL_DIR/dotsecenv"
         "$INSTALL_DIR/dotsecenv" version
-        echo "$INSTALL_DIR" >> $GITHUB_PATH
-        echo "binary-path=$INSTALL_DIR/dotsecenv" >> $GITHUB_OUTPUT
+        echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+        echo "binary-path=$INSTALL_DIR/dotsecenv" >> "$GITHUB_OUTPUT"
 
     # ============================================
     # Initialize config (optional)
@@ -193,5 +196,9 @@ runs:
     - name: Initialize config
       if: inputs.init-config != 'skip'
       shell: bash
+      env:
+        INIT_CONFIG: ${{ inputs.init-config }}
       run: |
-        dotsecenv init config ${{ inputs.init-config }}
+        # Split on whitespace into separate flags, with no shell expansion.
+        read -ra args <<< "$INIT_CONFIG"
+        dotsecenv init config "${args[@]}"

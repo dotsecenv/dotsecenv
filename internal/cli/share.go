@@ -141,6 +141,10 @@ func (c *CLI) secretShareInVault(secretKey, targetFingerprint string, vaultIndex
 	}
 	currentValue := secretObj.Values[len(secretObj.Values)-1]
 
+	if verifyErr := c.verifyBeforeDecrypt(vaultIndex, secretKey, secretObj, &currentValue); verifyErr != nil {
+		return verifyErr
+	}
+
 	// Check if already shared
 	if slices.Contains(currentValue.AvailableTo, targetFingerprint) {
 		if !silent {

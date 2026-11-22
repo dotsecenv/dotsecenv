@@ -73,8 +73,53 @@ func VerifyIdentitySignature(identity *Identity, signer *Identity) (bool, error)
 		return false, fmt.Errorf("hash mismatch: computed %s, stored %s (data tampering detected)", computedHash, identity.Hash)
 	}
 
-	// Step 2: Verify signature of the hash using the signer's public key
+	// Step 2: Both keys must be the ones their fingerprints name
+	if err := VerifyKeyFingerprint(identity); err != nil {
+		return false, err
+	}
+	if err := VerifyKeyFingerprint(signer); err != nil {
+		return false, err
+	}
+
+	// Step 3: Verify signature of the hash using the signer's public key
 	return VerifySignatureWithPublicKey(signer.PublicKey, []byte(identity.Hash), identity.Signature)
+}
+
+// VerifyKeyFingerprint checks that id.PublicKey holds exactly one key and that
+// its primary key's fingerprint is id.Fingerprint. Without it, an edited
+// identity entry could pair a teammate's fingerprint with an attacker's key.
+func VerifyKeyFingerprint(id *Identity) error {
+	keys, err := parsePublicKey(id.PublicKey)
+	if err != nil {
+		return err
+	}
+	if len(keys) != 1 {
+		return fmt.Errorf("public key of %s holds %d keys, want 1", id.Fingerprint, len(keys))
+	}
+	if got := strings.ToUpper(hex.EncodeToString(keys[0].PrimaryKey.Fingerprint)); got != NormalizeFingerprint(id.Fingerprint) {
+		return fmt.Errorf("public key fingerprint %s does not match identity %s", got, id.Fingerprint)
+	}
+	return nil
+}
+
+// parsePublicKey decodes a base64 public key, armored or binary.
+func parsePublicKey(publicKeyBase64 string) (openpgp.EntityList, error) {
+	publicKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyBase64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode public key from base64: %v", err)
+	}
+	keyEntities, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(publicKeyBytes))
+	if err != nil {
+		// If armored format fails, try binary format
+		keyEntities, err = openpgp.ReadKeyRing(bytes.NewReader(publicKeyBytes))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse public key: %v", err)
+		}
+	}
+	if len(keyEntities) == 0 {
+		return nil, fmt.Errorf("no public keys found in key data")
+	}
+	return keyEntities, nil
 }
 
 // VerifySignatureWithPublicKey performs cryptographic verification of a detached signature.
@@ -99,26 +144,9 @@ func VerifyIdentitySignature(identity *Identity, signer *Identity) (bool, error)
 //   - Does not require external GPG process
 //   - Is compatible with standard GPG detached signatures
 func VerifySignatureWithPublicKey(publicKeyBase64 string, data []byte, signatureHex string) (bool, error) {
-	// Decode the public key from base64
-	publicKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyBase64)
+	keyEntities, err := parsePublicKey(publicKeyBase64)
 	if err != nil {
-		return false, fmt.Errorf("failed to decode public key from base64: %v", err)
-	}
-
-	// Parse the public key using ProtonMail's openpgp
-	keyReader := bytes.NewReader(publicKeyBytes)
-	keyEntities, err := openpgp.ReadArmoredKeyRing(keyReader)
-	if err != nil {
-		// If armored format fails, try binary format
-		keyReader = bytes.NewReader(publicKeyBytes)
-		keyEntities, err = openpgp.ReadKeyRing(keyReader)
-		if err != nil {
-			return false, fmt.Errorf("failed to parse public key: %v", err)
-		}
-	}
-
-	if len(keyEntities) == 0 {
-		return false, fmt.Errorf("no public keys found in key data")
+		return false, err
 	}
 
 	// Decode signature from hex

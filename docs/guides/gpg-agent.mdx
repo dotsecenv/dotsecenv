@@ -1,0 +1,176 @@
+---
+title: GPG Agent
+description: Quick reference for configuring gpg-agent to work cleanly with dotsecenv
+---
+dotsecenv uses your existing gpg-agent configuration. This guide covers cache
+settings and pinentry for commands you run in your terminal and calls made by
+an agent plugin. For other configuration options, see the
+[GnuPG manual](https://www.gnupg.org/documentation/manuals/gnupg/Agent-Configuration.html).
+
+## Health check
+
+Before debugging anything specific, confirm the agent is reachable and the rest of the dotsecenv environment is healthy:
+
+```bash
+dotsecenv vault doctor
+```
+
+`doctor` verifies that gpg-agent is available, the vault format is current, and the vault is not fragmented. If gpg-agent is not running, `doctor` reports it and exits non-zero.
+
+To talk to the agent directly:
+
+```bash
+gpg-connect-agent /bye
+# OK   ← agent is running
+```
+
+To list the agent's current settings:
+
+```bash
+gpgconf --list-options gpg-agent
+```
+
+## Recommended `gpg-agent.conf`
+
+The same configuration used elsewhere in the documentation. Tuned for usability while still requiring re-entry on a regular cadence:
+
+```ini
+# ~/.gnupg/gpg-agent.conf
+
+# Use a GUI pinentry appropriate for your platform:
+# macOS:  pinentry-program /opt/homebrew/opt/pinentry-mac/bin/pinentry-mac
+# Linux:  pinentry-program /usr/bin/pinentry-gnome3
+
+# Passphrase expires after 1 hour of inactivity
+default-cache-ttl 3600
+
+# Hard cap: passphrase must be re-entered after 4 hours regardless of activity
+max-cache-ttl 14400
+
+# Prevent pinentry from storing passphrases in the OS keychain
+no-allow-external-cache
+```
+
+For the security rationale behind each option — why `no-allow-external-cache` matters, when to set both TTLs to `0` for maximum security, and how the OS keychain interacts with these settings — see [Threat Model: Recommended GPG Agent Configuration](/concepts/threat-model#recommended-gpg-agent-configuration).
+
+## Apply and verify
+
+After editing the config, run these commands in your terminal to confirm the agent picked up your changes and that the cache holds across calls.
+
+1. Reload the agent so the new values take effect without interrupting in-flight operations:
+
+   ```bash
+   gpgconf --reload gpg-agent
+   ```
+
+   The older `killall gpg-agent` works, but it cuts off any decryption already in progress. Use the reload instead.
+
+2. Confirm the agent now reports the TTLs you set:
+
+   ```bash
+   gpgconf --list-options gpg-agent | grep -E '^(default-cache-ttl|max-cache-ttl):'
+   # default-cache-ttl:0:0:N:N:0:::3600:
+   # max-cache-ttl:0:0:N:N:0:::14400:
+   ```
+
+   The number after the seventh colon is the current value. If you see `0` or your previous setting instead of `3600` / `14400`, you reloaded a different `GNUPGHOME` than you edited. Cross-check `gpgconf --list-dirs homedir` against `echo $GNUPGHOME` and try again.
+
+3. Unlock the signing key and the key needed for the requested decryption. Then check that the same decryption succeeds with pinentry disabled:
+
+   ```bash
+   gpg --sign --local-user YOUR_FINGERPRINT </dev/null >/dev/null   # pinentry prompts here
+   dotsecenv secret get ANY_SECRET >/dev/null                       # may unlock a different key
+   dotsecenv --no-pinentry secret get ANY_SECRET >/dev/null          # fails if pinentry is still required
+   ```
+
+   If the final call reports `GPG_ERR_NO_PIN_ENTRY`, the required credentials
+   are not available without pinentry. Check the cache policy and confirm that
+   each call uses the same GPG home. The error does not establish why pinentry
+   was needed.
+
+Cache entries expire according to `default-cache-ttl` and `max-cache-ttl`.
+Different keys can require separate unlocks. For automated use, unlock the
+required keys outside the agent session before retrying the operation.
+
+## Pinentry compatibility
+
+Calls to dotsecenv let GPG use its configured pinentry when interaction is
+needed. The prompt interface depends on the configured program:
+
+| Pinentry program | Prompt interface | Required session access |
+|------------------|------------------|-------------------------|
+| `pinentry-mac` | macOS dialog | macOS desktop session |
+| `pinentry-gnome3` | GNOME dialog | Graphical session and its prompt service |
+| `pinentry-qt` | Qt dialog | Graphical display session |
+| `pinentry-tty` | Terminal input | A terminal that accepts input for pinentry |
+| `pinentry-curses` | Terminal interface | A terminal that accepts input for pinentry |
+
+An inherited `GPG_TTY` identifies a terminal; pinentry also needs access to
+its input. Agent terminal interfaces can compete with pinentry for that input.
+GUI pinentry uses a separate window when the graphical session is available.
+Some graphical variants can fall back to curses, so the program name alone
+does not establish that a prompt will work.
+
+### Agent calls
+
+The Claude Code and Codex skills add `--no-pinentry` to every dotsecenv call.
+Adding this argument lets GPG use credentials already available to gpg-agent
+and suppresses all pinentry programs, including `pinentry-mac`. An operation
+that needs pinentry returns `GPG_ERR_NO_PIN_ENTRY` with exit code `4`.
+Credentials held only by a pinentry program's external cache are unavailable
+through this path.
+
+The skill stops on this error and waits for user action. To prepare credentials
+for plugin retrieval, complete the [signing and decryption checks](#apply-and-verify)
+in your own terminal with the same GPG home (`GNUPGHOME`, if set), then tell
+the agent to retry. Each required key may need its own unlock.
+
+You can also prepare secrets as environment variables before starting the
+agent. The [Claude Code guide](/guides/claude-code) covers `.secenv` loading,
+manual exports, and plugin retrieval using cached credentials.
+
+## Cache warming for non-interactive use
+
+Run the [signing and decryption checks](#apply-and-verify) from your terminal
+before automated use. Your GPG cache policy determines how long the required
+credentials remain available. The [agent calls](#agent-calls) section describes
+what happens when an operation needs pinentry during a session.
+
+## `GPG_TTY` for terminal sessions
+
+GPG needs to know which terminal to attach pinentry to. Most shells set this automatically; if not, add it to your shell init:
+
+<Tabs>
+  <Tab title="bash/zsh">
+    ```bash
+    # ~/.bashrc or ~/.zshrc
+    export GPG_TTY=$(tty)
+    ```
+  </Tab>
+  <Tab title="fish">
+    ```fish
+    # ~/.config/fish/config.fish
+    set -gx GPG_TTY (tty)
+    ```
+  </Tab>
+</Tabs>
+
+Without `GPG_TTY`, you may see `Inappropriate ioctl for device` when the agent tries to prompt.
+
+## Troubleshooting
+
+| Symptom                                                                | Likely cause                                                                | First thing to try                                                            |
+|------------------------------------------------------------------------|-----------------------------------------------------------------------------|-------------------------------------------------------------------------------|
+| `gpg: agent_genkey failed: No agent running`                           | Agent not started, or wrong `GNUPGHOME`                                     | `gpg-connect-agent /bye`; if it errors, run `gpgconf --launch gpg-agent`      |
+| `Inappropriate ioctl for device` from `secret get` or `secret store`   | Terminal pinentry without `GPG_TTY`                                         | `export GPG_TTY=$(tty)` and try again                                         |
+| Passphrase prompt every time you run `secret get`                      | `default-cache-ttl 0` or `no-allow-mark-trusted` overriding cache           | Set `default-cache-ttl 3600` and reload: `gpgconf --reload gpg-agent`         |
+| `secret get` hangs in CI/AI-agent contexts then times out              | Terminal pinentry trying to prompt with no controlling terminal             | Switch to a GUI pinentry, then warm the cache before running the job         |
+| `gpg: signing failed: Card error` or smartcard not detected            | YubiKey/smartcard not inserted, or `scdaemon` cannot reach the reader       | `gpg --card-status`; reinsert the card if missing                            |
+
+For broader threat-model context — what dotsecenv does and does not protect against, why caching is a security trade-off, and how the OS keychain factors in — see [Threat Model](/concepts/threat-model).
+
+## Related
+
+- [Threat Model](/concepts/threat-model) — security rationale for the recommended config
+- [Claude Code guide](/guides/claude-code) — the AI-agent-specific cache-warming pattern
+- [GnuPG Agent Configuration manual](https://www.gnupg.org/documentation/manuals/gnupg/Agent-Configuration.html) — daemon lifecycle, socket paths, and options beyond this page
