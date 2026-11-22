@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Bug Fixes
+
+- `identity create` no longer ignores your config when it cannot start normally. A malformed config, or a configured vault that could not be opened, made it fall back to the built-in defaults, so your `approved_algorithms` did not apply. It now uses the defaults only when no config file exists, reports config errors like every other command, and never opens vaults
+
 ### Other
 
 - The documentation website loads Docs7 analytics to measure page views. The privacy policy describes the data sent to Context7. (#482)
