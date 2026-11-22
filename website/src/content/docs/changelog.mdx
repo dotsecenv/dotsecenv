@@ -14,6 +14,7 @@ _Unreleased_
 ### Bug Fixes
 
 - **Breaking**: `doctor` and `vault doctor` now exit non-zero when they find problems. They used to exit 0 even when gpg-agent was missing, a vault failed to load, or a `--fix` failed. A failed check or fix exits with its error code (`3` for vaults, `4` for gpg-agent). Changes doctor found but did not apply, such as an outdated format, exit with the new code `10` and print the `doctor --fix` command to run. CI jobs that run `doctor` as a health check now fail in these cases (#486)
+- Pointing dotsecenv at a file of fewer than 3 lines that is not a vault no longer overwrites it. `vault describe -v notes.txt`, or a configured vault path holding such a file, replaced its contents with an empty vault. It now fails with "not a dotsecenv vault" and leaves the file alone. An empty or whitespace-only file still starts a new vault (#494)
 
 ### Other
 
