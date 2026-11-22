@@ -1856,6 +1856,46 @@ EOF
     fi
 }
 
+# bash only: zsh and fish do not run the plugin from a prompt hook
+test_bash_prompt_hook_keeps_status() {
+    local shell="$1"
+    [[ "$shell" == "bash" ]] || return 0
+    log "[$shell] Testing the prompt hook keeps \$? for later PROMPT_COMMAND entries..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_prompt_status"
+    mkdir -p "$test_dir"
+    echo 'FOO=bar' >"$test_dir/.secenv"
+    chmod 644 "$test_dir/.secenv"
+
+    local config_dir="$TEMP_DIR/config_prompt_status"
+    trust_dirs "$config_dir" "$test_dir"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    # Run PROMPT_COMMAND as bash would before a prompt: once with nothing to
+    # load, once after a directory change
+    local result
+    result=$(DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+        export PATH='$mock_path:$PATH'
+        PROMPT_COMMAND='echo last=\$?'
+        source '$SHELL_DIR/dotsecenv.plugin.bash'
+        false
+        eval \"\$PROMPT_COMMAND\"
+        cd '$test_dir'
+        false
+        eval \"\$PROMPT_COMMAND\"
+        echo FOO=\$FOO
+    " 2>&1)
+
+    if [[ "$(printf '%s\n' "$result" | grep -c '^last=1$')" == "2" && "$result" == *"FOO=bar"* ]]; then
+        pass "[$shell] Prompt hook keeps \$?"
+    else
+        fail "[$shell] Prompt hook reset \$?, got: $result"
+    fi
+}
+
 # Regression: a NON-interactive shell (editor/script that captures output) must
 # emit nothing when the plugin is sourced and a directory with an untrusted
 # .secenv is entered. See dotsecenv/plugin#29. Note this test deliberately does
@@ -1966,6 +2006,7 @@ main() {
         test_sync_new_key_not_always_trusted_no_autoload "bash"
         test_noninteractive_silent "bash"
         test_bash_cd_dot_asymmetry "bash"
+        test_bash_prompt_hook_keeps_status "bash"
     fi
 
     # Run zsh tests
