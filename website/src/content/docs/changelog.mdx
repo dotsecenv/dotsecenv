@@ -17,6 +17,7 @@ _Unreleased_
 - **Security**: `secret get` now checks a value before decrypting it. It verifies the hash and signature of the value, of its secret and of their signers' identity entries, and requires each identity's public key to match its fingerprint. `secret get --all`, `--last` and `-v`, `secret share` and `secret revoke` run the same checks. Before, only `dotsecenv validate` checked signatures, so an edited value in a vault was decrypted, printed and exported by the shell plugin without warning. A value that fails these checks now exits 6 and names the vault (#516)
 - `secret store`, `share`, `revoke`, `forget` and `identity add` exit non-zero when the vault write fails, for example when the clock check refuses the entry or the disk is full. Before, they printed success and the vault did not change (#517)
 - A secret larger than about 35 KB no longer makes its whole vault unreadable (`bufio.Scanner: token too long`). Vault lines can be up to 1 MiB, and a write that would produce a longer line is refused (#518)
+- Commands that write the same vault at the same time no longer lose entries. The vault lock now stays on the file the path names across each write, and `vault doctor` upgrades and `vault compact` write under that lock (#519)
 
 ### Other
 

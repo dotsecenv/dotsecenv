@@ -674,20 +674,12 @@ func (c *CLI) performVaultUpgrade(index int, vaultPath string, currentVersion in
 		return writeErr
 	}
 
-	// Perform the upgrade
-	writer, err := vault.NewWriter(expandedPath)
-	if err != nil {
-		return NewError(fmt.Sprintf("failed to open vault for upgrade: %v", err), ExitVaultError)
+	// Rewrite through the Manager that holds the vault lock
+	manager := c.vaultResolver.GetVaultManager(index)
+	if manager == nil {
+		return NewError(fmt.Sprintf("failed to open vault for upgrade: %s is not loaded", expandedPath), ExitVaultError)
 	}
-
-	// Read entire vault
-	vaultData, err := writer.ReadVault()
-	if err != nil {
-		return NewError(fmt.Sprintf("failed to read vault for upgrade: %v", err), ExitVaultError)
-	}
-
-	// Rewrite vault using latest version format
-	if err := writer.RewriteFromVaultWithVersion(vaultData, vault.LatestFormatVersion); err != nil {
+	if err := manager.Rewrite(manager.Get(), vault.LatestFormatVersion); err != nil {
 		return NewError(fmt.Sprintf("failed to upgrade vault: %v", err), ExitVaultError)
 	}
 
