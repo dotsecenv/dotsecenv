@@ -21,6 +21,8 @@ Shell plugins for [dotsecenv](https://github.com/dotsecenv/dotsecenv) that autom
 curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash
 ```
 
+The installer copies the plugin to `~/.local/share/dotsecenv/plugin` and adds a `source` line to each shell's RC file. Earlier versions installed into `~/.local/share/dotsecenv`; rerunning the installer moves the plugin and updates those `source` lines.
+
 ### Plugin Managers
 
 #### Zsh - Oh My Zsh
@@ -206,6 +208,8 @@ dotsecenv: refusing to load /path/.secenv - not owned by current user or root
 ```shell
 curl -fsSL https://raw.githubusercontent.com/dotsecenv/plugin/main/install.sh | bash -s -- --uninstall
 ```
+
+Uninstall removes only the files the plugin installed. Your vault and anything else in `~/.local/share/dotsecenv` stay.
 
 Or manually remove the source line from your shell's RC file.
 
