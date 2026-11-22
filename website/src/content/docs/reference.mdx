@@ -842,7 +842,7 @@ For each secret, compaction keeps the newest value every current identity can de
 
 Compaction never decrypts. It reads only access lists (`available_to` fingerprints) and value order, then rewrites the file preserving every kept value verbatim, so signatures stay valid. Identities are never touched.
 
-Without `--yes`, the command prints the plan and asks for confirmation before writing. Confirmation is skipped automatically in CI.
+Compaction writes only with `--yes`, in a terminal and in CI alike. Without it, the command prints the plan and the `--yes` command to run, leaves the vault unchanged, and exits `10` when there is something to drop. A vault that is already compact exits `0`.
 
 Compaction records the running dotsecenv release in the vault header as [`dotsecenv_version`](/concepts/vault-format/#header-format). If a newer release created the vault or last rewrote it, the command warns you to upgrade dotsecenv, then continues.
 
@@ -854,16 +854,16 @@ Compaction rewrites the vault file. Back it up first (`cp <vault> <vault>.bak`).
 
 | Flag | Description |
 |------|-------------|
-| `--yes` | Skip the confirmation prompt |
+| `--yes` | Rewrite the vault. Without it, only the plan is shown |
 | `--json` | Output as JSON (writes only when combined with `--yes`) |
 
 **Examples:**
 
 ```bash
-# Show the plan, then confirm before writing
+# Show the plan without writing (exits 10 if there is something to drop)
 dotsecenv vault compact
 
-# Compact without prompting (also auto-skips the prompt in CI)
+# Compact
 dotsecenv vault compact --yes
 
 # Preview the plan as JSON without writing

@@ -13,6 +13,7 @@ _Unreleased_
 
 ### Bug Fixes
 
+- **Breaking**: `vault compact` writes only with `--yes`. It used to rewrite the vault in CI without `--yes`, and to ask for confirmation in a terminal. Without `--yes` it now prints the plan and the command to apply it, leaves the vault unchanged, and exits `10` when there is something to drop. CI jobs that compact without `--yes` must add it
 - **Breaking**: `doctor` and `vault doctor` now exit non-zero when they find problems. They used to exit 0 even when gpg-agent was missing, a vault failed to load, or a `--fix` failed. A failed check or fix exits with its error code (`3` for vaults, `4` for gpg-agent). Changes doctor found but did not apply, such as an outdated format, exit with the new code `10` and print the `doctor --fix` command to run. CI jobs that run `doctor` as a health check now fail in these cases (#486)
 
 ### Other

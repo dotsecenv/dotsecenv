@@ -104,7 +104,9 @@ Compaction never decrypts: it reads only access lists and value order, then
 rewrites the file preserving every kept value verbatim, so signatures stay
 valid. Identities are never touched.
 
-Without --yes it prints the plan and asks for confirmation (skipped in CI).
+It writes only with --yes. Without it, it prints the plan, leaves the vault
+unchanged and exits 10 when there is something to drop (0 when the vault is
+already compact).
 
 Compaction records this dotsecenv release in the vault header. If a newer
 release created the vault or last rewrote it, compact warns you to upgrade
@@ -114,7 +116,7 @@ Use -v to target a specific vault.
 
 Options:
   --json  Output as JSON (writes only with --yes)
-  --yes   Skip the confirmation prompt`,
+  --yes   Rewrite the vault`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		vaultPath, fromIndex, parseErr := parseVaultSpecScoped()
@@ -143,7 +145,7 @@ func init() {
 
 	// vault compact flags
 	vaultCompactCmd.Flags().BoolVar(&vaultCompactJSON, "json", false, "Output as JSON")
-	vaultCompactCmd.Flags().BoolVar(&vaultCompactYes, "yes", false, "Skip the confirmation prompt")
+	vaultCompactCmd.Flags().BoolVar(&vaultCompactYes, "yes", false, "Rewrite the vault (without it, only the plan is shown)")
 
 	// Build command tree
 	vaultCmd.AddCommand(vaultDescribeCmd)
