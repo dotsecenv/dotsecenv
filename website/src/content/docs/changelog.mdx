@@ -22,6 +22,7 @@ _Unreleased_
 - **Breaking**: `plugin/install.sh --uninstall` no longer deletes `~/.local/share/dotsecenv/vault`. The shell plugin now installs to `~/.local/share/dotsecenv/plugin`. Rerun the installer to move an existing install and update the `source` lines it wrote. If you added a `source` line by hand, point it at the new path (#521)
 - **Security**: The installer stops when it cannot verify a download. That covers a bad signature, a signature not made by the pinned release key, a missing `checksums.txt.sig`, and a missing `gpg` or `sha256sum`/`shasum`; before, each of these printed a warning and installed anyway. Verification stays on by default, and `--no-verify` or `VERIFY=0` turns it off (#522)
 - **Security**: The GitHub Action fetches the release key over HTTPS instead of HTTP and requires the signature to come from the pinned release key. Inputs now reach its scripts through environment variables, so a branch name passed as `version` can no longer run shell commands. `init-config` is split on whitespace and no longer evaluates quotes or `$(...)` (#523)
+- Leaving a directory with a `.secenv` puts each variable back to the value it had before you entered, instead of unsetting it. An `AWS_PROFILE` you exported before entering a project is back after `cd ..` (#524)
 
 ### Other
 

@@ -140,42 +140,34 @@ MOCK_EOF
     echo "$mock_dir"
 }
 
-# Test helper: run a command in a subshell with the plugin loaded
-run_with_plugin_bash() {
-    local test_dir="$1"
-    local mock_path="$2"
-    shift 2
-    local cmd="$*"
-
-    # Run bash with the plugin sourced, preserving existing PATH
-    "$BASH_BIN" -c "
-        export PATH='$mock_path:$PATH'
-        export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config'
-        mkdir -p '$TEMP_DIR/config'
-        source '$SHELL_DIR/_dotsecenv_core.sh'
-        source '$SHELL_DIR/dotsecenv.plugin.bash'
-        cd '$test_dir'
-        # Trigger directory change hook
-        _dotsecenv_chpwd_hook
-        $cmd
-    " 2>&1
+# Trust directories "always" by writing them to a config dir's trusted_dirs
+trust_dirs() {
+    local config_dir="$1" dir
+    shift
+    mkdir -p "$config_dir"
+    for dir in "$@"; do
+        printf '%s\n' "$dir"
+    done >"$config_dir/trusted_dirs"
 }
 
-run_with_plugin_zsh() {
-    local test_dir="$1"
-    local mock_path="$2"
-    shift 2
-    local cmd="$*"
-
-    # Run zsh with the plugin sourced, preserving existing PATH
-    zsh -i -f -c "
-        export PATH='$mock_path:$PATH'
-        export DOTSECENV_CONFIG_DIR='$TEMP_DIR/config'
-        mkdir -p '$TEMP_DIR/config'
-        source '$SHELL_DIR/dotsecenv.plugin.zsh'
-        cd '$test_dir'
-        $cmd
-    " 2>&1
+# Run a script in a shell with the plugin loaded. In bash, `cd` also fires the
+# hook, as PROMPT_COMMAND would before the next prompt.
+run_plugin() {
+    local shell="$1" config_dir="$2" mock_path="$3" script="$4"
+    if [[ "$shell" == "bash" ]]; then
+        DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" "$BASH_BIN" -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.bash'
+            cd() { builtin cd \"\$@\" && _dotsecenv_chpwd_hook; }
+            $script
+        " 2>&1
+    else
+        DOTSECENV_CONFIG_DIR="$config_dir" DOTSECENV_TRUSTED_DIRS_FILE="$config_dir/trusted_dirs" zsh -i -f -c "
+            export PATH='$mock_path:$PATH'
+            source '$SHELL_DIR/dotsecenv.plugin.zsh'
+            $script
+        " 2>&1
+    fi
 }
 
 # ============================================================================
@@ -1101,6 +1093,42 @@ EOF
     fi
 }
 
+test_unload_restores_previous_values() {
+    local shell="$1"
+    log "[$shell] Testing unload restores the values a .secenv replaced..."
+    ((TESTS_RUN++)) || true
+
+    local test_dir="$TEMP_DIR/test_restore_$shell"
+    mkdir -p "$test_dir/parent/child" "$test_dir/other"
+    printf '%s\n' 'AWS_PROFILE=dev' 'DB_PASSWORD={dotsecenv}' >"$test_dir/parent/.secenv"
+    printf '%s\n' 'AWS_PROFILE=child' 'DB_PASSWORD=child-pw' 'NEW_KEY=x' >"$test_dir/parent/child/.secenv"
+    chmod 644 "$test_dir/parent/.secenv" "$test_dir/parent/child/.secenv"
+
+    local config_dir="$TEMP_DIR/config_restore_$shell"
+    trust_dirs "$config_dir" "$test_dir/parent" "$test_dir/parent/child"
+
+    local mock_path
+    mock_path=$(create_mock_dotsecenv)
+
+    local result
+    result=$(run_plugin "$shell" "$config_dir" "$mock_path" "
+        export AWS_PROFILE=prod
+        cd '$test_dir/parent'
+        cd child
+        echo \"1:\$AWS_PROFILE:\$DB_PASSWORD:\${NEW_KEY-unset}\"
+        cd ..
+        echo \"2:\$AWS_PROFILE:\$DB_PASSWORD:\${NEW_KEY-unset}\"
+        cd '$test_dir/other'
+        echo \"3:\$AWS_PROFILE:\${DB_PASSWORD-unset}:\${NEW_KEY-unset}\"
+    ")
+
+    if [[ "$result" == *"1:child:child-pw:x"* && "$result" == *"2:dev:super-secret-password:unset"* && "$result" == *"3:prod:unset:unset"* ]]; then
+        pass "[$shell] Unload restores parent values and the original environment"
+    else
+        fail "[$shell] Unload did not restore previous values, got: $result"
+    fi
+}
+
 # ============================================================================
 # dse up Tests
 # ============================================================================
@@ -1967,6 +1995,7 @@ main() {
         test_tree_scope_sibling_navigation "bash"
         test_tree_scope_no_reload_from_subdir "bash"
         test_multiline_warning "bash"
+        test_unload_restores_previous_values "bash"
         test_dse_up_basic "bash"
         test_dse_up_multiple_ancestors "bash"
         test_dse_up_skips_already_loaded "bash"
@@ -2010,6 +2039,7 @@ main() {
             test_tree_scope_sibling_navigation "zsh"
             test_tree_scope_no_reload_from_subdir "zsh"
             test_multiline_warning "zsh"
+            test_unload_restores_previous_values "zsh"
             test_dse_up_basic "zsh"
             test_dse_up_multiple_ancestors "zsh"
             test_dse_up_skips_already_loaded "zsh"

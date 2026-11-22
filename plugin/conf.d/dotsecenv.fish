@@ -34,8 +34,6 @@ set -g _DOTSECENV_SECRETS_LOADED
 set -g _DOTSECENV_ENVVARS_LOADED
 # Stack of directories with loaded .secenv (ordered ancestor → descendant)
 set -g _DOTSECENV_SOURCE_STACK
-# Track unloaded keys for re-fetch logic
-set -g _DOTSECENV_UNLOADED_KEYS
 
 # Ensure config directory exists
 function _dotsecenv_ensure_config_dir
@@ -264,6 +262,32 @@ function _dotsecenv_parse_line
     return 1
 end
 
+# Record that a directory loads a key, saving the value the key had (or that
+# it was unset) so unloading restores exactly that. Call before exporting.
+function _dotsecenv_track_key
+    set -l dir_hash $argv[1]
+    set -l key $argv[2]
+    set -l vars_var _DOTSECENV_LOADED_$dir_hash
+    if set -q $vars_var; and contains -- $key $$vars_var
+        return 0
+    end
+    if set -q $key
+        set -g _DOTSECENV_OLD_{$dir_hash}_$key $$key
+    end
+    set -g -a $vars_var $key
+end
+
+# Put a key back the way it was before the directory loaded it
+function _dotsecenv_restore_key
+    set -l old _DOTSECENV_OLD_$argv[1]_$argv[2]
+    if set -q $old
+        set -gx $argv[2] $$old
+        set -e $old
+    else
+        set -e $argv[2]
+    end
+end
+
 # Load a single .secenv file
 function _dotsecenv_load_file
     set -l file $argv[1]
@@ -287,8 +311,8 @@ function _dotsecenv_load_file
 
             if test "$phase" = 1; and test "$ptype" = plain
                 # Phase 1: load plain variables
+                _dotsecenv_track_key $dir_hash $key
                 set -gx $key "$value"
-                set -g -a _DOTSECENV_LOADED_$dir_hash "$key"
                 set -g -a _DOTSECENV_ENVVARS_LOADED "$key"
 
             else if test "$phase" = 2; and begin
@@ -309,8 +333,8 @@ function _dotsecenv_load_file
                 set -l secret_result (dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
                 set -l secret_status $status
                 if test $secret_status -eq 0
+                    _dotsecenv_track_key $dir_hash $key
                     set -gx $key "$secret_result"
-                    set -g -a _DOTSECENV_LOADED_$dir_hash "$key"
                     set -g -a _DOTSECENV_SECRETS_LOADED "$key"
                     # Show any warnings that were emitted
                     test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
@@ -329,16 +353,13 @@ function _dotsecenv_load_file
     end <"$file"
 end
 
-# Unload variables for a directory and track unloaded keys
+# Unload variables for a directory, restoring the values they replaced
 function _dotsecenv_unload_dir
     set -l dir $argv[1]
     set -l dir_hash (_dotsecenv_dir_hash "$dir")
     set -l vars_var "_DOTSECENV_LOADED_$dir_hash"
     set -l secrets_var "_DOTSECENV_SECRETS_$dir_hash"
     set -l envvars_var "_DOTSECENV_ENVVARS_$dir_hash"
-
-    # Reset the unloaded keys tracking
-    set -g _DOTSECENV_UNLOADED_KEYS
 
     # Report plain env vars and secrets on separate lines before clearing them;
     # skip a line when its category is empty.
@@ -362,50 +383,10 @@ function _dotsecenv_unload_dir
 
     if set -q $vars_var
         for var in $$vars_var
-            set -g -a _DOTSECENV_UNLOADED_KEYS $var
-            set -e $var
+            _dotsecenv_restore_key $dir_hash $var
         end
         set -e $vars_var
     end
-end
-
-# Re-fetch a specific secret key from a directory's .secenv file
-function _dotsecenv_refetch_key
-    set -l dir $argv[1]
-    set -l target_key $argv[2]
-    set -l file "$dir/.secenv"
-
-    if not test -f "$file"
-        return 1
-    end
-
-    while read -l line
-        if _dotsecenv_parse_line "$line"
-            set -l key "$_DOTSECENV_PARSE_KEY"
-            set -l value "$_DOTSECENV_PARSE_VALUE"
-            set -l ptype "$_DOTSECENV_PARSE_TYPE"
-
-            if test "$key" = "$target_key"
-                if test "$ptype" = secret_same; or test "$ptype" = secret_named
-                    set -l secret_name "$value"
-                    set -l secret_stderr_file (mktemp)
-                    set -l secret_result (dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
-                    if test $status -eq 0
-                        set -gx $key "$secret_result"
-                        test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
-                        if test (count $secret_result) -gt 1
-                            echo "dotsecenv: warning: $key contains newlines; use (string join \\n \$$key) to reconstruct the full value" >&2
-                        end
-                    end
-                    rm -f "$secret_stderr_file"
-                else if test "$ptype" = plain
-                    set -gx $key "$value"
-                end
-                return 0
-            end
-        end
-    end <"$file"
-    return 1
 end
 
 # Check if a key is defined in a directory's loaded vars
@@ -447,8 +428,8 @@ function _dotsecenv_load_key
             end
 
             if test "$ptype" = plain
+                _dotsecenv_track_key $dir_hash $key
                 set -gx $key "$value"
-                set -g -a _DOTSECENV_LOADED_$dir_hash "$key"
                 set -g -a _DOTSECENV_ENVVARS_$dir_hash "$key"
                 return 0
             else if test "$ptype" = secret_same; or test "$ptype" = secret_named
@@ -457,8 +438,8 @@ function _dotsecenv_load_key
                 set -l secret_result (dotsecenv secret get "$secret_name" 2>$secret_stderr_file)
                 set -l secret_status $status
                 if test $secret_status -eq 0
+                    _dotsecenv_track_key $dir_hash $key
                     set -gx $key "$secret_result"
-                    set -g -a _DOTSECENV_LOADED_$dir_hash "$key"
                     set -g -a _DOTSECENV_SECRETS_$dir_hash "$key"
                     set -g -a _DOTSECENV_SECRETS_LOADED "$key"
                     test -s "$secret_stderr_file"; and cat "$secret_stderr_file" >&2
@@ -551,25 +532,10 @@ function _dotsecenv_on_cd
             set -l stack_dir $_DOTSECENV_SOURCE_STACK[$i]
 
             if not _dotsecenv_is_subdir "$stack_dir" "$new_dir"
-                # We've left this directory tree - pop and unload
+                # We've left this directory tree - pop and unload. Restoring a
+                # key also brings back the value an ancestor set before this one.
                 _dotsecenv_stack_pop
                 _dotsecenv_unload_dir "$stack_dir"
-
-                # Re-fetch any keys that were shadowed by this directory
-                for unloaded_key in $_DOTSECENV_UNLOADED_KEYS
-                    # Check remaining stack entries (ancestors) for this key
-                    # Skip if no ancestors remain (i <= 1)
-                    if test $i -gt 1
-                        for j in (seq (math "$i - 1") -1 1)
-                            set -l ancestor_dir $_DOTSECENV_SOURCE_STACK[$j]
-                            if _dotsecenv_dir_has_key "$ancestor_dir" "$unloaded_key"
-                                # Re-fetch from the ancestor's .secenv
-                                _dotsecenv_refetch_key "$ancestor_dir" "$unloaded_key"
-                                break
-                            end
-                        end
-                    end
-                end
             else
                 # Still under this directory - stop popping
                 break

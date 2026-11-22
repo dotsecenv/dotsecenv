@@ -97,6 +97,25 @@ fi' >"$mock_dir/dotsecenv"
     echo $mock_dir
 end
 
+# Trust directories "always" by writing them to a config dir's trusted_dirs
+function trust_dirs
+    mkdir -p $argv[1]
+    printf '%s\n' $argv[2..] >$argv[1]/trusted_dirs
+end
+
+# Run a script in an interactive fish with the plugin loaded; output is one string
+function run_plugin
+    set -l config_dir $argv[1]
+    set -l mock_path $argv[2]
+    fish --no-config -i -c "
+        set -gx PATH '$mock_path' \$PATH
+        set -gx DOTSECENV_CONFIG_DIR '$config_dir'
+        set -gx DOTSECENV_TRUSTED_DIRS_FILE '$config_dir/trusted_dirs'
+        source '$SHELL_DIR/conf.d/dotsecenv.fish'
+        $argv[3]
+    " 2>&1 | string collect
+end
+
 # Regression: a NON-interactive fish (`fish -c`, as used by editors like Emacs
 # and by scripts/CI) must emit nothing when conf.d loads and a directory with an
 # untrusted .secenv is entered. See dotsecenv/plugin#29. Note this test does NOT
@@ -758,6 +777,38 @@ function test_multiline_warning
     end
 end
 
+function test_unload_restores_previous_values
+    log "[fish] Testing unload restores the values a .secenv replaced..."
+    set TESTS_RUN (math $TESTS_RUN + 1)
+
+    set test_dir "$TEMP_DIR/test_restore"
+    mkdir -p "$test_dir/parent/child" "$test_dir/other"
+    printf '%s\n' 'AWS_PROFILE=dev' 'DB_PASSWORD={dotsecenv}' >"$test_dir/parent/.secenv"
+    printf '%s\n' 'AWS_PROFILE=child' 'DB_PASSWORD=child-pw' 'NEW_KEY=x' >"$test_dir/parent/child/.secenv"
+    chmod 644 "$test_dir/parent/.secenv" "$test_dir/parent/child/.secenv"
+
+    set config_dir "$TEMP_DIR/config_restore"
+    trust_dirs "$config_dir" "$test_dir/parent" "$test_dir/parent/child"
+    set mock_path (create_mock_dotsecenv)
+
+    set result (run_plugin "$config_dir" "$mock_path" "
+        set -gx AWS_PROFILE prod
+        cd '$test_dir/parent'
+        cd child
+        echo 1:\$AWS_PROFILE:\$DB_PASSWORD:(set -q NEW_KEY; and echo \$NEW_KEY; or echo unset)
+        cd ..
+        echo 2:\$AWS_PROFILE:\$DB_PASSWORD:(set -q NEW_KEY; and echo \$NEW_KEY; or echo unset)
+        cd '$test_dir/other'
+        echo 3:\$AWS_PROFILE:(set -q DB_PASSWORD; and echo \$DB_PASSWORD; or echo unset):(set -q NEW_KEY; and echo \$NEW_KEY; or echo unset)
+    ")
+
+    if string match -q "*1:child:child-pw:x*" "$result"; and string match -q "*2:dev:super-secret-password:unset*" "$result"; and string match -q "*3:prod:unset:unset*" "$result"
+        pass "[fish] Unload restores parent values and the original environment"
+    else
+        fail "[fish] Unload did not restore previous values, got: $result"
+    end
+end
+
 # ============================================================================
 # dse up Tests
 # ============================================================================
@@ -1145,6 +1196,7 @@ function main
     test_tree_scope_sibling_navigation
     test_tree_scope_no_reload_from_subdir
     test_multiline_warning
+    test_unload_restores_previous_values
 
     # dse up tests
     test_dse_up_basic
