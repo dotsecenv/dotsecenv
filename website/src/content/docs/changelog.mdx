@@ -13,7 +13,7 @@ _Unreleased_
 
 ### Bug Fixes
 
-- `identity create` no longer ignores your config when it cannot start normally. A malformed config, or a configured vault that could not be opened, made it fall back to the built-in defaults, so your `approved_algorithms` did not apply. It now uses the defaults only when no config file exists, reports config errors like every other command, and never opens vaults
+- `identity create` no longer ignores your config when it cannot start normally. A malformed config, or a configured vault that could not be opened, made it fall back to the built-in defaults, so your `approved_algorithms` did not apply. It now uses the defaults only when no config file exists, reports config errors like every other command, and never opens vaults (#489)
 
 ### Other
 
