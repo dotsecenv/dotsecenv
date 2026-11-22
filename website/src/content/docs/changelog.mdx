@@ -11,6 +11,10 @@ All notable changes to dotsecenv are documented here. Each version includes chan
 
 _Unreleased_
 
+### Bug Fixes
+
+- The Homebrew cask installs every man page. Its list was written by hand and missed 10 of the 26 pages, including `secret forget`, `vault compact`, `doctor`, and the `identity` and `policy` commands. The cask now takes `man/man1/*.1`, so new commands are picked up automatically
+
 ### Other
 
 - The documentation website loads Docs7 analytics to measure page views. The privacy policy describes the data sent to Context7. (#482)
