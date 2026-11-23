@@ -13,6 +13,7 @@ _Unreleased_
 
 ### Other
 
+- Website CI runs `make lint` (markdownlint and ESLint) before the build, so a lint error fails the pull request instead of only the local pre-push hook (#540)
 - The plugin manager tests trust their test directory with a `<sha256> <dir>` entry, the format the plugin has read since #525, and print a failed container's output instead of exiting silently. The shell plugin tests pass when a git hook runs them (#541)
 
 ---
