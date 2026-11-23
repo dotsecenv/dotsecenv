@@ -1,3 +1,6 @@
+# A git hook exports these; the tests build their own git repos
+unexport GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+
 .PHONY: help
 help:
 	@echo "shell targets:"

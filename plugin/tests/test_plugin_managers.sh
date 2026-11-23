@@ -341,9 +341,9 @@ test_ohmyzsh() {
         echo "TEST_SECRET={dotsecenv}" > ~/testproject/.secenv
         chmod 600 ~/testproject/.secenv
 
-        # Pre-trust the directory
+        # Pre-trust the directory for its current .secenv contents
         mkdir -p ~/.config/dotsecenv
-        echo "/home/testuser/testproject" > ~/.config/dotsecenv/trusted_dirs
+        printf "%s %s\n" "$(sha256sum < ~/testproject/.secenv | cut -d" " -f1)" /home/testuser/testproject > ~/.config/dotsecenv/trusted_dirs
 
         # Run zsh and test
         cd ~/testproject
@@ -357,7 +357,7 @@ test_ohmyzsh() {
                 exit 1
             fi
         "
-    ' 2>&1)
+    ' 2>&1) || true # a failed run must reach the fail branch below, which prints its output
 
     if echo "$output" | grep -q "SUCCESS: Oh My Zsh plugin works"; then
         pass "Oh My Zsh plugin installation and functionality${mode_suffix}"
@@ -405,9 +405,9 @@ EOF
         echo "TEST_SECRET={dotsecenv}" > ~/testproject/.secenv
         chmod 600 ~/testproject/.secenv
 
-        # Pre-trust the directory
+        # Pre-trust the directory for its current .secenv contents
         mkdir -p ~/.config/dotsecenv
-        echo "/home/testuser/testproject" > ~/.config/dotsecenv/trusted_dirs
+        printf "%s %s\n" "$(sha256sum < ~/testproject/.secenv | cut -d" " -f1)" /home/testuser/testproject > ~/.config/dotsecenv/trusted_dirs
 
         # Run zsh and test
         cd ~/testproject
@@ -421,7 +421,7 @@ EOF
                 exit 1
             fi
         "
-    ' 2>&1)
+    ' 2>&1) || true # a failed run must reach the fail branch below, which prints its output
 
     if echo "$output" | grep -q "SUCCESS: Zinit plugin works"; then
         pass "Zinit plugin installation and functionality${mode_suffix}"
@@ -472,9 +472,9 @@ EOF
         echo "TEST_SECRET={dotsecenv}" > ~/testproject/.secenv
         chmod 600 ~/testproject/.secenv
 
-        # Pre-trust the directory
+        # Pre-trust the directory for its current .secenv contents
         mkdir -p ~/.config/dotsecenv
-        echo "/home/testuser/testproject" > ~/.config/dotsecenv/trusted_dirs
+        printf "%s %s\n" "$(sha256sum < ~/testproject/.secenv | cut -d" " -f1)" /home/testuser/testproject > ~/.config/dotsecenv/trusted_dirs
 
         # Run zsh and test
         cd ~/testproject
@@ -488,7 +488,7 @@ EOF
                 exit 1
             fi
         "
-    ' 2>&1)
+    ' 2>&1) || true # a failed run must reach the fail branch below, which prints its output
 
     if echo "$output" | grep -q "SUCCESS: Antidote plugin works"; then
         pass "Antidote plugin installation and functionality${mode_suffix}"
@@ -546,9 +546,9 @@ EOF
         echo "TEST_SECRET={dotsecenv}" > ~/testproject/.secenv
         chmod 600 ~/testproject/.secenv
 
-        # Pre-trust the directory
+        # Pre-trust the directory for its current .secenv contents
         mkdir -p ~/.config/dotsecenv
-        echo "/home/testuser/testproject" > ~/.config/dotsecenv/trusted_dirs
+        printf "%s %s\n" "$(sha256sum < ~/testproject/.secenv | cut -d" " -f1)" /home/testuser/testproject > ~/.config/dotsecenv/trusted_dirs
 
         # Source and test
         cd ~/testproject
@@ -563,7 +563,7 @@ EOF
             echo "FAIL: TEST_SECRET=$TEST_SECRET"
             exit 1
         fi
-    ' 2>&1)
+    ' 2>&1) || true # a failed run must reach the fail branch below, which prints its output
 
     if echo "$output" | grep -q "SUCCESS: Oh My Bash plugin works"; then
         pass "Oh My Bash plugin installation and functionality${mode_suffix}"
@@ -613,9 +613,9 @@ test_fisher() {
         echo "TEST_SECRET={dotsecenv}" > ~/testproject/.secenv
         chmod 600 ~/testproject/.secenv
 
-        # Pre-trust the directory
+        # Pre-trust the directory for its current .secenv contents
         mkdir -p ~/.config/dotsecenv
-        echo "/home/testuser/testproject" > ~/.config/dotsecenv/trusted_dirs
+        printf "%s %s\n" (sha256sum < ~/testproject/.secenv | string split -f1 " ") /home/testuser/testproject > ~/.config/dotsecenv/trusted_dirs
 
         # Test the plugin
         cd ~/testproject
@@ -627,7 +627,7 @@ test_fisher() {
             echo "FAIL: TEST_SECRET=$TEST_SECRET"
             exit 1
         end
-    ' 2>&1)
+    ' 2>&1) || true # a failed run must reach the fail branch below, which prints its output
 
     if echo "$output" | grep -q "SUCCESS: Fisher plugin works"; then
         pass "Fisher plugin installation and functionality${mode_suffix}"
@@ -683,9 +683,9 @@ test_ohmyfish() {
         echo "TEST_SECRET={dotsecenv}" > ~/testproject/.secenv
         chmod 600 ~/testproject/.secenv
 
-        # Pre-trust the directory
+        # Pre-trust the directory for its current .secenv contents
         mkdir -p ~/.config/dotsecenv
-        echo "/home/testuser/testproject" > ~/.config/dotsecenv/trusted_dirs
+        printf "%s %s\n" (sha256sum < ~/testproject/.secenv | string split -f1 " ") /home/testuser/testproject > ~/.config/dotsecenv/trusted_dirs
 
         # Test the plugin
         cd ~/testproject
@@ -697,7 +697,7 @@ test_ohmyfish() {
             echo "FAIL: TEST_SECRET=$TEST_SECRET"
             exit 1
         end
-    ' 2>&1)
+    ' 2>&1) || true # a failed run must reach the fail branch below, which prints its output
 
     if echo "$output" | grep -q "SUCCESS: Oh My Fish plugin works"; then
         pass "Oh My Fish plugin installation and functionality${mode_suffix}"
