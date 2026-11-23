@@ -259,8 +259,8 @@ What the script does NOT do — handle manually if needed:
   `<Warning title="Experimental">`, and internal links drop the trailing slash
   (`/concepts/compliance#rsa-keys-are-legacy`). Docs7 cannot run the Astro
   components, so `docs/` holds what `DownloadCommands`, `VersionOutput` and
-  `VersionExample` render, with the version written out; the release PR sets
-  it to the new version. Compare the two copies of a page before merging:
+  `VersionExample` render, with the version written out;
+  `scripts/set-docs-version.py X.Y.Z`, part of the release bump, sets it. Compare the two copies of a page before merging:
   only the markup should differ.
 - **Marking a feature experimental on the website:** use the shared
   `Experimental` component, don't hand-roll an aside. Import it from
@@ -293,7 +293,8 @@ What the script does NOT do — handle manually if needed:
 - **Linters:** `golangci-lint` v2.11.4 — pinned because v2.12.x had a
   checksum mismatch on release. Don't bump back to `latest` without verifying.
 - **Releases:** Triggered by pushing a signed semver tag. Before tagging, sync
-  the two agent plugin manifests with `uv run --script scripts/set-plugin-version.py X.Y.Z`,
+  the two agent plugin manifests with `uv run --script scripts/set-plugin-version.py X.Y.Z`
+  and the version in `docs/` with `uv run --script scripts/set-docs-version.py X.Y.Z`,
   validate them with `uv run --script scripts/validate-agent-plugins.py X.Y.Z`, then run the
   CLI reference drift check (`bash .agents/skills/cli-reference-drift/check.sh`; see
   `.agents/skills/cli-reference-drift/SKILL.md`) and resolve any drift. Use
