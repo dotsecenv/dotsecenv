@@ -14,6 +14,7 @@ _Unreleased_
 
 - Website CI runs `make lint` (markdownlint and ESLint) before the build, so a lint error fails the pull request instead of only the local pre-push hook (#540)
 - The release bump runs `scripts/set-docs-version.py`, which sets the version that the Docs7 install and `version` examples in `docs/` write out (#542)
+- `make test-managers` copies the plugin into Oh My Zsh in local mode, as it already did for Oh My Bash, so the test passes from a linked git worktree (#543)
 - The plugin manager tests trust their test directory with a `<sha256> <dir>` entry, the format the plugin has read since #525, and print a failed container's output instead of exiting silently. The shell plugin tests pass when a git hook runs them (#541)
 
 ---

@@ -322,7 +322,7 @@ test_ohmyzsh() {
     [[ $REMOTE_MODE -eq 1 ]] && image_name="dotsecenv-plugin-test-base-remote"
 
     local output
-    output=$(docker run --rm -e PLUGIN_SOURCE="$plugin_source" "$image_name" bash -c '
+    output=$(docker run --rm -e PLUGIN_SOURCE="$plugin_source" -e REMOTE_MODE="$REMOTE_MODE" "$image_name" bash -c '
         set -e
 
         # Install Oh My Zsh (unattended)
@@ -330,8 +330,12 @@ test_ohmyzsh() {
         export CHSH=no
         sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
-        # Clone plugin to custom plugins directory
-        git clone "$PLUGIN_SOURCE" ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/dotsecenv
+        # Install plugin to custom plugins directory
+        if [[ "$REMOTE_MODE" -eq 1 ]]; then
+            git clone "$PLUGIN_SOURCE" ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/dotsecenv
+        else
+            cp -r "$PLUGIN_SOURCE" ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/dotsecenv
+        fi
 
         # Configure .zshrc to use the plugin
         sed -i "s/plugins=(git)/plugins=(git dotsecenv)/" ~/.zshrc
