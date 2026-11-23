@@ -11,6 +11,10 @@ on:
       - "scripts/set-plugin-version.py"
       - "scripts/validate-agent-plugins.py"
       - "scripts/test-agent-plugins.py"
+      - "scripts/set-docs-version.py"
+      - "scripts/test-docs-version.py"
+      - "docs/tutorials/installation.mdx"
+      - "docs/reference.mdx"
       - ".github/workflows/ci-agent-plugins.yml"
   pull_request:
     branches: [main]
@@ -21,6 +25,10 @@ on:
       - "scripts/set-plugin-version.py"
       - "scripts/validate-agent-plugins.py"
       - "scripts/test-agent-plugins.py"
+      - "scripts/set-docs-version.py"
+      - "scripts/test-docs-version.py"
+      - "docs/tutorials/installation.mdx"
+      - "docs/reference.mdx"
       - ".github/workflows/ci-agent-plugins.yml"
 
 permissions:
@@ -47,9 +55,13 @@ jobs:
         run: |
           uv run --script scripts/set-plugin-version.py --help
           uv run --script scripts/validate-agent-plugins.py --help
+          uv run --script scripts/set-docs-version.py --help
 
       - name: Validate packaging
         run: uv run --script scripts/validate-agent-plugins.py
 
       - name: Test version synchronization
         run: uv run --script scripts/test-agent-plugins.py
+
+      - name: Test docs version update
+        run: uv run --script scripts/test-docs-version.py
